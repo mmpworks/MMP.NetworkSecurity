@@ -6,7 +6,7 @@
       "title": "An old device and a new server",
       "text": [
         "An old device can often speak only SSH. The bank's server speaks TLS 1.3 with a post-quantum key exchange. A gateway sits between them and speaks both.",
-        "This lesson follows one PIN from the PIN pad to the bank. It passes through four hands: the PIN pad, the old device (the CE), the gateway, and the server. The bank checks it last.",
+        "This lesson follows one PIN from the PIN pad to the bank. It passes through five parts: the PIN pad, the old device (the CE), the gateway, the server, and the bank.",
         "The question to keep in mind is this: what can each hand see, and what can each hand change? The bridge makes things safer, but it leaves some things exposed, and the last step lists them.",
         "Built to show the parts. Do not copy."
       ],
@@ -21,7 +21,7 @@
       "title": "The PIN is locked first",
       "text": [
         "The PIN pad locks the PIN before it leaves. It packs the PIN with the card number into a {{term:pin-block}} and locks it with a DUKPT key from lesson 6.",
-        "The envelope holds three things: the card number and the {{term:ksn}} in the clear, and the locked PIN block.",
+        "The envelope holds five things: a trace id, the card number and the {{term:ksn}} in the clear, the locked PIN block, and a seal. The seal is a CMAC over all the rest.",
         "The PIN pad does not hold a base key. A key was loaded into it ahead of time, the way a key loader would do it. The bank can derive the same key from the base key and the KSN."
       ],
       "glossary": ["pin-block", "ksn"],
@@ -30,8 +30,8 @@
       "claims": [
         {
           "id": "L9-C01",
-          "text": "The envelope carries the card number and the KSN in the clear and the PIN block locked. The PIN pad reads no base key, and the key it uses was loaded ahead of time (InjectedInitialKey).",
-          "source": "docs/lesson-9-names.md, section 2 step 1 and section 5 item 4 (branch feat/lesson-9, commit 3e728c1)"
+          "text": "The envelope carries a trace id, the card number and the KSN in the clear, the PIN block locked, and a 16-byte CMAC over every byte before it. The PIN pad reads no base key, and the key it uses was loaded ahead of time (InjectedInitialKey).",
+          "source": "docs/lesson-9-names.md, section 2 step 1 and section 5 item 4 (branch feat/lesson-9, commit 3e728c1); src/NetSec.Core/Bridge/PinEnvelope.cs (TraceId, Pan, Ksn, LockedBlock, Mac; the CMAC covers every byte before it)"
         }
       ],
       "unlock": { "mode": "event" }
@@ -195,7 +195,7 @@
       "title": "The reply the CE cannot check",
       "text": [
         "The bank sends a reply, and it travels back the same way. The CE relays it and shows accepted.",
-        "The reply is one result byte and a code, with no seal on it. The CE holds no key that could check it. So accepted means only that the reply said yes. A forged reply byte would read the same.",
+        "The reply is one result byte and a code, with no end-to-end seal on it. It rides inside the sealed hops, but the CE cannot check where it came from. The CE holds no key that could check it. So accepted means only that the reply said yes. A forged reply byte would read the same.",
         "A real system signs the reply for the party that acts on it."
       ],
       "glossary": [],
