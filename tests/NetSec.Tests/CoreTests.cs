@@ -350,18 +350,42 @@ namespace NetSec.Tests
             Assert.Equal(EngineStatus.Failed, run.Result.Status);
         }
 
-        /// <summary>The length then promises more bytes than ever come, so the receiver waits. Only the deadline ends the wait.</summary>
-        [Fact]
-        public void A_flipped_length_byte_ends_in_the_named_deadline_on_both_sides()
+        static Pair FlippedLength(int serverDeadlineMs, int clientDeadlineMs)
         {
             MemoryLink[] links = MemoryLink.Pair();
             TamperPlan plan = new TamperPlan { Point = TamperPoint.Wire, Message = EchoEngine.HelloName, Offset = 1, Xor = 1 };
-            // The server's deadline comes first. With equal deadlines the client can close first, and the server then reports PEER_CLOSED_EARLY.
-            Pair p = Run(links[0], links[1], null, plan, 300, 5000);
+            Pair p = Run(links[0], links[1], null, plan, serverDeadlineMs, clientDeadlineMs);
             Make.Done(p.Client);
             Make.Done(p.Server);
-            Assert.Equal(ErrorCodes.LinkDeadline, p.Server.Result.Error.Code);
-            Assert.NotNull(p.Client.Result.Error);
+            return p;
+        }
+
+        /// <summary>
+        /// The length promises more bytes than ever come, so both sides wait on a read. The side whose deadline fires reports LINK_DEADLINE and closes the
+        /// link. The other side then reads that close, so PEER_CLOSED_EARLY is its true outcome. The two orders prove the deadline on each side in turn.
+        /// The 300 ms and 5000 ms deadlines fix the order. Only a stall of over 4 s could swap it.
+        /// </summary>
+        [Theory]
+        [InlineData(300, 5000, ErrorCodes.LinkDeadline, ErrorCodes.PeerClosedEarly)]
+        [InlineData(5000, 300, ErrorCodes.PeerClosedEarly, ErrorCodes.LinkDeadline)]
+        public void A_flipped_length_byte_ends_in_the_named_deadline_on_both_sides(int serverDeadlineMs, int clientDeadlineMs, string serverCode, string clientCode)
+        {
+            Pair p = FlippedLength(serverDeadlineMs, clientDeadlineMs);
+            Assert.Equal(serverCode, p.Server.Result.Error.Code);
+            Assert.Equal(clientCode, p.Client.Result.Error.Code);
+            NetSecError stuck = serverCode == ErrorCodes.LinkDeadline ? p.Server.Result.Error : p.Client.Result.Error;
+            Assert.Equal("read deadline", stuck.CheckName);
+        }
+
+        /// <summary>With equal deadlines either side can fire first, or both can. Each side still ends by name, and at least one names the deadline.</summary>
+        [Fact]
+        public void Equal_deadlines_end_each_side_by_name_whichever_fires_first()
+        {
+            Pair p = FlippedLength(300, 300);
+            string[] allowed = { ErrorCodes.LinkDeadline, ErrorCodes.PeerClosedEarly };
+            Assert.Contains(p.Server.Result.Error.Code, allowed);
+            Assert.Contains(p.Client.Result.Error.Code, allowed);
+            Assert.True(p.Server.Result.Error.Code == ErrorCodes.LinkDeadline || p.Client.Result.Error.Code == ErrorCodes.LinkDeadline);
         }
 
         [Fact]

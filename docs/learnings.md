@@ -111,3 +111,7 @@ Each correction goes here, newest slice last. Later slices read this file first.
 10. **The server decides a tunnel, as RFC 4254 section 7.2 says.** PR #38 named the client as the actor of `tunnel allow list`, and the claim reader caught it. The server now owns that check, through `Effect.CheckFailed`, and it stays open and sends `ChannelOpenFailure`. The client owns `tunnel accepted`, which only reports the answer. A real client could keep the session. The lab ends it with `SSH_TUNNEL_REFUSED`, and `LabResult.FailedCheck` names the server's check, since that check decided.
 11. **A flipped length byte that still looks sensible makes the reader wait for bytes that never come.** `LINK_DEADLINE` ends that wait on both gates, by the S3 rule that the clock restarts only while the gate holds an event. PR #38 passed 0 in step mode and reported this as open, because it branched before S3 landed. A length no packet may hold ends at once in `SSH_PACKET_LENGTH`.
 12. **The client's referee is Go, and the server's referee is `ssh.exe`.** Each referee is another SSH implementation. The `sshpeer` client mode has no independent peer, so no claim here rests on it.
+
+## Pump deadline test
+
+1. **The side whose deadline fires reports `LINK_DEADLINE`. The side that then reads the close reports `PEER_CLOSED_EARLY`, and that is its true outcome.** A test that names one side's code must fix the order with two deadlines. `LabPair.Named` drops the second code, so a lab reports the real failure in either order.
