@@ -22,5 +22,22 @@
       "note": "ux-design.md section 2 moment 2: protected rows turn to amber noise labelled unreadable. Code: ByteInspector.vue hides only fields with visibleToWire false in the Eavesdropper view; other fields and arrows keep their readable state.",
       "checkedAgainst": "docs/ux-design.md section 2 moment 2 (read); app/src/components/ByteInspector.vue, SequenceDiagram.vue (read)"
     }
-  ]
+  ],
+  "textRead": {
+    "readAt": "main c0a105b; tour text identical to main 562047e (lessons 0 to 8, 10, 11)",
+    "method": "Every sentence of every step text read against the lab. The lab ran in-process (NetSec.Core: LabCatalog, Lesson10Auth, TimingAttackLab), once as a control and once for every try-it attack row; trace events, secrets, field lists and check names were compared with the words. Code was read where the trace did not show the fact. Statements about the UI (colours, panels) and about lesson 9 (not built) were not run.",
+    "stepsRead": 8,
+    "stepsWithProblems": 1,
+    "problemsFound": 1,
+    "problems": [
+      {
+        "step": "L0-S05",
+        "severity": "medium",
+        "wrong": "Compare the two arrows. The byte counts match, and so do the bytes. ... The two lists are the same.",
+        "right": "Compare the two arrows. The byte counts match. The bytes match except the first one: 01 marks the hello and 02 marks the reply.",
+        "evidence": "Lab run, lesson 0: EchoHello plainHex 01000b68656c6c6f2c2070697065, EchoReply plainHex 02000b68656c6c6f2c2070697065."
+      }
+    ],
+    "notes": []
+  }
 }

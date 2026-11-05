@@ -2532,6 +2532,17 @@
    "counts": false
   },
   {
+   "id": "SELF.hop-labels-check-bites",
+   "base": "SELF.hop-labels-check-bites",
+   "assertion": "SELF",
+   "group": "selftest",
+   "build": "host",
+   "slice": "S0",
+   "referee": "stand-ins built on the BCL, python cryptography and real OpenSSL runs",
+   "roles": [],
+   "counts": false
+  },
+  {
    "id": "SELF.kschedule-rfc8448-pass",
    "base": "SELF.kschedule-rfc8448-pass",
    "assertion": "SELF",
@@ -2591,6 +2602,17 @@
    "base": "SELF.reference-passes",
    "assertion": "SELF",
    "group": "selftest",
+   "build": "host",
+   "slice": "S0",
+   "referee": "stand-ins built on the BCL, python cryptography and real OpenSSL runs",
+   "roles": [],
+   "counts": false
+  },
+  {
+   "id": "SELF.summary-m-stays-a-count",
+   "base": "SELF.summary-m-stays-a-count",
+   "assertion": "SELF",
+   "group": "driver",
    "build": "host",
    "slice": "S0",
    "referee": "stand-ins built on the BCL, python cryptography and real OpenSSL runs",

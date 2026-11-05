@@ -127,3 +127,13 @@ Each correction goes here, newest slice last. Later slices read this file first.
 ## Pump deadline test
 
 1. **The side whose deadline fires reports `LINK_DEADLINE`. The side that then reads the close reports `PEER_CLOSED_EARLY`, and that is its true outcome.** A test that names one side's code must fix the order with two deadlines. `LabPair.Named` drops the second code, so a lab reports the real failure in either order.
+
+## Build lanes
+
+1. **A ProjectReference into the sibling MMP.AsyncProxy made every worktree write one output folder.** Four lanes that started a build at the same moment failed 9 of 64 builds with `CS2012`. `src/AsyncProxy.Local` and `src/AsyncProxy.Local.NetCF` now compile the sibling's source into each worktree's own output: 0 of 64 failed, and 0 files were written in the sibling. `tools/layer_check.py` refuses the old reference.
+2. **The two local projects copy the sibling's CF flags and its assembly versions.** The netstandard2.0 version is read from the sibling's project file. The CF project states 1.0.0, because the sibling's CF project sets none. A new source file in the sibling joins by glob. A new flag in the sibling does not.
+3. **S4 item 14 is a separate lock.** It names `NetSec.Core.NetCF` in one worktree, so this fix does not address it.
+
+## Gate hang limit
+
+1. **Each `dotnet test` step in the gate now ends a stuck test at 3 minutes and names it.** The slowest test takes 11.4 s at 100% CPU. `--blame-hang-dump-type none` keeps the run on net48 and writes no dump. The name sits in the last lines of the step, so the gate report keeps it. A9 runs its own `dotnet test` with a 30-minute limit per build, so after a hang the gate still waits for A9.

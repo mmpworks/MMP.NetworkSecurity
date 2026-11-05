@@ -563,6 +563,18 @@ namespace Acceptance
             File.WriteAllText(path, text);
         }
 
+        [Clause("SELF.hop-labels-check-bites")]
+        public static string HopLabelsCheckBites(Ctx c)
+        {
+            TraceLine h1 = TraceLine.Parse("{\"actor\":\"ce\",\"type\":\"wire.sent\",\"hop\":\"hop1\"}"), h2 = TraceLine.Parse("{\"actor\":\"gateway\",\"type\":\"wire.sent\",\"hop\":\"hop2\"}");
+            Check.True(TraceChecks.HopLabelProblem(new TraceLine[] { h1, h2 }, true) == null, "a trace with both hops must pass when hop 2 is required");
+            Check.True(TraceChecks.HopLabelProblem(new TraceLine[] { h1 }, true) != null, "a glass-topology trace that omits hop 2 must FAIL");
+            Check.True(TraceChecks.HopLabelProblem(new TraceLine[] { h1 }, false) == null, "a Go-hop-2 topology needs no hop 2 label");
+            Check.True(TraceChecks.HopLabelProblem(new TraceLine[] { h2 }, false) != null, "hop 1 is required in every topology");
+            Check.True(TraceChecks.HopLabelProblem(new TraceLine[0], false) != null, "an empty trace must FAIL");
+            return "hop 2 required: both pass, hop 1 alone FAILs; hop 2 not required: hop 1 alone passes; hop 1 missing or an empty trace FAILs";
+        }
+
         [Clause("SELF.type-clause-bites")]
         public static string TypeClauseBites(Ctx c)
         {

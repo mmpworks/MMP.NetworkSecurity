@@ -86,6 +86,7 @@ namespace NetSec.Auth
     public static class Token
     {
         public const string SignatureCheck = "token signature";
+        public const string FormatCheck = "token format";
         public const string ExpiryCheck = "token expiry";
         public const string AudienceCheck = "token audience";
         const string Header = "{\"alg\":\"EdDSA\",\"typ\":\"JWT\"}";
@@ -115,9 +116,9 @@ namespace NetSec.Auth
                 CompactJws parts = CompactJws.Split(jws);
                 object alg;
                 if (!parts.Header.TryGetValue("alg", out alg) || !"EdDSA".Equals(alg))
-                    return AuthDecision.Refuse(ErrorCodes.TokenBadAlg, SignatureCheck, "the header must name EdDSA");
+                    return AuthDecision.Refuse(ErrorCodes.TokenBadAlg, FormatCheck, "the header must name EdDSA");
                 if (parts.Header.ContainsKey("crit"))
-                    return AuthDecision.Refuse(ErrorCodes.TokenBadHeader, SignatureCheck, "this verifier knows no critical header extension");
+                    return AuthDecision.Refuse(ErrorCodes.TokenBadHeader, FormatCheck, "this verifier knows no critical header extension");
                 if (!Ed25519.Verify(pub, parts.SigningInput, parts.Signature))
                     return AuthDecision.Refuse(ErrorCodes.TokenBadSignature, SignatureCheck, "the signature does not fit this key and these claims");
                 Dictionary<string, object> claims = parts.ReadClaims();
@@ -130,11 +131,11 @@ namespace NetSec.Auth
             }
             catch (ParseFailure failure)
             {
-                return AuthDecision.Refuse(ErrorCodes.TokenMalformed, SignatureCheck, failure.Message);
+                return AuthDecision.Refuse(ErrorCodes.TokenMalformed, FormatCheck, failure.Message);
             }
             catch (ArgumentException failure)
             {
-                return AuthDecision.Refuse(ErrorCodes.TokenMalformed, SignatureCheck, failure.Message);
+                return AuthDecision.Refuse(ErrorCodes.TokenMalformed, FormatCheck, failure.Message);
             }
         }
     }

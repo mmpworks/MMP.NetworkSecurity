@@ -27,7 +27,7 @@ namespace Acceptance
             return d != null && d.TryGetValue(k, out v) ? v as string : null;
         }
 
-        static void CommonRun(BridgeOutcome o, bool sshLinkOurs)
+        static void CommonRun(BridgeOutcome o, bool sshLinkOurs, bool hop2Traced = true)
         {
             System.Text.RegularExpressions.Match m = System.Text.RegularExpressions.Regex.Match(o.CeReady ?? "", @"^CE-READY pool=(?<w>\d+)/(?<c>\d+) ptr=(?<ptr>\d+) clr=(?<clr>\S+)");
             Check.True(m.Success, "CE ready line is '" + o.CeReady + "'; expected 'CE-READY pool=<w>/<c> ptr=<n> clr=<v>'");
@@ -48,7 +48,8 @@ namespace Acceptance
                 if (t.Hop == "hop2") hop2 = true;
             }
             Check.True(ids.Count == 1, "trace ids in the lab: " + string.Join(",", new List<string>(ids.Keys).ToArray()) + "; expected exactly one across all five processes");
-            Check.True(hop1 && hop2, "the trace does not label both hops (hop1 seen: " + hop1 + ", hop2 seen: " + hop2 + ")");
+            string hopProblem = TraceChecks.HopLabelProblem(o.Trace, hop2Traced);
+            Check.True(hopProblem == null, hopProblem ?? "");
             // the bytes: nothing the PIN pad locked is readable on either hop
             byte[] clearField = Hex.Decode(Str(o.PinPad, "pinBlockHex"));
             Check.True(!Contains(o.Hop1.ClientToServer, clearField) && !Contains(o.Hop1.ServerToClient, clearField), "the clear PIN block is on hop 1");
@@ -77,7 +78,7 @@ namespace Acceptance
         public static string RunGoReferees(Ctx c)
         {
             BridgeOutcome o = BridgeRun.Get(c, Topology.GoReferees, null, ControlSeed, true, 0);
-            CommonRun(o, false);
+            CommonRun(o, false, false);       // both ends of hop 2 are Go programs with no trace file; the tap proves hop 2 below
             Check.True(SshWire.StartsWithVersion(o.Hop1.ClientToServer), "hop 1 client-to-server does not start with SSH-2.0-");
             return "Go x/crypto/ssh gateway and Go crypto/tls server: PIN block recovered by the bank, " + o.Trace.Length + " trace lines";
         }
