@@ -15,11 +15,13 @@ using NetSec.Trace;
 namespace NetSec.CeDevice
 {
     /// <summary>
-    /// S0 holds the startup contract and the socket loop. --socket-loop runs an EchoEngine pair through EnginePump over loopback,
-    /// and uses all four Begin pairs. The PIN relay over an IDeviceLink arrives in S5.
+    /// The CE process: a CF-compiled exe on the desktop CLR. It takes a sealed PIN envelope from the PIN pad and relays it through a device link.
+    /// --socket-loop runs an EchoEngine pair through EnginePump over loopback, and uses all four Begin pairs. Nothing here has run on CE.
     /// </summary>
     static class Program
     {
+        const int RunLimitMs = 60000;
+
         static int Main(string[] args)
         {
             int pool = IntOption(args, "--pool", DeviceProfile.Ce.PoolThreads);
@@ -29,9 +31,38 @@ namespace NetSec.CeDevice
             Console.WriteLine("CE-READY pool=" + workers + "/" + ports + " ptr=" + IntPtr.Size + " clr=" + Environment.Version + " capped=" + (capped ? "true" : "false"));
 
             if (HasFlag(args, "--socket-loop")) return SocketLoop();
+            return Relay(args);
+        }
 
-            Console.WriteLine("CE-RESULT {\"ok\":false,\"code\":" + MiniJson.Quote(ErrorCodes.CeLinkNotBuilt) + "}");
-            return 1;
+        static int Relay(string[] args)
+        {
+            string pad = Option(args, "--pinpad"), gateway = Option(args, "--gateway");
+            if (pad == null || gateway == null) return Result(false, ErrorCodes.CeLinkNotBuilt, null, "--pinpad and --gateway are required");
+
+            CeRunOptions options = new CeRunOptions();
+            options.PinPad = new IPEndPoint(IPAddress.Loopback, int.Parse(pad));
+            options.Gateway = new IPEndPoint(IPAddress.Loopback, int.Parse(gateway));
+            options.LinkKind = Option(args, "--link") ?? CeDeviceFlow.LinkExternalForward;
+            options.Clock = new MonotonicClock();
+            string traceFile = Option(args, "--trace-file");
+            options.Sink = traceFile != null ? (ITraceSink)new NdjsonFileSink(traceFile) : new NullSink();
+
+            IFuture<CeRunResult> run = CeDeviceFlow.Run(options);
+            if (!run.Wait(RunLimitMs)) return Result(false, ErrorCodes.LinkDeadline, null, null);
+            if (run.IsFaulted) return Result(false, ErrorCodes.LinkLost, null, run.Exception.Message);
+            CeRunResult done = run.Result;
+            return Result(done.Ok, done.Code, done.TraceId, null);
+        }
+
+        static int Result(bool ok, string code, string traceId, string detail)
+        {
+            StringBuilder line = new StringBuilder("CE-RESULT {\"ok\":").Append(ok ? "true" : "false");
+            if (!string.IsNullOrEmpty(code)) line.Append(",\"code\":").Append(MiniJson.Quote(code));
+            if (traceId != null) line.Append(",\"traceId\":").Append(MiniJson.Quote(traceId));
+            if (detail != null) line.Append(",\"detail\":").Append(MiniJson.Quote(detail));
+            line.Append(",\"gcTotalBytes\":").Append(GC.GetTotalMemory(false)).Append("}");
+            Console.WriteLine(line.ToString());
+            return ok ? 0 : 1;
         }
 
         static int SocketLoop()
@@ -85,10 +116,16 @@ namespace NetSec.CeDevice
             return Array.IndexOf(args, name) >= 0;
         }
 
-        static int IntOption(string[] args, string name, int fallback)
+        static string Option(string[] args, string name)
         {
             int at = Array.IndexOf(args, name);
-            return at >= 0 && at + 1 < args.Length ? int.Parse(args[at + 1]) : fallback;
+            return at >= 0 && at + 1 < args.Length ? args[at + 1] : null;
+        }
+
+        static int IntOption(string[] args, string name, int fallback)
+        {
+            string value = Option(args, name);
+            return value != null ? int.Parse(value) : fallback;
         }
     }
 }

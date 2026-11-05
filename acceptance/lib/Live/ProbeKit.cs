@@ -26,7 +26,7 @@ namespace Acceptance
         public static PkiDir Export(Ctx c, string name)
         {
             PkiDir p = new PkiDir();
-            p.Dir = LivePki.Dir(c, name);
+            p.Dir = LivePki.Dir(c, name + "-" + c.Build);          // one folder for each build, so the net10 and cf clauses never share files
             TrainingPki.Export(p.Dir);
             foreach (string f in new string[] { p.Root, p.Cert, p.Key, p.RsaCert, p.RsaKey, p.HostKey, p.RsaHostKey, p.UserPub, p.UserKey, p.IssuerPub })
                 if (!File.Exists(f)) throw new FailException("TrainingPki.Export wrote no " + Path.GetFileName(f) + " in " + p.Dir);

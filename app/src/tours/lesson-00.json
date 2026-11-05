@@ -69,7 +69,7 @@
         {
           "id": "L0-C01",
           "text": "The server returns the same bytes it received, and the engine holds no crypto.",
-          "source": "docs/program-design.md, section 8 (Build order), slice S0: EchoEngine through EnginePump, one live toy lesson"
+          "source": "src/NetSec.Core/Machine/EchoEngine.cs: the class comment (\"before any cryptography exists\"), ServerHello (sends the received body back) and ClientReply (compares the reply with the bytes sent)"
         }
       ],
       "unlock": { "mode": "ack" }

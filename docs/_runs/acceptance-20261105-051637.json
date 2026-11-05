@@ -1,0 +1,236 @@
+{
+  "summary": {
+    "schema": 1,
+    "timestamp": "2026-11-05T05:17:07.6478850-06:00",
+    "machine": "BEAST",
+    "command": "run.ps1 -Clauses A3,A16.type",
+    "productRoot": "E:\\dev\\ns-s2",
+    "productCommit": "96f6380",
+    "acceptanceCommit": "a85c872",
+    "freshClone": false,
+    "productPresent": true,
+    "M": 202,
+    "selected": 17,
+    "pass": 16,
+    "fail": 0,
+    "notRun": 1,
+    "reasons": [
+      {
+        "key": "NOT RUN LESSON_NOT_BUILT",
+        "count": 1
+      }
+    ],
+    "selfChecks": {
+      "selected": 0,
+      "pass": 0,
+      "fail": 0,
+      "notRun": 0
+    }
+  },
+  "results": [
+    {
+      "id": "A16.type.core-holds-no-keyhandle-implementation-and-no-io-member-takes-one",
+      "assertion": "A16",
+      "slice": "S2",
+      "group": "keys",
+      "build": "host",
+      "referee": "test, Playwright, OpenSSL key log",
+      "status": "PASS",
+      "reason": "",
+      "detail": "329 of 329 vectors",
+      "ms": 13
+    },
+    {
+      "id": "A16.type.keyhandle-cannot-reach-glass-factory",
+      "assertion": "A16",
+      "slice": "S2",
+      "group": "keys",
+      "build": "host",
+      "referee": "test, Playwright, OpenSSL key log",
+      "status": "PASS",
+      "reason": "",
+      "detail": "4 of 4 vectors",
+      "ms": 8715
+    },
+    {
+      "id": "A3.erasure.used-keys-absent.cf",
+      "assertion": "A3",
+      "slice": "S2",
+      "group": "dukpt",
+      "build": "cf",
+      "referee": "x9.org vectors",
+      "status": "PASS",
+      "reason": "",
+      "detail": "20301 of 20301 vectors",
+      "ms": 45
+    },
+    {
+      "id": "A3.erasure.used-keys-absent.net10",
+      "assertion": "A3",
+      "slice": "S2",
+      "group": "dukpt",
+      "build": "net10",
+      "referee": "x9.org vectors",
+      "status": "PASS",
+      "reason": "",
+      "detail": "20301 of 20301 vectors",
+      "ms": 82
+    },
+    {
+      "id": "A3.pinblock.format4.cf",
+      "assertion": "A3",
+      "slice": "S2",
+      "group": "dukpt",
+      "build": "cf",
+      "referee": "x9.org vectors",
+      "status": "PASS",
+      "reason": "",
+      "detail": "27 of 27 vectors",
+      "ms": 6
+    },
+    {
+      "id": "A3.pinblock.format4.net10",
+      "assertion": "A3",
+      "slice": "S2",
+      "group": "dukpt",
+      "build": "net10",
+      "referee": "x9.org vectors",
+      "status": "PASS",
+      "reason": "",
+      "detail": "27 of 27 vectors",
+      "ms": 3
+    },
+    {
+      "id": "A3.sales1000.agree.cf",
+      "assertion": "A3",
+      "slice": "S2",
+      "group": "dukpt",
+      "build": "cf",
+      "referee": "x9.org vectors",
+      "status": "PASS",
+      "reason": "",
+      "detail": "6000 of 6000 vectors",
+      "ms": 29
+    },
+    {
+      "id": "A3.sales1000.agree.net10",
+      "assertion": "A3",
+      "slice": "S2",
+      "group": "dukpt",
+      "build": "net10",
+      "referee": "x9.org vectors",
+      "status": "PASS",
+      "reason": "",
+      "detail": "6000 of 6000 vectors",
+      "ms": 102
+    },
+    {
+      "id": "A3.tour.states-managed-heap-can-keep-copies",
+      "assertion": "A3",
+      "slice": "S2",
+      "group": "docs",
+      "build": "host",
+      "referee": "x9.org vectors",
+      "status": "NOT RUN",
+      "reason": "LESSON_NOT_BUILT",
+      "detail": "lesson 6 has no tour yet",
+      "ms": 0
+    },
+    {
+      "id": "A3.vec.aes128-from-aes128.cf",
+      "assertion": "A3",
+      "slice": "S2",
+      "group": "dukpt",
+      "build": "cf",
+      "referee": "x9.org vectors",
+      "status": "PASS",
+      "reason": "",
+      "detail": "68 of 68 vectors",
+      "ms": 3
+    },
+    {
+      "id": "A3.vec.aes128-from-aes128.net10",
+      "assertion": "A3",
+      "slice": "S2",
+      "group": "dukpt",
+      "build": "net10",
+      "referee": "x9.org vectors",
+      "status": "PASS",
+      "reason": "",
+      "detail": "68 of 68 vectors",
+      "ms": 5
+    },
+    {
+      "id": "A3.vec.aes128-from-aes256.cf",
+      "assertion": "A3",
+      "slice": "S2",
+      "group": "dukpt",
+      "build": "cf",
+      "referee": "x9.org vectors",
+      "status": "PASS",
+      "reason": "",
+      "detail": "68 of 68 vectors",
+      "ms": 2
+    },
+    {
+      "id": "A3.vec.aes128-from-aes256.net10",
+      "assertion": "A3",
+      "slice": "S2",
+      "group": "dukpt",
+      "build": "net10",
+      "referee": "x9.org vectors",
+      "status": "PASS",
+      "reason": "",
+      "detail": "68 of 68 vectors",
+      "ms": 3
+    },
+    {
+      "id": "A3.vec.aes256-from-aes256.cf",
+      "assertion": "A3",
+      "slice": "S2",
+      "group": "dukpt",
+      "build": "cf",
+      "referee": "x9.org vectors",
+      "status": "PASS",
+      "reason": "",
+      "detail": "68 of 68 vectors",
+      "ms": 2
+    },
+    {
+      "id": "A3.vec.aes256-from-aes256.net10",
+      "assertion": "A3",
+      "slice": "S2",
+      "group": "dukpt",
+      "build": "net10",
+      "referee": "x9.org vectors",
+      "status": "PASS",
+      "reason": "",
+      "detail": "68 of 68 vectors",
+      "ms": 6
+    },
+    {
+      "id": "A3.vec.all-usages.cf",
+      "assertion": "A3",
+      "slice": "S2",
+      "group": "dukpt",
+      "build": "cf",
+      "referee": "x9.org vectors",
+      "status": "PASS",
+      "reason": "",
+      "detail": "72 of 72 vectors",
+      "ms": 2
+    },
+    {
+      "id": "A3.vec.all-usages.net10",
+      "assertion": "A3",
+      "slice": "S2",
+      "group": "dukpt",
+      "build": "net10",
+      "referee": "x9.org vectors",
+      "status": "PASS",
+      "reason": "",
+      "detail": "72 of 72 vectors",
+      "ms": 2
+    }
+  ]
+}

@@ -79,6 +79,12 @@ namespace NetSec.Machine
             Status = EngineStatus.Closed;
         }
 
+        /// <summary>Runs effects outside a table row: data the caller sends, a close, or the alert that follows a failure.</summary>
+        public void Perform(string step, params StepEffect[] effects)
+        {
+            for (int i = 0; i < effects.Length; i++) ApplyEffect(effects[i], step);
+        }
+
         public bool IsEnded { get { return Status == EngineStatus.Closed || Status == EngineStatus.Failed; } }
 
         /// <summary>Hands over what the last calls produced, and starts a new output.</summary>
@@ -152,6 +158,7 @@ namespace NetSec.Machine
                 case EffectKind.Deliver: _app.Add(new DeliveredChunk(effect.Channel, effect.Bytes)); break;
                 case EffectKind.Note: ApplyNote(effect, step); break;
                 case EffectKind.Measure: ApplyMeasure(effect, step); break;
+                case EffectKind.Store: effect.Store(); break;
                 default: throw new InvalidOperationException("no case for effect kind " + effect.Kind);
             }
         }
@@ -165,7 +172,7 @@ namespace NetSec.Machine
                 if (result != null && result.Bytes != null) body = result.Bytes;
             }
             TraceEventDraft draft = new TraceEventDraft();
-            draft.Type = _session.SentType;
+            draft.Type = effect.Text ?? _session.SentType;
             draft.Message = effect.Name;
             draft.Step = step;
             draft.Plain = body;
@@ -237,7 +244,7 @@ namespace NetSec.Machine
         void EmitReceived(InboundMessage message, StepRow<TSession> row)
         {
             TraceEventDraft draft = new TraceEventDraft();
-            draft.Type = _session.ReceivedType;
+            draft.Type = message.EventType ?? _session.ReceivedType;
             draft.Message = message.Name;
             draft.Step = row == null ? null : row.Step;
             draft.Plain = _session.PlainOf(message);

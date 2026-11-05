@@ -1,0 +1,214 @@
+{
+  "steps": [
+    {
+      "id": "L4-S01",
+      "lesson": 4,
+      "title": "A secret shared with whom?",
+      "text": [
+        "Lesson 3 showed two programs reaching a shared key. It left one question open: who is on the other end? An attacker in the middle can run a key exchange with you too.",
+        "So the client needs proof that it is talking to the right server. A {{term:signature}} and a {{term:certificate}} give that proof. This lesson shows how the proof works and how each part can fail.",
+        "Here the server proves itself to the client. Lesson 10 turns it around and shows how a client proves itself to a server.",
+        "Built to show the parts. Do not copy."
+      ],
+      "glossary": ["signature", "certificate"],
+      "bind": { "kind": "concept" },
+      "highlight": ["diagram:lane=client", "diagram:lane=server", "diagram:lane=ca"],
+      "unlock": { "mode": "ack" }
+    },
+    {
+      "id": "L4-S02",
+      "lesson": 4,
+      "title": "The root of trust",
+      "text": [
+        "The third lane is a {{term:ca}}, short for certificate authority. A CA is a signer that clients agree to trust. Here it is a training CA made for this course.",
+        "Its first product is the root certificate. The client has a copy before the talk starts, and that copy is the {{term:trust-anchor}}. Everything the client believes about the server traces back to it."
+      ],
+      "glossary": ["ca", "trust-anchor"],
+      "bind": { "kind": "event", "eventType": "ca.certificate.issued", "match": { "actor": "ca", "message": "RootCertificate" } },
+      "highlight": ["diagram:lane=ca"],
+      "claims": [
+        {
+          "id": "L4-C01",
+          "text": "A public key user is only initialized with a limited number of assured CA public keys, and a certification path leads from the certificate of the key owner to a trusted CA.",
+          "source": "RFC 5280, section 3.2 (Certification Paths and Trust)"
+        }
+      ],
+      "unlock": { "mode": "event" }
+    },
+    {
+      "id": "L4-S03",
+      "lesson": 4,
+      "title": "The server's certificate",
+      "text": [
+        "The CA now signs a certificate for the server. A certificate is a signed card. It binds a name to a public key.",
+        "Open the inspector. Find the subject (who the card is for), the issuer (who signed it), the serial number, and the two dates that bound its life. The signature at the end covers all the rest.",
+        "Anyone can read a certificate. It holds no secret, and that matters in a later step."
+      ],
+      "glossary": [],
+      "bind": { "kind": "event", "eventType": "ca.certificate.issued", "match": { "actor": "ca", "message": "ServerCertificate" } },
+      "highlight": ["inspector:field=cert.subject", "inspector:field=cert.issuer", "inspector:field=cert.serial", "inspector:field=cert.not_before", "inspector:field=cert.not_after", "inspector:field=cert.signature"],
+      "claims": [
+        {
+          "id": "L4-C02",
+          "text": "An X.509 certificate carries a serial number, issuer, validity period (notBefore and notAfter), subject, subject public key, and the CA's signature over those fields.",
+          "source": "RFC 5280, section 4.1 (Basic Certificate Fields) and section 4.1.2.5 (Validity)"
+        }
+      ],
+      "unlock": { "mode": "event" }
+    },
+    {
+      "id": "L4-S04",
+      "lesson": 4,
+      "title": "The certificate travels sealed",
+      "text": [
+        "The server now sends its certificate to the client. In TLS 1.3 this message is sealed, because all handshake messages after the ServerHello are encrypted.",
+        "Try it: switch to the eavesdropper view. Eve sees that a message passed, and she sees noise where the certificate sits.",
+        "The seal hides the card from onlookers. It does not prove the card is real. The client must check that for itself, and the next four steps show how."
+      ],
+      "glossary": ["eavesdropper"],
+      "bind": { "kind": "event", "eventType": "tls.handshake.sent", "match": { "actor": "server", "message": "Certificate" } },
+      "highlight": ["diagram:lane=server"],
+      "tryIt": {
+        "id": "L4-S04-T1",
+        "label": "Switch to the eavesdropper view",
+        "action": { "type": "set-view", "value": "eavesdropper" },
+        "expect": { "type": "view", "value": "eavesdropper" }
+      },
+      "claims": [
+        {
+          "id": "L4-C03",
+          "text": "In TLS 1.3, all handshake messages after the ServerHello are encrypted, and the Certificate message conveys the endpoint's certificate chain to the peer.",
+          "source": "RFC 8446, section 1.2 (Major Differences from TLS 1.2) and section 4.4.2 (Certificate)"
+        }
+      ],
+      "unlock": { "mode": "action", "ref": "L4-S04-T1" }
+    },
+    {
+      "id": "L4-S05",
+      "lesson": 4,
+      "title": "Check 1: does it lead to my root?",
+      "text": [
+        "The client first asks whether the certificate leads back to a root it already trusts. The check is named chain to trust anchor.",
+        "In this lab the chain has two cards: the root, and the server's card signed by that root.",
+        "Try it: let an attacker's own root sign the server's card. The client has never seen that root, so the check fails."
+      ],
+      "glossary": [],
+      "bind": { "kind": "event", "eventType": "check.result", "match": { "message": "chain to trust anchor" } },
+      "highlight": ["check:name=chain to trust anchor"],
+      "tryIt": {
+        "id": "L4-S05-T1",
+        "label": "Sign the server's card with an attacker's root",
+        "action": { "type": "run-attack", "attackId": "L4-unknown-ca" },
+        "expect": { "type": "check", "name": "chain to trust anchor", "result": "fail" }
+      },
+      "unlock": { "mode": "action", "ref": "L4-S05-T1" }
+    },
+    {
+      "id": "L4-S06",
+      "lesson": 4,
+      "title": "Check 2: is the signature real?",
+      "text": [
+        "Next the client checks the signature on the card with the root's public key. A valid signature means the root signed these bytes and no others.",
+        "Try it: change one byte of the serial number before the record is sealed. The card no longer matches its signature, and the check named signature verify fails."
+      ],
+      "glossary": [],
+      "bind": { "kind": "event", "eventType": "check.result", "match": { "message": "signature verify" } },
+      "highlight": ["check:name=signature verify", "inspector:field=cert.signature"],
+      "tryIt": {
+        "id": "L4-S06-T1",
+        "label": "Change one byte of the certificate",
+        "action": { "type": "run-attack", "attackId": "L4-flip-cert-byte" },
+        "expect": { "type": "check", "name": "signature verify", "result": "fail" }
+      },
+      "unlock": { "mode": "action", "ref": "L4-S06-T1" }
+    },
+    {
+      "id": "L4-S07",
+      "lesson": 4,
+      "title": "Check 3: is it still valid?",
+      "text": [
+        "A card has a start date and an end date. The client checks that today falls between them. The check is named validity window.",
+        "The dates limit the damage from a stolen or forgotten key, because a card cannot be used forever.",
+        "Try it: use a card that ended in 2021. The check fails."
+      ],
+      "glossary": [],
+      "bind": { "kind": "event", "eventType": "check.result", "match": { "message": "validity window" } },
+      "highlight": ["check:name=validity window", "inspector:field=cert.not_before", "inspector:field=cert.not_after"],
+      "tryIt": {
+        "id": "L4-S07-T1",
+        "label": "Use an expired certificate",
+        "action": { "type": "run-attack", "attackId": "L4-expired-cert" },
+        "expect": { "type": "check", "name": "validity window", "result": "fail" }
+      },
+      "unlock": { "mode": "action", "ref": "L4-S07-T1" }
+    },
+    {
+      "id": "L4-S08",
+      "lesson": 4,
+      "title": "Check 4: is it for this server?",
+      "text": [
+        "A real, valid card can still belong to someone else. The client checks that the card names the server it meant to reach. The check is named name match.",
+        "Without this check, any site with a real card could pose as any other site.",
+        "Try it: use a card for other.example. The names differ and the check fails."
+      ],
+      "glossary": [],
+      "bind": { "kind": "event", "eventType": "check.result", "match": { "message": "name match" } },
+      "highlight": ["check:name=name match", "inspector:field=cert.subject_alt_name"],
+      "tryIt": {
+        "id": "L4-S08-T1",
+        "label": "Use a card for another name",
+        "action": { "type": "run-attack", "attackId": "L4-wrong-name" },
+        "expect": { "type": "check", "name": "name match", "result": "fail" }
+      },
+      "claims": [
+        {
+          "id": "L4-C04",
+          "text": "A client verifies a server by matching the DNS name it meant to reach against the names in the presented certificate.",
+          "source": "RFC 9525, section 6 (Verifying Service Identity) and section 6.3 (Matching the DNS Domain Name Portion)"
+        }
+      ],
+      "unlock": { "mode": "action", "ref": "L4-S08-T1" }
+    },
+    {
+      "id": "L4-S09",
+      "lesson": 4,
+      "title": "The last proof: holding the key",
+      "text": [
+        "A certificate is public. Anyone can copy it and send it. So the card alone does not prove the sender is the real server.",
+        "The server proves it holds the matching private key. It signs a hash of the whole handshake so far, and sends that signature in the CertificateVerify message.",
+        "Try it: change one byte of that signature. The client checks it against the public key on the card, and the check named CertificateVerify signature fails."
+      ],
+      "glossary": [],
+      "bind": { "kind": "event", "eventType": "tls.handshake.sent", "match": { "actor": "server", "message": "CertificateVerify" } },
+      "highlight": ["check:name=CertificateVerify signature", "inspector:field=signature"],
+      "tryIt": {
+        "id": "L4-S09-T1",
+        "label": "Change one byte of the CertificateVerify signature",
+        "action": { "type": "run-attack", "attackId": "L4-flip-cert-verify" },
+        "expect": { "type": "check", "name": "CertificateVerify signature", "result": "fail" }
+      },
+      "claims": [
+        {
+          "id": "L4-C05",
+          "text": "CertificateVerify provides explicit proof that an endpoint possesses the private key corresponding to its certificate, and its signature covers the transcript hash of the handshake up to that point.",
+          "source": "RFC 8446, section 4.4.3 (Certificate Verify)"
+        }
+      ],
+      "unlock": { "mode": "action", "ref": "L4-S09-T1" }
+    },
+    {
+      "id": "L4-S10",
+      "lesson": 4,
+      "title": "Three links, one chain",
+      "text": [
+        "Put the pieces together. The root signs the server's card. The server's key signs the handshake. Each link is a signature, and the client checked all of them.",
+        "Four checks cover the card: where it leads, whether the signature is real, whether it is in date, and whether it names the right server. One more covers the key: the CertificateVerify signature.",
+        "Each check closes a different door.",
+        "Built to show the parts. Do not copy."
+      ],
+      "glossary": [],
+      "bind": { "kind": "concept" },
+      "unlock": { "mode": "ack" }
+    }
+  ]
+}
