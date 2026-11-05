@@ -24,6 +24,7 @@ namespace NetSec.Pki
         const string SubjectKeyIdOid = "551d0e";
         const string AuthorityKeyIdOid = "551d23";
         const string ServerAuthOid = "2b06010505070301";
+        const string ClientAuthOid = "2b06010505070302";
         const int DnsNameTag = 0x82;
         const int KeyIdTag = 0x80;
 
@@ -55,6 +56,16 @@ namespace NetSec.Pki
                 Extension(SubjectAltNameOid, false, san),
                 Extension(AuthorityKeyIdOid, false, Der.Sequence(Der.Tlv(KeyIdTag, KeyId(_public)))));
             return Sign(Serial(dnsName), _name, dnsName, notBefore, notAfter, subjectPublicKeyInfoDer, extensions);
+        }
+
+        /// <summary>The leaf carries the subject name as its CN and allows client authentication only. It has no SAN, because nobody dials a client.</summary>
+        public byte[] IssueClientCertificate(string subjectName, byte[] subjectPublicKeyInfoDer, DateTime notBefore, DateTime notAfter)
+        {
+            byte[] extensions = Der.Sequence(
+                Extension(BasicConstraintsOid, true, Der.Sequence()),
+                Extension(ExtendedKeyUsageOid, false, Der.Sequence(Der.Oid(ClientAuthOid))),
+                Extension(AuthorityKeyIdOid, false, Der.Sequence(Der.Tlv(KeyIdTag, KeyId(_public)))));
+            return Sign(Serial(subjectName), _name, subjectName, notBefore, notAfter, subjectPublicKeyInfoDer, extensions);
         }
 
         public static byte[] Ed25519Spki(byte[] publicKey)
