@@ -1,7 +1,7 @@
 # MMP.NetworkSecurity: setup wizards, UX design
 
 Author: Nancy. Date: 2026-11-05. Status: design for review, no product code. Branch `docs/wizards-ux`, off `docs/security-modes` (`d124d62`).
-Inputs: `docs/modes-design.md` (sections 1, 2, 6, 8, 10), `docs/ux-design.md`, Steve's request (quoted in section 0). `docs/modes-real-world.md` from Jared was not on `origin` or in `E:\dev\ns-modes-real` when this was written, and I asked `jared-referees` for it. The accuracy limits here come from `modes-design.md` 1.6, 1.8, 6.3 and 8.5, which quote Jared's findings. Section 12 lists what to recheck when his file lands.
+Inputs: `docs/modes-design.md` (sections 1, 2, 6, 8, 10), `docs/ux-design.md`, Steve's request (quoted in section 0). Jared's `docs/modes-real-world.md` (branch `docs/modes-real-world`, commit `ab12da8`) supplies the per-type limits (section 8) and the referee commands (section 6.1). Section 12 lists what to recheck if his file changes.
 
 ## Conclusion
 
@@ -205,7 +205,7 @@ Eight screens. Ids are `wiz-token-issuer-<n>` with the Host's state in brackets.
 | Why it exists | In a real system, one service signs the tokens and every other service checks the signature. If the signing key leaks, anyone can make tokens that pass the check. That is why real teams guard it. |
 | What you do now | Read this, then choose `Continue`. Next you will make or pick a key, choose two names, and test it. This takes about 3 minutes. |
 | What good looks like | At the end, lesson 10 signs its tokens with your key. A separate tool called OpenSSL checks the signatures and agrees they are good. |
-| Test-keys line (first, before any choice) | Use test keys only. This course shows your keys on screen and in saved files. *(When Show keys is Off the line reads: "This course hides your keys on screen for now and shows short fingerprints instead. Saved files can still hold them.")* |
+| Test-keys line (first, before any choice) | This course shows every key, so it expects test keys. A real system keeps these hidden. *(When Show keys is Off the line reads: "This course hides your keys on screen for now and shows short fingerprints instead. Saved files can still hold them.")* |
 | Buttons | `Cancel setup`, `Continue` (default) |
 | Fails when | Nothing here fails. |
 
@@ -320,7 +320,7 @@ Each row lists the Host's steps in order, with the decision on each. Every scree
 | `lab.aes-key` (F8) | Data key for lesson 1 | Make a wrapping key for me | 1 One screen: make the key. 2 Prove: wrap, unwrap, compare with the .NET library | `VAULT_UNWRAP_FAILED` |
 | `lab.seal-key` (F8) | Data key for lesson 2 | Make a wrapping key for me | Same as above | `VAULT_UNWRAP_FAILED` |
 
-`token.issuer` is the 15th type and is walked in section 4.
+`token.issuer` is the 15th type and is walked in section 4. The Prove cells above name the family of check. Section 6.1 holds the full commands and the judge for each type.
 
 ## 6. The proof step in everyday words
 
@@ -331,13 +331,33 @@ Every Prove screen has the same four parts, in this order: the real command in a
 | Command | The text the Host ran, with paths shortened to file names | `prove-command` |
 | Output | The last 20 lines the tool printed. No editing | `prove-output` |
 | In words | One sentence the copy file keeps per type: "OpenSSL read your server's certificate and said it traces to your root." | `prove-words` |
-| Tier | `Proof by an outside tool.` or `Proof by this course's own code, a weaker proof.` (glass to glass) | `prove-tier` |
+| Judge | `Judged by: OpenSSL` (or Go, or ssh.exe), or `Judged by: our own check` when no outside tool can judge. The name comes from the Host with the proof | `prove-tier` |
 
 | Outcome | What the learner sees | Next |
 |---|---|---|
 | Pass | Green check and `OpenSSL agrees` (or the tool's name). The type becomes `Proven` | `Done` |
 | `PROOF_FAILED` | Red cross, the output, and the one-sentence cause from the copy file | `Back to the start` or `Cancel setup`. The earlier key stays saved |
 | `REFEREE_MISSING` | An amber note, not a failure of the key: "The test tool is missing. Your key is saved and counts as proven once the check passes." | Fix steps in section 8 row 9. The type stays `Set up, not proven` |
+
+### 6.1 Judge and full command for each type
+
+The Host runs these (Jared's runs, `modes-real-world.md` section 5). Each `<...>` is a course file. Where a section 5 cell and this table differ, this table wins.
+
+| Type | Judge | Full command or check | Words to add on the screen |
+|---|---|---|---|
+| `pki.root-ca`, `tls13.server` (chain) | OpenSSL | `openssl verify -x509_strict -CAfile root.pem -untrusted int.pem -purpose sslserver -verify_hostname localhost srv.pem` | "Verified means: against the root you gave it. A client trusts this root only if you told it to." |
+| `tls13.server` (key) | Go and OpenSSL | `tlspeer -mode server -groups x25519 -cert chain.pem -key srv.key`, then `openssl s_client -connect 127.0.0.1:<port> -tls1_3 -CAfile root.pem -verify_return_error -verify_hostname localhost -brief` | none |
+| `tls13.client` | Go | `tlspeer -mode server -groups x25519 -require-client-cert -cert chain.pem -key srv.key -ca root.pem`, then `openssl s_client ... -cert client.pem -key client.key -cert_chain int.pem -brief` | "A valid chain is not permission. The server still decides what this client may do. No outside tool judges the name check, so that part is our own check." |
+| `tls11.server` | OpenSSL | `openssl s_client -connect 127.0.0.1:<port> -tls1_1 -cipher AES128-SHA:@SECLEVEL=0 -CAfile root.pem -verify_return_error -verify_hostname localhost` | "TLS 1.1 was retired by RFC 8996. A pass here does not make it safe to use." |
+| `ssh.host-*`, `ssh.client` | ssh.exe and Go | `sshpeer -host-key host_key -authorized authorized_keys`, then `ssh.exe -F NUL -p <port> -i user_key -o IdentitiesOnly=yes -o UserKnownHostsFile=known_hosts -o GlobalKnownHostsFile=NUL -o StrictHostKeyChecking=yes learner@127.0.0.1 "echo hello"` | Windows only: lock `user_key` with `icacls` first. The wizard does this and says so. |
+| `ssh.known-hosts` | ssh.exe | Same run. The wizard passes `-f` with a course folder and never uses the default key path | "A fingerprint on this screen proves nothing: compare it on a second channel. `accept-new` proves only that later connects match the first one." |
+| `token.issuer` | Go | `tokenverify -pub iss.jwk -token <jws>`. (Section 4 shows an OpenSSL form, `modes-design.md` 8.6. Use whichever the Host reports.) | "A token can be read by anyone who sees it. The signature stops changes, and it hides nothing." |
+| `device.enrolment` | none | The course's own check | `Judged by: our own check.` "Enrolling the key this client just showed is not enrolment. A passkey-shaped challenge is not WebAuthn." No green outside proof. |
+| `dukpt.bdk`, `dukpt.pad` | none live | Published X9.24-3 vectors, then a round trip | "Checked against published vectors, no outside system. A real base key stays inside an HSM. This file is not a TR-31 file. One person typing the parts is not dual control." |
+| `lab.aes-key` | .NET library | Wrap, unwrap, compare with BCL `AesGcm` | none |
+| `lab.seal-key` | OpenSSL | `openssl mac -digest SHA256 -macopt hexkey:<hex> -in <file> HMAC`. The command ran. A comparison with the engine's tag has not run yet | "A password is not a MAC key. A MAC is not a signature." |
+
+Rule for every Prove screen (Jared): show the command, its real output, and the name of who judged it. With no outside judge, say "our own check".
 
 ## 7. Show keys on every wizard screen
 
@@ -346,8 +366,10 @@ Every Prove screen has the same four parts, in this order: the real command in a
 | Read-back facts | The key bytes in a `Show all` fold, copy button | `fp:` fingerprint and length, "Hidden by the Show keys switch" |
 | Prove output | As the tool printed | The tool output is unchanged (it holds public data), key file paths only |
 | DUKPT component fields | Masked while typed, always. The check value shows | Same |
-| The setup screen header | Test-keys line says "This course shows your keys on screen and in saved files." | Says "This course hides your keys on screen for now and shows short fingerprints instead. Saved files can still hold them." |
+| The setup screen header | Test-keys line says "This course shows every key, so it expects test keys. A real system keeps these hidden." | Says "This course hides your keys on screen for now and shows short fingerprints instead. Saved files can still hold them." |
 | A non-exportable key | Shows the fingerprint and the line "This key cannot be read. A real HSM would refuse too." | Same |
+| Any view of a vault key | Label: "A real vault never shows you this." | Same |
+| The vault itself (map footer, Place screens) | Label: "Practice vault. Not an HSM. Not FIPS validated." Non-export is a rule in this course's code. | Same |
 
 Flipping the switch while a wizard is open replaces the facts block from the Host. The wizard does not move.
 
@@ -359,12 +381,22 @@ Flipping the switch while a wizard is open replaces the facts block from the Hos
 | 2 | A self-signed certificate is not a chain. It vouches for itself, so nothing outside it proves it. A chain ends in a root that the checker already trusts. | `pki.root-ca` Intro, `tls.trust` Intro | PRD framing; `ChainCheck` |
 | 3 | The course's own engines check Ed25519 signatures only. An RSA or ECDSA certificate stops with a named error code. RSA runs through the OS transport. ECDSA is not supported in the course's engines. | `KEY_ALGORITHM_NOT_IN_ENGINE` and `CERT_SIGNATURE_ALG_UNSUPPORTED` boxes, kind choice screens | `modes-design.md` 1.8, 8.5 |
 | 4 | A certificate signed by a middle authority must be sent together with that authority's certificate. This holds for a client too. Sent alone, it gets the error `certificate signed by unknown authority`. | `tls13.client` screen 4 and `CHAIN_INCOMPLETE` | Jared's finding, `modes-design.md` 8.5 |
-| 5 | Use test keys only. This course shows your keys on screen and in saved files. Nothing here can tell a test key from a production key. | Every Intro, before any choice | `modes-design.md` 8.2 |
+| 5 | This course shows every key, so it expects test keys. A real system keeps these hidden. Nothing here can tell a test key from a production key, so the line is the whole control (Steve's ruling: no hard stop). | Every Intro, before any choice | `modes-design.md` 8.2 |
 | 6 | The key store is a plain file, and anyone who holds both files can read every key. It is not a production vault. | `Place` screens | `modes-design.md` O5 |
 | 7 | Card numbers and PINs stay test values. The wizard has no field for them. | `dukpt.bdk` Intro, `dukpt.pad` Intro | `modes-design.md` 1.6, O10 |
 | 8 | A key you mark as non-exportable cannot be read back. This is a one-way step, as in a real HSM. | `dukpt.bdk` screen 6, vault key choices | `modes-design.md` 6.3 |
 | 9 | If the test tool is missing, your key is saved but not yet proven, and lessons will not run on it until it is. | Prove screen, `REFEREE_MISSING` | `modes-design.md` 2.3 |
 | 10 | A proof by the course's own code is weaker than a proof by an outside tool. | `prove-tier` | `modes-design.md` 8.6 |
+| 11 | "Verified" means verified against the root you gave it. A self-signed certificate passes against itself. | `Proven` chip help text, every F1 Prove screen | Jared, section 3.1 |
+| 12 | The wizard never installs a root in the OS store without asking, and says what it changed. | `os-pick` step | Jared, section 3.1 |
+| 13 | A valid chain is not permission. | `tls13.client` Done | Jared, section 3.3 |
+| 14 | A fingerprint on the same screen proves nothing. Compare it on a second channel. | `ssh.known-hosts` `compare` step | Jared, section 3.4 |
+| 15 | `accept-new` proves nothing on the first connect, only that later connects match. | `ssh.known-hosts` `learn` step | Jared, section 3.5 |
+| 16 | A real base key stays in an HSM. This file is not TR-31. One person is not dual control. | `dukpt.bdk` Intro and `combine` step | Jared, section 3.7 |
+| 17 | A password is not a MAC key. A MAC is not a signature. | `lab.seal-key` Intro | Jared, section 3.8 |
+| 18 | A token is readable by anyone who sees it. The `iss` claim counts only if the code reads it. | `token.issuer` Intro and Done | Jared, section 3.9 |
+| 19 | DPoP stops token theft. Code running on the client can still make new proofs while it is online. | Lesson 10 callout, not a wizard | Jared, section 3.10 |
+| 20 | Enrolling the key a client just showed is not enrolment. A passkey-shaped challenge is not WebAuthn. No proof screen. | `device.enrolment` Intro | Jared, sections 3.11 and 3.12 |
 
 ## 9. Screens and stable test ids
 
@@ -435,7 +467,7 @@ Distinct screen ids in this design: 6 shared, 12 in F1, 2 in F2, 3 in F3, 3 in F
 |                       [Security setup (1)]  Tour|Free  Endpoints|..  Show keys (o)|
 +--------------------------------------------------------------------------------+
 | Security setup                                           [Back to lessons]     |
-| Use test keys only. This course shows your keys on screen and in saved files.  |
+| This course shows every key, so it expects test keys. A real system keeps these hidden. |
 |                                                                                |
 | +-- Run a lesson with my own keys ----------------------------------------+  |
 | |  Lesson: [ 10 Client proof and permission v ]            [ Start ]       |  |
@@ -509,7 +541,7 @@ Each gets a `short` of 20 words or fewer at grade 8, in `app/src/glossary.json`.
 
 | # | Question | My pick | What would change it |
 |---|---|---|---|
-| Q1 | Jared's `docs/modes-real-world.md` was not found. Do his accuracy limits add anything beyond `modes-design.md` 1.6, 1.8, 6.3, 8.5? | Use the quoted limits now | His file lists a limit that needs a new line in section 8 |
+| Q1 | Jared's file landed (`ab12da8`). Does it change if his referee runs change? | Sections 6.1 and 8 follow it. Recheck on any change | A command in 6.1 stops working on a learner key (TLS 1.1 has run with the training root only) |
 | Q2 | Electron needs a file dialog (`dialog.showOpenDialog`) through an IPC handler in `main.cjs` and `preload.cjs`. This is Electron's own API, not a new package. May I add it? | Yes, one IPC call named `pickFile` that returns a path | A rule against new IPC channels |
 | Q3 | Resume after quitting needs `openWizardId` on each type in `GET /api/security`, and the Host storing wizard state without secrets. Richard owns the contract. | Add both | Richard keeps wizards in memory only: then a quit loses the wizard and the row says `Needs setup` |
 | Q4 | One decision per screen makes `dukpt.bdk` 12 screens long. Is that too long? | Keep one decision per screen, since a key ceremony is a slow, careful thing, and show a progress line | Steve finds it tedious: merge `component-1` and `component-2` into one screen with two fields |
