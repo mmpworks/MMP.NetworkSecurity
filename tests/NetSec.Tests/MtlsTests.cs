@@ -108,8 +108,8 @@ namespace NetSec.Tests
         [Fact]
         public void The_catalog_holds_both_rows_and_each_changes_one_thing()
         {
-            AttackDefinition remove = AttackCatalog.Lesson10Unreleased.Single(a => a.AttackId == "L10-remove-client-cert");
-            AttackDefinition corrupt = AttackCatalog.Lesson10Unreleased.Single(a => a.AttackId == "L10-corrupt-client-cert");
+            AttackDefinition remove = AttackCatalog.All.Where(a => a.Lesson == 10).Single(a => a.AttackId == "L10-remove-client-cert");
+            AttackDefinition corrupt = AttackCatalog.All.Where(a => a.Lesson == 10).Single(a => a.AttackId == "L10-corrupt-client-cert");
             Assert.Equal("certificate_required alert", remove.ExpectCheck);
             Assert.Equal("bad_certificate alert", corrupt.ExpectCheck);
             Assert.Single(remove.Options);

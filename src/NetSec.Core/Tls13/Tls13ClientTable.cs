@@ -48,7 +48,10 @@ namespace NetSec.Tls13
         {
             ServerHelloInfo hello = Tls13Messages.ReadServerHello(message.Bytes);
             if (hello.IsHelloRetry) return Tls13Rules.Refuse(Tls13Codes.HrrUnsupported, "the server asked for a second key share round, and this engine offers one group");
-            if (hello.SelectedVersion != Tls13Messages.Tls13Version) return RefuseVersion(hello);
+            if (hello.HasDowngradeSentinel) return Tls13Rules.Refuse(Tls13Codes.DowngradeSentinel, "the server random ends in DOWNGRD, so a TLS 1.3 server was pushed to an older version");
+            if (hello.SelectedVersion != Tls13Messages.Tls13Version) return Tls13Rules.Refuse(Tls13Codes.VersionRefused, "the server chose legacy version " + hello.LegacyVersion + " and no TLS 1.3");
+            if (session.Offer == null) return Tls13Rules.Refuse(Tls13Codes.IllegalParameter, "the server chose TLS 1.3, and this client offered only TLS 1.1");
+            if (hello.LegacyVersion != 0x0303 || hello.Compression != 0) return Tls13Rules.Refuse(Tls13Codes.IllegalParameter, "RFC 8446 section 4.1.3 fixes legacy_version at 0x0303 and compression at 0");
 
             Tls13Options o = session.Options;
             Tls13Suite suite = Tls13Suite.Find(hello.Suite);
@@ -69,12 +72,6 @@ namespace NetSec.Tls13
             effects.Add(Tls13Rules.Install(Direction.Inbound, suite, s.ServerHandshakeTrafficSecret, "handshake"));
             effects.Add(Tls13Rules.Install(Direction.Outbound, suite, s.ClientHandshakeTrafficSecret, "handshake"));
             return StepDecision.Advance(effects.ToArray());
-        }
-
-        static StepDecision RefuseVersion(ServerHelloInfo hello)
-        {
-            if (hello.HasDowngradeSentinel) return Tls13Rules.Refuse(Tls13Codes.DowngradeSentinel, "the server random ends in DOWNGRD, so a TLS 1.3 server was pushed to an older version");
-            return Tls13Rules.Refuse(Tls13Codes.VersionRefused, "the server chose legacy version " + hello.LegacyVersion + " and no TLS 1.3");
         }
 
         static StepDecision Absorb(Tls13Session session, InboundMessage message)

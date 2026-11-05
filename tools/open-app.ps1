@@ -4,7 +4,8 @@
   Opens the Network Security Lab app. Builds what is missing, checks the Electron binary, and launches.
 .DESCRIPTION
   Steps, each one skipped when its result already exists:
-    1. Host build      src\NetSec.Host\bin\Release\net10.0\NetSec.Host.dll
+    1. Host build      src\NetSec.Host\bin\Release\net10.0\NetSec.Host.dll, and netsec_ct.dll beside it (the Host's build makes it, for lesson 11).
+                       With no C compiler the script warns and goes on: lesson 11 reads a named error, and every other lesson opens.
     2. app packages    app\node_modules (npm ci)
     3. app build       app\dist\index.html (npm run build)
     4. Electron binary app\node_modules\electron\dist\electron.exe. If it is absent, the script repairs it from the cached official zip
@@ -37,6 +38,7 @@ $ErrorActionPreference = 'Stop'
 $root = Split-Path -Parent $PSScriptRoot
 $app = Join-Path $root 'app'
 $hostDll = Join-Path $root 'src\NetSec.Host\bin\Release\net10.0\NetSec.Host.dll'
+$nativeDll = Join-Path (Split-Path -Parent $hostDll) 'netsec_ct.dll'
 $electronDir = Join-Path $app 'node_modules\electron'
 $electronExe = Join-Path $electronDir 'dist\electron.exe'
 
@@ -57,7 +59,7 @@ Need-Tool 'npm' 'Install Node.js 20 or newer from https://nodejs.org.'
 if (-not (Test-Path (Join-Path $app 'package.json'))) { Fail 'APP_MISSING' "app\package.json is not in $root." 'Run this script from a full clone of MMP.NetworkSecurity.' }
 
 # ---------------------------------------------------------------- 1 Host
-if ($Rebuild -or -not (Test-Path $hostDll)) {
+if ($Rebuild -or -not (Test-Path $hostDll) -or -not (Test-Path $nativeDll)) {
     if (-not $AsyncProxyRoot) { $AsyncProxyRoot = Join-Path (Split-Path -Parent $root) 'MMP.AsyncProxy' }
     if (-not (Test-Path (Join-Path $AsyncProxyRoot 'src\MMP.AsyncProxy'))) {
         Fail 'ASYNCPROXY_MISSING' "MMP.AsyncProxy is not at $AsyncProxyRoot." 'Clone MMP.AsyncProxy beside this repo, or pass -AsyncProxyRoot <path>.'
@@ -67,6 +69,8 @@ if ($Rebuild -or -not (Test-Path $hostDll)) {
     if ($LASTEXITCODE -ne 0) { Fail 'HOST_BUILD_FAILED' 'dotnet build of src\NetSec.Host failed.' 'Read the build output above. Run `dotnet --list-sdks` and confirm a 10.x SDK.' }
     if (-not (Test-Path $hostDll)) { Fail 'HOST_BUILD_FAILED' "The build passed but $hostDll is absent." 'Run the build again with -Rebuild and read the output.' }
 } else { Say 'Host already built' }
+if (Test-Path $nativeDll) { Say 'netsec_ct.dll is beside the Host' }
+else { Write-Host "open-app: WARNING NATIVE_LIB_NOT_BUILT: netsec_ct.dll is not beside the Host. Lesson 11 will end in NATIVE_LIB_MISSING. Every other lesson works. Fix: install the C++ tools of Visual Studio 2022, then run this script again." -ForegroundColor Yellow }
 
 # ---------------------------------------------------------------- 2 and 3 app
 Push-Location $app

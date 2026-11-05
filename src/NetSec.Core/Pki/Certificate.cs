@@ -12,6 +12,9 @@ namespace NetSec.Pki
         const string Ed25519Oid = "2b6570";
         const string SanOid = "551d11";
         const string BasicConstraintsOid = "551d13";
+        const string KeyUsageOid = "551d0f";
+        const string SubjectKeyIdOid = "551d0e";
+        const string AuthorityKeyIdOid = "551d23";
         const string ExtendedKeyUsageOid = "551d25";
         const string ClientAuthOid = "2b06010505070302";
         const int DnsNameTag = 0x82;
@@ -29,6 +32,7 @@ namespace NetSec.Pki
         public bool KeyIsEd25519 { get; private set; }
         public bool SignedWithEd25519 { get; private set; }
         public bool IsCa { get; private set; }
+        public bool HasUnknownCritical { get; private set; }
         public bool AllowsClientAuth { get; private set; }
         public string[] DnsNames { get; private set; }
 
@@ -41,23 +45,27 @@ namespace NetSec.Pki
             if (der == null) throw new ArgumentNullException("der");
             Certificate c = new Certificate();
             c.Der = (byte[])der.Clone();
-            DerReader outer = new DerReader(der, 0, der.Length).Read(NetSec.Pki.Der.TagSequence).Inner;
+            DerReader whole = new DerReader(der, 0, der.Length);
+            DerReader outer = whole.Read(NetSec.Pki.Der.TagSequence).Inner;
+            if (whole.HasMore) throw new ParseFailure(DerReader.ParseCode, "bytes follow the certificate, and no signature covers them");
             DerItem tbs = outer.Read(NetSec.Pki.Der.TagSequence);
             DerItem algorithm = outer.Read(NetSec.Pki.Der.TagSequence);
             DerItem signature = outer.Read(NetSec.Pki.Der.TagBitString);
+            if (outer.HasMore) throw new ParseFailure(DerReader.ParseCode, "bytes follow the signature, and no signature covers them");
             c.Tbs = tbs.Whole;
             c.SignedWithEd25519 = HasOid(algorithm, Ed25519Oid);
             c.Signature = AfterUnusedBits(signature);
-            c.ReadTbs(tbs.Inner);
+            c.ReadTbs(tbs.Inner, algorithm.Whole);
             c.Mark("cert.signature", signature, "mac");
             return c;
         }
 
-        void ReadTbs(DerReader tbs)
+        void ReadTbs(DerReader tbs, byte[] outerAlgorithm)
         {
             if (tbs.PeekTag == ExplicitVersionTag) tbs.Read();
             Mark("cert.serial", tbs.Read(NetSec.Pki.Der.TagInteger), "id");
-            tbs.Read(NetSec.Pki.Der.TagSequence);
+            // RFC 5280 section 4.1.1.2: the outer field sits outside the signature, so it must equal the signed copy.
+            if (Hex.Encode(tbs.Read(NetSec.Pki.Der.TagSequence).Whole) != Hex.Encode(outerAlgorithm)) throw new ParseFailure(DerReader.ParseCode, "the signed algorithm differs from the outer algorithm");
             DerItem issuer = tbs.Read(NetSec.Pki.Der.TagSequence);
             Issuer = issuer.Whole;
             Mark("cert.issuer", issuer, "id");
@@ -100,12 +108,23 @@ namespace NetSec.Pki
             {
                 DerReader extension = extensions.Read(NetSec.Pki.Der.TagSequence).Inner;
                 string oid = Hex.Encode(extension.Read(NetSec.Pki.Der.TagOid).Value);
-                if (extension.PeekTag == NetSec.Pki.Der.TagBoolean) extension.Read();
+                bool critical = false;
+                if (extension.PeekTag == NetSec.Pki.Der.TagBoolean)
+                {
+                    byte[] flag = extension.Read().Value;
+                    critical = flag.Length == 1 && flag[0] != 0;
+                }
+                if (critical && !IsKnownExtension(oid)) HasUnknownCritical = true;
                 DerItem value = extension.Read(NetSec.Pki.Der.TagOctetString);
                 if (oid == SanOid) ReadNames(value);
                 else if (oid == BasicConstraintsOid) ReadBasicConstraints(value);
                 else if (oid == ExtendedKeyUsageOid) ReadKeyUsages(value);
             }
+        }
+
+        static bool IsKnownExtension(string oid)
+        {
+            return oid == SanOid || oid == BasicConstraintsOid || oid == ExtendedKeyUsageOid || oid == KeyUsageOid || oid == SubjectKeyIdOid || oid == AuthorityKeyIdOid;
         }
 
         void ReadNames(DerItem value)
@@ -173,7 +192,8 @@ namespace NetSec.Pki
             if (text.Length != (utc ? 13 : 15) || text[text.Length - 1] != 'Z') throw new ParseFailure(DerReader.ParseCode, "a validity date has the wrong shape");
             int at = utc ? 2 : 4;
             int year = utc ? TwoDigitYear(Number(text, 0, 2)) : Number(text, 0, 4);
-            return new DateTime(year, Number(text, at, 2), Number(text, at + 2, 2), Number(text, at + 4, 2), Number(text, at + 6, 2), Number(text, at + 8, 2), DateTimeKind.Utc);
+            try { return new DateTime(year, Number(text, at, 2), Number(text, at + 2, 2), Number(text, at + 4, 2), Number(text, at + 6, 2), Number(text, at + 8, 2), DateTimeKind.Utc); }
+            catch (ArgumentOutOfRangeException) { throw new ParseFailure(DerReader.ParseCode, "a validity date names a day that does not exist: " + text); }
         }
 
         /// <summary>RFC 5280: a two-digit year from 50 means 19xx, below 50 means 20xx.</summary>
@@ -233,6 +253,7 @@ namespace NetSec.Pki
         public const string Validity = "CERT_VALIDITY";
         public const string Name = "CERT_NAME";
         public const string BadSignature = "CERT_SIGNATURE";
+        public const string UnknownCritical = "CERT_UNKNOWN_CRITICAL";
         public const string NotForClients = "CERT_NOT_FOR_CLIENTS";
 
         public static ChainVerdict Run(Certificate[] chain, Certificate[] anchors, string dnsName, DateTime now)
@@ -264,6 +285,9 @@ namespace NetSec.Pki
             }
             for (int i = 0; i < chain.Length; i++)
                 if (!chain[i].VerifySignedBy(issuers[i].PublicKey)) return new ChainVerdict(BadSignature, "the signature on certificate " + i + " does not verify");
+            // RFC 5280 section 4.2: a verifier rejects a critical extension it does not read. This check reads no pathLen, keyUsage, or name constraints values.
+            for (int i = 0; i < chain.Length; i++)
+                if (chain[i].HasUnknownCritical) return new ChainVerdict(UnknownCritical, "certificate " + i + " has a critical extension this check does not read");
             for (int i = 0; i < chain.Length; i++)
                 if (now < chain[i].NotBefore || now > chain[i].NotAfter) return new ChainVerdict(Validity, "certificate " + i + " is outside its validity window");
             return ChainVerdict.Ok;
