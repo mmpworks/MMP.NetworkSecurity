@@ -1,0 +1,168 @@
+{
+  "summary": {
+    "schema": 1,
+    "timestamp": "2026-11-05T05:20:07.3289417-06:00",
+    "machine": "BEAST",
+    "command": "run.ps1 -Clauses A9,A11",
+    "productRoot": "E:\\dev\\ns-s6",
+    "productCommit": "7f2d03c",
+    "acceptanceCommit": "a85c872",
+    "freshClone": false,
+    "productPresent": true,
+    "M": 202,
+    "selected": 11,
+    "pass": 3,
+    "fail": 1,
+    "notRun": 7,
+    "reasons": [
+      {
+        "key": "FAIL ASSERTION",
+        "count": 1
+      },
+      {
+        "key": "NOT RUN PRODUCT_MISSING",
+        "count": 7
+      }
+    ],
+    "selfChecks": {
+      "selected": 0,
+      "pass": 0,
+      "fail": 0,
+      "notRun": 0
+    }
+  },
+  "results": [
+    {
+      "id": "A11.catalog.every-row-beside-control",
+      "assertion": "A11",
+      "slice": "S6",
+      "group": "auth",
+      "build": "host",
+      "referee": "Go tokenverify",
+      "status": "NOT RUN",
+      "reason": "PRODUCT_MISSING",
+      "detail": "the group does not compile against the built NetSec.Core: a type or member the contract names is missing or differs. E:\\dev\\ns-s6\\acceptance\\groups\\auth\\AuthClauses.cs(8,14): error CS0234: The type or namespace name 'Pki' does not exist in the namespace 'NetSec' (are you missing an assembly reference?) | E:\\dev\\ns-s6\\acceptance\\lib\\Live\\ProbeKit.cs(4,14): error CS0234: The type or namespace name 'Pki' does not exist in the namespace 'NetSec' (are you missing an assembly reference?) | E:\\dev\\ns-s6\\acceptance\\lib\\Live\\ProbeKit.cs(39,43): error CS0246: The type or namespace name 'ProbeRequest' could not be found (are you missing a using directive or an assembly reference?)",
+      "ms": 0
+    },
+    {
+      "id": "A11.dpop.replay-beside-control",
+      "assertion": "A11",
+      "slice": "S6",
+      "group": "auth",
+      "build": "host",
+      "referee": "Go tokenverify",
+      "status": "NOT RUN",
+      "reason": "PRODUCT_MISSING",
+      "detail": "the group does not compile against the built NetSec.Core: a type or member the contract names is missing or differs. E:\\dev\\ns-s6\\acceptance\\groups\\auth\\AuthClauses.cs(8,14): error CS0234: The type or namespace name 'Pki' does not exist in the namespace 'NetSec' (are you missing an assembly reference?) | E:\\dev\\ns-s6\\acceptance\\lib\\Live\\ProbeKit.cs(4,14): error CS0234: The type or namespace name 'Pki' does not exist in the namespace 'NetSec' (are you missing an assembly reference?) | E:\\dev\\ns-s6\\acceptance\\lib\\Live\\ProbeKit.cs(39,43): error CS0246: The type or namespace name 'ProbeRequest' could not be found (are you missing a using directive or an assembly reference?)",
+      "ms": 0
+    },
+    {
+      "id": "A11.mtls.missing-client-cert-beside-control",
+      "assertion": "A11",
+      "slice": "S6",
+      "group": "auth",
+      "build": "host",
+      "referee": "Go tokenverify",
+      "status": "NOT RUN",
+      "reason": "PRODUCT_MISSING",
+      "detail": "the group does not compile against the built NetSec.Core: a type or member the contract names is missing or differs. E:\\dev\\ns-s6\\acceptance\\groups\\auth\\AuthClauses.cs(8,14): error CS0234: The type or namespace name 'Pki' does not exist in the namespace 'NetSec' (are you missing an assembly reference?) | E:\\dev\\ns-s6\\acceptance\\lib\\Live\\ProbeKit.cs(4,14): error CS0234: The type or namespace name 'Pki' does not exist in the namespace 'NetSec' (are you missing an assembly reference?) | E:\\dev\\ns-s6\\acceptance\\lib\\Live\\ProbeKit.cs(39,43): error CS0246: The type or namespace name 'ProbeRequest' could not be found (are you missing a using directive or an assembly reference?)",
+      "ms": 0
+    },
+    {
+      "id": "A11.passkey.challenge-replay-beside-control",
+      "assertion": "A11",
+      "slice": "S6",
+      "group": "auth",
+      "build": "host",
+      "referee": "Go tokenverify",
+      "status": "NOT RUN",
+      "reason": "PRODUCT_MISSING",
+      "detail": "the group does not compile against the built NetSec.Core: a type or member the contract names is missing or differs. E:\\dev\\ns-s6\\acceptance\\groups\\auth\\AuthClauses.cs(8,14): error CS0234: The type or namespace name 'Pki' does not exist in the namespace 'NetSec' (are you missing an assembly reference?) | E:\\dev\\ns-s6\\acceptance\\lib\\Live\\ProbeKit.cs(4,14): error CS0234: The type or namespace name 'Pki' does not exist in the namespace 'NetSec' (are you missing an assembly reference?) | E:\\dev\\ns-s6\\acceptance\\lib\\Live\\ProbeKit.cs(39,43): error CS0246: The type or namespace name 'ProbeRequest' could not be found (are you missing a using directive or an assembly reference?)",
+      "ms": 0
+    },
+    {
+      "id": "A11.roles.capability-not-granted-beside-control",
+      "assertion": "A11",
+      "slice": "S6",
+      "group": "auth",
+      "build": "host",
+      "referee": "Go tokenverify",
+      "status": "NOT RUN",
+      "reason": "PRODUCT_MISSING",
+      "detail": "the group does not compile against the built NetSec.Core: a type or member the contract names is missing or differs. E:\\dev\\ns-s6\\acceptance\\groups\\auth\\AuthClauses.cs(8,14): error CS0234: The type or namespace name 'Pki' does not exist in the namespace 'NetSec' (are you missing an assembly reference?) | E:\\dev\\ns-s6\\acceptance\\lib\\Live\\ProbeKit.cs(4,14): error CS0234: The type or namespace name 'Pki' does not exist in the namespace 'NetSec' (are you missing an assembly reference?) | E:\\dev\\ns-s6\\acceptance\\lib\\Live\\ProbeKit.cs(39,43): error CS0246: The type or namespace name 'ProbeRequest' could not be found (are you missing a using directive or an assembly reference?)",
+      "ms": 0
+    },
+    {
+      "id": "A11.token.claim-changed-beside-control",
+      "assertion": "A11",
+      "slice": "S6",
+      "group": "auth",
+      "build": "host",
+      "referee": "Go tokenverify",
+      "status": "NOT RUN",
+      "reason": "PRODUCT_MISSING",
+      "detail": "the group does not compile against the built NetSec.Core: a type or member the contract names is missing or differs. E:\\dev\\ns-s6\\acceptance\\groups\\auth\\AuthClauses.cs(8,14): error CS0234: The type or namespace name 'Pki' does not exist in the namespace 'NetSec' (are you missing an assembly reference?) | E:\\dev\\ns-s6\\acceptance\\lib\\Live\\ProbeKit.cs(4,14): error CS0234: The type or namespace name 'Pki' does not exist in the namespace 'NetSec' (are you missing an assembly reference?) | E:\\dev\\ns-s6\\acceptance\\lib\\Live\\ProbeKit.cs(39,43): error CS0246: The type or namespace name 'ProbeRequest' could not be found (are you missing a using directive or an assembly reference?)",
+      "ms": 0
+    },
+    {
+      "id": "A11.token.verifies-under-go-tokenverify",
+      "assertion": "A11",
+      "slice": "S6",
+      "group": "auth",
+      "build": "host",
+      "referee": "Go tokenverify",
+      "status": "NOT RUN",
+      "reason": "PRODUCT_MISSING",
+      "detail": "the group does not compile against the built NetSec.Core: a type or member the contract names is missing or differs. E:\\dev\\ns-s6\\acceptance\\groups\\auth\\AuthClauses.cs(8,14): error CS0234: The type or namespace name 'Pki' does not exist in the namespace 'NetSec' (are you missing an assembly reference?) | E:\\dev\\ns-s6\\acceptance\\lib\\Live\\ProbeKit.cs(4,14): error CS0234: The type or namespace name 'Pki' does not exist in the namespace 'NetSec' (are you missing an assembly reference?) | E:\\dev\\ns-s6\\acceptance\\lib\\Live\\ProbeKit.cs(39,43): error CS0246: The type or namespace name 'ProbeRequest' could not be found (are you missing a using directive or an assembly reference?)",
+      "ms": 0
+    },
+    {
+      "id": "A9.cf.binaries-reference-cf-mscorlib",
+      "assertion": "A9",
+      "slice": "All",
+      "group": "binproof",
+      "build": "host",
+      "referee": "CF references and System.Reflection.Metadata",
+      "status": "PASS",
+      "reason": "",
+      "detail": "4 of 4 vectors",
+      "ms": 14
+    },
+    {
+      "id": "A9.cf.compiles-against-reference-assemblies-with-langversion-3",
+      "assertion": "A9",
+      "slice": "All",
+      "group": "binproof",
+      "build": "host",
+      "referee": "CF references and System.Reflection.Metadata",
+      "status": "PASS",
+      "reason": "",
+      "detail": "src/NetSec.Core and src/NetSec.Core.NetCF use LangVersion 3; the CF project builds against E:\\dev\\tools\\netcf35-ref",
+      "ms": 1850
+    },
+    {
+      "id": "A9.cf.same-suite-passes-on-net48-skips-pinned",
+      "assertion": "A9",
+      "slice": "All",
+      "group": "binproof",
+      "build": "host",
+      "referee": "CF references and System.Reflection.Metadata",
+      "status": "FAIL",
+      "reason": "ASSERTION",
+      "detail": "2 of 4 vectors pass. First misses: test 'NetSec.Tests.KeysTests.An_rsa_key_is_pkcs8_with_its_matching_spki(id: \"server-tls11-rsa\")': passes on net10.0 and did not pass on net48, and the skip list does not pin it | test 'NetSec.Tests.KeysTests.An_rsa_key_is_pkcs8_with_its_matching_spki(id: \"ssh-host-rsa\")': passes on net10.0 and did not pass on net48, and the skip list does not pin it",
+      "ms": 13011
+    },
+    {
+      "id": "A9.git-ls-files.no-cf-binary",
+      "assertion": "A9",
+      "slice": "All",
+      "group": "binproof",
+      "build": "host",
+      "referee": "CF references and System.Reflection.Metadata",
+      "status": "PASS",
+      "reason": "",
+      "detail": "301 tracked files checked against 42 CF reference files and the CF mscorlib token; none match",
+      "ms": 401
+    }
+  ]
+}

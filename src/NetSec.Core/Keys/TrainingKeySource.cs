@@ -20,6 +20,7 @@ namespace NetSec.Keys
             {
                 case KeyIds.CaRoot:
                 case KeyIds.ServerTlsEd25519:
+                case KeyIds.ClientTlsEd25519:
                 case KeyIds.SshHostEd25519:
                 case KeyIds.SshClient:
                 case KeyIds.TokenIssuer:
