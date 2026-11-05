@@ -96,7 +96,7 @@ Steve chose five grouped "make my set" flows. Each flow has a **default path of 
 | 1 | Make my web security set (Host flow `my-certificates`) | `pki.root-ca`, `tls.trust`, `tls13.server`, `tls13.client`, `tls11.server` | 4, 5, 7, 9, 10 | `flow-my-certificates` |
 | 2 | Make my remote login set (Host flow `my-ssh`) | `ssh.host-ed25519`, `ssh.host-rsa`, `ssh.client`, `ssh.known-hosts` | 8, 9 | `flow-my-ssh` |
 | 3 | Make my card PIN keys (Host flow `my-payment`) | `dukpt.bdk`, `dukpt.pad` | 6, 9 | `flow-my-payment` |
-| 4 | Make my sign-in set (Host flow `my-login`) | `token.issuer`, `device.enrolment` (named "Device key entry") | 10 | `flow-my-login` |
+| 4 | Make my sign-in set (Host flow `my-login`) | `token.issuer`, `device.enrolment` (named "Device key, no outside check") | 10 | `flow-my-login` |
 | 5 | Make my data keys (Host flow `my-lesson-keys`) | `lab.aes-key`, `lab.seal-key` | 1, 2 | `flow-my-lesson-keys` |
 
 The flow ids are the Host's (`wizard-flows.json`, `modes-design.md` 8.1). Test ids add the prefix `flow-`: `flow-my-certificates-make`. The Host spine maps to the five screens: `Intro` is screen 1, `ChooseSource` and `Place` are screen 2 (`make`), `PickFiles` is the branch (`options`), `ReadBack` is screen 3, `Check` is screen 4, `Done` is screen 5.
@@ -576,7 +576,7 @@ The screens are the ids in 9.1 and 9.1a. A test walks the default path of every 
 |    Public key    7c1e 9a02 ...   [Show all] [Copy]         |
 |    Issuer        https://pump.training/issuer              |
 |    Audience      https://pump.training/api                 |
-|  DEVICE KEY (Device key entry)                             |
+|  DEVICE KEY (no outside check)                           |
 |    Device        pump-reader-4                             |
 |    Fingerprint   SHA256:Zp1...c0A=                         |
 |  These are test keys. This course shows them on screen.    |
