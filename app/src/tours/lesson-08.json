@@ -277,7 +277,7 @@
       "claims": [
         {
           "id": "L8-C10",
-          "text": "Collision attacks have been used to undermine SHA-1, and NIST retired it, recommending SHA-2 or SHA-3.",
+          "text": "Collision attacks have been used to undermine SHA-1. In 2022 NIST announced that SHA-1 should be phased out by Dec. 31, 2030, and recommended SHA-2 or SHA-3.",
           "source": "NIST news, NIST Retires SHA-1 Cryptographic Algorithm, 2022-12-15"
         },
         {
@@ -287,7 +287,7 @@
         },
         {
           "id": "L8-C12",
-          "text": "SSH using a block cipher in CBC mode makes it easier for remote attackers to recover certain plaintext from a block of ciphertext (CVE-2008-5161).",
+          "text": "Error handling in the SSH protocol in SSH Tectia products and OpenSSH 4.7p1, and possibly other versions, makes it easier for remote attackers to recover certain plaintext data from an arbitrary block of ciphertext when a block cipher in CBC mode is used (CVE-2008-5161).",
           "source": "NVD, CVE-2008-5161, description (the published paper by Albrecht, Paterson and Watson, 2009 was not fetched)"
         },
         {
@@ -312,7 +312,7 @@
       "claims": [
         {
           "id": "L8-C14",
-          "text": "Nothing in this course has touched real Windows CE hardware. The engines are compiled for the CF runtime and run on the desktop CLR.",
+          "text": "In this run, nothing has touched real Windows CE hardware. The engines are compiled for the CF runtime and run on the desktop CLR.",
           "source": "docs/prd.md, Spike results table, row 'CE compiler, emulator, device'"
         }
       ],
