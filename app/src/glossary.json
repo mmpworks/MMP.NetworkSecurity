@@ -1,0 +1,16 @@
+{
+  "terms": [
+    { "id": "client", "term": "client", "short": "The program that starts the talk and asks for something." },
+    { "id": "server", "term": "server", "short": "The program that waits for a client and answers it." },
+    { "id": "loopback", "term": "loopback", "short": "A link from your computer back to itself. No bytes leave the machine." },
+    { "id": "byte", "term": "byte", "short": "A small piece of data. One byte holds a number from 0 to 255." },
+    { "id": "hex", "term": "hex", "short": "A way to write bytes with the digits 0 to 9 and the letters a to f." },
+    { "id": "wire", "term": "wire", "short": "The path that carries bytes between two programs." },
+    { "id": "trace", "term": "trace", "short": "A list of everything that happened, in order." },
+    { "id": "event", "term": "trace event", "short": "One line in the trace. It records one step, such as bytes sent." },
+    { "id": "eavesdropper", "term": "eavesdropper", "short": "Someone who listens to the wire but takes no part in the talk." },
+    { "id": "plaintext", "term": "plaintext", "short": "Data that anyone can read." },
+    { "id": "ciphertext", "term": "ciphertext", "short": "Data scrambled by a key. It looks like random noise." },
+    { "id": "key", "term": "key", "short": "A secret number that locks and unlocks data." }
+  ]
+}
