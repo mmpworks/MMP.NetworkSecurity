@@ -12,6 +12,7 @@
 
   <ItemGroup>
     <ProjectReference Include="..\NetSec.Core\NetSec.Core.csproj" />
+    <ProjectReference Include="..\NetSec.Vault\NetSec.Vault.csproj" />
     <None Include="wizard-flows.json" CopyToOutputDirectory="PreserveNewest" />
   </ItemGroup>
 

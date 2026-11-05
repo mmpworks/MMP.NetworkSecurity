@@ -21,6 +21,8 @@ public sealed class FlowParts(SecurityStore store, Func<string, string?> env)
     public const string SaysAgainstRoot = "checked-against-root", SaysSignatureOnly = "checked-signature-only", SaysNoOutsideJudge = "no-outside-judge";
     const string ReadOnlyNotAfter = "2049-12-31";
 
+    readonly OpenSslTool _openSsl = new(env);
+
     static readonly HashSet<string> Built =
     [
         SecurityTypes.RootCa, SecurityTypes.TlsTrust, SecurityTypes.Tls13Server, SecurityTypes.Tls13Client, SecurityTypes.Tls11Server,
@@ -158,47 +160,16 @@ public sealed class FlowParts(SecurityStore store, Func<string, string?> env)
     /// <summary>A check must have a way to fail, so a second run with one thing changed must be refused by the same tool.</summary>
     CheckFact Judged(string typeId, string says, string dir, string arguments, string mustFail, string refusal)
     {
-        string? openssl = OpenSslPath();
+        string? openssl = _openSsl.Locate();
         if (openssl is null) return new CheckFact(typeId, JudgeOpenSsl, says, "openssl " + arguments, "", false, "REFEREE_MISSING", "OpenSSL is not on this machine, so this key is saved and not yet checked. Set NETSEC_OPENSSL to its path.");
-        (int code, string output) = Run(openssl, arguments, dir);
+        (int code, string output) = OpenSslTool.Run(openssl, arguments, dir);
         string command = "openssl " + arguments;
-        if (code == CouldNotStart) return new CheckFact(typeId, JudgeOpenSsl, says, command, output, false, "REFEREE_MISSING", "OpenSSL could not start, so this key is saved and not yet checked. Set NETSEC_OPENSSL to its path.");
+        if (code == OpenSslTool.CouldNotStart) return new CheckFact(typeId, JudgeOpenSsl, says, command, output, false, "REFEREE_MISSING", "OpenSSL could not start, so this key is saved and not yet checked. Set NETSEC_OPENSSL to its path.");
         if (code != 0) return new CheckFact(typeId, JudgeOpenSsl, says, command, output, false, "CHECK_FAILED", "OpenSSL did not accept this key. Make the keys again.");
-        (int controlCode, string controlOutput) = Run(openssl, mustFail, dir);
+        (int controlCode, string controlOutput) = OpenSslTool.Run(openssl, mustFail, dir);
         string control = "openssl " + mustFail;
         if (controlCode <= 0 || !controlOutput.Contains(refusal, StringComparison.Ordinal))
             return new CheckFact(typeId, JudgeOpenSsl, says, command, output, false, "CHECK_FAILED", "OpenSSL did not refuse a changed input for the expected reason, so this check proves nothing.", control, controlOutput);
         return new CheckFact(typeId, JudgeOpenSsl, says, command, output, true, null, null, control, controlOutput);
-    }
-
-    string? OpenSslPath()
-    {
-        string? set = env("NETSEC_OPENSSL");
-        if (!string.IsNullOrEmpty(set)) return File.Exists(set) ? set : null;
-        const string Pinned = @"C:\Program Files\Git\mingw64\bin\openssl.exe";
-        return File.Exists(Pinned) ? Pinned : null;
-    }
-
-    const int CouldNotStart = -2, TimedOut = -1;
-
-    static Process? TryStart(ProcessStartInfo info)
-    {
-        try { return Process.Start(info); }
-        catch (System.ComponentModel.Win32Exception) { return null; }
-    }
-
-    static (int Code, string Output) Run(string exe, string arguments, string dir)
-    {
-        ProcessStartInfo info = new(exe, arguments) { WorkingDirectory = dir, RedirectStandardOutput = true, RedirectStandardError = true, UseShellExecute = false };
-        using Process? process = TryStart(info);
-        if (process is null) return (CouldNotStart, "the tool could not start");
-        Task<string> errors = process.StandardError.ReadToEndAsync();
-        string output = process.StandardOutput.ReadToEnd();
-        if (!process.WaitForExit(30_000))
-        {
-            process.Kill();
-            return (TimedOut, "the tool did not finish in 30 s");
-        }
-        return (process.ExitCode, (output + errors.Result).Trim());
     }
 }

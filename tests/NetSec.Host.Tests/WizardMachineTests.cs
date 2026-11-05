@@ -95,7 +95,7 @@ public class WizardMachineTests
     }
 
     [Fact]
-    public void Back_at_review_makes_a_new_version_and_keeps_the_old_file()
+    public void Back_at_review_makes_a_new_version_and_keeps_the_old_one()
     {
         using Rig rig = new();
         FlowRun run = rig.Runs.Start("my-login")!.Run;
@@ -106,7 +106,7 @@ public class WizardMachineTests
         Assert.Equal("Make", run.State);
         run = Move(rig.Runs, run, "make", NoData).Run;
         Assert.Equal(2, rig.Store.Entry(SecurityTypes.TokenIssuer).Binding!.Version);
-        Assert.True(File.Exists(Path.Combine(rig.Store.Root, "files", SecurityTypes.TokenIssuer, "v1", "key.pem")));
+        Assert.Equal(2, rig.Store.Vault.Describe(SecurityTypes.TokenIssuer).Versions);
     }
 
     [Fact]
@@ -141,11 +141,11 @@ public class WizardMachineTests
     public void A_changed_key_file_turns_a_verified_type_broken()
     {
         using Rig rig = new();
-        rig.Store.PlaceKey(SecurityTypes.TokenIssuer, "first");
-        rig.Store.MarkChecked(SecurityTypes.TokenIssuer, "openssl", "checked-signature-only");
-        Assert.Equal(SecurityStore.StateVerified, rig.Store.StateOf(SecurityTypes.TokenIssuer));
-        File.WriteAllText(Path.Combine(rig.Store.Root, "files", SecurityTypes.TokenIssuer, "v1", "key.pem"), "changed");
-        Assert.Equal(SecurityStore.StateBroken, rig.Store.StateOf(SecurityTypes.TokenIssuer));
+        rig.Store.PlaceKey(SecurityTypes.Tls13Server, "first");
+        rig.Store.MarkChecked(SecurityTypes.Tls13Server, "openssl", "checked-against-root");
+        Assert.Equal(SecurityStore.StateVerified, rig.Store.StateOf(SecurityTypes.Tls13Server));
+        File.WriteAllText(Path.Combine(rig.Store.Root, "files", SecurityTypes.Tls13Server, "v1", "key.pem"), "changed");
+        Assert.Equal(SecurityStore.StateBroken, rig.Store.StateOf(SecurityTypes.Tls13Server));
     }
 
     [Fact]

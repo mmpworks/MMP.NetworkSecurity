@@ -75,6 +75,7 @@ app.MapGet("/api/ce", () => Results.Json(ce.Status()));
 app.MapPost("/api/ce/start", async () => Results.Json(await ce.StartAsync()));
 app.MapPost("/api/ce/stop", () => { ce.Stop(); return Results.Json(ce.Status()); });
 SecurityRoutes.Map(app, security, flowRuns);
+VaultRoutes.Map(app, security.Vault, new VaultExercise(security.Vault, new OpenSslTool(Environment.GetEnvironmentVariable), Path.Combine(security.Root, "proof")));
 
 app.Map("/ws", async ctx =>
 {
@@ -231,7 +232,7 @@ namespace NetSec.Host
                 return;
             }
             CredentialSet credentials;
-            try { credentials = security.Credentials(LabCatalog.Needs(lesson)); }
+            try { credentials = security.Credentials(LabCatalog.Needs(lesson), "host/lab-" + lesson); }
             catch (NetSecException e)
             {
                 Fail(requestId, e.Error.Code, e.Error.Message);

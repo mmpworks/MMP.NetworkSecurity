@@ -1,6 +1,6 @@
 # Third-party notices
 
-Conclusion: this repository commits no third-party binary. The app, when built, ships Electron 33.2.1 (which carries Chromium) and four npm packages. The Go referees use two Go modules. Each licence below was read from the file named, on 2026-11-05.
+Conclusion: this repository commits no third-party binary. The app, when built, ships Electron 33.2.1 (which carries Chromium) and four npm packages. The Go referees use two Go modules. The Host's practice vault uses six NuGet packages (section 6). Each licence below was read from the file named, on 2026-11-05.
 
 ## 1. What was read
 
@@ -8,6 +8,7 @@ Conclusion: this repository commits no third-party binary. The app, when built, 
 2. Direct npm dependencies: the `license` field of each package's own `package.json`, and the licence file in each package folder, in `E:\dev\ns-ui13\app\node_modules`.
 3. All 188 installed npm packages: the `license` field of each `package.json`. The count by licence is in section 4.
 4. Go: the `LICENSE` file of each module in the Go module cache, at the versions `acceptance/referees/go/go.mod` names.
+5. NuGet: the `<license>` and `<copyright>` fields of each package's `.nuspec`, and `LICENSE.txt` where the package carries one, in the NuGet cache (`%USERPROFILE%\.nuget\packages`), at the versions `src/NetSec.Vault/obj/project.assets.json` resolves.
 
 ## 2. Electron and Chromium (shipped with the app)
 
@@ -93,7 +94,22 @@ THEORY OF LIABILITY, WHETHER IN CONTRACT, STRICT LIABILITY, OR TORT
 OF THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
 ```
 
-## 6. Not in this repository
+## 6. NuGet packages (the Host's practice vault)
+
+`src/NetSec.Vault` names two packages. NuGet resolves four more under them. The build copies their DLLs and `runtimes/win-x64/native/e_sqlite3.dll` into the Host's output folder. Git holds none of them.
+
+| Package | Version | Licence | Copyright | Read from |
+|---|---|---|---|---|
+| `Microsoft.Data.Sqlite.Core` | 10.0.9 | MIT | © Microsoft Corporation | `.nuspec` |
+| `SQLitePCLRaw.bundle_e_sqlite3` | 3.0.3 | Apache-2.0 | Copyright 2014-2026 SourceGear, LLC | `.nuspec` |
+| `SQLitePCLRaw.config.e_sqlite3` | 3.0.3 | Apache-2.0 | Copyright 2014-2026 SourceGear, LLC | `.nuspec` |
+| `SQLitePCLRaw.core` | 3.0.3 | Apache-2.0 | Copyright 2014-2025 SourceGear, LLC | `.nuspec` |
+| `SQLitePCLRaw.provider.e_sqlite3` | 3.0.3 | Apache-2.0 | Copyright 2014-2025 SourceGear, LLC | `.nuspec` |
+| `SourceGear.sqlite3` | 3.50.4.5 | SQLite is public domain. The file reads "SQLite is Public Domain" and links https://sqlite.org/copyright.html | | `LICENSE.txt`, 61 bytes |
+
+`Microsoft.Data.Sqlite` 10.0.9 is not used. It pulls a SQLite older than 3.50.2, which carries advisory GHSA-2m69-gcr7-jv3q (`docs/modes-design.md` section 4.4).
+
+## 7. Not in this repository
 
 1. The .NET Compact Framework 3.5 reference assemblies (`E:\dev\tools\netcf35-ref`). They are Microsoft files, kept out of the repository, and the acceptance suite checks that no CF binary is committed.
 2. The X9.24-3 test vectors. The PRD licence checklist keeps them behind a fetch script and out of the repository.
