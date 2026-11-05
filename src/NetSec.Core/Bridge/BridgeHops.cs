@@ -247,7 +247,18 @@ namespace NetSec.Bridge
     {
         public ITrainingKeySource Keys;
         public IRandomSource Random;
+
+        /// <summary>The gateway's hop 2 draws here, so the two hops cannot race for one stream. Null shares Random.</summary>
+        public IRandomSource NextHopRandom;
         public ITraceSink Sink;
+        public IStepGate Gate;
+        public ITamperHook Tamper;
+
+        /// <summary>Null means "bridge", for a process that serves whoever connects.</summary>
+        public string SessionId;
+
+        /// <summary>A caller that knows the id ahead of time sets it. Null means learn it from the first frame.</summary>
+        public string TraceId;
     }
 
     /// <summary>
@@ -260,8 +271,9 @@ namespace NetSec.Bridge
         const string Session = "bridge";
         const int FrameHeader = 4;
         const string NoOpenNote = "PIN block: gateway cannot open this";
+        const int LockedBlockFromEnd = 17;
 
-        /// <summary>One CE connection. Ends when the SSH session ends. flipEnvelope changes one MAC byte after SSH and before TLS, so the bank is the one that catches it.</summary>
+        /// <summary>One CE connection. Ends when the SSH session ends. flipEnvelope changes one byte of the locked PIN block after SSH and before TLS, so the bank is the one that catches it.</summary>
         public static IFuture ServeGateway(IByteLink ce, HopServerOptions o, int nextPort, bool flipEnvelope)
         {
             return AsyncProxy.Run(GatewayBody(ce, o, nextPort, flipEnvelope));
@@ -269,9 +281,11 @@ namespace NetSec.Bridge
 
         static IEnumerable<IFuture> GatewayBody(IByteLink ce, HopServerOptions o, int nextPort, bool flipEnvelope)
         {
-            LateTraceSink sink = new LateTraceSink(o.Sink);
+            LateTraceSink late = o.TraceId == null ? new LateTraceSink(o.Sink) : null;
+            ITraceSink sink = late ?? o.Sink;
+            string session = o.SessionId ?? Session;
             GlassTransportFactory factory = new GlassTransportFactory(o.Keys);
-            TraceStream notes = new TraceStream(Session + "/gateway/bridge", Session, null, null, "gateway", new MonotonicClock());
+            TraceStream notes = new TraceStream(session + "/gateway/bridge", session, o.TraceId, null, "gateway", new MonotonicClock());
 
             TransportRequest ssh = new TransportRequest();
             ssh.Protocol = WireProtocol.Ssh;
@@ -279,14 +293,18 @@ namespace NetSec.Bridge
             ssh.Link = ce;
             ssh.Random = o.Random;
             ssh.Sink = sink;
+            ssh.Gate = o.Gate;
+            ssh.Tamper = o.Tamper;
+            ssh.TraceId = o.TraceId;
             ssh.Hop = Hop1;
-            ssh.SessionId = Session;
+            ssh.SessionId = session;
             ssh.Actor = "gateway";
+            ssh.PeerActor = "ce";
             // The gateway forwards to one place and ignores the target name, as Go gogateway does, so an ssh.exe -L run works.
             ssh.AllowTunnel = delegate(string host, int port) { return true; };
             ssh.OpenTarget = delegate(string host, int port)
             {
-                return Futures.FromResult<IByteLink>(new FirstWriteOpensLink(delegate { return OpenNextHop(factory, o, sink, notes, nextPort, flipEnvelope); }));
+                return Futures.FromResult<IByteLink>(new FirstWriteOpensLink(delegate { return OpenNextHop(factory, o, sink, late, notes, nextPort, flipEnvelope); }));
             };
 
             IFuture<ISecureChannel> opened = factory.Open(ssh);
@@ -296,16 +314,16 @@ namespace NetSec.Bridge
                 IFuture<PumpResult> finished = ((GlassSshSession)opened.Result).Finished;
                 yield return Futures.Observe(finished);
             }
-            sink.Flush();
+            if (late != null) late.Flush();
             ce.Close();
         }
 
-        static IFuture<IByteLink> OpenNextHop(GlassTransportFactory factory, HopServerOptions o, LateTraceSink sink, TraceStream notes, int nextPort, bool flipEnvelope)
+        static IFuture<IByteLink> OpenNextHop(GlassTransportFactory factory, HopServerOptions o, ITraceSink sink, LateTraceSink late, TraceStream notes, int nextPort, bool flipEnvelope)
         {
-            return AsyncProxy.Run<IByteLink>(delegate(Return<IByteLink> ret) { return NextHopBody(factory, o, sink, notes, nextPort, flipEnvelope, ret); });
+            return AsyncProxy.Run<IByteLink>(delegate(Return<IByteLink> ret) { return NextHopBody(factory, o, sink, late, notes, nextPort, flipEnvelope, ret); });
         }
 
-        static IEnumerable<IFuture> NextHopBody(GlassTransportFactory factory, HopServerOptions o, LateTraceSink sink, TraceStream notes, int nextPort, bool flipEnvelope, Return<IByteLink> ret)
+        static IEnumerable<IFuture> NextHopBody(GlassTransportFactory factory, HopServerOptions o, ITraceSink sink, LateTraceSink late, TraceStream notes, int nextPort, bool flipEnvelope, Return<IByteLink> ret)
         {
             IFuture<SocketLink> connected = SocketLink.Connect(new IPEndPoint(IPAddress.Loopback, nextPort));
             yield return connected;
@@ -315,24 +333,26 @@ namespace NetSec.Bridge
             tls.Role = EngineRole.Client;
             tls.Group = KexGroup.X25519MlKem768;
             tls.Link = connected.Result;
-            tls.Random = o.Random;
+            tls.Random = o.NextHopRandom ?? o.Random;
             tls.Sink = sink;
+            tls.Gate = o.Gate;
+            tls.Tamper = o.Tamper;
+            tls.TraceId = o.TraceId;
             tls.Hop = Hop2;
-            tls.SessionId = Session;
+            tls.SessionId = o.SessionId ?? Session;
             tls.Actor = "gateway";
             IFuture<ISecureChannel> opened = factory.Open(tls);
             yield return opened;
 
             ret.Value = new FirstWriteLink(new ChannelByteLink(opened.Result, 0, true), delegate(byte[] first)
             {
-                string traceId = TraceIdOf(first);
-                if (traceId != null) sink.Learn(traceId);
+                Learn(late, first);
                 TraceEventDraft note = new TraceEventDraft();
                 note.Type = "gateway.envelope.relayed";
                 note.Message = "PinEnvelope";
                 note.Detail = NoOpenNote;
                 sink.Write(notes.Stamp(note));
-                if (flipEnvelope) first[first.Length - 1] ^= 1;
+                if (flipEnvelope) first[first.Length - LockedBlockFromEnd] ^= 1;
                 return first;
             });
         }
@@ -345,7 +365,7 @@ namespace NetSec.Bridge
 
         static IEnumerable<IFuture> ServerBody(IByteLink gateway, HopServerOptions o, int bankPort)
         {
-            LateTraceSink sink = new LateTraceSink(o.Sink);
+            LateTraceSink late = o.TraceId == null ? new LateTraceSink(o.Sink) : null;
             IFuture<SocketLink> bank = SocketLink.Connect(new IPEndPoint(IPAddress.Loopback, bankPort));
             yield return bank;
 
@@ -355,21 +375,31 @@ namespace NetSec.Bridge
             tls.Group = KexGroup.X25519MlKem768;
             tls.Link = gateway;
             tls.Random = o.Random;
-            tls.Sink = sink;
+            tls.Sink = late ?? o.Sink;
+            tls.Gate = o.Gate;
+            tls.Tamper = o.Tamper;
+            tls.TraceId = o.TraceId;
             tls.Hop = Hop2;
-            tls.SessionId = Session;
+            tls.SessionId = o.SessionId ?? Session;
             tls.Actor = "server";
+            tls.PeerActor = "gateway";
             IFuture<ISecureChannel> opened = new GlassTransportFactory(o.Keys).Open(tls);
             yield return opened;
 
             IByteLink toBank = new FirstWriteLink(bank.Result, delegate(byte[] first)
             {
-                string traceId = TraceIdOf(first);
-                if (traceId != null) sink.Learn(traceId);
+                Learn(late, first);
                 return first;
             });
             yield return BridgeRelay.Join(new ChannelByteLink(opened.Result, 0, true), toBank);
-            sink.Flush();
+            if (late != null) late.Flush();
+        }
+
+        static void Learn(LateTraceSink late, byte[] firstWrite)
+        {
+            if (late == null) return;
+            string traceId = TraceIdOf(firstWrite);
+            if (traceId != null) late.Learn(traceId);
         }
 
         /// <summary>The id the first frame claims, or null when it does not read as an envelope. A hop only labels its trace with this. The bank alone can verify it.</summary>
@@ -396,7 +426,7 @@ namespace NetSec.Bridge
         GlassSshSession _session;
         IByteLink _tunnel;
 
-        public GlassSshLink(IPEndPoint endpoint, ITrainingKeySource keys, SshSuite suite, IRandomSource random, ITraceSink sink, string traceId)
+        public GlassSshLink(IPEndPoint endpoint, ITrainingKeySource keys, SshSuite suite, IRandomSource random, ITraceSink sink, string traceId, string sessionId, IStepGate gate, ITamperHook tamper)
         {
             _endpoint = endpoint;
             _factory = new GlassTransportFactory(keys);
@@ -407,9 +437,12 @@ namespace NetSec.Bridge
             _request.Random = random;
             _request.Sink = sink;
             _request.TraceId = traceId;
-            _request.SessionId = traceId;
+            _request.SessionId = sessionId ?? traceId;
+            _request.Gate = gate;
+            _request.Tamper = tamper;
             _request.Hop = BridgeHopServers.Hop1;
             _request.Actor = "ce";
+            _request.PeerActor = "gateway";
             _request.PeerName = endpoint.Address.ToString();
             _request.PeerPort = endpoint.Port;
             _request.KnownHosts = SshSetup.KnownHostLine(keys, suite, _request.PeerName, endpoint.Port);

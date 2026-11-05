@@ -206,6 +206,16 @@ namespace NetSec.Labs
 
         public static AttackDefinition[] All { get { return (AttackDefinition[])Rows.Clone(); } }
 
+        /// <summary>Lesson 9's rows, which join All when its tour lands.</summary>
+        public static AttackDefinition[] Lesson9Unreleased { get { return (AttackDefinition[])Lesson9Rows.Clone(); } }
+
+        static readonly AttackDefinition[] Lesson9Rows =
+        {
+            Flip("L9-tamper-hop1", 9, SshNames.ChannelData, SshProtectedBodyOffset, SshCodes.PacketMac, SshChecks.PacketMac),
+            Flip("L9-tamper-hop2", 9, "ApplicationData", Tls13Lab.RecordCipherOffset, Tls13Codes.AeadTag, Tls13Codes.CheckName(Tls13Codes.AeadTag)),
+            WithOption("L9-flip-pin-block", 9, Lesson09Bridge.OptionFlipPinBlock, "yes", AttackOutcome.Rejected, ErrorCodes.DukptMacMismatch, NetSec.Bridge.BankHsmCore.MacCheck),
+        };
+
         static AttackDefinition Flip(string id, int lesson, string message, int offset, string code, string check)
         {
             TamperPlan plan = new TamperPlan();

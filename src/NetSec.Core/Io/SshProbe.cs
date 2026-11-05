@@ -83,7 +83,7 @@ namespace NetSec.Io
         {
             bool isClient = r.Role == EngineRole.Client;
             string actor = r.Actor ?? (isClient ? "client" : "server");
-            string peer = isClient ? "server" : "client";
+            string peer = r.PeerActor ?? (isClient ? "server" : "client");
             string session = r.SessionId ?? r.TraceId ?? "glass";
             TraceStream stream = new TraceStream(session + "/" + actor + "/ssh", session, r.TraceId, r.Hop, actor, new MonotonicClock());
             SshEngine engine = isClient
