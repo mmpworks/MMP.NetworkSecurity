@@ -56,6 +56,7 @@ export async function fingerprintOfHex(hex: string): Promise<string> {
 
 async function call(path: string, body: unknown): Promise<{ ok: boolean; body: any }> {
   vault.busy = true
+  vault.fault = null
   try {
     const r = await hostSend(addr, 'POST', path, body)
     if (r.status >= 300) { vault.fault = refusal(r.body); return { ok: false, body: r.body } }
@@ -72,7 +73,6 @@ export async function loadVaultKeys() {
     const b = await hostGet(addr, '/api/security/vault/keys')
     vault.keys = list(b.keys).map(toKey)
     vault.loaded = true
-    vault.fault = null
   } catch (e: any) { vault.fault = { code: e?.status === 404 ? 'PRODUCT_MISSING' : 'HOST_VAULT_FAILED', message: 'The course could not read the vault list from the engine.', retryable: true, requestId: '' } }
 }
 
@@ -106,6 +106,7 @@ export async function tryExport() {
 
 export async function showAudit() {
   vault.auditShown = true
+  vault.fault = null
   const rows: AuditRow[] = []
   try {
     for (let after = 0; ;) {
@@ -116,13 +117,13 @@ export async function showAudit() {
       after = page[page.length - 1].seq
     }
     vault.audit = rows
-    vault.fault = null
   } catch { vault.fault = { code: 'HOST_VAULT_FAILED', message: 'The course could not read the audit list.', retryable: true, requestId: '' } }
 }
 
 export async function checkChain() {
   const r = await call('/api/security/vault/exercise/audit-check', {})
-  if (r.ok) vault.chain = { rows: list(r.body.rows).length || Number(r.body.rows ?? 0), firstBadSeq: Number(r.body.firstBadSeq ?? 0), code: str(r.body.code) }
+  if (!r.ok) return
+  vault.chain = { rows: list(r.body.rows).length || Number(r.body.rows ?? 0), firstBadSeq: Number(r.body.firstBadSeq ?? 0), code: str(r.body.code) }
   await showAudit()
 }
 
