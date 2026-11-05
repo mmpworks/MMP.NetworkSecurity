@@ -62,6 +62,23 @@ namespace NetSec.Tests
             Assert.NotEqual(Lines(Go(lesson, null, 21)), Lines(Go(lesson, null, 22)));
         }
 
+        /// <summary>
+        /// A pinned digest of every engine event. Both builds run this test, so net10.0 and the CF binaries give the same bytes for a seed.
+        /// A change to a message, a field, or an event name changes the pin. Update it on purpose, and only after both names and tours agree.
+        /// </summary>
+        [Theory]
+        [InlineData(1, "96aedafa541b5c3eafc972f0b21534dbccd385a3")]
+        [InlineData(2, "033931d977ab44f5268abf662084e0de6a75c0a0")]
+        [InlineData(3, "7a6fcd9878e6188fcff35ef9e4684ce0e9250b4b")]
+        public void The_engine_bytes_for_a_seed_are_the_same_on_both_builds(int lesson, string pin)
+        {
+            Run run = Go(lesson, null, 31);
+            byte[] lines = System.Text.Encoding.UTF8.GetBytes(string.Join("\n", run.Events.Where(e => !e.StreamId.EndsWith("/wire")).OrderBy(e => e.EventId, StringComparer.Ordinal).Select(TraceJson.ToLine).ToArray()));
+            NetSec.Crypto.IHash hash = NetSec.Crypto.Hashes.Sha256();
+            hash.Update(lines, 0, lines.Length);
+            Assert.Equal(pin, NetSec.Bytes.Hex.Encode(hash.Finish()).Substring(0, pin.Length));
+        }
+
         [Fact]
         public void Lesson_1_sends_the_named_messages_in_order()
         {
