@@ -18,7 +18,7 @@ namespace NetSec.Io
     {
         public const string DefaultUser = "training";
 
-        /// <summary>A silent peer ends in LINK_DEADLINE after this long. Step mode has no deadline: a learner may read for an hour (docs/learnings.md S0 item 11).</summary>
+        /// <summary>A silent peer ends in LINK_DEADLINE after this long. The pump restarts the clock while a learner holds an event at the gate (docs/learnings.md S3 item 1).</summary>
         public const int ReadDeadlineMs = 30000;
 
         public static SshAlgorithms AlgorithmsFor(SshSuite suite)
@@ -80,8 +80,7 @@ namespace NetSec.Io
             SshEngine engine = isClient
                 ? SshEngine.Client(Client(keys, r.Suite, r.Random, r.PeerName, r.PeerPort, r.KnownHosts, r.KnownHosts == null), stream, r.Tamper, peer)
                 : SshEngine.Server(Server(keys, r.Suite, r.Random, r.AllowTunnel), stream, r.Tamper, peer);
-            int deadline = r.Gate == null || r.Gate is FreeRunGate ? ReadDeadlineMs : 0;
-            return new GlassSshSession(engine, r.Link, r.Sink, r.Gate, r.Tamper, deadline, null, r.OpenTarget ?? SocketTarget);
+            return new GlassSshSession(engine, r.Link, r.Sink, r.Gate, r.Tamper, ReadDeadlineMs, null, r.OpenTarget ?? SocketTarget);
         }
 
         /// <summary>A socket to a target name. The server's allow list has already passed this target.</summary>

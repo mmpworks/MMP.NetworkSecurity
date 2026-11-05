@@ -36,6 +36,7 @@ namespace NetSec.Ssh
         public const string AuthSignature = "userauth signature verify";
         public const string ExecAccepted = "exec accepted";
         public const string TunnelAllowList = "tunnel allow list";
+        public const string TunnelAccepted = "tunnel accepted";
         public const string ChannelKnown = "channel number known";
         public const string ChannelWindow = "channel window";
         public const string NoRekey = "no rekey in this lab";

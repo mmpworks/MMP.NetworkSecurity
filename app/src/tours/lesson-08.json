@@ -234,7 +234,7 @@
       "title": "A tunnel through the server",
       "text": [
         "SSH can also carry other traffic. The client asks the server to open a connection to a target and relay it. This is a tunnel.",
-        "A server should not relay to just anywhere. The lab keeps an allow list of targets. The client checks the target against it, and the check is named tunnel allow list.",
+        "A server should not relay to just anywhere. The lab keeps an allow list of targets. The server checks the target against it, and the check is named tunnel allow list.",
         "Try it: ask for a tunnel to a target that is off the list. The check fails."
       ],
       "glossary": [],
@@ -249,8 +249,8 @@
       "claims": [
         {
           "id": "L8-C09",
-          "text": "SSH TCP/IP forwarding uses direct-tcpip channels to open a connection to a host and port.",
-          "source": "RFC 4254, section 7.2 (TCP/IP Forwarding Channels)"
+          "text": "SSH TCP/IP forwarding uses direct-tcpip channels to open a connection to a host and port, and the receiving side must decide whether to allow the forwarding.",
+          "source": "RFC 4254, section 7.2 (TCP/IP Forwarding Channels); docs/lesson-ssh-names.md, tunnel allow list row (actor server, branch fix/ssh-followups)"
         }
       ],
       "unlock": { "mode": "action", "ref": "L8-S11-T1" }

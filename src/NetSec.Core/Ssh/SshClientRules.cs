@@ -197,14 +197,14 @@ namespace NetSec.Ssh
                 effects.Add(s.SealedPacket(SshNames.ChannelRequestExec, new ByteWriter().U8(SshMsg.ChannelRequest).U32(channel.Remote).Prefixed("exec").U8(1).Prefixed(channel.ExecCommand).ToArray()));
             else
             {
-                effects.Add(Effect.Check(SshChecks.TunnelAllowList, SshCodes.TunnelRefused));
+                effects.Add(Effect.Check(SshChecks.TunnelAccepted, SshCodes.TunnelRefused));
                 effects.Add(Effect.Deliver(SshControl.Channel, SshControl.Encode(SshControl.ChannelReady, channel.Local, "")));
             }
             SshRows.Drain(s, channel, effects);
             return StepDecision.Stay(effects.ToArray());
         }
 
-        /// <summary>The lab ends the session on a refused tunnel, so the refusal has one name for the learner.</summary>
+        /// <summary>The server decided (RFC 4254 section 7.2). The client only learns the answer, and the lab ends its session there, so a refusal ends the run.</summary>
         static StepDecision ReadOpenFailure(SshSession s, InboundMessage m)
         {
             ByteReader r = new ByteReader(m.Body, 1, m.Body.Length - 1, true);
@@ -212,7 +212,7 @@ namespace NetSec.Ssh
             SshChannel channel = SshRows.Find(s, r.U32("recipient", "id"), out refused);
             if (channel == null) return refused;
             string description = "reason " + r.U32("reason", "id") + ": " + SshFields.Text(r.Prefixed("description", "data"));
-            return StepDecision.Fail(SshCodes.TunnelRefused, SshChecks.TunnelAllowList, "the server refused channel " + channel.Local + ", " + description);
+            return StepDecision.Fail(SshCodes.TunnelRefused, SshChecks.TunnelAccepted, "the server refused channel " + channel.Local + ", " + description);
         }
 
         static StepDecision ReadExecOk(SshSession s, InboundMessage m)
