@@ -210,8 +210,10 @@ namespace NetSec.Tests
                 "L6-replay-sale", "L6-flip-pin-block", "L6-ask-past-key",
                 "L7-downgrade", "L7-modern-server", "L7-flip-record",
                 "L8-change-host-key", "L8-flip-exchange-signature", "L8-zero-share", "L8-flip-packet", "L8-wrong-user-key", "L8-refused-tunnel", "L8-legacy-flip-signature",
+                "L9-tamper-hop1", "L9-tamper-hop2", "L9-flip-pin-block",
+                "L11-guess-leaky", "L11-guess-constant-time",
             };
-            Assert.Equal(expected, AttackCatalog.All.Where(a => a.Lesson >= 1 && a.Lesson != 4 && a.Lesson != 5).Select(a => a.AttackId).ToArray());
+            Assert.Equal(expected, AttackCatalog.All.Where(a => a.Lesson >= 1 && a.Lesson != 4 && a.Lesson != 5 && a.Lesson != 10).Select(a => a.AttackId).ToArray());
         }
     }
 }

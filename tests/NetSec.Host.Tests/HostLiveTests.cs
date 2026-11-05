@@ -175,12 +175,19 @@ namespace NetSec.Host.Tests
         }
 
         [Fact]
-        public async Task Lesson_11_is_refused_until_its_tour_lands_and_the_host_already_carries_its_library()
+        public async Task Lesson_11_loads_the_native_library_in_the_host_and_finishes_with_measured_numbers()
         {
             using Socket s = await Socket.Open(host);
-            await s.Send("{\"type\":\"session.start\",\"requestId\":\"r1\",\"lesson\":11,\"mode\":\"run\"}");
-            Assert.Equal("LESSON_NOT_BUILT", (await s.Until("error")).GetProperty("code").GetString());
-            Assert.True(File.Exists(Path.Combine(Path.GetDirectoryName(HostFixture.HostDll()), "netsec_ct.dll")));
+            await s.Send("{\"type\":\"session.start\",\"requestId\":\"r1\",\"lesson\":11,\"seed\":7,\"mode\":\"run\",\"transport\":\"glass\"}");
+            JsonElement started = await s.Next();
+            Assert.Equal("session.started", started.GetProperty("type").GetString());
+            List<JsonElement> frames = await s.UntilFinished(started.GetProperty("sessionId").GetString());
+            Assert.Equal("completed", frames.Last().GetProperty("outcome").GetString());
+            string[] types = frames.Where(f => f.GetProperty("type").GetString() == "trace").Select(f => f.GetProperty("event").GetProperty("type").GetString()).ToArray();
+            Assert.Equal(4, types.Count(t => t == "timing.samples"));
+            Assert.Contains("timing.verdict", types);
+            Assert.Contains("timing.managed", types);
+            Assert.Equal(2, types.Count(t => t == "timing.guess.finished"));
         }
 
         [Fact]
@@ -242,10 +249,48 @@ namespace NetSec.Host.Tests
             using Socket s = await Socket.Open(host);
             await s.Send("{\"type\":\"session.start\",\"requestId\":\"r1\",\"lesson\":99,\"mode\":\"run\"}");
             Assert.Equal("LESSON_NOT_BUILT", (await s.Until("error")).GetProperty("code").GetString());
-            await s.Send("{\"type\":\"session.start\",\"requestId\":\"r3\",\"lesson\":10,\"mode\":\"run\"}");
-            Assert.Equal("LESSON_NOT_BUILT", (await s.Until("error")).GetProperty("code").GetString());
+            // Lessons leave this list as they release, so the test asks the Host which ones are still unbuilt.
+            JsonElement rows = await GetJson("/api/lessons");
+            foreach (JsonElement row in rows.EnumerateArray().Where(r => !r.GetProperty("built").GetBoolean()))
+            {
+                await s.Send("{\"type\":\"session.start\",\"requestId\":\"r3\",\"lesson\":" + row.GetProperty("lesson").GetInt32() + ",\"mode\":\"run\"}");
+                Assert.Equal("LESSON_NOT_BUILT", (await s.Until("error")).GetProperty("code").GetString());
+            }
             await s.Send("{\"type\":\"session.start\",\"requestId\":\"r2\",\"lesson\":0,\"mode\":\"run\",\"transport\":\"real\"}");
             Assert.Equal("REAL_MODE_NOT_BUILT", (await s.Until("error")).GetProperty("code").GetString());
+        }
+
+        /// <summary>A lab can do slow work before its first event. A step sent right after session.started must still release that event, with no resend.</summary>
+        [Theory]
+        [InlineData(0)]
+        [InlineData(1)]
+        [InlineData(3)]
+        [InlineData(4)]
+        [InlineData(6)]
+        [InlineData(7)]
+        [InlineData(8)]
+        public async Task A_step_right_after_session_started_releases_the_first_event(int lesson)
+        {
+            using Socket s = await Socket.Open(host);
+            await s.Send("{\"type\":\"session.start\",\"requestId\":\"r1\",\"lesson\":" + lesson + ",\"seed\":7,\"mode\":\"step\"}");
+            JsonElement started = await s.Until("session.started");
+            string id = started.GetProperty("sessionId").GetString();
+            await s.Send("{\"type\":\"session.step\",\"sessionId\":\"" + id + "\"}");
+            await s.Until("trace").WaitAsync(TimeSpan.FromSeconds(20));
+            await s.Send("{\"type\":\"session.run\",\"sessionId\":\"" + id + "\"}");
+            await s.UntilFinished(id);
+        }
+
+        [Fact]
+        public async Task Lesson_10_runs_through_the_host_to_the_end_with_its_rows_listed()
+        {
+            using Socket s = await Socket.Open(host);
+            await s.Send("{\"type\":\"session.start\",\"requestId\":\"r1\",\"lesson\":10,\"seed\":13,\"mode\":\"run\"}");
+            string id = (await s.Until("session.started")).GetProperty("sessionId").GetString();
+            Assert.Equal("completed", (await s.UntilFinished(id)).Last().GetProperty("outcome").GetString());
+            JsonElement row = await GetJson("/api/lessons/10");
+            Assert.True(row.GetProperty("built").GetBoolean());
+            Assert.Equal(13, row.GetProperty("attacks").GetArrayLength());
         }
 
         [Fact]
@@ -254,7 +299,7 @@ namespace NetSec.Host.Tests
             JsonElement rows = await GetJson("/api/lessons");
             Assert.Equal(Enumerable.Range(1, 11), rows.EnumerateArray().Select(r => r.GetProperty("lesson").GetInt32()));
             int[] built = rows.EnumerateArray().Where(r => r.GetProperty("built").GetBoolean()).Select(r => r.GetProperty("lesson").GetInt32()).ToArray();
-            foreach (int lesson in new[] { 1, 2, 3, 4, 5 }) Assert.Contains(lesson, built);
+            foreach (int lesson in new[] { 1, 2, 3, 4, 5, 10, 11 }) Assert.Contains(lesson, built);
             JsonElement toy = await GetJson("/api/lessons/0");
             Assert.True(toy.GetProperty("built").GetBoolean());
             Assert.Equal("L0-flip-wire-byte", toy.GetProperty("attacks")[0].GetProperty("attackId").GetString());

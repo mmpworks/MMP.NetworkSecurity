@@ -31,12 +31,18 @@ namespace NetSec.Io
         readonly object _lock = new object();
         readonly Queue<Promise> _waiting = new Queue<Promise>();
         bool _open;
+        bool _stepHeld;
 
         public IFuture Pass(TraceEvent e)
         {
             lock (_lock)
             {
                 if (_open) return Futures.Completed;
+                if (_stepHeld)
+                {
+                    _stepHeld = false;
+                    return Futures.Completed;
+                }
                 Promise waiter = new Promise(PromiseOptions.RunContinuationsAsynchronously);
                 _waiting.Enqueue(waiter);
                 return waiter.Future;
@@ -49,7 +55,11 @@ namespace NetSec.Io
         {
             Promise waiter = null;
             lock (_lock)
+            {
+                // A lab can do slow work before an event reaches the gate. One step waits for that event. More steps add nothing, because the app resends.
                 if (_waiting.Count > 0) waiter = _waiting.Dequeue();
+                else _stepHeld = true;
+            }
             if (waiter != null) waiter.TrySetResult();
         }
 
@@ -59,6 +69,7 @@ namespace NetSec.Io
             lock (_lock)
             {
                 _open = true;
+                _stepHeld = false;
                 released = _waiting.ToArray();
                 _waiting.Clear();
             }
@@ -67,13 +78,17 @@ namespace NetSec.Io
 
         public void Pause()
         {
-            lock (_lock) _open = false;
+            lock (_lock)
+            {
+                _open = false;
+                _stepHeld = false;
+            }
         }
     }
 
     /// <summary>
     /// The only code that joins an engine to a socket. Two C# 3 iterators run on MMP.AsyncProxy:
-    /// the read loop feeds the engine and waits for the outbox to drain, so the engine cannot run ahead of the gate;
+    /// the read loop feeds the engine. With a gate it waits for the outbox to drain, so the engine cannot run ahead of the gate. With no gate it keeps reading while a write waits, up to InboundBacklogLimit;
     /// the outbox loop is the only code that touches the gate, the Wire tamper point, the sink, and the socket write.
     /// A socket event carries the bytes as they went on the wire, on a stream of its own: TCP chunking can change between
     /// runs, and the engine's own sequence numbers must not change with it.
@@ -95,6 +110,24 @@ namespace NetSec.Io
         readonly Promise<PumpResult> _result = new Promise<PumpResult>();
         Promise _outboxWake;
         Promise _drained;
+        Promise _readRoom;
+        readonly Queue<int> _outboxSizes = new Queue<int>();
+        readonly Queue<PublishWaiter> _publishWaiters = new Queue<PublishWaiter>();
+        readonly bool _readsWhileWriting;
+        long _inboundBacklog, _queuedOutputs, _publishedOutputs;
+
+        /// <summary>
+        /// With no gate, the read loop keeps reading while a write waits, or two ends that both send would each wait for the other. What reads produce
+        /// then waits behind that write, so this limit bounds it. Past it, the loop stops reading, and TCP makes the peer wait. A peer that also stops ends in the write deadline.
+        /// </summary>
+        public const int InboundBacklogLimit = 16 * 1024 * 1024;
+
+        sealed class PublishWaiter
+        {
+            public readonly long Ticket;
+            public readonly Promise Done;
+            public PublishWaiter(long ticket, Promise done) { Ticket = ticket; Done = done; }
+        }
         bool _publishing;
         bool _ended;
         NetSecError _linkError;
@@ -111,6 +144,7 @@ namespace NetSec.Io
             if (link == null) throw new ArgumentNullException("link");
             _engine = engine; _link = link; _sink = sink ?? new NullSink(); _gate = gate ?? new FreeRunGate();
             _tamper = tamper; _deadlineMs = deadlineMs;
+            _readsWhileWriting = _gate is FreeRunGate;
             TraceStream s = engine.Stream;
             _wireStream = new TraceStream(s.StreamId + "/wire", s.SessionId, s.TraceId, s.Hop, s.Actor, clock);
         }
@@ -120,7 +154,7 @@ namespace NetSec.Io
 
         public IFuture<PumpResult> Run()
         {
-            Drive(delegate { return _engine.Start(); });
+            Drive(delegate { return _engine.Start(); }, false);
             Observed(AsyncProxy.Run(OutboxLoop()));
             Observed(AsyncProxy.Run(ReadLoop()));
             return _result.Future;
@@ -128,8 +162,19 @@ namespace NetSec.Io
 
         public IFuture Enqueue(EngineCommand command)
         {
-            Drive(delegate { return _engine.Command(command); });
-            return Drained();
+            return PublishedThrough(Drive(delegate { return _engine.Command(command); }, false));
+        }
+
+        /// <summary>Completes when this output is out. It never waits for a quiet moment, because a two-way flow may have none.</summary>
+        IFuture PublishedThrough(long ticket)
+        {
+            lock (_lock)
+            {
+                if (_ended || _publishedOutputs >= ticket) return Futures.Completed;
+                Promise done = new Promise(PromiseOptions.RunContinuationsAsynchronously);
+                _publishWaiters.Enqueue(new PublishWaiter(ticket, done));
+                return done.Future;
+            }
         }
 
         void Observed(IFuture loop)
@@ -145,7 +190,7 @@ namespace NetSec.Io
             byte[] buffer = new byte[16384];
             while (!IsEnded)
             {
-                yield return Drained();
+                yield return ReadMayGo();
                 if (IsEnded || EngineEnded) yield break;
 
                 IFuture<int> read = _link.Read(buffer, 0, buffer.Length);
@@ -166,28 +211,64 @@ namespace NetSec.Io
             }
         }
 
+        /// <summary>A gate needs the drain wait: a learner holds each event, and the engine must not run ahead of what the learner has seen.</summary>
+        IFuture ReadMayGo()
+        {
+            if (!_readsWhileWriting) return Drained();
+            lock (_lock)
+            {
+                if (_ended || _inboundBacklog < InboundBacklogLimit) return Futures.Completed;
+                if (_readRoom == null) _readRoom = new Promise(PromiseOptions.RunContinuationsAsynchronously);
+                return _readRoom.Future;
+            }
+        }
+
+        /// <summary>
+        /// A learner can read one event for an hour, so the clock restarts while the gate holds an event. It also restarts while this side has output to
+        /// write: a long upload with no reply is no silent peer, and a stuck write has its own deadline.
+        /// A read that stays open with nothing else going on has no one left to wake it: a flipped length byte does that.
+        /// </summary>
         IEnumerable<IFuture> AwaitRead(IFuture<int> read)
         {
             if (_deadlineMs <= 0) { yield return Futures.Observe(read); yield break; }
-            IGateState gate = _gate as IGateState;
-            if (gate == null) { yield return Futures.WhenAny(read, Futures.Delay(_deadlineMs)); yield break; }
-
-            // A learner can read one event for an hour, so the clock restarts while the gate holds an event.
-            // A read that stays open with nothing at the gate has no one left to wake it: a flipped length byte does that.
             int waited = 0;
             while (!read.IsCompleted && waited < _deadlineMs)
             {
                 int slice = Math.Min(DeadlineSliceMs, _deadlineMs - waited);
                 yield return Futures.WhenAny(read, Futures.Delay(slice));
-                waited = gate.IsHolding ? 0 : waited + slice;
+                waited = LearnerHolds || OutboxBusy ? 0 : waited + slice;
             }
         }
+
+        /// <summary>A peer that stops reading parks a write, and only this ends that wait. The clock restarts only while a learner holds an event.</summary>
+        IEnumerable<IFuture> AwaitWrite(IFuture write)
+        {
+            if (_deadlineMs <= 0) { yield return Futures.Observe(write); yield break; }
+            int waited = 0;
+            while (!write.IsCompleted && waited < _deadlineMs)
+            {
+                int slice = Math.Min(DeadlineSliceMs, _deadlineMs - waited);
+                yield return Futures.WhenAny(write, Futures.Delay(slice));
+                waited = LearnerHolds ? 0 : waited + slice;
+            }
+        }
+
+        bool LearnerHolds
+        {
+            get
+            {
+                IGateState gate = _gate as IGateState;
+                return gate != null && gate.IsHolding;
+            }
+        }
+
+        bool OutboxBusy { get { lock (_lock) return _publishing || _outbox.Count > 0; } }
 
         void Take(byte[] buffer, int count)
         {
             if (count == 0)
             {
-                Drive(delegate { return _engine.Command(EngineCommand.PeerClosed); });
+                Drive(delegate { return _engine.Command(EngineCommand.PeerClosed); }, true);
             }
             else
             {
@@ -199,7 +280,7 @@ namespace NetSec.Io
                 {
                     _received.Enqueue(arrival);
                     return _engine.Feed(buffer, 0, count);
-                });
+                }, true);
             }
         }
 
@@ -211,10 +292,15 @@ namespace NetSec.Io
                 EngineOutput output = null;
                 IFuture wake = null;
                 bool finish = false;
+                int size = 0;
                 lock (_lock)
                 {
                     if (_received.Count > 0) arrival = _received.Dequeue();
-                    else if (_outbox.Count > 0) output = _outbox.Dequeue();
+                    else if (_outbox.Count > 0)
+                    {
+                        output = _outbox.Dequeue();
+                        size = _outboxSizes.Dequeue();
+                    }
                     else if (_ended) finish = true;
                     else wake = ParkOutbox();
                     _publishing = arrival != null || output != null;
@@ -228,6 +314,7 @@ namespace NetSec.Io
                     continue;
                 }
                 foreach (IFuture step in Publish(output)) yield return step;
+                OutputPublished(size);
                 if (_linkError != null) { Conclude(); yield break; }
                 if (output.Status == EngineStatus.Closed || output.Status == EngineStatus.Failed) { Conclude(); yield break; }
             }
@@ -258,7 +345,13 @@ namespace NetSec.Io
             TraceEvent sent = WireEvent("wire.sent", _engine.Stream.Actor, _engine.Peer, item.Event.Message, wire, item.Event.Plain, item.Event.Fields);
             yield return _gate.Pass(sent);
             IFuture write = _link.Write(wire, 0, wire.Length);
-            yield return Futures.Observe(write);
+            foreach (IFuture wait in AwaitWrite(write)) yield return wait;
+            if (!write.IsCompleted)
+            {
+                _linkError = NetSecError.Of(ErrorCodes.LinkDeadline, "the peer took no bytes for " + _deadlineMs + " ms");
+                _linkError.CheckName = "write deadline";
+                yield break;
+            }
             if (write.IsFaulted || write.IsCanceled)
             {
                 _linkError = NetSecError.Of(ErrorCodes.LinkLost, write.IsFaulted ? write.Exception.Message : "write canceled");
@@ -293,16 +386,53 @@ namespace NetSec.Io
         /// Runs the engine and queues what it made under one lock. A record cipher numbers records in the order the engine makes them.
         /// With a gap between the call and the queue, a caller's Enqueue and the read loop could swap, and a clean link then failed its AEAD tag.
         /// </summary>
-        void Drive(Func<EngineOutput> call)
+        long Drive(Func<EngineOutput> call, bool fromRead)
         {
             Promise wake;
+            long ticket;
             lock (_lock)
             {
-                _outbox.Enqueue(call());
+                EngineOutput output = call();
+                int size = fromRead ? SizeOf(output) : 0;
+                _outbox.Enqueue(output);
+                _outboxSizes.Enqueue(size);
+                _inboundBacklog += size;
+                ticket = ++_queuedOutputs;
                 wake = _outboxWake;
                 _outboxWake = null;
             }
             if (wake != null) wake.TrySetResult();
+            return ticket;
+        }
+
+        /// <summary>Counts wire and app bytes, because app bytes wait behind a stuck write too. A caller's own sends stay out: the caller paces those.</summary>
+        static int SizeOf(EngineOutput output)
+        {
+            int size = 0;
+            for (int i = 0; i < output.Items.Length; i++)
+                if (output.Items[i].Wire != null) size += output.Items[i].Wire.Length;
+            for (int i = 0; i < output.App.Length; i++)
+                if (output.App[i].Bytes != null) size += output.App[i].Bytes.Length;
+            return size;
+        }
+
+        void OutputPublished(int size)
+        {
+            List<Promise> done = new List<Promise>();
+            Promise room = null;
+            lock (_lock)
+            {
+                _publishedOutputs++;
+                _inboundBacklog -= size;
+                while (_publishWaiters.Count > 0 && _publishWaiters.Peek().Ticket <= _publishedOutputs) done.Add(_publishWaiters.Dequeue().Done);
+                if (_inboundBacklog < InboundBacklogLimit)
+                {
+                    room = _readRoom;
+                    _readRoom = null;
+                }
+            }
+            for (int i = 0; i < done.Count; i++) done[i].TrySetResult();
+            if (room != null) room.TrySetResult();
         }
 
         IFuture ParkOutbox()
@@ -338,17 +468,23 @@ namespace NetSec.Io
         /// <summary>Ends the run once. A link error wins over the engine's status, because the engine never saw the failure.</summary>
         void End(NetSecError linkError)
         {
-            Promise wake, drained;
+            Promise wake, drained, room;
+            PublishWaiter[] waiters;
             lock (_lock)
             {
                 if (_ended) return;
                 _ended = true;
                 wake = _outboxWake; _outboxWake = null;
                 drained = _drained; _drained = null;
+                room = _readRoom; _readRoom = null;
+                waiters = _publishWaiters.ToArray();
+                _publishWaiters.Clear();
             }
             _link.Close();
             if (wake != null) wake.TrySetResult();
             if (drained != null) drained.TrySetResult();
+            if (room != null) room.TrySetResult();
+            for (int i = 0; i < waiters.Length; i++) waiters[i].Done.TrySetResult();
             EngineStatus status = linkError != null ? EngineStatus.Failed : _engine.Status;
             NetSecError error = linkError;
             if (error == null)

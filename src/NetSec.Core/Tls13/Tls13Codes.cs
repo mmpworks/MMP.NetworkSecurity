@@ -20,6 +20,9 @@ namespace NetSec.Tls13
         public const string NoCommonSuite = "TLS13_NO_COMMON_SUITE";
         public const string NoCommonSignature = "TLS13_NO_COMMON_SIGNATURE";
         public const string AlertReceived = "TLS13_ALERT_RECEIVED";
+        public const string KeyChangeBoundary = "TLS13_KEY_CHANGE_BOUNDARY";
+        public const string MessageTooLong = "TLS13_MESSAGE_TOO_LONG";
+        public const string Truncated = "TLS13_TRUNCATED";
         public const string ClientNameRefused = "TLS13_CLIENT_NAME_REFUSED";
         public const string CertRequired = "TLS13_CERT_REQUIRED";
         public const string BadCertificate = "TLS13_BAD_CERTIFICATE";
@@ -41,6 +44,9 @@ namespace NetSec.Tls13
             new Row(AeadTag, "AEAD tag", 20),
             new Row(KeyUpdateUnsupported, "KeyUpdate support", 10),
             new Row(RecordOverflow, "record length", 22),
+            new Row(KeyChangeBoundary, "record ends at the key change", 10),
+            new Row(MessageTooLong, "message length", 50),
+            new Row(Truncated, "close_notify before the close", 80),
             new Row(X25519Zero, "X25519 result not zero", 47),
             new Row(KeyShareInvalid, "key share shape", 47),
             new Row(IllegalParameter, "ServerHello matches the offer", 47),
@@ -55,6 +61,7 @@ namespace NetSec.Tls13
             new Row("CERT_NAME", "name match", 42),
             new Row("CERT_SIGNATURE", "signature verify", 42),
             new Row("CERT_PARSE", "certificate parse", 42),
+            new Row("CERT_UNKNOWN_CRITICAL", "critical extension", 42),
             new Row(ErrorCodes.ParseTruncated, "message parse", 50),
             new Row(ErrorCodes.UnexpectedMessage, "message allowed in this state", 10),
         };

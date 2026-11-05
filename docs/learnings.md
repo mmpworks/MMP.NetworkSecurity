@@ -67,6 +67,9 @@ Each correction goes here, newest slice last. Later slices read this file first.
 12. **`Tls13KeySchedule.Resume` holds the resumption rung, and no engine calls it.** This engine reads a ticket and drops it. The RFC 8448 check is its only caller. Finished checks go through `VerifyFinished`, which calls `Hmac.Verify`.
 13. **`EnginePump` ran the engine and queued its output under two locks, so a caller's `Enqueue` could pass the read loop.** A record cipher numbers records in engine order, so the swap failed `TLS13_AEAD_TAG` on a clean link, about 1 run in 20 at 100% CPU. `PumpOrderTests` forces the window: 15 to 538 swaps per run before the fix, on both builds. `Drive` now holds one lock across both. A gate that shows a tag failure with no tamper is this class first.
 14. **A tap can lead a trace.** A pump writes `wire.sent` after the socket write, and the tap logs before it forwards. A comparison must wait for equal lengths and never for "at least". Unit tests alone hide this: the tap test passed 48 of 48 alone and failed under the full suite at load, so repeat a flake inside the full suite.
+15. **A sealed `close_notify` is the only clean end.** RFC 8446 section 5 allows one clear type after keys exist: a one-byte CCS of value 1, before the peer's Finished. `Tls13Engine.ReadRecord` refuses every other clear record, because a forged clear alert otherwise reads as a clean close. S5: a tap or a relay must carry records unchanged. A transport close with no `close_notify` is now `TLS13_TRUNCATED`, so each process in the bridge must close with `EngineCommand.Close` and never only drop the socket.
+16. **`Feed` holds a named result by test, not by catch-all.** `Guarded` catches `ParseFailure` only, on purpose, so a real bug still shows. `Tls13FlipSweepTests` flips each byte of each message and fails on any throw. Its first run found 3 sources: `server_name` length, a null `Offer`, and a bad date. A new reader must throw `ParseFailure`. S4's engines have no such sweep yet.
+17. **A sweep's allowed exceptions are the finding.** A flip may complete only in the clear record's legacy version bytes, which RFC 8446 section 5.1 says a receiver ignores. A flip may stall only in a length field that promises more bytes, and the pump's read deadline names that wait.
 
 ## S4, TLS 1.1
 
@@ -141,6 +144,13 @@ Each correction goes here, newest slice last. Later slices read this file first.
 3. **A hop reads the trace id without proof, so it only labels with it.** The bank refuses before the MAC passes under no trace id, and names the claimed id in the detail.
 4. **The pad holds a loaded key.** `PinPadCore.InjectedInitialKey` stands for a key loader's work, and a test pins it to what the bank derives. The base key is in `NetSec.Core.dll` on every process, because `TrainingKeySource` derives it from public text. So the boundary is what each role's code reads, and no binary hides anything.
 5. **Open a live `tap` log with `FileShare.ReadWrite`.** The tap still holds it open.
+## Two-way pump
+
+1. **With no gate, the read loop keeps reading while a write waits.** Waiting for the outbox before each read made two ends that both send wait for each other, and no deadline ran. This changes design section 3. A gate keeps the drain wait, because a learner holds each event.
+2. **A write has its own deadline, `LINK_DEADLINE` with check `write deadline`.** The read clock restarts while this side has output to write, so a long upload is no silent peer. What reads produce stops at 16 MiB behind a stuck write.
+3. **`Enqueue` completes when its own output is out.** An outbox that must be empty may never be empty in a two-way flow.
+4. **A test link that completes reads at once runs the read loop inline inside `Run`, and `Run` then never returns.** Use `Futures.Run` in a test link that always has bytes.
+
 ## Pump deadline test
 
 1. **The side whose deadline fires reports `LINK_DEADLINE`. The side that then reads the close reports `PEER_CLOSED_EARLY`, and that is its true outcome.** A test that names one side's code must fix the order with two deadlines. `LabPair.Named` drops the second code, so a lab reports the real failure in either order.
@@ -156,3 +166,7 @@ Each correction goes here, newest slice last. Later slices read this file first.
 1. **Each `dotnet test` step in the gate now ends a stuck test at 3 minutes and names it.** The slowest test takes 11.4 s at 100% CPU. `--blame-hang-dump-type none` keeps the run on net48 and writes no dump. The name sits in the last lines of the step, so the gate report keeps it. A9 runs its own `dotnet test` with a 30-minute limit per build, so after a hang the gate still waits for A9.
 
 **S5 addendum.** One gateway speaks one suite, set by `--suite` on the gateway role. A CE on the other suite stops at `SSH_NO_COMMON_ALG`. Steve's device is the legacy case: run the gateway and the CE with `--suite legacy`. This flag is an addition to the command line in `acceptance/CONTRACT.md`, and the default stays modern.
+
+## Step gate
+
+1. **A step that finds no event waiting is held for the next event, and more such steps add nothing.** A lab can do slow work before its first event, so a step can arrive in that gap. The app no longer needs its 3 s resend.

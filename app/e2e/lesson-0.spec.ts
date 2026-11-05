@@ -25,6 +25,19 @@ test('the rail shows lesson 0 as Start here beside lessons 1 to 11', async ({ pa
   for (let n = 1; n <= 11; n++) await expect(page.getByTestId(`lesson-item-${n}`)).toBeVisible()
 })
 
+test('the target device dropdown offers this computer and shows the CE boxes disabled', async ({ page }) => {
+  await open(page)
+  const target = page.getByTestId('target-select')
+  await expect(target).toHaveValue('this-computer')
+  const options = target.locator('option')
+  await expect(options).toHaveText(['This computer', 'WinCE 6', 'WinCE 7'])
+  await expect(options.nth(0)).toHaveJSProperty('disabled', false)
+  await expect(options.nth(1)).toHaveJSProperty('disabled', true)
+  await expect(options.nth(2)).toHaveJSProperty('disabled', true)
+  fs.mkdirSync(OUT, { recursive: true })
+  await page.screenshot({ path: path.join(OUT, 'target-select.png'), clip: { x: 0, y: 0, width: 1000, height: 60 } })
+})
+
 test('walks every step of lesson 0 against the live Host', async ({ page }) => {
   const ids = tourIds()
   expect(ids.length).toBeGreaterThan(0)

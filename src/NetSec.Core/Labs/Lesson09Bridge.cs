@@ -25,6 +25,7 @@ namespace NetSec.Labs
         public const string OptionFlipPinBlock = "flip-pin-block";
 
         const string Pin = "1234", Pan = "4111111111111111";
+        const string DefaultTraceId = "lab-09-trace";
 
         public string LabId { get { return "lab-09-bridge"; } }
 
@@ -36,7 +37,7 @@ namespace NetSec.Labs
 
         static IEnumerable<IFuture> Body(LabContext c, Return<LabResult> ret)
         {
-            string traceId = c.TraceId ?? c.SessionId;
+            string traceId = c.TraceId ?? c.SessionId ?? DefaultTraceId;
             ITrainingKeySource keys = new TrainingKeySource();
             ITamperHook plan = LabPair.Plan(c);
             FailureWatch watch = new FailureWatch(c.Sink);
@@ -51,7 +52,7 @@ namespace NetSec.Labs
             locked.Type = "pin.block.locked";
             locked.Message = "PinEnvelope";
             locked.Plain = sale.Envelope.Bytes;
-            yield return Publish(c, watch, LabPair.Stream(c, "reader", "bridge").Stamp(locked));
+            yield return Publish(c, watch, Stream(c, traceId, "reader").Stamp(locked));
 
             HopServerOptions gateway = HopOptions(c, keys, gatewayRandom, watch, plan, traceId);
             gateway.NextHopRandom = nextHopRandom;
@@ -61,7 +62,7 @@ namespace NetSec.Labs
             IFuture padRun = AsyncProxy.Run(PadBody(padListener, sale));
             IFuture gatewayRun = AsyncProxy.Run(GatewayBody(gatewayListener, gateway, serverListener.Port, flip));
             IFuture serverRun = AsyncProxy.Run(ServerBody(serverListener, server, bankListener.Port));
-            IFuture bankRun = AsyncProxy.Run(BankBody(bankListener, c, watch, keys));
+            IFuture bankRun = AsyncProxy.Run(BankBody(bankListener, c, watch, keys, traceId));
 
             CeRunOptions ce = new CeRunOptions();
             ce.PinPad = new IPEndPoint(IPAddress.Loopback, padListener.Port);
@@ -89,6 +90,13 @@ namespace NetSec.Labs
             yield return Futures.Observe(bankRun);
 
             ret.Value = Result(flow, watch);
+        }
+
+        /// <summary>LabPair.Stream takes the trace id from the context, and a context may hold none. Every stream here carries the one id.</summary>
+        static TraceStream Stream(LabContext c, string traceId, string actor)
+        {
+            string session = c.SessionId ?? traceId;
+            return new TraceStream(session + "/" + actor + "/bridge", session, traceId, null, actor, c.Clock);
         }
 
         static LinkListener NewListener() { return new LinkListener(new IPEndPoint(IPAddress.Loopback, 0)); }
@@ -163,7 +171,7 @@ namespace NetSec.Labs
             yield return Futures.Observe(BridgeHopServers.ServeServer(accepted.Result, o, bankPort));
         }
 
-        static IEnumerable<IFuture> BankBody(LinkListener listener, LabContext c, ITraceSink sink, ITrainingKeySource keys)
+        static IEnumerable<IFuture> BankBody(LinkListener listener, LabContext c, ITraceSink sink, ITrainingKeySource keys, string traceId)
         {
             IFuture<SocketLink> accepted = listener.Accept();
             yield return Futures.Observe(accepted);
@@ -171,7 +179,7 @@ namespace NetSec.Labs
 
             byte[] bdk = keys.Find(KeyIds.DukptBdk128).CopyMaterial();
             KsnLedger ledger = new KsnLedger();
-            TraceStream stream = LabPair.Stream(c, "bank", "bridge");
+            TraceStream stream = Stream(c, traceId, "bank");
             while (true)
             {
                 IFuture<byte[]> frame = FrameIo.ReadFrame(accepted.Result);

@@ -14,7 +14,7 @@ namespace NetSec.Labs
     /// <summary>
     /// Lesson 11. A control run measures both compares, measures the managed compare, and runs the guess loop against both native compares.
     /// An attack row runs one guess loop. Times are measured numbers on the run's machine. Managed code has no constant-time guarantee,
-    /// and the C++ result depends on the optimizer. LabCatalog and AttackCatalog leave this lab out until its tour and UI land (docs/lesson-11-names.md).
+    /// and the C++ result depends on the optimizer.
     /// </summary>
     public sealed class TimingAttackLab : ILab
     {

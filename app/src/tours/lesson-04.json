@@ -203,11 +203,18 @@
       "text": [
         "Put the pieces together. The root signs the server's card. The server's key signs the handshake. Each link is a signature, and the client checked all of them.",
         "Four checks cover the card: where it leads, whether the signature is real, whether it is in date, and whether it names the right server. One more covers the key: the CertificateVerify signature.",
-        "Each check closes a different door.",
+        "The lab's check is partial. It reads the chain, the signatures, the dates, the name, and the CA flag, and it refuses a critical extension it does not read. It does not read pathLen, keyUsage or name constraint values, and it does not date the trust anchor.",
         "Built to show the parts. Do not copy."
       ],
       "glossary": [],
       "bind": { "kind": "concept" },
+      "claims": [
+        {
+          "id": "L4-C06",
+          "text": "The lab's certificate check reads the chain, the signatures, the dates, the name and the basicConstraints CA flag, and refuses a critical extension it does not read. It does not read pathLen, keyUsage or name constraint values, and does not date the trust anchor. A real verifier does more.",
+          "source": "docs/lessons-4-5-names.md, What the lessons must state (branch fix/s3-tls-blockers, local at b5d6641), item 2; RFC 5280, section 6 (Certification Path Validation)"
+        }
+      ],
       "unlock": { "mode": "ack" }
     }
   ]
