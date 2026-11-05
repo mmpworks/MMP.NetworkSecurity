@@ -60,3 +60,10 @@ Each correction goes here, newest slice last. Later slices read this file first.
 9. **`Probe` throws `NotImplementedException` for TLS 1.1 and SSH until S4.** The suite maps that to NOT RUN. A7 and A8 stay NOT RUN for that reason, and S4 removes `Probe.NeedBuilt`.
 10. **The glass client offers no CCS and an empty session id, and tolerates a CCS from the peer.** OpenSSL and Go accept this. The glass server echoes the client's session id and sends no CCS.
 11. **`EncryptedExtensions` has no `group unchanged` check.** Design section 2.6 lists one. The group check runs at ServerHello, against the one group the client offered, so a second check at `ee` would always pass and show the learner nothing.
+
+## S6
+
+1. **Name known skips in the PR body.** A clean PR body said "a change to any token character is refused" while a test skipped the last character. The skip was the defect showing. A skip goes in the body, with its reason.
+2. **A signature shows who calls only when the verifier already holds the key.** The first lab checked a signature against the key the caller sent, so any key earned a token. The issuer now holds an enrolment row, and it compares the answer to the challenge it sent.
+3. **`Convert.FromBase64String` accepts set spare bits and whitespace on both builds.** To hold one spelling, encode the result and compare it to the text.
+4. **`DateTime` subtraction ignores `Kind`.** A verifier that takes a `DateTime` must convert a local value and refuse one with no zone, or a local clock moves every expiry.

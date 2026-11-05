@@ -97,8 +97,6 @@ namespace NetSec.Tests
                 char[] changed = token.ToCharArray();
                 changed[i] = changed[i] == 'A' ? 'B' : 'A';
                 AuthDecision d = Token.Verify(Issuer.CopyPublic(), new string(changed), Now);
-                // The last signature character holds spare bits, so a change there can decode to the same bytes.
-                if (i == token.Length - 1 && d.Allowed) continue;
                 Assert.False(d.Allowed, "a change at character " + i + " passed");
                 Assert.Equal(Token.SignatureCheck, d.CheckName);
             }
@@ -284,7 +282,7 @@ namespace NetSec.Tests
             Assert.Equal(new[] { "Challenge", "TokenIssued" }, run.Sent("issuer"));
             Assert.Equal(new[] { "CallOk", "CallOk" }, run.Sent("server"));
             string[] passed = run.Events.Where(e => e.Type == "check.result" && e.Check.Passed).Select(e => e.Message).Distinct().ToArray();
-            Assert.Equal(new[] { "challenge signature", "challenge already used", "token signature", "token expiry", "proof signature", "proof binding", "proof age", "jti already used", "permission check" }, passed);
+            Assert.Equal(new[] { "device enrolled", "challenge issued", "challenge signature", "challenge already used", "token signature", "token expiry", "token audience", "proof signature", "proof binding", "proof age", "jti already used", "permission check" }, passed);
             Assert.DoesNotContain(run.Events, e => e.Check != null && !e.Check.Passed);
         }
 
@@ -312,7 +310,7 @@ namespace NetSec.Tests
         public void Every_row_stops_at_its_named_check_with_one_thing_changed()
         {
             AttackDefinition[] rows = AttackCatalog.Lesson10Unreleased;
-            Assert.Equal(7, rows.Length);
+            Assert.Equal(10, rows.Length);
             foreach (AttackDefinition a in rows)
             {
                 Assert.Equal(1, (a.Plan != null ? 1 : 0) + a.Options.Length);

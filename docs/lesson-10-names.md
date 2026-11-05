@@ -8,7 +8,7 @@ Lesson 10: Client proof and permission. Protocol `auth`. Lanes `client`, `issuer
 
 | Order | `message` | Direction | Field names after `type`, `length` |
 |---|---|---|---|
-| 1 | `LoginRequest` | client to issuer | `devicePublicKey` |
+| 1 | `LoginRequest` | client to issuer | `subject`, `devicePublicKey` |
 | 2 | `Challenge` | issuer to client | `challenge` |
 | 3 | `ChallengeResponse` | client to issuer | `challenge`, `signature` |
 | 4 | `TokenIssued` | issuer to client | `tokenHeader`, `tokenClaims`, `tokenSignature` |
@@ -32,7 +32,8 @@ The token parts and proof parts have dots between them, one byte each. Their fie
 
 | Event type | `actor` | `message` | Carries |
 |---|---|---|---|
-| `secret.derived` | `client` | none | `secrets[]`: `auth.device-key`, then `auth.token` |
+| `secret.derived` | `client` | none | `secrets[]`: `auth.device-key`, then `auth.challenge`, then `auth.token` |
+| `secret.derived` | `issuer` | none | `secrets[]`: `auth.issued-challenge`. The challenge is public on the wire. The issuer stores it to compare the answer |
 | `measure.result` | `issuer` | `token claims` | `plain`: the claims JSON as text. Bind the moment that splits a token and reads its claims here |
 | `measure.result` | `client` | `proof claims` | `plain`: the DPoP claims JSON as text, one per call |
 | `auth.message.sent`, `wire.sent` | sender | as tables | |
@@ -40,10 +41,13 @@ The token parts and proof parts have dots between them, one byte each. Their fie
 
 | Check name, `check.result` `message` | `actor` | When it passes |
 |---|---|---|
-| `challenge signature` | `issuer` | The device key signed this challenge and origin |
+| `device enrolled` | `issuer` | The issuer already holds this key for this subject |
+| `challenge issued` | `issuer` | The answer names the challenge this issuer sent in this login |
+| `challenge signature` | `issuer` | The enrolled key signed this challenge and origin |
 | `challenge already used` | `issuer` | This challenge has not been answered before |
 | `token signature` | `server` | The issuer key signed the token |
 | `token expiry` | `server` | The token has not expired |
+| `token audience` | `server` | The token names this server in `aud` |
 | `proof signature` | `server` | The proof is well formed, and the key in its header signed it |
 | `proof binding` | `server` | Method, address, token hash, and key all fit this call and this token |
 | `proof age` | `server` | `iat` is within 60 seconds |
@@ -58,7 +62,9 @@ The token parts and proof parts have dots between them, one byte each. Their fie
 | `void-sale` | Capability `void-sale` |
 | `refund` | Capability `refund` |
 
-The token in a normal run holds `roles: ["cashier"]` and `cap: ["void-sale"]`.
+The token in a normal run holds `iss`, `aud`, `sub`, `roles: ["cashier"]`, `cap: ["void-sale"]`, `iat`, `exp`, and `cnf.jkt`.
+
+A signature shows who calls only because the key was enrolled ahead of time. The lab enrols one device for one subject before the login starts. The tour must say so.
 
 ## Attacks
 
@@ -73,6 +79,9 @@ Each row changes one thing from the control run.
 | `L10-ungranted-capability` | Calls `Refund`, a capability the token lacks | `Rejected` | `CAPABILITY_DENIED` | `permission check` |
 | `L10-wrong-role` | The token holds role `guest`, so `ReadTotals` is refused | `Rejected` | `ROLE_DENIED` | `permission check` |
 | `L10-replay-challenge` | Sends `ChallengeResponse` a second time | `Rejected` | `CHALLENGE_REPLAY` | `challenge already used` |
+| `L10-unissued-challenge` | Signs a challenge the issuer never sent | `Rejected` | `CHALLENGE_NOT_ISSUED` | `challenge issued` |
+| `L10-unknown-device` | Logs in with a key nobody enrolled | `Rejected` | `DEVICE_NOT_ENROLLED` | `device enrolled` |
+| `L10-wrong-audience` | The issuer writes the token for another server | `Rejected` | `TOKEN_BAD_AUDIENCE` | `token audience` |
 
 The mutual TLS row, `L10-remove-client-cert` with check `bad_certificate alert`, arrives after S3.
 

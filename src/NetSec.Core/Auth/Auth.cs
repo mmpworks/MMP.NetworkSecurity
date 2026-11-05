@@ -87,6 +87,7 @@ namespace NetSec.Auth
     {
         public const string SignatureCheck = "token signature";
         public const string ExpiryCheck = "token expiry";
+        public const string AudienceCheck = "token audience";
         const string Header = "{\"alg\":\"EdDSA\",\"typ\":\"JWT\"}";
 
         /// <summary>How many characters the token's first part holds, so a tamper plan can aim past it.</summary>
@@ -100,16 +101,23 @@ namespace NetSec.Auth
             return CompactJws.Sign(k.CopyMaterial(), Header, claimsJson);
         }
 
-        /// <summary>Checks the signature before it reads a claim. A rule: the same input gives the same answer.</summary>
+        /// <summary>
+        /// Checks the signature before it reads a claim. A rule: the same input gives the same answer. A clock value with no zone is refused,
+        /// because DateTime subtraction ignores Kind and a local value would move the expiry.
+        /// </summary>
         public static AuthDecision Verify(byte[] pub, string jws, DateTime now)
         {
             if (pub == null) throw new ArgumentNullException("pub");
+            if (now.Kind == DateTimeKind.Unspecified)
+                return AuthDecision.Refuse(ErrorCodes.TokenBadClock, ExpiryCheck, "the clock value names no zone");
             try
             {
                 CompactJws parts = CompactJws.Split(jws);
                 object alg;
                 if (!parts.Header.TryGetValue("alg", out alg) || !"EdDSA".Equals(alg))
                     return AuthDecision.Refuse(ErrorCodes.TokenBadAlg, SignatureCheck, "the header must name EdDSA");
+                if (parts.Header.ContainsKey("crit"))
+                    return AuthDecision.Refuse(ErrorCodes.TokenBadHeader, SignatureCheck, "this verifier knows no critical header extension");
                 if (!Ed25519.Verify(pub, parts.SigningInput, parts.Signature))
                     return AuthDecision.Refuse(ErrorCodes.TokenBadSignature, SignatureCheck, "the signature does not fit this key and these claims");
                 Dictionary<string, object> claims = parts.ReadClaims();
@@ -122,11 +130,11 @@ namespace NetSec.Auth
             }
             catch (ParseFailure failure)
             {
-                return AuthDecision.Refuse(ErrorCodes.TokenBadSignature, SignatureCheck, failure.Message);
+                return AuthDecision.Refuse(ErrorCodes.TokenMalformed, SignatureCheck, failure.Message);
             }
             catch (ArgumentException failure)
             {
-                return AuthDecision.Refuse(ErrorCodes.TokenBadSignature, SignatureCheck, failure.Message);
+                return AuthDecision.Refuse(ErrorCodes.TokenMalformed, SignatureCheck, failure.Message);
             }
         }
     }
@@ -135,7 +143,13 @@ namespace NetSec.Auth
     {
         static readonly DateTime Epoch = new DateTime(1970, 1, 1, 0, 0, 0, DateTimeKind.Utc);
 
-        public static long ToUnix(DateTime utc) { return (utc - Epoch).Ticks / TimeSpan.TicksPerSecond; }
+        /// <summary>Unix seconds. A local value converts first. A value with no zone throws, because guessing its zone would move an expiry.</summary>
+        public static long ToUnix(DateTime when)
+        {
+            if (when.Kind == DateTimeKind.Unspecified) throw new ArgumentException("the clock value names no zone", "when");
+            return (when.ToUniversalTime() - Epoch).Ticks / TimeSpan.TicksPerSecond;
+        }
+
         public static DateTime FromUnix(long seconds) { return Epoch.AddSeconds(seconds); }
     }
 
@@ -147,6 +161,9 @@ namespace NetSec.Auth
         public const string AgeCheck = "proof age";
         public const string ReplayCheck = "jti already used";
         public const int MaxAgeSeconds = 60;
+
+        // RFC 7517 and RFC 7518 private key members. RFC 9449 section 4.3 step 7 refuses a jwk that holds a private key.
+        static readonly string[] PrivateMembers = { "d", "p", "q", "dp", "dq", "qi", "oth", "k" };
 
         static string JwkJson(byte[] pub)
         {
@@ -168,7 +185,13 @@ namespace NetSec.Auth
             return CompactJws.Sign(seed, header, claims);
         }
 
-        /// <summary>The checks of RFC 9449 section 4.3, in its order. Replay stays with the caller, which holds the seen ids. A pass returns the jti.</summary>
+        /// <summary>
+        /// Runs these steps of RFC 9449 section 4.3, in this order: 2, 4, 5, the shape of the jwk, 6, 7, 3, 8, 9, 11, 12. Step 3 runs after step 6 so no
+        /// unsigned claim is read. Not run: step 1, because this method takes one proof and counting header fields belongs to an HTTP server; and
+        /// step 10, because this lab supplies no nonce, which sections 8 and 9 make optional. Step 9 compares the whole htu, so a query is refused where
+        /// the RFC says to ignore it. Replay stays with the caller, which holds the seen ids, and a real server keeps them for the whole iat window.
+        /// A pass returns the jti.
+        /// </summary>
         public static AuthDecision Check(string proof, string htm, string htu, long now, string accessToken, string expectedJkt)
         {
             try
@@ -187,12 +210,16 @@ namespace NetSec.Auth
 
         static AuthDecision CheckParts(CompactJws parts, string htm, string htu, long now, string accessToken, string expectedJkt)
         {
-            if (!"dpop+jwt".Equals(Member(parts.Header, "typ")) || !"EdDSA".Equals(Member(parts.Header, "alg")))
-                return AuthDecision.Refuse(ErrorCodes.DpopMalformed, SignatureCheck, "the header must say dpop+jwt and EdDSA");
-            byte[] pub = PublicFrom(Member(parts.Header, "jwk") as Dictionary<string, object>);
+            if (!"dpop+jwt".Equals(Member(parts.Header, "typ")) || !"EdDSA".Equals(Member(parts.Header, "alg")) || parts.Header.ContainsKey("crit"))
+                return AuthDecision.Refuse(ErrorCodes.DpopMalformed, SignatureCheck, "the header must say dpop+jwt and EdDSA, and hold no crit");
+            Dictionary<string, object> jwk = Member(parts.Header, "jwk") as Dictionary<string, object>;
+            byte[] pub = PublicFrom(jwk);
             if (pub == null) return AuthDecision.Refuse(ErrorCodes.DpopBadKey, SignatureCheck, "the header holds no Ed25519 key");
             if (!Ed25519.Verify(pub, parts.SigningInput, parts.Signature))
                 return AuthDecision.Refuse(ErrorCodes.DpopBadSignature, SignatureCheck, "the key in the header did not sign this proof");
+            for (int i = 0; i < PrivateMembers.Length; i++)
+                if (jwk.ContainsKey(PrivateMembers[i]))
+                    return AuthDecision.Refuse(ErrorCodes.DpopBadKey, SignatureCheck, "the key in the header holds the private member " + PrivateMembers[i]);
             Dictionary<string, object> claims = parts.ReadClaims();
             string jti = Member(claims, "jti") as string;
             if (string.IsNullOrEmpty(jti) || !(Member(claims, "iat") is long))
@@ -235,6 +262,8 @@ namespace NetSec.Auth
     {
         public const string SignatureCheck = "challenge signature";
         public const string ReplayCheck = "challenge already used";
+        public const string IssuedCheck = "challenge issued";
+        public const string EnrolledCheck = "device enrolled";
 
         static byte[] Input(byte[] challenge, string origin)
         {

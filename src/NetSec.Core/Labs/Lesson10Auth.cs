@@ -13,8 +13,9 @@ using NetSec.Trace;
 namespace NetSec.Labs
 {
     /// <summary>
-    /// Lesson 10. A device answers a challenge and gets a signed token bound to its key. It then calls a server, with a fresh DPoP proof on
-    /// each call, and the token's role or capability decides what it may do. This lab has no TLS, so the token shows on the wire.
+    /// Lesson 10. A device enrolled ahead of time answers a challenge and gets a signed token bound to its key. A signature shows who calls only
+    /// because the issuer already holds that key for that subject. The device then calls a server, with a fresh DPoP proof on each call, and the
+    /// token's role or capability decides what it may do. This lab has no TLS, so the token shows on the wire.
     /// A passkey-shaped challenge is not WebAuthn. Built to show the parts. Do not copy.
     /// </summary>
     public sealed class Lesson10Auth : ILab
@@ -25,6 +26,10 @@ namespace NetSec.Labs
         public const string OptionReplayProof = "replay-proof";
         public const string OptionStolenToken = "stolen-token";
         public const string OptionCallRefund = "call-refund";
+        public const string OptionAnswerUnissued = "answer-unissued";
+        public const string OptionUnknownDevice = "unknown-device";
+        public const string OptionDeviceKeyHex = "device-key-hex";
+        public const string OptionTokenAudience = "token-audience";
 
         // A fixed lab time, so a same-seed run gives the same bytes.
         const long LabNow = 1793836800;
@@ -37,11 +42,14 @@ namespace NetSec.Labs
         const string Origin = "https://pump.training";
         const string BaseUrl = "https://pump.training/api/";
         const string Method = "POST";
+        const string Subject = "pump-reader-4";
+        const string Audience = "https://pump.training/api";
+        const string IssuerName = "https://pump.training/issuer";
         const string Start0 = "Start";
         const string DeviceKeyName = "auth.device-key";
         const string TokenName = "auth.token";
         const string ChallengeName = "auth.challenge";
-        const string DevicePublicName = "auth.device-public";
+        const string IssuedChallengeName = "auth.issued-challenge";
         const string IssuerPublicName = "auth.issuer-public";
 
         const int LoginRequest = 1, ChallengeMessage = 2, ChallengeResponse = 3, TokenIssued = 4, LoginDone = 5;
@@ -62,7 +70,12 @@ namespace NetSec.Labs
             readonly Dictionary<string, bool> _seen = new Dictionary<string, bool>();
             public ITrainingKey Issuer;
             public string TokenRole = "cashier";
-            public bool TokenExpired, ReplayChallenge, ReplayProof, StolenToken, CallRefund;
+            public bool TokenExpired, ReplayChallenge, ReplayProof, StolenToken, CallRefund, AnswerUnissued, UnknownDevice;
+            public byte[] PresentedKey;
+            public string TokenAudience = Audience;
+
+            // The issuer's one enrolment row. A real issuer holds one row per subject.
+            public byte[] EnrolledKey;
 
             public Session(IRandomSource random) : base(random) { }
             public override string Protocol { get { return "auth"; } }
@@ -85,7 +98,16 @@ namespace NetSec.Labs
             ITrainingKey issuerKey = new TrainingKeySource().Find(KeyIds.TokenIssuer);
             ITamperHook plan = LabPair.Plan(c);
 
+            // Enrolment happens ahead of the login, out of band. The issuer learns this device's public key, and the device keeps its seed.
+            byte[] deviceSeed = new byte[SeedSize];
+            LabPair.Fork(c).Fill(deviceSeed, 0, SeedSize);
+
             Session client = new Session(LabPair.Fork(c));
+            client.Remember(DeviceKeyName, deviceSeed);
+            client.AnswerUnissued = LabPair.Option(c, OptionAnswerUnissued) == "yes";
+            client.UnknownDevice = LabPair.Option(c, OptionUnknownDevice) == "yes";
+            string presented = LabPair.Option(c, OptionDeviceKeyHex);
+            if (presented != null) client.PresentedKey = Hex.Decode(presented);
             client.ReplayChallenge = LabPair.Option(c, OptionReplayChallenge) == "yes";
             client.ReplayProof = LabPair.Option(c, OptionReplayProof) == "yes";
             client.StolenToken = LabPair.Option(c, OptionStolenToken) == "yes";
@@ -93,6 +115,9 @@ namespace NetSec.Labs
 
             Session issuer = new Session(LabPair.Fork(c));
             issuer.Issuer = issuerKey;
+            issuer.EnrolledKey = Ed25519.PublicFrom(deviceSeed);
+            string audience = LabPair.Option(c, OptionTokenAudience);
+            if (audience != null) issuer.TokenAudience = audience;
             string role = LabPair.Option(c, OptionTokenRole);
             if (role != null) issuer.TokenRole = role;
             issuer.TokenExpired = LabPair.Option(c, OptionTokenExpired) == "yes";
@@ -127,15 +152,18 @@ namespace NetSec.Labs
 
         static StepDecision ClientLogin(Session s, InboundMessage m)
         {
-            byte[] seed = s.Draw(SeedSize);
+            byte[] seed = s.UnknownDevice ? s.Draw(SeedSize) : s.Secret(DeviceKeyName);
+            byte[] presented = s.PresentedKey ?? Ed25519.PublicFrom(seed);
+            byte[] body = new ByteWriter().Put(Encoding.UTF8.GetBytes(Subject)).Put(presented).ToArray();
             return StepDecision.Advance(
                 Effect.Secret("client", DeviceKeyName, seed),
-                Send(LoginRequest, Ed25519.PublicFrom(seed), new FieldSpan("devicePublicKey", "key", -1, 0, true)));
+                Send(LoginRequest, body, new FieldSpan("subject", "id", -1, PublicSize, true), new FieldSpan("devicePublicKey", "key", PublicSize, 0, true)));
         }
 
         static StepDecision ClientAnswer(Session s, InboundMessage m)
         {
-            byte[] response = new ByteWriter().Put(m.Body).Put(Challenge.Sign(s.Secret(DeviceKeyName), m.Body, Origin)).ToArray();
+            byte[] answered = s.AnswerUnissued ? new byte[ChallengeSize] : m.Body;
+            byte[] response = new ByteWriter().Put(answered).Put(Challenge.Sign(s.Secret(DeviceKeyName), answered, Origin)).ToArray();
             return StepDecision.Advance(
                 Effect.Secret("client", ChallengeName, response),
                 Send(ChallengeResponse, response, new FieldSpan("challenge", "random", ChallengeSize, 0, true), new FieldSpan("signature", "mac", -1, 0, true)));
@@ -165,9 +193,17 @@ namespace NetSec.Labs
 
         static StepDecision IssuerChallenge(Session s, InboundMessage m)
         {
+            if (m.Body.Length <= PublicSize) throw new ParseFailure(ErrorCodes.ParseTruncated, "a login request holds a subject and a " + PublicSize + "-byte key");
+            byte[] subject = new byte[m.Body.Length - PublicSize], presented = new byte[PublicSize];
+            Buffer.BlockCopy(m.Body, 0, subject, 0, subject.Length);
+            Buffer.BlockCopy(m.Body, subject.Length, presented, 0, PublicSize);
+            if (Encoding.UTF8.GetString(subject, 0, subject.Length) != Subject || !Same(presented, s.EnrolledKey))
+                return StepDecision.Fail(ErrorCodes.DeviceNotEnrolled, Challenge.EnrolledCheck, "no enrolment row holds this key for this subject");
+            byte[] challenge = s.Draw(ChallengeSize);
             return StepDecision.Advance(
-                Effect.Secret("issuer", DevicePublicName, m.Body),
-                Send(ChallengeMessage, s.Draw(ChallengeSize), new FieldSpan("challenge", "random", -1, 0, true)));
+                Effect.Check(Challenge.EnrolledCheck, ErrorCodes.DeviceNotEnrolled),
+                Effect.Secret("issuer", IssuedChallengeName, challenge),
+                Send(ChallengeMessage, challenge, new FieldSpan("challenge", "random", -1, 0, true)));
         }
 
         static StepDecision IssuerToken(Session s, InboundMessage m)
@@ -176,13 +212,15 @@ namespace NetSec.Labs
             byte[] challenge = new byte[ChallengeSize], signature = new byte[SignatureSize];
             Buffer.BlockCopy(m.Body, 0, challenge, 0, ChallengeSize);
             Buffer.BlockCopy(m.Body, ChallengeSize, signature, 0, SignatureSize);
+            if (!Same(challenge, s.Secret(IssuedChallengeName))) return StepDecision.Fail(ErrorCodes.ChallengeNotIssued, Challenge.IssuedCheck, "this issuer did not send this challenge in this login");
             if (s.Seen(challenge)) return StepDecision.Fail(ErrorCodes.ChallengeReplay, Challenge.ReplayCheck, "this challenge has been answered before");
-            AuthDecision signed = Challenge.Verify(s.Secret(DevicePublicName), challenge, Origin, signature);
+            AuthDecision signed = Challenge.Verify(s.EnrolledKey, challenge, Origin, signature);
             if (!signed.Allowed) return StepDecision.Fail(signed.Code, signed.CheckName, signed.Detail);
 
             string claims = ClaimsFor(s);
             string token = Token.Issue(s.Issuer, claims);
             return StepDecision.Advance(
+                Effect.Check(Challenge.IssuedCheck, ErrorCodes.ChallengeNotIssued),
                 Effect.Check(Challenge.SignatureCheck, ErrorCodes.ChallengeBadSignature),
                 Effect.Check(Challenge.ReplayCheck, ErrorCodes.ChallengeReplay),
                 Effect.Absorb(challenge),
@@ -193,8 +231,9 @@ namespace NetSec.Labs
         static string ClaimsFor(Session s)
         {
             long exp = s.TokenExpired ? LabNow - 1 : LabNow + TokenLifeSeconds;
-            return "{\"sub\":\"pump-reader-4\",\"roles\":[" + MiniJson.Quote(s.TokenRole) + "],\"cap\":[\"void-sale\"],\"iat\":" + LabNow + ",\"exp\":" + exp
-                + ",\"cnf\":{\"jkt\":\"" + DpopProof.Thumbprint(s.Secret(DevicePublicName)) + "\"}}";
+            return "{\"iss\":" + MiniJson.Quote(IssuerName) + ",\"aud\":" + MiniJson.Quote(s.TokenAudience) + ",\"sub\":" + MiniJson.Quote(Subject)
+                + ",\"roles\":[" + MiniJson.Quote(s.TokenRole) + "],\"cap\":[\"void-sale\"],\"iat\":" + LabNow + ",\"exp\":" + exp
+                + ",\"cnf\":{\"jkt\":\"" + DpopProof.Thumbprint(s.EnrolledKey) + "\"}}";
         }
 
         static StepEffect SendToken(string token)
@@ -281,6 +320,9 @@ namespace NetSec.Labs
 
             AuthDecision tokenDecision = Token.Verify(s.Secret(IssuerPublicName), token, AuthTime.FromUnix(LabNow));
             if (!tokenDecision.Allowed) return StepDecision.Fail(tokenDecision.Code, tokenDecision.CheckName, tokenDecision.Detail);
+            object aud;
+            if (!tokenDecision.Claims.TryGetValue("aud", out aud) || !Audience.Equals(aud))
+                return StepDecision.Fail(ErrorCodes.TokenBadAudience, Token.AudienceCheck, "this token was written for another audience");
 
             AuthDecision proofDecision = DpopProof.Check(proof, Method, BaseUrl + action, LabNow, token, BoundKey(tokenDecision.Claims));
             if (!proofDecision.Allowed) return StepDecision.Fail(proofDecision.Code, proofDecision.CheckName, proofDecision.Detail);
@@ -293,6 +335,7 @@ namespace NetSec.Labs
             return StepDecision.Stay(
                 Effect.Check(Token.SignatureCheck, ErrorCodes.TokenBadSignature),
                 Effect.Check(Token.ExpiryCheck, ErrorCodes.TokenExpired),
+                Effect.Check(Token.AudienceCheck, ErrorCodes.TokenBadAudience),
                 Effect.Check(DpopProof.SignatureCheck, ErrorCodes.DpopBadSignature),
                 Effect.Check(DpopProof.BindingCheck, ErrorCodes.DpopJktMismatch),
                 Effect.Check(DpopProof.AgeCheck, ErrorCodes.DpopIatWindow),
@@ -300,6 +343,15 @@ namespace NetSec.Labs
                 Effect.Absorb(jti),
                 Effect.Check(AccessRules.PermissionCheck, ErrorCodes.CapabilityDenied),
                 Send(CallOk, new byte[0]));
+        }
+
+        // Plain compares: a public key and a challenge the issuer sent in the clear are both public, so their timing reveals nothing secret.
+        static bool Same(byte[] a, byte[] b)
+        {
+            if (a.Length != b.Length) return false;
+            for (int i = 0; i < a.Length; i++)
+                if (a[i] != b[i]) return false;
+            return true;
         }
 
         static string BoundKey(Dictionary<string, object> claims)
