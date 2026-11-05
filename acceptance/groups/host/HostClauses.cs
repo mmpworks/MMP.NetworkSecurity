@@ -19,6 +19,8 @@ namespace Acceptance
     /// </summary>
     public static class HostClauses
     {
+        static void Crumb(string what) { if (Environment.GetEnvironmentVariable("ACC_TRACE") == "1") File.AppendAllText(Path.Combine(Path.GetTempPath(), "acc-crumbs.log"), "[host " + DateTime.Now.ToString("HH:mm:ss") + "] " + what + "\n"); }
+
         sealed class HostProc : IDisposable
         {
             public Proc P; public int Port; public string Token = Guid.NewGuid().ToString("N"); public string LocalAppData;
@@ -26,6 +28,7 @@ namespace Acceptance
 
             public static HostProc Start(Ctx c, string name, IDictionary<string, string> extraEnv)
             {
+                Crumb("HostProc.Start " + name);
                 string dll = c.Prop("host", "");
                 if (dll.Length == 0 || !File.Exists(dll)) throw new NotRunException("PRODUCT_MISSING", "NetSec.Host is not built (host=" + dll + ")");
                 HostProc h = new HostProc();
@@ -34,6 +37,9 @@ namespace Acceptance
                 Directory.CreateDirectory(h.LocalAppData);
                 Dictionary<string, string> env = new Dictionary<string, string>();
                 env["LOCALAPPDATA"] = h.LocalAppData;
+                // Design section 11 gives the flags --port and --token. Design section 5 gives the environment variables NETSEC_PORT and NETSEC_TOKEN.
+                // The two sections differ, so the suite passes both and a Host that reads either one starts.
+                env["NETSEC_PORT"] = h.Port.ToString(); env["NETSEC_TOKEN"] = h.Token;
                 if (extraEnv != null) foreach (KeyValuePair<string, string> kv in extraEnv) env[kv.Key] = kv.Value;
                 string args = "--port " + h.Port + " --token " + h.Token;                                  // design section 11, "Processes" item 3
                 h.P = dll.EndsWith(".dll", StringComparison.OrdinalIgnoreCase)
@@ -102,8 +108,9 @@ namespace Acceptance
             {
                 ws.Options.SetRequestHeader("Origin", "http://localhost:5173");
                 ws.ConnectAsync(new Uri("ws://127.0.0.1:" + h.Port + "/ws?token=" + h.Token), CancellationToken.None).Wait(20000);
+                if (ws.State != WebSocketState.Open) throw new FailException("the WebSocket to the Host did not open (state " + ws.State + ")");
                 string start = "{\"type\":\"session.start\",\"requestId\":\"r1\",\"lesson\":" + lesson + ",\"seed\":7,\"mode\":\"step\",\"transport\":\"" + transport + "\"" + (extraJson ?? "") + "}";
-                ws.SendAsync(new ArraySegment<byte>(Encoding.UTF8.GetBytes(start)), WebSocketMessageType.Text, true, CancellationToken.None).Wait();
+                ws.SendAsync(new ArraySegment<byte>(Encoding.UTF8.GetBytes(start)), WebSocketMessageType.Text, true, CancellationToken.None).Wait(15000);
                 DateTime end = DateTime.UtcNow.AddSeconds(90);
                 byte[] buf = new byte[1 << 16];
                 while (DateTime.UtcNow < end && run.Finished == null && run.Error == null)
@@ -126,7 +133,7 @@ namespace Acceptance
                         run.SessionId = MiniJson.Str(m, "sessionId"); run.TransportKind = MiniJson.Str(m, "transportKind"); run.SessionFile = MiniJson.Str(m, "sessionFile");
                         // The lesson waits in step mode. session.run lets it go to the end (design section 5).
                         string go = "{\"type\":\"session.run\",\"requestId\":\"r2\",\"sessionId\":\"" + run.SessionId + "\"}";
-                        ws.SendAsync(new ArraySegment<byte>(Encoding.UTF8.GetBytes(go)), WebSocketMessageType.Text, true, CancellationToken.None).Wait();
+                        ws.SendAsync(new ArraySegment<byte>(Encoding.UTF8.GetBytes(go)), WebSocketMessageType.Text, true, CancellationToken.None).Wait(15000);
                         object t; run.TrainingOnly = m.TryGetValue("trainingOnly", out t) && t is bool && (bool)t;
                     }
                     else if (kind == "trace") { Dictionary<string, object> ev = MiniJson.Obj(m, "event"); if (ev != null) run.Events.Add(ev); }
@@ -168,7 +175,7 @@ namespace Acceptance
             if (Proc.Run(openssl, "genpkey -algorithm ed25519 -out \"" + key + "\"", dir, 30000, out o) != 0) throw new FailException(o);
             if (Proc.Run(openssl, "req -new -x509 -key \"" + key + "\" -subj \"/CN=localhost\" -days 2 -addext \"subjectAltName=DNS:localhost\" -out \"" + cert + "\"", dir, 30000, out o) != 0) throw new FailException(o);
             // The real peer is a long-lived OpenSSL server (more than one session). It writes the true secrets to its key log.
-            Proc peer = Proc.Start(openssl, "s_server -accept 0 -tls1_3 -rev -cert \"" + cert + "\" -key \"" + key + "\" -keylogfile \"" + refKeylog + "\"");
+            Crumb("real: start s_server"); Proc peer = Proc.Start(openssl, "s_server -accept 0 -tls1_3 -rev -cert \"" + cert + "\" -key \"" + key + "\" -keylogfile \"" + refKeylog + "\"");
             using (peer)
             {
                 string accept = peer.WaitForLine(delegate (string l) { return l.StartsWith("ACCEPT"); }, 20000);
@@ -177,24 +184,22 @@ namespace Acceptance
                 Dictionary<string, string> env = new Dictionary<string, string>();
                 env["NETSEC_REAL_PEER"] = "127.0.0.1:" + peerPort;                                      // ASSUMED, see CONTRACT.md
                 env["SSL_CERT_FILE"] = cert;
-                using (HostProc h = HostProc.Start(c, "a16-real", env))
+                Crumb("real: s_server up, start Host"); using (HostProc h = HostProc.Start(c, "a16-real", env))
                 {
                     // Control first: a glass-box session shows its secrets, so a scan of the session can see them.
-                    SessionRun glass = RunSession(h, 5, "glass", null);
-                    RequireBuilt(glass, 5);
-                    Check.True(glass.Error == null, "glass session reported an error: " + (glass.Error == null ? "" : glass.Error.ToString()));
+                    Crumb("glass session start"); SessionRun glass = RunSession(h, 5, "glass", null); Crumb("glass session done"); RequireBuilt(glass, 5);
+                    Check.True(glass.Error == null, "glass session reported an error: " + (glass.Frames.Count == 0 ? "" : glass.Frames[glass.Frames.Count - 1]));
                     Check.True(glass.TrainingOnly && glass.TransportKind == "glass", "glass session did not say trainingOnly with transportKind glass");
                     Check.True(SecretCount(glass) > 0, "the glass-box control session shows no secrets, so the scan cannot prove absence in real mode");
-                    HttpResponseMessage glassKeylog = Get(h, "/api/sessions/" + glass.SessionId + "/keylog", h.Token, "http://localhost:5173");
+                    Crumb("glass keylog"); HttpResponseMessage glassKeylog = Get(h, "/api/sessions/" + glass.SessionId + "/keylog", h.Token, "http://localhost:5173");
                     Check.True(glassKeylog.IsSuccessStatusCode, "the key log of a glass session got HTTP " + (int)glassKeylog.StatusCode);
 
-                    SessionRun real = RunSession(h, 5, "real", null);
-                    RequireBuilt(real, 5);
-                    Check.True(real.Error == null, "real session reported an error: " + (real.Error == null ? "" : real.Error.ToString()));
+                    Crumb("real session start"); SessionRun real = RunSession(h, 5, "real", null); Crumb("real session done"); RequireBuilt(real, 5);
+                    Check.True(real.Error == null, "real session reported an error: " + (real.Frames.Count == 0 ? "" : real.Frames[real.Frames.Count - 1]));
                     Check.True(!real.TrainingOnly && real.TransportKind == "os", "real session reported trainingOnly=" + real.TrainingOnly + " transportKind=" + real.TransportKind + "; expected false and os");
                     Check.True(real.Events.Count > 0, "real session sent no trace events");
                     Check.Equal("secrets shown in real mode", 0, SecretCount(real));
-                    HttpResponseMessage realKeylog = Get(h, "/api/sessions/" + real.SessionId + "/keylog", h.Token, "http://localhost:5173");
+                    Crumb("real keylog"); HttpResponseMessage realKeylog = Get(h, "/api/sessions/" + real.SessionId + "/keylog", h.Token, "http://localhost:5173");
                     Check.True(!realKeylog.IsSuccessStatusCode, "the key log of a real-mode session was served (HTTP " + (int)realKeylog.StatusCode + ")");
 
                     // Scan: every secret the referee logged, as hex, as lower or upper case, must be absent from frames and session files.
@@ -230,7 +235,10 @@ namespace Acceptance
         {
             string toursDir = Path.Combine(c.RepoRoot, "app", "src", "tours");
             if (!Directory.Exists(toursDir)) throw new NotRunException("PRODUCT_MISSING", "app/src/tours does not exist yet");
-            string[] files = Directory.GetFiles(toursDir, "lesson-*.json");
+            List<string> built = new List<string>();
+            foreach (string f in Directory.GetFiles(toursDir, "lesson-*.json"))
+                if (int.Parse(Regex.Match(Path.GetFileName(f), @"lesson-(\d+)\.json").Groups[1].Value) >= 1) built.Add(f);      // lesson 0 is the toy lesson, outside the suite
+            string[] files = built.ToArray();
             if (files.Length == 0) throw new NotRunException("PRODUCT_MISSING", "no tour files yet");
             using (HostProc h = HostProc.Start(c, "a14-bindings", null))
             {
@@ -241,7 +249,7 @@ namespace Acceptance
                     int lesson = int.Parse(Regex.Match(Path.GetFileName(file), @"lesson-(\d+)\.json").Groups[1].Value);
                     object parsed = MiniJson.Parse(File.ReadAllText(file));
                     List<object> steps = parsed as List<object> ?? MiniJson.Arr(MiniJson.AsObject(parsed), "steps");
-                    SessionRun run = RunSession(h, lesson, "glass", null);
+                    Crumb("A14 lesson " + lesson); SessionRun run = RunSession(h, lesson, "glass", null); Crumb("A14 lesson " + lesson + " done");
                     if (run.Error != null && MiniJson.Str(run.Error, "code") == "LESSON_NOT_BUILT") { notBuilt++; continue; }
                     if (run.Error != null) { t.Miss("lesson " + lesson, "the Host answered session.start with an error: " + run.Error.ToString()); continue; }
                     if (run.Events.Count == 0) { t.Miss("lesson " + lesson, "the live session produced no trace events, so no binding can be shown"); continue; }
