@@ -206,6 +206,34 @@ namespace NetSec.Tests
             Assert.Equal(SshCodes.PacketMac, Assert.Throws<ParseFailure>(() => reader.TryNext()).Code);
         }
 
+        /// <summary>
+        /// aes128-ctr runs one counter through the whole session. Modes.Ctr returns no next counter, so a caller that restarts it on each packet
+        /// reuses the keystream, and a sealed-then-opened round trip cannot see that, because both sides reuse it alike. One Modes.Ctr call over
+        /// both packets, from the first counter, is the outside check.
+        /// </summary>
+        [Fact]
+        public void Two_ctr_packets_continue_one_counter_and_share_no_keystream()
+        {
+            byte[] key = Filled(16, 0x10, 0x11), mac = Filled(32, 0x30, 0x31);
+            byte[] iv = Filled(16, 0xff, 0xff);   // The counter must carry across all 16 bytes on the way.
+            SshPacketWriter writer = new SshPacketWriter();
+            writer.Arm(new AesCtrStream(key, iv), mac, Hashes.Sha256);
+            SeededRandom random = new SeededRandom(1);
+            byte[] payload = Filled(23, 0x55, 0x55);
+
+            byte[] first = writer.Seal(payload, random), second = writer.Seal(payload, random);
+            byte[] cipherFirst = first.Take(first.Length - 32).ToArray(), cipherSecond = second.Take(second.Length - 32).ToArray();
+            Assert.Equal(32, cipherFirst.Length);
+            Assert.NotEqual(Hex.Encode(cipherFirst.Take(5).ToArray()), Hex.Encode(cipherSecond.Take(5).ToArray()));
+
+            byte[] plain = Modes.Ctr(new AesKey(key), iv, cipherFirst.Concat(cipherSecond).ToArray());
+            byte[] expectedHeader = new ByteWriter().U32(28).U8(4).ToArray();
+            Assert.Equal(Hex.Encode(expectedHeader), Hex.Encode(plain.Take(5).ToArray()));
+            Assert.Equal(Hex.Encode(payload), Hex.Encode(plain.Skip(5).Take(23).ToArray()));
+            Assert.Equal(Hex.Encode(expectedHeader), Hex.Encode(plain.Skip(32).Take(5).ToArray()));
+            Assert.Equal(Hex.Encode(payload), Hex.Encode(plain.Skip(37).Take(23).ToArray()));
+        }
+
         [Fact]
         public void A_length_no_packet_may_hold_gets_a_named_error()
         {
@@ -258,8 +286,10 @@ namespace NetSec.Tests
                 Assert.Contains(name, client);
             foreach (string name in new[] { "VersionLine", "KexInit", "KexEcdhReply", "KexdhReply", "NewKeys", "ServiceAccept", "UserauthPkOk", "UserauthSuccess", "ChannelOpenConfirmation", "ChannelSuccess", "ChannelData", "ChannelRequestExitStatus", "ChannelEof", "ChannelClose" })
                 Assert.Contains(name, server);
-            foreach (string check in new[] { SshChecks.Version, SshChecks.Algorithm, SshChecks.KnownHosts, SshChecks.ZeroSecret, SshChecks.ExchangeSignature, SshChecks.AuthAccepted, SshChecks.AuthSignature, SshChecks.ExecAccepted, SshChecks.TunnelAllowList })
+            foreach (string check in new[] { SshChecks.Version, SshChecks.Algorithm, SshChecks.KnownHosts, SshChecks.ZeroSecret, SshChecks.ExchangeSignature, SshChecks.AuthAccepted, SshChecks.AuthSignature, SshChecks.ExecAccepted, SshChecks.TunnelAllowList, SshChecks.TunnelAccepted })
                 Assert.Contains(check, run.PassedChecks);
+            Assert.All(run.Of("check.result").Where(e => e.Message == SshChecks.TunnelAllowList), e => Assert.Equal("server", e.Actor));
+            Assert.All(run.Of("check.result").Where(e => e.Message == SshChecks.TunnelAccepted), e => Assert.Equal("client", e.Actor));
 
             Assert.Contains(run.Of("ssh.message.received"), e => e.Actor == "client" && e.Message == "ChannelData" && Encoding.UTF8.GetString(e.Plain).Contains("hello"));
             Assert.Equal(2, run.Of("ssh.message.received").Count(e => e.Actor == "client" && e.Message == "ChannelData" && Encoding.UTF8.GetString(e.Plain).Contains("hello")));
@@ -340,6 +370,31 @@ namespace NetSec.Tests
             Assert.True(session.Opened.IsFaulted);
         }
 
+        [Fact]
+        public void The_server_decides_a_refused_tunnel_and_stays_open_to_answer()
+        {
+            Run run = Go(Attack("L8-refused-tunnel"));
+            TraceEvent refusal = run.Of("check.result").Single(e => !e.Check.Passed && e.Message == SshChecks.TunnelAllowList);
+            Assert.Equal("server", refusal.Actor);
+            Assert.Equal(SshCodes.TunnelRefused, refusal.Check.Code);
+            Assert.Contains("bank.lab:1433", refusal.Check.Detail);
+            Assert.Contains("ChannelOpenFailure", run.Sent("server"));
+            Assert.Equal("client", run.Of("check.result").Single(e => !e.Check.Passed && e.Message == SshChecks.TunnelAccepted).Actor);
+        }
+
+        [Fact]
+        public void A_silent_peer_ends_in_a_named_deadline_through_a_step_gate_too()
+        {
+            MemoryLink[] links = MemoryLink.Pair();
+            StepGate gate = new StepGate();
+            gate.Run();
+            SshClientOptions options = new SshClientOptions { Algorithms = SshAlgorithms.Modern, Random = new SeededRandom(2), Host = "h", Port = 22, User = "training", UserKey = new TrainingKeySource().Find(KeyIds.SshClient) };
+            GlassSshSession session = new GlassSshSession(SshEngine.Client(options, new TraceStream("c", "c", "c", null, "client", new FixedClock(1)), null, "server"), links[0], new ListSink(), gate, null, 200, new FixedClock(1), null);
+            session.Run();
+            Assert.True(session.Finished.Wait(30000), "the deadline did not end the wait");
+            Assert.Equal(NetSec.Errors.ErrorCodes.LinkDeadline, session.Finished.Result.Error.Code);
+        }
+
         /// <summary>An attack's control is the same lab with no attack: the test above. Each row differs from it in one thing.</summary>
         [Theory]
         [InlineData("L8-change-host-key")]
@@ -374,7 +429,7 @@ namespace NetSec.Tests
         {
             string[] lines = Go(null, 7).Events.Where(e => !e.StreamId.EndsWith("/wire")).OrderBy(e => e.EventId, StringComparer.Ordinal).Select(TraceJson.ToLine).ToArray();
             using (SHA1 sha = SHA1.Create())
-                Assert.Equal("6a65211dcee27087b5d82421c95b91246fc8d022", Hex.Encode(sha.ComputeHash(Encoding.UTF8.GetBytes(string.Join("\n", lines)))));
+                Assert.Equal("9e63738720149855050bad893caf628548fa5b94", Hex.Encode(sha.ComputeHash(Encoding.UTF8.GetBytes(string.Join("\n", lines)))));
         }
     }
 }

@@ -155,6 +155,7 @@ namespace NetSec.Machine
                 case EffectKind.Secret: ApplySecret(effect, step); break;
                 case EffectKind.InstallKeys: ApplyInstallKeys(effect, step); break;
                 case EffectKind.Check: ApplyCheck(effect, step); break;
+                case EffectKind.CheckFailed: ApplyCheckFailed(effect, step); break;
                 case EffectKind.Deliver: _app.Add(new DeliveredChunk(effect.Channel, effect.Bytes)); break;
                 case EffectKind.Note: ApplyNote(effect, step); break;
                 case EffectKind.Measure: ApplyMeasure(effect, step); break;
@@ -213,6 +214,23 @@ namespace NetSec.Machine
             check.Id = effect.Text;
             check.Name = effect.Name;
             check.Passed = true;
+            TraceEventDraft draft = new TraceEventDraft();
+            draft.Type = "check.result";
+            draft.Message = effect.Name;
+            draft.Step = step;
+            draft.Check = check;
+            Emit(draft, null);
+        }
+
+        void ApplyCheckFailed(StepEffect effect, string step)
+        {
+            int split = effect.Text.IndexOf('|');
+            TraceCheck check = new TraceCheck();
+            check.Id = effect.Text.Substring(0, split);
+            check.Code = check.Id;
+            check.Name = effect.Name;
+            check.Passed = false;
+            check.Detail = effect.Text.Substring(split + 1);
             TraceEventDraft draft = new TraceEventDraft();
             draft.Type = "check.result";
             draft.Message = effect.Name;

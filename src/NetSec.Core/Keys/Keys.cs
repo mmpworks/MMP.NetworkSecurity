@@ -34,6 +34,7 @@ namespace NetSec.Keys
     {
         public const string CaRoot = "ca-root";
         public const string ServerTlsEd25519 = "server-tls-ed25519";
+        public const string ClientTlsEd25519 = "client-tls-ed25519";
         public const string ServerTls11Rsa = "server-tls11-rsa";
         public const string SshHostEd25519 = "ssh-host-ed25519";
         public const string SshHostRsa = "ssh-host-rsa";

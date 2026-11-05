@@ -85,7 +85,7 @@ namespace NetSec.Labs
         }
 
         /// <summary>The server sends each chunk back. The client closes when it has its line back.</summary>
-        static void EchoThenClose(EnginePump client, EnginePump server)
+        internal static void EchoThenClose(EnginePump client, EnginePump server)
         {
             server.OnApp = delegate(AppChunk chunk) { server.Enqueue(new EngineCommand(EngineCommandKind.Send, 0, chunk.Bytes, null)); };
             client.OnApp = delegate(AppChunk chunk) { client.Enqueue(EngineCommand.Close); };

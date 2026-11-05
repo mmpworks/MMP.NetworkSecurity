@@ -578,9 +578,12 @@ namespace NetSec.Tests
 
             public void Dispose()
             {
-                // Windows answers Access is denied when the process is already exiting. The wait below covers that case.
-                try { if (!P.HasExited) P.Kill(); } catch (InvalidOperationException) { } catch (System.ComponentModel.Win32Exception) { }
+                // The tap ends by itself when its links close. Between HasExited and Kill, .NET Framework then reports access denied.
+                try { if (!P.HasExited) P.Kill(); }
+                catch (InvalidOperationException) { }
+                catch (System.ComponentModel.Win32Exception) { }
                 P.WaitForExit(5000);
+                Assert.True(P.HasExited, "the tap is still running");
                 P.Dispose();
                 // The log is a temp file, and Windows can hold it for a moment after the process ends.
                 try { File.Delete(Log); } catch (IOException) { }

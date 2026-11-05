@@ -64,6 +64,15 @@ Each correction goes here, newest slice last. Later slices read this file first.
 9. **`Probe` throws `NotImplementedException` for TLS 1.1 and SSH until S4.** The suite maps that to NOT RUN. A7 and A8 stay NOT RUN for that reason, and S4 removes `Probe.NeedBuilt`.
 10. **The glass client offers no CCS and an empty session id, and tolerates a CCS from the peer.** OpenSSL and Go accept this. The glass server echoes the client's session id and sends no CCS.
 11. **`EncryptedExtensions` has no `group unchanged` check.** Design section 2.6 lists one. The group check runs at ServerHello, against the one group the client offered, so a second check at `ee` would always pass and show the learner nothing.
+
+## S6
+
+1. **Name known skips in the PR body.** A clean PR body said "a change to any token character is refused" while a test skipped the last character. The skip was the defect showing. A skip goes in the body, with its reason.
+2. **A signature shows who calls only when the verifier already holds the key.** The first lab checked a signature against the key the caller sent, so any key earned a token. The issuer now holds an enrolment row, and it compares the answer to the challenge it sent.
+3. **`Convert.FromBase64String` accepts set spare bits and whitespace on both builds.** To hold one spelling, encode the result and compare it to the text.
+4. **`DateTime` subtraction ignores `Kind`.** A verifier that takes a `DateTime` must convert a local value and refuse one with no zone, or a local clock moves every expiry.
+
+5. **The contract named the wrong alert for a removed client certificate.** RFC 8446 sections 4.4.2.4 and 6.2 name `certificate_required` for an empty list and `bad_certificate` for a corrupt certificate. Go sends alert 116 in a live run. Read the RFC before you wire an alert name from a design doc.
 ## S7
 
 1. **Timing cases taken one after the other measure the machine, and they do not measure the compare.** This machine has 24 logical CPUs. A whole-case sample of the constant-time compare moved its mean between about 12 and 19 ticks from run to run. Sequential constant-time |t| ran from 3.7 to 230, and a control with two identical cases reached 89. So `TimingLab.Interleaved` takes turns of 100 samples between its two cases, and the lab uses it. `TimingLab.Sample` stays sequential because the contract names it.
@@ -89,8 +98,8 @@ Each correction goes here, newest slice last. Later slices read this file first.
 13. **A peer's EOF closes the whole tunnel target.** `IByteLink` has no half close, so bytes the target sends after that are lost. `ssh.exe -W` passes, because its reply came before its EOF. S5 needs a half close if the gateway must carry late replies.
 14. **`dotnet build` can lock `NetSec.Core.NetCF` for a run started right after a build.** One gate run reported `A9.cf.same-suite-passes-on-net48-skips-pinned` as `CS2012 ... being used by another process`. The next run passed 4 of 4 with no change. It is a build-server race, not a product fault.
 9. **For S5: a server tunnel opens through `TransportRequest.OpenTarget`.** It defaults to a socket. The gateway passes its own link there, and `AllowTunnel` decides the target first. The engine confirms a channel before the target connects, so a failed connect shows as a channel that closes at once.
-10. **A refused tunnel ends the lab's session with `SSH_TUNNEL_REFUSED`.** A real client could keep the session. The lab ends it, so the learner gets one named failure.
-11. **Step mode still has no read deadline for SSH.** A flipped length byte that still looks sensible makes the reader wait for bytes that never come. Free run ends in `LINK_DEADLINE`. In step mode the wait has no end, as S0 item 11 says. A length no packet may hold ends at once in `SSH_PACKET_LENGTH` on both modes.
+10. **The server decides a tunnel, as RFC 4254 section 7.2 says.** PR #38 named the client as the actor of `tunnel allow list`, and the claim reader caught it. The server now owns that check, through `Effect.CheckFailed`, and it stays open and sends `ChannelOpenFailure`. The client owns `tunnel accepted`, which only reports the answer. A real client could keep the session. The lab ends it with `SSH_TUNNEL_REFUSED`, and `LabResult.FailedCheck` names the server's check, since that check decided.
+11. **A flipped length byte that still looks sensible makes the reader wait for bytes that never come.** `LINK_DEADLINE` ends that wait on both gates, by the S3 rule that the clock restarts only while the gate holds an event. PR #38 passed 0 in step mode and reported this as open, because it branched before S3 landed. A length no packet may hold ends at once in `SSH_PACKET_LENGTH`.
 12. **The client's referee is Go, and the server's referee is `ssh.exe`.** Each referee is another SSH implementation. The `sshpeer` client mode has no independent peer, so no claim here rests on it.
 
 ## Pump deadline test

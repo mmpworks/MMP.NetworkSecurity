@@ -178,10 +178,15 @@ namespace NetSec.Ssh
 
             string host = SshFields.Text(r.Prefixed("host", "id"));
             int port = (int)r.U32("port", "id");
+            // RFC 4254 section 7.2: the side that receives the request decides. A refusal costs one channel, so the session stays open.
+            string target = host + ":" + port;
             if (s.Server.AllowTunnel == null || !s.Server.AllowTunnel(host, port))
-                return StepDecision.Stay(OpenFailure(s, sender, OpenAdministrativelyProhibited, host + ":" + port + " is off the allow list"));
+                return StepDecision.Stay(
+                    Effect.CheckFailed(SshChecks.TunnelAllowList, SshCodes.TunnelRefused, target + " is off the allow list"),
+                    OpenFailure(s, sender, OpenAdministrativelyProhibited, target + " is off the allow list"));
             SshChannel channel = SshRows.AddRemote(s, sender, window, maxPacket);
             return StepDecision.Stay(
+                Effect.Check(SshChecks.TunnelAllowList, SshCodes.TunnelRefused),
                 s.SealedPacket(SshNames.ChannelOpenConfirmation, SshRows.Confirmation(channel)),
                 Effect.Deliver(SshControl.Channel, SshControl.Encode(SshControl.TunnelRequested, channel.Local, host + ":" + port)));
         }
