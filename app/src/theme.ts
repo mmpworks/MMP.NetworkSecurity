@@ -14,11 +14,11 @@ export const vuetify = createVuetify({
     themes: {
       nsDark: {
         dark: true,
-        colors: { background: '#0e1318', surface: '#151c23', 'surface-variant': '#1d2630', primary: '#56b4e9', secondary: '#b39dff', success: '#3fb950', warning: '#e0a82e', error: '#ff6b6b', info: '#56b4e9' },
+        colors: { background: '#0e1318', surface: '#151c23', 'surface-variant': '#1d2630', 'on-surface-variant': '#e6edf3', primary: '#56b4e9', secondary: '#b39dff', success: '#3fb950', warning: '#e0a82e', error: '#ff6b6b', info: '#56b4e9' },
       },
       nsLight: {
         dark: false,
-        colors: { background: '#f6f8fa', surface: '#ffffff', 'surface-variant': '#e8edf2', primary: '#0072b2', secondary: '#6a4fc2', success: '#1a7f37', warning: '#8a6100', error: '#c4242f', info: '#0072b2' },
+        colors: { background: '#f6f8fa', surface: '#ffffff', 'surface-variant': '#e8edf2', 'on-surface-variant': '#1f2933', primary: '#0072b2', secondary: '#6a4fc2', success: '#176f32', warning: '#8a6100', error: '#c4242f', info: '#0072b2' },
       },
     },
   },
