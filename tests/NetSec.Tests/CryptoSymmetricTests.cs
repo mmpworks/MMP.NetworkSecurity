@@ -2,6 +2,7 @@ using System;
 using System.Security.Cryptography;
 using NetSec.Bytes;
 using NetSec.Crypto;
+using NetSec.Errors;
 using Xunit;
 
 namespace NetSec.Tests
@@ -325,6 +326,67 @@ namespace NetSec.Tests
             Assert.Empty(Hkdf.Expand(Hashes.Sha256, prk, new byte[0], 0));
             Assert.Throws<ArgumentOutOfRangeException>(() => Hkdf.Expand(Hashes.Sha256, prk, new byte[0], 255 * 32 + 1));
             Assert.Throws<ArgumentOutOfRangeException>(() => Hkdf.Expand(Hashes.Sha256, prk, new byte[0], -1));
+        }
+
+        [Theory]
+        [InlineData("sha1", 20)]
+        [InlineData("sha256", 32)]
+        [InlineData("sha512", 64)]
+        public void Hkdf_expand_refuses_a_prk_shorter_than_the_hash(string alg, int hashLength)
+        {
+            Assert.Equal(10, Hkdf.Expand(Factory(alg), Fill(hashLength), new byte[0], 10).Length);
+            NetSecException refused = Assert.Throws<NetSecException>(() => Hkdf.Expand(Factory(alg), Fill(hashLength - 1), new byte[0], 10));
+            Assert.Equal(ErrorCodes.HkdfPrkTooShort, refused.Error.Code);
+        }
+
+        [Fact]
+        public void Hmac_verify_takes_the_right_tag_and_refuses_the_rest()
+        {
+            byte[] key = Fill(32), data = Fill(40, 2);
+            byte[] tag = Hmac.Compute(Hashes.Sha256, key, data);
+            Assert.True(Hmac.Verify(Hashes.Sha256, key, data, tag));
+
+            for (int i = 0; i < tag.Length; i++)
+            {
+                byte[] bad = (byte[])tag.Clone();
+                bad[i] ^= 0x01;
+                Assert.False(Hmac.Verify(Hashes.Sha256, key, data, bad));
+            }
+            Assert.False(Hmac.Verify(Hashes.Sha256, key, Fill(40, 3), tag));
+            Assert.False(Hmac.Verify(Hashes.Sha256, Fill(32, 9), data, tag));
+            Assert.False(Hmac.Verify(Hashes.Sha256, key, data, Slice(tag, 16)));
+            Assert.False(Hmac.Verify(Hashes.Sha256, key, data, new byte[0]));
+            Assert.False(Hmac.Verify(Hashes.Sha256, key, data, Join(tag, new byte[1])));
+            Assert.Throws<ArgumentNullException>(() => Hmac.Verify(Hashes.Sha256, key, data, null));
+        }
+
+        [Fact]
+        public void Cmac_verify_takes_the_right_tag_and_refuses_the_rest()
+        {
+            AesKey k = new AesKey(Fill(16));
+            byte[] message = Fill(40, 2);
+            byte[] tag = Cmac.Compute(k, message);
+            Assert.True(Cmac.Verify(k, message, tag));
+
+            for (int i = 0; i < tag.Length; i++)
+            {
+                byte[] bad = (byte[])tag.Clone();
+                bad[i] ^= 0x01;
+                Assert.False(Cmac.Verify(k, message, bad));
+            }
+            Assert.False(Cmac.Verify(k, Fill(40, 3), tag));
+            Assert.False(Cmac.Verify(new AesKey(Fill(16, 9)), message, tag));
+            Assert.False(Cmac.Verify(k, message, Slice(tag, 8)));
+            Assert.False(Cmac.Verify(k, message, new byte[0]));
+            Assert.False(Cmac.Verify(k, message, Join(tag, new byte[1])));
+            Assert.Throws<ArgumentNullException>(() => Cmac.Verify(k, message, null));
+        }
+
+        static byte[] Slice(byte[] a, int n)
+        {
+            byte[] r = new byte[n];
+            Buffer.BlockCopy(a, 0, r, 0, n);
+            return r;
         }
 
         static byte[] Join(byte[] a, byte[] b)
