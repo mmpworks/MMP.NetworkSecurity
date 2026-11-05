@@ -188,10 +188,7 @@ namespace NetSec.Labs
 
         static StepDecision CheckConfirm(Session s, InboundMessage m, string secretName)
         {
-            byte[] expected = Hmac.Compute(Hashes.Sha256, s.Secret(secretName), ConfirmLabel);
-            bool same = expected.Length == m.Body.Length;
-            for (int i = 0; same && i < expected.Length; i++) same = expected[i] == m.Body[i];
-            if (!same) return StepDecision.Fail(ErrorCodes.KexConfirmMismatch, ConfirmCheck, m.Name + ": the two sides hold different secrets");
+            if (!Hmac.Verify(Hashes.Sha256, s.Secret(secretName), ConfirmLabel, m.Body)) return StepDecision.Fail(ErrorCodes.KexConfirmMismatch, ConfirmCheck, m.Name + ": the two sides hold different secrets");
             return StepDecision.Advance(Effect.Check(ConfirmCheck, ErrorCodes.KexConfirmMismatch));
         }
 
