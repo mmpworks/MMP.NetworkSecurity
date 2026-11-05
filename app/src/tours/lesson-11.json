@@ -1,0 +1,177 @@
+{
+  "steps": [
+    {
+      "id": "L11-S01",
+      "lesson": 11,
+      "title": "A compare that tells on you",
+      "text": [
+        "A program often checks a secret by comparing it with a guess, byte by byte. A simple compare stops at the first byte that differs.",
+        "That stop leaks time. A guess with a wrong first byte ends fast. A guess with a right first byte takes a little longer. An attacker who can time the check learns the secret one byte at a time.",
+        "The fix is a {{term:constant-time}} compare. It takes the same time whatever the secret is. This lesson measures both kinds.",
+        "Built to show the parts. Do not copy."
+      ],
+      "glossary": ["constant-time"],
+      "bind": { "kind": "concept" },
+      "highlight": ["diagram:lane=attacker", "diagram:lane=target"],
+      "unlock": { "mode": "ack" }
+    },
+    {
+      "id": "L11-S02",
+      "lesson": 11,
+      "title": "The target holds a secret",
+      "text": [
+        "The target lane holds a made-up secret. Find it in the secrets panel under the lab-secret row.",
+        "The lab runs on your own computer, so every time you see here comes from your machine. Another machine gives other numbers."
+      ],
+      "glossary": [],
+      "bind": { "kind": "event", "eventType": "timing.lab.started", "match": { "actor": "target", "step": "start" } },
+      "highlight": ["secrets:row=target.lab-secret"],
+      "unlock": { "mode": "event" }
+    },
+    {
+      "id": "L11-S03",
+      "lesson": 11,
+      "title": "Time the compares",
+      "text": [
+        "The target times four cases, 100,000 times each. It times the leaky compare when the first byte differs and when the last byte differs. It does the same for the constant-time compare.",
+        "Each chart is a {{term:histogram}}. It counts how many timings fell in each range, in nanoseconds. A nanosecond is one billionth of a second.",
+        "Compare the leaky pair. The two charts sit in different places, because the compare did more work when it matched further in."
+      ],
+      "glossary": ["histogram"],
+      "bind": { "kind": "event", "eventType": "timing.samples", "match": { "actor": "target", "step": "measure" } },
+      "highlight": ["diagram:lane=target"],
+      "claims": [
+        {
+          "id": "L11-C01",
+          "text": "The lab measures 100,000 samples per case for the leaky and constant-time compares, and the histogram spread uses nanoseconds from the same run.",
+          "source": "docs/lesson-11-names.md, section 2 Events, paragraph after the order table (branch feat/s7)"
+        }
+      ],
+      "unlock": { "mode": "event" }
+    },
+    {
+      "id": "L11-S04",
+      "lesson": 11,
+      "title": "One number for the gap",
+      "text": [
+        "The verdict gives each pair a {{term:t-statistic}}. It compares the average times of two groups against their noise. A large size means the groups differ by more than noise.",
+        "Read three numbers together: the leaky compare, the constant-time compare, and the control. The control runs the constant-time compare against itself, so it shows this machine's noise on one run.",
+        "For the constant-time row, ask one question: does it show any effect that the control lacks? If the lab says this machine was too noisy, run it again."
+      ],
+      "glossary": ["t-statistic"],
+      "bind": { "kind": "event", "eventType": "timing.verdict", "match": { "actor": "target", "step": "measure" } },
+      "highlight": ["check:name=leaky compare separates"],
+      "claims": [
+        {
+          "id": "L11-C02",
+          "text": "A two-sample t statistic compares the means of two samples against their spread, and the variances may be treated as equal or unequal.",
+          "source": "NIST/SEMATECH e-Handbook of Statistical Methods, section 1.3.5.3 (Two-Sample t-Test for Equal Means), read 2026-11-05"
+        },
+        {
+          "id": "L11-C03",
+          "text": "Identical cases also exceed |t| 4.5 on the lab machine: the constant-time compare in 5 of 20 runs and the identical-case control in 1 of 20, so a single run under or over a cut-off settles nothing.",
+          "source": "docs/learnings.md, section S7, item 2 (branch feat/s7)"
+        }
+      ],
+      "unlock": { "mode": "event" }
+    },
+    {
+      "id": "L11-S05",
+      "lesson": 11,
+      "title": "Managed code makes no promise",
+      "text": [
+        "The lab also times a compare written in managed code, which is C# running on the .NET runtime. Managed code has no constant-time guarantee. The runtime compiles and optimizes the code, and it may change how long a compare takes.",
+        ".NET offers a helper for this job, CryptographicOperations.FixedTimeEquals. Use a helper like that instead of a loop you wrote.",
+        "C++ results depend on the {{term:optimizer}}. The lab measured the constant-time result only for this source, this compiler, these flags, and this CPU. A new compiler or flag can change it."
+      ],
+      "glossary": ["optimizer"],
+      "bind": { "kind": "event", "eventType": "timing.managed", "match": { "actor": "target", "step": "measure" } },
+      "highlight": ["diagram:lane=target"],
+      "claims": [
+        {
+          "id": "L11-C04",
+          "text": "Managed code has no constant-time guarantee, and C++ results depend on the optimizer.",
+          "source": "docs/prd.md, Teaching accuracy rules, rule 5; docs/lesson-11-names.md, section 5 Statements, rows 1 and 2 (branch feat/s7)"
+        },
+        {
+          "id": "L11-C05",
+          "text": "Whether code runs in constant time depends on how it is written, the compiler version and flags, and the architecture. An optimized build can hide a leak that an unoptimized build shows.",
+          "source": "dudect README (github.com/oreparaz/dudect), section 'Further notes', read 2026-11-05"
+        },
+        {
+          "id": "L11-C06",
+          "text": ".NET provides CryptographicOperations.FixedTimeEquals, which compares buffers without leaking timing information, and it returns early only when the lengths differ.",
+          "source": "Microsoft Learn, CryptographicOperations.FixedTimeEquals method, Remarks (read 2026-11-05)"
+        }
+      ],
+      "unlock": { "mode": "event" }
+    },
+    {
+      "id": "L11-S06",
+      "lesson": 11,
+      "title": "Guess the secret from timings",
+      "text": [
+        "Now the attacker guesses. For each position, it tries every possible byte value, times each try, and picks the one that took longest.",
+        "One compare of one byte is too fast to time. So the lab stretches each secret byte to 1,024 bytes, and the timer runs in the same process. A remote attacker sees much more noise than this.",
+        "Try it: run the guess loop against the leaky compare. The run finishes with no failed check, and the attack works."
+      ],
+      "glossary": [],
+      "bind": { "kind": "event", "eventType": "timing.guess.finished", "match": { "actor": "attacker", "step": "guess-leaky" } },
+      "highlight": ["check:name=guess loop reads the leak"],
+      "tryIt": {
+        "id": "L11-S06-T1",
+        "label": "Run the guess against the leaky compare",
+        "action": { "type": "run-attack", "attackId": "L11-guess-leaky" },
+        "expect": { "type": "ran" }
+      },
+      "claims": [
+        {
+          "id": "L11-C07",
+          "text": "The lab's guess loop stretches each secret byte to a 1,024-byte block. One loop pass takes about 0.33 ns, and the clock tick is 100 ns.",
+          "source": "docs/learnings.md, section S7, item 3 (branch feat/s7)"
+        }
+      ],
+      "unlock": { "mode": "action", "ref": "L11-S06-T1" }
+    },
+    {
+      "id": "L11-S07",
+      "lesson": 11,
+      "title": "The same loop on the constant-time compare",
+      "text": [
+        "Now the attacker runs the same loop against the constant-time compare.",
+        "Try it: run the loop. The loop fails to recover the secret, and the run stops with the check named constant-time compare.",
+        "A failed guess shows one thing: this loop found nothing in 500 samples per candidate. It does not prove the compare is safe against a better attacker."
+      ],
+      "glossary": [],
+      "bind": { "kind": "event", "eventType": "timing.guess.finished", "match": { "actor": "attacker", "step": "guess-constant-time" } },
+      "highlight": ["check:name=constant-time compare"],
+      "tryIt": {
+        "id": "L11-S07-T1",
+        "label": "Run the guess against the constant-time compare",
+        "action": { "type": "run-attack", "attackId": "L11-guess-constant-time" },
+        "expect": { "type": "check", "name": "constant-time compare", "result": "fail" }
+      },
+      "claims": [
+        {
+          "id": "L11-C08",
+          "text": "A passing timing test does not show that code is constant time; it is the simplest form of leakage detection.",
+          "source": "dudect README (github.com/oreparaz/dudect), section 'Questions', answer to 'My code passes this tests. Does it mean it is really time constant?' (read 2026-11-05)"
+        }
+      ],
+      "unlock": { "mode": "action", "ref": "L11-S07-T1" }
+    },
+    {
+      "id": "L11-S08",
+      "lesson": 11,
+      "title": "What to take away",
+      "text": [
+        "A compare that stops early leaks time, and a timer can turn that leak into a secret.",
+        "Use the library helper for secret compares. Managed code has no constant-time guarantee, and a C++ result holds only for the compiler and flags you measured.",
+        "Built to show the parts. Do not copy."
+      ],
+      "glossary": [],
+      "bind": { "kind": "concept" },
+      "unlock": { "mode": "ack" }
+    }
+  ]
+}

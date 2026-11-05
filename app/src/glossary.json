@@ -27,6 +27,16 @@
     { "id": "key-share", "term": "key share", "short": "The public half of a key exchange. It is safe to send in the open." },
     { "id": "ml-kem", "term": "ML-KEM", "short": "A key exchange built on lattice math, meant to resist quantum computers." },
     { "id": "hybrid", "term": "hybrid", "short": "A key exchange that runs two methods together. An attacker must break both." },
-    { "id": "quantum-computer", "term": "quantum computer", "short": "A new kind of computer that could break some of today's locks, such as X25519." }
+    { "id": "quantum-computer", "term": "quantum computer", "short": "A new kind of computer that could break some of today's locks, such as X25519." },
+    { "id": "dukpt", "term": "DUKPT", "short": "A scheme where every sale gets its own key, made from a base key and a counter." },
+    { "id": "bdk", "term": "BDK", "short": "The base derivation key. A bank keeps it and uses it to rebuild each reader's keys." },
+    { "id": "ksn", "term": "KSN", "short": "Key serial number. It holds the reader's id and a counter, and travels with each sale." },
+    { "id": "pin-block", "term": "PIN block", "short": "A PIN packed with the card number into a fixed-size block, then locked." },
+    { "id": "replay", "term": "replay", "short": "Sending a copy of an old message again, hoping the receiver accepts it." },
+    { "id": "managed-heap", "term": "managed heap", "short": "Memory that the .NET runtime controls. It may move and copy objects on its own." },
+    { "id": "constant-time", "term": "constant-time", "short": "Code meant to take the same time whatever the secret data is." },
+    { "id": "histogram", "term": "histogram", "short": "A chart that counts how many timings fell in each range." },
+    { "id": "t-statistic", "term": "t statistic", "short": "A number that compares two groups of timings. A large size means they differ by more than noise." },
+    { "id": "optimizer", "term": "optimizer", "short": "The part of a compiler that rewrites code to run faster. It can change timing." }
   ]
 }
