@@ -163,7 +163,7 @@ const shortcuts: [string, string][] = [
           <ShowKeysSwitch testid="show-keys-switch" />
           <v-btn :variant="ui.transport === 'real' ? 'flat' : 'tonal'" :color="ui.transport === 'real' ? 'info' : undefined" data-testid="transport-switch" :aria-pressed="ui.transport === 'real'" @click="toggleTransport">OS transport</v-btn>
           <select v-model.number="ui.speed" class="ns-select" data-testid="speed-select" aria-label="Animation speed"><option :value="0.5">0.5x</option><option :value="1">1x</option><option :value="2">2x</option></select>
-          <select :value="ui.theme" class="ns-select" data-testid="theme-select" aria-label="Theme" @change="e => setTheme((e.target as HTMLSelectElement).value as any)"><option value="system">System</option><option value="dark">Dark</option><option value="light">Light</option></select>
+          <select :value="ui.theme" class="ns-select" data-testid="theme-select" aria-label="Theme" @change="e => setTheme((e.target as HTMLSelectElement).value as any)"><option value="system">System</option><option value="light">Light</option><option value="dark">Dark</option></select>
           <v-btn size="small" icon="mdi-keyboard-outline" aria-label="Keyboard shortcuts" @click="ui.shortcuts = true" />
         </header>
 

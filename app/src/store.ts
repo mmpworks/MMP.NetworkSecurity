@@ -51,7 +51,7 @@ export const ui = reactive({
   view: 'endpoints' as ViewMode,
   transport: 'glass' as Transport,
   speed: 1,
-  theme: (safeGet('mmpns.theme') ?? 'system') as 'system' | 'dark' | 'light',
+  theme: storedTheme(),
   sessions: [] as SessionRec[],
   activeId: '',
   viewUpTo: null as number | null,
@@ -77,6 +77,8 @@ export const tour = reactive({
   seen: new Set<string>(),
 })
 
+export type ThemeChoice = 'system' | 'light' | 'dark'
+function storedTheme(): ThemeChoice { const v = safeGet('mmpns.theme'); return v === 'light' || v === 'dark' ? v : 'system' }
 function safeGet(k: string): string | null { try { return localStorage.getItem(k) } catch { return null } }
 function safeSet(k: string, v: string) { try { localStorage.setItem(k, v) } catch { /* storage may be blocked */ } }
 
@@ -406,7 +408,7 @@ export function setMode(m: AppMode) {
   if (m === 'free') { tour.active = false; ui.viewUpTo = null } else if (active.value) tour.active = true
 }
 
-export function setTheme(t: 'system' | 'dark' | 'light') { ui.theme = t; safeSet('mmpns.theme', t); applyTheme() }
+export function setTheme(t: ThemeChoice) { ui.theme = t; safeSet('mmpns.theme', t); applyTheme() }
 
 export function applyTheme() {
   const dark = ui.theme === 'dark' || (ui.theme === 'system' && window.matchMedia?.('(prefers-color-scheme: dark)').matches)
@@ -414,7 +416,13 @@ export function applyTheme() {
   themeHook?.(dark ? 'nsDark' : 'nsLight')
 }
 let themeHook: ((name: string) => void) | null = null
-export function onTheme(h: (name: string) => void) { themeHook = h; applyTheme() }
+// System follows the operating system live: a change of the OS setting re-applies the theme while the choice is System.
+let watching = false
+export function onTheme(h: (name: string) => void) {
+  themeHook = h
+  if (!watching) { watching = true; window.matchMedia?.('(prefers-color-scheme: dark)').addEventListener('change', () => { if (ui.theme === 'system') applyTheme() }) }
+  applyTheme()
+}
 
 /** True when the current tour step highlights this target (ux-design.md section 3.1 grammar `<panel>:<kind>=<name>`). */
 const highlights = computed(() => (tour.active ? step.value?.highlight ?? [] : []).map(parseHighlight).filter((h): h is NonNullable<typeof h> => h !== null))
