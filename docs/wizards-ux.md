@@ -96,7 +96,7 @@ Steve chose five grouped "make my set" flows. Each flow has a **default path of 
 |---|---|---|---|---|
 | 1 | Make my web security set (Host flow `my-certificates`) | `pki.root-ca`, `tls.trust`, `tls13.server`, `tls13.client`, `tls11.server` | 4, 5, 7, 9, 10 | `flow-my-certificates` |
 | 2 | Make my remote login set (Host flow `my-ssh`) | `ssh.host-ed25519`, `ssh.host-rsa`, `ssh.client`, `ssh.known-hosts` | 8, 9 | `flow-my-ssh` |
-| 3 | Enter my card PIN keys (key entry) (Host flow `my-payment`) | `dukpt.bdk`, `dukpt.pad` | 6, 9 | `flow-my-payment` |
+| 3 | Type in my card PIN keys (Host flow `my-payment`) | `dukpt.bdk`, `dukpt.pad` | 6, 9 | `flow-my-payment` |
 | 4 | Make my sign-in set (Host flow `my-login`) | `token.issuer`, `device.enrolment` (named "Device key entry") | 10 | `flow-my-login` |
 | 5 | Make my data keys (Host flow `my-lesson-keys`) | `lab.aes-key`, `lab.seal-key` | 1, 2 | `flow-my-lesson-keys` |
 
@@ -257,9 +257,9 @@ The first slice is `token.issuer` (`modes-design.md` slice M0). In the flows it 
 
 | Block | Words |
 |---|---|
-| First line | This course shows every key, so use test keys. A real system keeps these hidden. *(When Show keys is Off: "This course hides key bytes on screen for now. Saved files can still hold them.")* |
-| What this is | This set makes two keys. The first signs sign-in {{token}}s. A token is a small signed note that says who you are and what you may do. The second is a key for one device, so the device can prove who it is. |
-| Why it exists | A real service signs tokens, and other services check the signature. If the signing key leaks, anyone can make tokens. So real teams guard it. |
+| First line | This course shows every key, so use test keys. A real system keeps these hidden. *(When Show keys is Off: "This course hides your keys on screen for now and shows short fingerprints instead. Saved files can still hold them.")* |
+| What this is | This set makes two keys. The first key signs {{token}}s. A token is a small note that says who you are and what you may do, and the signature on it shows nobody changed it. The second key belongs to one device, so the device can prove who it is. |
+| Why it exists | A real service signs tokens, and other services check the signature. If the signing key leaks, anyone can make tokens that pass the check. That is why real teams guard it. |
 | What you do now | Read this, then choose `Continue`. The whole set takes about 2 minutes. |
 | What good looks like | At the end, lesson 10 uses your keys. |
 | Buttons | `Cancel setup`, `Continue` (default) |
@@ -269,13 +269,13 @@ The first slice is `token.issuer` (`modes-design.md` slice M0). In the flows it 
 
 | Block | Words |
 |---|---|
-| What this is | The course will make two keys with safe settings. Both use {{ed25519}}, a modern signing method with short keys. |
-| Why it exists | Token checks in this course read Ed25519 signatures only, so this is the kind that works here. |
+| What this is | The course will make two keys with safe settings. Both use {{ed25519}}, a modern way to sign things, and its keys are short. |
+| Why it exists | Token checks in this course read Ed25519 signatures only. So this is the kind of key that works here. |
 | What you do now | Choose `Make it for me` (recommended). The course saves the keys in the `.security` folder of this project. |
-| The two parts, one line each | **Token signing key.** Signs tokens for the issuer `https://pump.training/issuer`, for the audience `https://pump.training/api`. **Device key (Device key entry).** One device, named `pump-reader-4`, with its enrolment row. |
+| The two parts, one line each | **Token signing key.** Signs tokens for the issuer `https://pump.training/issuer`, for the audience `https://pump.training/api`. **Device key.** One device, named `pump-reader-4`, with its enrolment row, which is the record that lets the issuer recognize the device. |
 | Link | `Change the defaults or use my own files` |
 | What good looks like | You see `Made 2 keys`. |
-| Fails when | `KEY_FILE_UNREADABLE`: "The course could not save a key file. Check that the project folder can be written, then try again." |
+| Fails when | `KEY_FILE_UNREADABLE`: "The course could not save a key file. Check that you can save files in the project folder, then try again." |
 
 ### Branch: Change the defaults or use my own files (`flow-my-login-options`, kind `entry`)
 
@@ -283,10 +283,10 @@ One screen. Two parts. It returns to the Review screen after it makes the set.
 
 | Part | Field | Words and default | Fails when |
 |---|---|---|---|
-| Change the defaults | Issuer name | "The name written in every token that says who signed it. It is a web address." Default `https://pump.training/issuer` | `ISSUER_NAME_BAD`: "An issuer name must be a web address that starts with https://. Try `https://pump.training/issuer`." |
+| Change the defaults | Issuer name | "A name written inside every token. It tells the reader who signed the token. Here it is a web address." Default `https://pump.training/issuer` | `ISSUER_NAME_BAD`: "The issuer name needs to be a web address that starts with `https://`. Try `https://pump.training/issuer`." |
 | Change the defaults | Audience | "Which service a token is meant for. Each service checks that its own name is in the audience." Default `https://pump.training/api` | Same as above |
 | Change the defaults | Device name | "The name of the one device." Default `pump-reader-4` | none |
-| Use my own files | Token key file | A {{pem}} file with an Ed25519 private key. `Choose a file` opens a window. The path goes to the course, not the bytes | `KEY_FILE_UNREADABLE`: "The course could not open that file. Pick it again." `KEY_FILE_FORMAT`: "That is not a PEM key. Make one with `openssl genpkey -algorithm ed25519 -out issuer.pem`." `KEY_FILE_ENCRYPTED`: "That key has a passphrase. For a test key, remove it with `openssl pkey -in issuer.pem -out issuer-open.pem`." `KEY_ALGORITHM_NOT_IN_ENGINE`: "Token keys here must be Ed25519." |
+| Use my own files | Token key file | A {{pem}} file with an Ed25519 private key. `Choose a file` opens a window. Only the path goes to the course, meaning where the file lives on your disk | `KEY_FILE_UNREADABLE`: "The course could not open that file. Pick it again, or move it into the project folder." `KEY_FILE_FORMAT`: "The course could not read that file as a PEM key. To make one, run `openssl genpkey -algorithm ed25519 -out issuer.pem`, then pick the new file." `KEY_FILE_ENCRYPTED`: "That key is locked with a passphrase, and this course has no place to type one. For a test key, you can remove the passphrase with `openssl pkey -in issuer.pem -out issuer-open.pem`, then pick the new file." `KEY_ALGORITHM_NOT_IN_ENGINE`: "Token keys in this course must be Ed25519." |
 | Use my own files | Device key file | Same as above | Same as above |
 
 The warnings of 3.6 apply to every file pick. Nothing is saved until the learner chooses `Make it for me` or `Use these`.
@@ -296,7 +296,7 @@ The warnings of 3.6 apply to every file pick. Nothing is saved until the learner
 | Block | Words |
 |---|---|
 | What this is | This shows what the course made. Read it like a receipt. |
-| Why it exists | Teams read a key's details before they use it. A wrong key causes a failure far from the mistake. |
+| Why it exists | Teams read a key's details before they use it. A wrong key causes a failure far from where the mistake happened. |
 | What you do now | Check the facts. Choose `Back` to make new keys, or `Continue`. |
 | Token signing key | Ed25519. Fingerprint `SHA256:...`. Public key (shown when Show keys is On, a fingerprint when Off). Issuer and audience. Saved as version 1. |
 | Device key | Ed25519. Fingerprint. Device `pump-reader-4`. The enrolment row the issuer will hold: the device name and its public key. |
@@ -308,19 +308,19 @@ The warnings of 3.6 apply to every file pick. Nothing is saved until the learner
 
 | Block | Words |
 |---|---|
-| What this is | The course asks another program to check your work. For the token key, that program is OpenSSL. It reads a token the course signed and says if the signature is good. It checks the signature only. |
+| What this is | The course asks another program to check your work. For the token key, that program is OpenSSL. It reads a token the course signed and says whether the signature is good. It checks the signature only. |
 | Why it exists | If the course checked itself, a mistake could hide. A different program has no reason to agree. |
 | What you do now | Choose `Check it`. |
 | Token key result | The command, for example `openssl pkeyutl -verify -pubin -inkey issuer.pub -rawin -in signing-input.bin -sigfile signature.bin`. The real output, `Signature Verified Successfully`. In words: "OpenSSL read the public half of your key and said the signature on the token is good. It checks the signature only." The chip reads `Checked by OpenSSL. It checks the signature only.` |
-| Device key result | An amber note: "No outside tool can check a device key. A passkey-shaped challenge is not WebAuthn. Your key is saved." The chip reads `Saved, no outside check`. No green tick. |
-| What good looks like | A tick for the token key, and a plain amber line for the device key. |
-| Fails when | `REFEREE_MISSING`: "OpenSSL was not found. Git for Windows includes it. Set its path in `NETSEC_OPENSSL`, or install Git for Windows, then check again." `PROOF_FAILED`: "OpenSSL said the signature is bad. The key and the token do not match. Choose `Back` and make the keys again. The output is below." |
+| Device key result | An amber note: "No outside tool can check a device key. The sign-in challenge here is modeled on a passkey's, and it is not the WebAuthn standard. Your key is saved." The chip reads `Saved, no outside check`. No green tick. |
+| What good looks like | A tick for the token key, and an amber line for the device key. |
+| Fails when | `REFEREE_MISSING`: "The course could not find OpenSSL on this computer. Git for Windows includes a copy. Install Git for Windows, or set `NETSEC_OPENSSL` to the path of OpenSSL, then check again. Your keys are saved." `PROOF_FAILED`: "OpenSSL said the signature is bad. The key and the token do not match. Your earlier keys are still saved. Choose `Back` and make the keys again. The output is below." |
 
 ### Screen 5 of 5: Done (`flow-my-login-done`, `Done`, kind `done`)
 
 | Block | Words |
 |---|---|
-| What happened | Your sign-in keys are saved. The token key is `Checked by OpenSSL`. The device key is `Saved, no outside check`. |
+| What happened | Your sign-in keys are saved. The token key is `Checked by OpenSSL`, which means OpenSSL agreed the signature is good. The device key is `Saved, no outside check`, because no outside tool can check it. |
 | Which lessons use them | Lesson 10 now signs its tokens with your token key and enrols your device key. |
 | What you do now | `Run lesson 10` (when you came from a lesson), `Back to the map`, or `Use practice keys again`. |
 
@@ -336,7 +336,7 @@ Each flow runs the same five screens as section 4. This section lists what diffe
 | Branch (`flow-my-certificates-options`) | Change the defaults: server names, device name, key kind (Ed25519, or RSA with the note "RSA runs through the OS transport"), the dates and why they are long, drop the old-style certificate. Use my own files: root PEM, server certificate and key and chain, device certificate and key with its middle authority, PKCS#12 (RSA), OS store (RSA, with "The course does not install anything in your computer's store without asking") |
 | Review shows | One block per part: who it is for, who signed it, the dates, the fingerprint. A line for the trust list: "It trusts the root you made." The line "A self-signed certificate passes against itself. The check below is against the root you gave it." |
 | Check runs | Chain: `openssl verify -x509_strict -CAfile root.pem -untrusted int.pem -purpose sslserver -verify_hostname localhost srv.pem`. Server: `tlspeer`, then `openssl s_client -tls1_3 ...`. Device: `tlspeer -require-client-cert`, then `openssl s_client ... -cert_chain int.pem`. Old-style: `openssl s_client -tls1_1 -cipher AES128-SHA:@SECLEVEL=0`. Chips: `Checked by OpenSSL against the root you gave it`. Line after the device check: "A valid chain is not permission." Line after the old-style check: "TLS 1.1 was retired by RFC 8996. A pass does not make it safe." |
-| Fails when | `CERT_NOT_A_CA` (pick a CA certificate). `CERT_SIGNATURE_ALG_UNSUPPORTED` ("This root uses RSA or ECDSA. The course checks Ed25519 signatures. Make an Ed25519 root."). `CERT_NAME_MISSING` ("This certificate does not list `localhost`."). `KEY_CERT_MISMATCH` ("This key does not go with this certificate. Pick the key that goes with it."). `CHAIN_INCOMPLETE` ("The certificate of the authority between yours and the root is missing. Add it to the file. A device under a middle authority must send that authority too."). `PKCS12_PASSWORD` ("That file needs a password. Type it, or export again with none."). `REFEREE_MISSING` |
+| Fails when | `CERT_NOT_A_CA` ("This certificate cannot sign other certificates, so it cannot act as an authority. Pick a certificate made for a certificate authority (CA)."). `CERT_SIGNATURE_ALG_UNSUPPORTED` ("This root uses RSA or ECDSA, and the course can check only Ed25519 signatures. Make an Ed25519 root."). `CERT_NAME_MISSING` ("This certificate does not list `localhost` as a name it answers to. Make or pick one that does."). `KEY_CERT_MISMATCH` ("This key does not go with this certificate. Pick the key that goes with it."). `CHAIN_INCOMPLETE` ("The certificate of the authority between yours and the root is missing from the file. Add it to the file. A device certificate signed by a middle authority must travel with that authority's certificate."). `PKCS12_PASSWORD` ("That file is protected by a password. Type it, or export the file again without one."). `REFEREE_MISSING` |
 
 ### 5.2 `flow-my-ssh`: Make my remote login set
 
@@ -346,19 +346,19 @@ Each flow runs the same five screens as section 4. This section lists what diffe
 | Branch (`flow-my-ssh-options`) | Change the defaults: drop the legacy key. Use my own files: OpenSSH files for each key (the `~/.ssh` warning of 3.6 shows first), paste a `known_hosts` line, learn the key on the first connect, "user key for the CE process" (file only) |
 | Review shows | Each key's public line and `SHA256:` fingerprint. The line "Check this fingerprint a second way, for example read it from the server file. A fingerprint on this screen proves nothing." The line on the legacy key: "RSA host keys here sign with SHA-1, which is weak." |
 | Check runs | `sshpeer -host-key host_key -authorized authorized_keys`, then `ssh.exe -F NUL -p <port> -i user_key -o IdentitiesOnly=yes -o UserKnownHostsFile=known_hosts -o GlobalKnownHostsFile=NUL -o StrictHostKeyChecking=yes learner@127.0.0.1 "echo hello"`, then a mismatch run that names `SSH_HOST_KEY_CHANGED`. Chips: `Checked by ssh.exe`. A user key held in the vault shows `Saved, no outside check`: no outside tool can use a vault key |
-| Fails when | `KEY_FILE_FORMAT` ("Not an OpenSSH private key. It starts with `-----BEGIN OPENSSH PRIVATE KEY-----`."). `KEY_FILE_ENCRYPTED`. `KEY_ALGORITHM_NOT_IN_ENGINE` ("Sign-in keys here are Ed25519 only."). `KNOWN_HOSTS_LINE_BAD` ("That line does not parse. Wildcards are refused."). `KEY_PATH_PERSONAL` (a warning) |
+| Fails when | `KEY_FILE_FORMAT` ("That file is not an OpenSSH private key. A real one starts with `-----BEGIN OPENSSH PRIVATE KEY-----`."). `KEY_FILE_ENCRYPTED`. `KEY_ALGORITHM_NOT_IN_ENGINE` ("Sign-in keys in this course must be Ed25519."). `KNOWN_HOSTS_LINE_BAD` ("The course could not read that line. It does not accept wildcards."). `KEY_PATH_PERSONAL` (a warning) |
 
-### 5.3 `flow-my-payment`: Enter my card PIN keys (key entry)
+### 5.3 `flow-my-payment`: Type in my card PIN keys
 
-This flow says in its name, on its first screen, and on its Check screen: **this is key entry, not a key ceremony. No outside tool can judge it.** A real ceremony uses a secure device and several people.
+This flow says in its name, on its first screen, and on its Check screen: **this is key entry. No outside tool can judge it.** A real key ceremony is the formal event where several people use a secure device to combine key parts. Here one person types the parts.
 
 | Screen | Content |
 |---|---|
 | Make it for me makes | A test base key, 16 bytes, labeled `TEST` on screen. The PIN pad key, which comes from the base key and a key id, as a key loader would |
 | Branch (`flow-my-payment-options`) | Enter my own key parts: two fields (a third if wanted), 32 hex characters each, masked while typed, each with its check value. The final check value to compare with your own paper. No choice about reading the key back: a key that cannot be read back exists only in the vault exercise (5.5), as `modes-design.md` 8 now rules |
 | Review shows | The base key's fingerprint and check value. The PIN pad's key id. The line "Card numbers and PINs stay test values." |
-| Check runs | The published X9.24-3 vector first, then one sale from the pad to the bank. Judge: `none`. The chip reads `Saved, no outside check`. The screen says: "Checked against published vectors. No outside system can check a base key. One person typing the parts is not dual control." |
-| Fails when | `DUKPT_COMPONENT_LENGTH` ("A component is 32 hex characters, which is 16 bytes. This one has <n>."). `DUKPT_KCV_MISMATCH` ("The check value differs. A digit is wrong. Type that part again.") |
+| Check runs | The published X9.24-3 vector first, then one sale from the pad to the bank. Judge: `none`. The chip reads `Saved, no outside check`. The screen says: "The course checked the key against published test vectors. No outside system can check a base key. One person typing the parts is not dual control, which needs two people to act together." |
+| Fails when | `DUKPT_COMPONENT_LENGTH` ("A component is 32 hex characters, which is 16 bytes. This one has <n> characters."). `DUKPT_KCV_MISMATCH` ("The check value does not match, which usually means a digit is wrong. Type that part again.") |
 
 ### 5.4 `flow-my-lesson-keys`: Make my data keys
 
@@ -366,7 +366,7 @@ This flow says in its name, on its first screen, and on its Check screen: **this
 |---|---|
 | Make it for me makes | One key of random bytes for lesson 1 (AES) and one for lesson 2 (seals). The Host's `my-lesson-keys` flow makes or takes bytes, with no wrapping key |
 | Branch | None |
-| Review shows | Each key's fingerprint and length. "A password is not a MAC key. A MAC is not a signature." |
+| Review shows | Each key's fingerprint and length. "A MAC is a short code that shows a message stayed the same. A password is not a MAC key. A MAC is not a signature." |
 | Check runs | Judge: OpenSSL (`modes-design.md` 8.6). Seal key: `openssl mac -digest SHA256 -macopt hexkey:<hex> -in <file> HMAC`. Jared: the comparison with the engine's tag has not run yet. Chip: `Checked by OpenSSL` |
 | Fails when | `VAULT_UNWRAP_FAILED` ("The key could not open what it locked. Make the keys again."). `REFEREE_MISSING` |
 
@@ -376,9 +376,9 @@ A learner can play with the practice vault. It opens from the map footer (`sec-v
 
 | Screen | Id | Words | Learner does | Shows |
 |---|---|---|---|---|
-| 1 Sign and derive | `vault-sign-derive` | First line: "This course shows every key, so use test keys. A real system keeps these hidden." Then: "Practice vault. Not an HSM. Not FIPS validated. Refusing to export is a rule in this course's code." Sign: "A vault signs for you, so the key stays inside. A real vault works the same way." Derive: "A vault can make a new key from a parent key and a label. The same label always gives the same key." | Type a message, `Sign it`, `Check it`. Type a label, `Derive` twice, then once with another label | The signature, the public key, the check result (a one-bit change fails). Each derived key's fingerprint: same label, same fingerprint |
-| 2 Refuse | `vault-refuse` | "You can mark a key so it cannot be read out. A real vault then refuses every request to export it." | `Try to read this key out` on a key made non-exportable | The refusal and `VAULT_EXPORT_REFUSED`: "The vault refused. This key cannot be read out." The key view shows the fingerprint only, with the line: "The course refuses to show it. A real HSM would refuse too. These files could still open it here." |
-| 3 Audit | `vault-audit` | "A vault writes down every request. The list is chained, so a changed row shows." | `Show the audit list`, `Check the chain` | Rows of time, who, what, result. Each row holds a hash of the one before. The chain check says whether any row changed |
+| 1 Sign and derive | `vault-sign-derive` | First line: "This course shows every key, so use test keys. A real system keeps these hidden." Then: "This is a practice vault. A real vault is a locked device called an HSM, and this is not one. It has no FIPS validation, the formal approval some real vaults hold. Refusing to export is a rule in this course's code." Sign: "A vault signs a message for you, so the key never has to leave the vault. A real vault works the same way." Derive: "A vault can make a new key from a parent key and a label. A label is any name you pick. The same label always gives the same key." | Type a message, `Sign it`, `Check it`. Type a label, `Derive` twice, then once with another label | The signature, the public key, the check result (a one-bit change fails). Each derived key's fingerprint: same label, same fingerprint |
+| 2 Refuse | `vault-refuse` | "You can mark a key so it cannot be read out. To export a key is to copy it out of the vault, and a real vault then refuses every request to export it." | `Try to read this key out` on a key made non-exportable | The refusal and `VAULT_EXPORT_REFUSED`: "The vault refused. This key cannot be read out." The key view shows the fingerprint only, with the line: "The course refuses to show it. A real HSM would refuse too. These files could still open it here." |
+| 3 Audit | `vault-audit` | "A vault writes down every request, so you can see who asked for what. Each row holds a short code made from the row before it, so a changed row shows up." | `Show the audit list`, `Check the chain` | Rows of time, who, what, result. Each row holds a hash of the one before. The chain check says whether any row changed |
 
 **Routes (Q10, answered):** `POST /api/security/vault/exercise/{sign|derive|export|audit-check}`. The label typed on the Derive station is the `input` of the derive call. The Check it button on the Sign station runs `openssl pkeyutl -verify` and shows its output.
 
@@ -398,7 +398,7 @@ Every Prove screen has the same four parts, in this order: the real command in a
 | Pass | A tick and `<tool> agrees`. The chip reads `Checked by <tool> against <what it checked against>`, for example `Checked by OpenSSL against the root you gave it`. The word `trusted` never appears | `Done` |
 | No outside judge | An amber note: "No outside tool can check this key, so no green check appears. Your key is saved." The chip reads `Saved, no outside check`. No green, no tick | `Done` |
 | `PROOF_FAILED` | Red cross, the output, and the one-sentence cause from the copy file | `Back to the start` or `Cancel setup`. The earlier key stays saved |
-| `REFEREE_MISSING` | An amber note, not a failure of the key: "The test tool is missing. Your key is saved and counts as checked once the check passes." | Fix steps in section 8 row 9. The type stays `Set up, not proven` |
+| `REFEREE_MISSING` | An amber note, not a failure of the key: "The test tool is missing. Your key is saved and counts as checked once the check passes." | Fix steps in section 8 row 9. The type stays `Set up, not checked` |
 
 ### 6.1 Judge and full command for each type
 
@@ -413,10 +413,10 @@ The Host runs these (Jared's runs, `modes-real-world.md` section 5). Each `<...>
 | `ssh.host-*`, `ssh.client` | ssh.exe and Go | `sshpeer -host-key host_key -authorized authorized_keys`, then `ssh.exe -F NUL -p <port> -i user_key -o IdentitiesOnly=yes -o UserKnownHostsFile=known_hosts -o GlobalKnownHostsFile=NUL -o StrictHostKeyChecking=yes learner@127.0.0.1 "echo hello"` | Windows only: lock `user_key` with `icacls` first. The wizard does this and says so. |
 | `ssh.known-hosts` | ssh.exe | Same run. The wizard passes `-f` with a course folder and never uses the default key path | "A fingerprint on this screen proves nothing: compare it on a second channel. `accept-new` proves only that later connects match the first one." |
 | `token.issuer` | OpenSSL | `openssl pkeyutl -verify -pubin -rawin -in <signing input> -sigfile <signature>` (`modes-design.md` 8.6). Lead's ruling, 2026-11-05: the product cannot depend on `acceptance/referees`, so OpenSSL judges, and clause A11 judges the rest | "This check covers the signature only, not the dates, the audience, or the algorithm name. A token can be read by anyone who sees it. The signature stops changes, and it hides nothing." |
-| `device.enrolment` | none | The course's own check | `Judged by: our own check.` "Enrolling the key this client just showed is not enrolment. A passkey-shaped challenge is not WebAuthn." No green outside proof. |
-| `dukpt.bdk`, `dukpt.pad` | none live | Published X9.24-3 vectors, then a round trip | "Checked against published vectors, no outside system. A real base key stays inside an HSM. This file is not a TR-31 file. One person typing the parts is not dual control." |
+| `device.enrolment` | none | The course's own check | `Judged by: our own check.` "Enrolling the key this client just showed is not enrolment. The sign-in challenge here is modeled on a passkey's, and it is not the WebAuthn standard." No green outside proof. |
+| `dukpt.bdk`, `dukpt.pad` | none live | Published X9.24-3 vectors, then a round trip | "Checked against published vectors, no outside system. A real base key stays inside an HSM, a locked hardware device. This file is not a TR-31 file, the standard format for moving keys safely. One person typing the parts is not dual control, which needs two people to act together." |
 | `lab.aes-key` | .NET library | Wrap, unwrap, compare with BCL `AesGcm` | none |
-| `lab.seal-key` | OpenSSL | `openssl mac -digest SHA256 -macopt hexkey:<hex> -in <file> HMAC`. The command ran. A comparison with the engine's tag has not run yet | "A password is not a MAC key. A MAC is not a signature." |
+| `lab.seal-key` | OpenSSL | `openssl mac -digest SHA256 -macopt hexkey:<hex> -in <file> HMAC`. The command ran. A comparison with the engine's tag has not run yet | "A MAC is a short code that shows a message stayed the same. A password is not a MAC key. A MAC is not a signature." |
 
 Rule for every Prove screen (Jared): show the command, its real output, and the name of who judged it. With no outside judge, say "our own check".
 
@@ -451,12 +451,12 @@ Flipping the switch while a wizard is open replaces the facts block from the Hos
 | 12 | The wizard never installs a root in the OS store without asking, and says what it changed. | `os-pick` step | Jared, section 3.1 |
 | 13 | A valid chain is not permission. | `tls13.client` Done | Jared, section 3.3 |
 | 14 | A fingerprint on the same screen proves nothing. Compare it on a second channel. | `ssh.known-hosts` `compare` step | Jared, section 3.4 |
-| 15 | `accept-new` proves nothing on the first connect, only that later connects match. | `ssh.known-hosts` `learn` step | Jared, section 3.5 |
-| 16 | A real base key stays in an HSM. This file is not TR-31. One person is not dual control. | `dukpt.bdk` Intro and `combine` step | Jared, section 3.7 |
-| 17 | A password is not a MAC key. A MAC is not a signature. | `lab.seal-key` Intro | Jared, section 3.8 |
-| 18 | A token is readable by anyone who sees it. The `iss` claim counts only if the code reads it. | `token.issuer` Intro and Done | Jared, section 3.9 |
-| 19 | DPoP stops token theft. Code running on the client can still make new proofs while it is online. | Lesson 10 callout, not a wizard | Jared, section 3.10 |
-| 20 | Enrolling the key a client just showed is not enrolment. A passkey-shaped challenge is not WebAuthn. No proof screen. | `device.enrolment` Intro | Jared, sections 3.11 and 3.12 |
+| 15 | The ssh setting `accept-new` proves nothing on the first connect. It proves only that later connects match the first one. | `ssh.known-hosts` `learn` step | Jared, section 3.5 |
+| 16 | A real base key stays inside an HSM, a locked hardware device. This file is not a TR-31 file, the standard format for moving keys safely. One person is not dual control, which needs two people to act together. | `dukpt.bdk` Intro and `combine` step | Jared, section 3.7 |
+| 17 | A MAC is a short code that shows a message stayed the same. A password is not a MAC key. A MAC is not a signature. | `lab.seal-key` Intro | Jared, section 3.8 |
+| 18 | A token is readable by anyone who sees it. The `iss` claim, the issuer name inside the token, counts only if the code reads it. | `token.issuer` Intro and Done | Jared, section 3.9 |
+| 19 | DPoP, a way to tie a token to the client that holds a key, stops token theft. Code running on the client can still make new proofs while it is online. | Lesson 10 callout, not a wizard | Jared, section 3.10 |
+| 20 | Enrolling the key a client just showed is not enrolment. The sign-in challenge here is modeled on a passkey's, and it is not the WebAuthn standard. No proof screen. | `device.enrolment` Intro | Jared, sections 3.11 and 3.12 |
 | 21 | The lessons run on a fixed clock. The TLS labs read 1 January 2030, and the token lab reads a fixed day in November 2026. A certificate must be valid on those dates. A 90-day certificate made today would look expired in the labs. | `flow-my-certificates-options` | `Tls13Lab.cs:40`, `Lesson07Tls11.cs:29`, `Lesson10Auth.cs:47` |
 | 22 | This is key entry, and a real key ceremony is a bigger event. A real ceremony uses a secure device and several people. Here one person types the parts. No outside tool can judge the result. | `flow-my-payment-intro`, `flow-my-payment-check`, `flow-my-login-check` | Steve, 2026-11-05; Jared section 3.7 |
 
@@ -539,28 +539,28 @@ The screens are the ids in 9.1 and 9.1a. A test walks the default path of every 
 ### 10.1 Security setup screen (section 1.2)
 
 ```
-+--------------------------------------------------------------------------------+
-| Network Security Lab [TRAINING ONLY] [Keys: 2 of mine] [engine connected]         |
-|                       [Security setup (1)]  Tour|Free  Endpoints|..  Show keys (o)|
-+--------------------------------------------------------------------------------+
-| Security setup                                           [Back to lessons]     |
-| This course shows every key, so use test keys. A real system keeps these hidden. |
-|                                                                                |
-| +-- Run a lesson with my own keys ----------------------------------------+  |
-| |  Lesson: [ 10 Client proof and permission v ]            [ Start ]       |  |
-| +--------------------------------------------------------------------------+  |
-|                                                                                |
-| WEB SECURITY (TLS)                                                             |
-| Certificate authority      Practice | My test key [Checked]       Lessons 4,5,7,10 [Change]|
-| Server certificate (1.3)   Practice | My test key [Needs setup]   Lessons 4,5,7,9,10 [Set up]|
-| Trusted authorities        Practice | My test key [Practice key]  ...      [Set up my own]  |
-|   Set up the certificate authority first.  (link)                              |
-| ...                                                                            |
-| SIGN-IN TOKENS                                                                 |
++-----------------------------------------------------------------------------------------------+
+| Network Security Lab [TRAINING ONLY] [Keys: 2 of mine] [engine connected]                     |
+|                       [Security setup (1)]  Tour|Free  Endpoints|..  Show keys (o)            |
++-----------------------------------------------------------------------------------------------+
+| Security setup                                           [Back to lessons]                    |
+| This course shows every key, so use test keys. A real system keeps these hidden.              |
+|                                                                                               |
+| +-- Run a lesson with my own keys ----------------------------------------+                   |
+| |  Lesson: [ 10 Client proof and permission v ]            [ Start ]       |                  |
+| +--------------------------------------------------------------------------+                  |
+|                                                                                               |
+| WEB SECURITY (TLS)                                                                            |
+| Certificate authority      Practice | My test key [Checked]       Lessons 4,5,7,10 [Change]   |
+| Server certificate (1.3)   Practice | My test key [Needs setup]   Lessons 4,5,7,9,10 [Set up] |
+| Trusted authorities        Practice | My test key [Practice key]  ...      [Set up my own]    |
+|   Set up the certificate authority first.  (link)                                             |
+| ...                                                                                           |
+| SIGN-IN TOKENS                                                                                |
 | Token signing key          Practice | My test key [Setup paused, step 3 of 5] [Continue setup]|
-| ...                                                                            |
-|                                              [ Use practice keys everywhere ]  |
-+--------------------------------------------------------------------------------+
+| ...                                                                                           |
+|                                              [ Use practice keys everywhere ]                 |
++-----------------------------------------------------------------------------------------------+
 ```
 
 ### 10.2 Flow screen 3 of 5, Review (section 4)
@@ -599,11 +599,12 @@ The screens are the ids in 9.1 and 9.1a. A test walks the default path of every 
 |  Signature Verified Successfully                           |
 |  [tick] OpenSSL read the public half of your key           |
 |         and said the signature on the token is good.       |
-|         Checked by OpenSSL. It checks the signature only.                    |
+|         Checked by OpenSSL. It checks the signature only.  |
 |  DEVICE KEY                                                |
 |  [amber] No outside tool can check a device key.           |
-|          A passkey-shaped challenge is not WebAuthn.       |
-|          Saved, no outside check.                          |
+|          The sign-in challenge is modeled on a passkey's,  |
+|          and it is not the WebAuthn standard.              |
+|          Your key is saved. Saved, no outside check.       |
 | ---------------------------------------------------------- |
 | [Back]                                       [Continue]    |
 +------------------------------------------------------------+
