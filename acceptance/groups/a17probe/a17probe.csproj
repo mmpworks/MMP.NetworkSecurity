@@ -1,0 +1,12 @@
+<Project Sdk="Microsoft.NET.Sdk">
+  <Import Project="..\Group.props" />
+  <!-- A17: the learner's key judged from outside. Links NetSec.Core: it starts a glass server or client on a CredentialSet the suite built from its own files. -->
+  <PropertyGroup>
+    <TargetFramework>net10.0</TargetFramework>
+    <AssemblyName>Acceptance.A17Probe</AssemblyName>
+  </PropertyGroup>
+  <ItemGroup>
+    <Compile Include="..\..\lib\Live\*.cs" Link="Live\%(Filename)%(Extension)" />
+    <Compile Include="..\a17\TestPki.cs" Link="a17\TestPki.cs" />
+  </ItemGroup>
+</Project>

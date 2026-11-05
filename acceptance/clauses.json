@@ -131,6 +131,25 @@
    ],
    "needsCore": false
   },
+  "golden": {
+   "kind": "csharp",
+   "project": "groups/golden/golden.csproj",
+   "assembly": "Acceptance.Golden",
+   "builds": [
+    "net10",
+    "cf"
+   ],
+   "needsCore": true
+  },
+  "a17probe": {
+   "kind": "csharp",
+   "project": "groups/a17probe/a17probe.csproj",
+   "assembly": "Acceptance.A17Probe",
+   "builds": [
+    "net10"
+   ],
+   "needsCore": true
+  },
   "a17": {
    "kind": "csharp",
    "project": "groups/a17/a17.csproj",
@@ -1642,6 +1661,28 @@
    "counts": true
   },
   {
+   "id": "A17.mock.golden-trace-equal.cf",
+   "base": "A17.mock.golden-trace-equal",
+   "assertion": "A17",
+   "group": "golden",
+   "build": "cf",
+   "slice": "V0",
+   "referee": "test over HTTP and WebSocket, OpenSSL, ssh.exe, Go referees; known-answer where no outside referee exists",
+   "roles": [],
+   "counts": true
+  },
+  {
+   "id": "A17.mock.golden-trace-equal.net10",
+   "base": "A17.mock.golden-trace-equal",
+   "assertion": "A17",
+   "group": "golden",
+   "build": "net10",
+   "slice": "V0",
+   "referee": "test over HTTP and WebSocket, OpenSSL, ssh.exe, Go referees; known-answer where no outside referee exists",
+   "roles": [],
+   "counts": true
+  },
+  {
    "id": "A17.payment.known-answer-vectors-through-flow-code",
    "base": "A17.payment.known-answer-vectors-through-flow-code",
    "assertion": "A17",
@@ -1700,7 +1741,7 @@
    "id": "A17.referee.ssh-client-go",
    "base": "A17.referee.ssh-client-go",
    "assertion": "A17",
-   "group": "a17",
+   "group": "a17probe",
    "build": "host",
    "slice": "V0",
    "referee": "test over HTTP and WebSocket, OpenSSL, ssh.exe, Go referees; known-answer where no outside referee exists",
@@ -1711,7 +1752,7 @@
    "id": "A17.referee.ssh-host-ssh-exe",
    "base": "A17.referee.ssh-host-ssh-exe",
    "assertion": "A17",
-   "group": "a17",
+   "group": "a17probe",
    "build": "host",
    "slice": "V0",
    "referee": "test over HTTP and WebSocket, OpenSSL, ssh.exe, Go referees; known-answer where no outside referee exists",
@@ -1722,7 +1763,7 @@
    "id": "A17.referee.tls11-server-openssl",
    "base": "A17.referee.tls11-server-openssl",
    "assertion": "A17",
-   "group": "a17",
+   "group": "a17probe",
    "build": "host",
    "slice": "V0",
    "referee": "test over HTTP and WebSocket, OpenSSL, ssh.exe, Go referees; known-answer where no outside referee exists",
@@ -1733,7 +1774,7 @@
    "id": "A17.referee.tls13-client-go-with-intermediate",
    "base": "A17.referee.tls13-client-go-with-intermediate",
    "assertion": "A17",
-   "group": "a17",
+   "group": "a17probe",
    "build": "host",
    "slice": "V0",
    "referee": "test over HTTP and WebSocket, OpenSSL, ssh.exe, Go referees; known-answer where no outside referee exists",
@@ -1744,7 +1785,7 @@
    "id": "A17.referee.tls13-server-openssl",
    "base": "A17.referee.tls13-server-openssl",
    "assertion": "A17",
-   "group": "a17",
+   "group": "a17probe",
    "build": "host",
    "slice": "V0",
    "referee": "test over HTTP and WebSocket, OpenSSL, ssh.exe, Go referees; known-answer where no outside referee exists",
@@ -1884,17 +1925,6 @@
    "counts": true
   },
   {
-   "id": "A17.vault.course-read-audited",
-   "base": "A17.vault.course-read-audited",
-   "assertion": "A17",
-   "group": "a17",
-   "build": "host",
-   "slice": "V0",
-   "referee": "test over HTTP and WebSocket, OpenSSL, ssh.exe, Go referees; known-answer where no outside referee exists",
-   "roles": [],
-   "counts": true
-  },
-  {
    "id": "A17.vault.exercise-sign-judged-by-openssl",
    "base": "A17.vault.exercise-sign-judged-by-openssl",
    "assertion": "A17",
@@ -1908,6 +1938,17 @@
   {
    "id": "A17.vault.exercise-walk",
    "base": "A17.vault.exercise-walk",
+   "assertion": "A17",
+   "group": "a17",
+   "build": "host",
+   "slice": "V0",
+   "referee": "test over HTTP and WebSocket, OpenSSL, ssh.exe, Go referees; known-answer where no outside referee exists",
+   "roles": [],
+   "counts": true
+  },
+  {
+   "id": "A17.vault.export-audited-with-caller",
+   "base": "A17.vault.export-audited-with-caller",
    "assertion": "A17",
    "group": "a17",
    "build": "host",
@@ -3094,6 +3135,17 @@
   {
    "id": "SELF.a17-cold-clause-bites",
    "base": "SELF.a17-cold-clause-bites",
+   "assertion": "SELF",
+   "group": "selftest",
+   "build": "host",
+   "slice": "S0",
+   "referee": "stand-ins built on the BCL, python cryptography and real OpenSSL runs",
+   "roles": [],
+   "counts": false
+  },
+  {
+   "id": "SELF.a17-intermediate-referee-bites",
+   "base": "SELF.a17-intermediate-referee-bites",
    "assertion": "SELF",
    "group": "selftest",
    "build": "host",

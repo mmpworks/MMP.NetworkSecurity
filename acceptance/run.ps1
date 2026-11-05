@@ -38,6 +38,7 @@ param(
     [string]$NetCFRefDir = 'E:\dev\tools\netcf35-ref',
     [string]$OutDir,
     [switch]$SelfTest,
+    [switch]$RecordGolden,
     [switch]$Contract,
     [switch]$FreshChild
 )
@@ -211,7 +212,7 @@ if ($needX9 -and -not (Test-Path $x9Out)) {
 $productExists = Test-Path (Join-Path $ProductRoot 'src\NetSec.Core\NetSec.Core.csproj')
 $prep = [ordered]@{ core10 = $null; coreCf = $null; ce = $null; node = $null; host = $null; ap = $null; errors = [ordered]@{} }
 $groupsNeeded = @($pending | ForEach-Object { $_.group } | Sort-Object -Unique)
-$needsProductGroups = @('prim', 'dukpt', 'kschedule', 'tls13live', 'tls11', 'ssh', 'auth', 'nativeprod', 'bridge', 'host', 'a17', 'keys', 'binproof', 'e2e')
+$needsProductGroups = @('prim', 'dukpt', 'kschedule', 'tls13live', 'tls11', 'ssh', 'auth', 'nativeprod', 'bridge', 'host', 'a17', 'a17probe', 'golden', 'keys', 'binproof', 'e2e')
 $wantProduct = @($groupsNeeded | Where-Object { $needsProductGroups -contains $_ }).Count -gt 0
 
 function Build-Piece([string]$key, [string]$projRel, [string[]]$extra, [string[]]$outRels) {
@@ -272,6 +273,7 @@ function Get-Props([string]$build) {
     Add-Prop 'asyncproxy.ns2' $(if ($prep.ap) { $prep.ap.ns2 })
     Add-Prop 'asyncproxy.cf' $(if ($prep.ap) { $prep.ap.cf })
     Add-Prop 'netcf' $NetCFRefDir
+    if ($RecordGolden) { Add-Prop 'golden.record' '1' }
     return , $p.ToArray()
 }
 

@@ -2,9 +2,9 @@
 
 Author: Echo. Date: 2026-11-05. Branch: `test/acceptance-suite`. Rule: D11. Builders never write under `acceptance/`.
 
-Conclusion: the suite has **M = 208 product clauses** (`clauses.json`). With no product built it reports **0 of 208 PASS, 0 FAIL, 208 NOT RUN**.
-Its 22 checks on itself all PASS. The suite is written against `docs/program-design.md` section 11 and the merged referees in `acceptance/referees`. Every group compiles against the contract stub on net10.0 and on net48 with the CF build of MMP.AsyncProxy.
-Disposition: merge this branch before S0 starts. Send the open items in section 7 to Richard and Jared.
+Conclusion: the suite has **M = 259 product clauses** (`clauses.json`): the 208 of the first release and 51 for A17 (section 8). With no product built it reports **0 of 259 PASS, 0 FAIL, 259 NOT RUN**.
+Its 31 checks on itself all PASS. The suite is written against `docs/program-design.md` section 11, `docs/modes-design.md`, and the merged referees in `acceptance/referees`. Every group compiles against the contract stub on net10.0 and on net48 with the CF build of MMP.AsyncProxy.
+Disposition: merge this branch. Send the open items in section 7 and in `CONTRACT.md` section 5.7 to Richard and Jared.
 
 ## 1. Run it
 
@@ -13,7 +13,8 @@ pwsh acceptance/run.ps1 -Clauses All                 # build what exists, run, w
 pwsh acceptance/run.ps1 -Clauses A1,A2               # ids, assertions, slices (S3), groups (tls13live) or prefixes (A5.client)
 pwsh acceptance/run.ps1 -Clauses All -Fresh          # clone HEAD beside MMP.AsyncProxy, run the clone's own script, diff acceptance/ against PIN
 pwsh acceptance/run.ps1 -Contract                    # compile every group against the contract stub; run nothing
-pwsh acceptance/run.ps1 -Clauses All -SelfTest       # add the 19 checks the suite runs on itself (not part of M)
+pwsh acceptance/run.ps1 -Clauses All -SelfTest       # add the checks the suite runs on itself (not part of M)
+pwsh acceptance/run.ps1 -Clauses A17.mock -RecordGolden # record the golden traces into acceptance/golden/ (section 8)
 ```
 
 Set `AsyncProxyRoot` (parameter or environment variable) when the clone does not sit beside `MMP.AsyncProxy`. CF references: `E:\dev\tools\netcf35-ref`, never committed.
@@ -112,7 +113,7 @@ A cut role is listed in `roles.json`. Its clauses report NOT RUN `ROLE_CUT:<role
 | A12 | The suite builds `native/netsec_ct.c` itself (C++ and C, `/W4 /WX`), P/Invokes it, and computes Welch t with a common 99th percentile crop. Threshold: leaky \|t\| > 4.5 and above 3 x constant-time \|t\| |
 | A13 | A fresh clone beside the sibling. The walk compares the step ids shown with the tour file. `acceptance/` is diffed against `PIN` |
 | A14, A15, A15a | The grade script and the concept cap are the suite's own. Dangling bindings are tested against a live Host. Accuracy rules 1 to 8 must appear in the named lessons. Reader verdicts must come from a reader who did not write the tour |
-| A16 | Compile-time negative tests against the built `NetSec.Core.dll` (control compiles, four attacks fail with named compiler errors). Real mode is scanned for the secrets that an OpenSSL peer logs |
+| A16 | Compile-time negative tests against the built `NetSec.Core.dll` (control compiles, four attacks fail with named compiler errors). The OS transport is scanned for the secrets that an OpenSSL peer logs |
 
 ## 5. Routine calls I made (Steve is asleep)
 
@@ -127,7 +128,7 @@ A cut role is listed in `roles.json`. Its clauses report NOT RUN `ROLE_CUT:<role
 | 7 | SP 800-38A F.2.5 (CBC-AES256) left out | The PDF text scrambles that block. CBC with 128 and 192 bit keys, and AES-256 in ECB, CTR, GCM and FIPS 197, cover the core |
 | 8 | RSA and DH group 14 known answers come from OpenSSL 3.5.7, with python cross-checks | No free published RSA PKCS#1 vector set was at hand. The PRD names OpenSSL a referee |
 | 9 | TDES single-key CAVP files use one DES key three times. I added the 2-key and 3-key multi-block files | The KAT set alone would not test the EDE chain |
-| 10 | Section 11 gives the process command lines. Where it is silent, `CONTRACT.md` marks the flag ASSUMED: `--seed` on a node, `--tamper-envelope`, the PIN pad result fields, `NETSEC_REAL_PEER`, `mode: step` then `session.run` | The design leaves these open and A10 needs them |
+| 10 | Section 11 gives the process command lines. Where it is silent, `CONTRACT.md` marks the flag ASSUMED: `--seed` on a node, `--tamper-envelope`, the PIN pad result fields, `NETSEC_OS_PEER`, `mode: step` then `session.run` | The design leaves these open and A10 needs them |
 | 11 | Ed25519 SSH keys are written as OpenSSH private key files | ssh.exe 9.5 rejects PKCS#8 |
 | 12 | Welch t uses a common 99th percentile crop | Raw t is dominated by scheduler outliers. Uncropped t is printed beside it |
 | 13 | `-Fresh` clones `HEAD` and runs the clone's own `run.ps1` | The third agent must run the code under review, not the code that launches it |
@@ -162,3 +163,27 @@ These appear later by design, each named in the report: `REFEREE_MISSING`, `REFE
 | `vectors/` | `.nsv` vectors, `SOURCES.md`, fetch scripts, extractors (`fetch-x9.ps1` downloads the X9.24-3 PDF to `_cache` with a recorded SHA-256) |
 | `e2e/` | Playwright specs for A13 and the UI half of A16 (`npm ci` then `npx playwright test`; `run.ps1` does both) |
 | `CONTRACT.md` | What the suite needs from the build. The referees are described in `referees/README.md` |
+
+## 8. A17: per-type test keys, wizards and the vault (added 2026-11-05)
+
+Conclusion: A17 adds **51 clauses**, so M is **259** (208 + 51). The A16 renames add none. Source: `docs/modes-design.md` and `docs/wizards-ux.md` on `main` at c65e1bb. The Host contract the clauses read is `CONTRACT.md` section 5.
+Disposition: merge. Then the builders' slices V0 to V8 turn the clauses from NOT RUN to PASS one by one.
+
+| Group | Clauses | Judge |
+|---|---|---|
+| `a17` (Host over HTTP and WebSocket, net10) | 39: readiness 2, personal-path warning 1, login walk 1, token 1, repo 1, vault 7, Show keys 5, flow walks 4, payment known-answer 1, lesson-key MAC 1, certificates and attacks 5, lessons on own keys 9, cold reader 1 | OpenSSL, Go `tokenverify`, the vault file read with Python sqlite3 and its master key, the suite's own SHA-256 and DUKPT reference |
+| `a17probe` (links `NetSec.Core`, net10) | 5: TLS 1.3 server, TLS 1.1 server, TLS 1.3 client with an intermediate, SSH host key, SSH client key | OpenSSL, Go `crypto/tls`, `ssh.exe`, Go `x/crypto/ssh`, on `ProbeRequest.Credentials` |
+| `golden` (links `NetSec.Core`, net10 and CF) | 2: `A17.mock.golden-trace-equal` on each build | The traces recorded in `acceptance/golden/` before the key work began |
+| `docs` (Python) | 4: `A17.ui.no-word-real`, `.ui.test-keys-line`, `.ui.no-outside-judge-line`, `.copy.grade-and-tics` | Flesch-Kincaid, tic-gate, pattern checks over `app/src` |
+| `e2e` (Playwright) | 1: `A17.ui.show-keys-switch` | The browser |
+
+The wizard is driven by step kind (explain, choose or generate, file, review, prove, done), so the state names of `modes-design.md` and `wizards-ux.md`, which differ, do not matter to the suite.
+
+How a clause is proven to bite. `selftest/FakeHost/` is a Host built from `CONTRACT.md` section 5 and nothing else. `SELF.a17-clauses-pass-and-bite` runs each real clause on the faithful fake (it must PASS) and again on the fake with one named defect (it must FAIL). `ACC_SELF_LOG=<file>` writes the reason of each FAIL, so a person can check that each defect fails for the right reason. `SELF.a17-absent-host-is-not-run` runs every clause with no Host and expects NOT RUN `PRODUCT_MISSING`. The text, repository, cold-reader and referee clauses have stand-in trees of their own: `SELF.a17-text-checks-bite`, `SELF.a17-a15a-binding-bites`, `SELF.a17-repo-guard-bites`, `SELF.a17-cold-clause-bites`, `SELF.a17-intermediate-referee-bites`.
+The five `a17probe` clauses also run on today's engines with `--prop a17probe.training=1`, which uses the training files and no `Credentials`. That proves the OpenSSL, `ssh.exe` and Go wiring on the real product (4 PASS, 1 has no training form).
+
+Two rules from the lead. A clause on a type that no outside tool can judge (payment keys, the passkey-shaped login) says `known-answer` in its name or its text, and never reads as proved by a referee. The product's own word `Verified` never counts: only a referee in `acceptance/` does.
+
+A15a: a verdict now binds to claim id plus a hash of the claim text, and to a hash of every step text and `textMine`. A verdict with no hash reads NOT RUN `ACCURACY_VERDICT_UNBOUND`, and one for changed text reads NOT RUN `ACCURACY_VERDICT_STALE`. The 12 existing verdicts carry no hash yet, so `A15a.tours.reader-verdicts` reads NOT RUN until each reader confirms and stamps the hashes (`python -I acceptance/checks/docs_checks.py --root . --hashes`).
+
+Golden traces: record with `pwsh acceptance/run.ps1 -Clauses A17.mock.golden-trace-equal -RecordGolden`, then commit `acceptance/golden/`. Compare is the default. The recorder runs each lab three times and refuses to write a lab whose runs differ.

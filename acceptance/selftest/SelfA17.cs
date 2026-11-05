@@ -23,22 +23,22 @@ namespace Acceptance
         {
             new Case("A17.readiness.refuses-by-name", V0Clauses.ReadinessRefusesByName, "ready-runs-anyway", "ready-no-name", "proven-not-checked", "ready-code-wrong"),
             new Case("A17.readiness.types-disagree", V0Clauses.TypesDisagree, "disagree-ignored"),
-            new Case("A17.import.warns-on-personal-ssh-path", V0Clauses.WarnsOnPersonalSshPath, "no-personal-warning"),
-            new Case("A17.flow.login.walk", V0Clauses.LoginWalk, "machine-allows-any", "stale-accepted", "back-after-check", "no-judge-facts", "device-judge-claimed"),
+            new Case("A17.import.warns-on-personal-ssh-path", V0Clauses.WarnsOnPersonalSshPath, "no-personal-warning", "personal-path-is-error"),
+            new Case("A17.flow.login.walk", V0Clauses.LoginWalk, "machine-allows-any", "stale-accepted", "no-judge-facts", "device-judge-claimed"),
             new Case("A17.referee.token-issuer-go", V0Clauses.TokenIssuerGo, "token-wrong-key", "key-route-other-public", "pub-in-trace-wrong"),
             new Case("A17.show-keys.default-on", V3Clauses.DefaultOn, "default-off", "no-health-showkeys"),
             new Case("A17.show-keys.off-holds-no-secret", V3Clauses.OffHoldsNoSecret, "off-keeps-hex-in-events", "off-keeps-hex-in-file", "off-hex-in-frames", "hidden-missing", "keylog-served-when-off"),
             new Case("A17.show-keys.mine-shows-exportable", V3Clauses.MineShowsExportable, "mine-key-route-no-hex", "no-key-in-use"),
-            new Case("A17.show-keys.non-exportable-hidden-when-on", V3Clauses.NonExportableHiddenWhenOn, "nonexportable-leaks", "nonexportable-hides-all"),
+            new Case("A17.show-keys.non-exportable-hidden-when-on", V3Clauses.NonExportableHiddenWhenOn, "exercise-key-leaks"),
             new Case("A17.show-keys.fingerprint-compare", V3Clauses.FingerprintCompare, "fingerprint-wrong"),
             new Case("A17.vault.export-refused-and-audited", V1Clauses.ExportRefusedAndAudited, "export-not-audited", "export-allowed"),
             new Case("A17.vault.exercise-sign-judged-by-openssl", V1Clauses.ExerciseSignJudgedByOpenssl, "sign-bad-signature"),
-            new Case("A17.vault.exercise-walk", V1Clauses.ExerciseWalk, "walk-order-wrong", "export-allowed"),
-            new Case("A17.vault.course-read-audited", V1Clauses.CourseReadAudited, "course-read-as-export", "course-read-unaudited"),
+            new Case("A17.vault.exercise-walk", V1Clauses.ExerciseWalk, "derive-random", "audit-check-blind", "export-allowed"),
+            new Case("A17.vault.export-audited-with-caller", V1Clauses.ExportAuditedWithCaller, "export-caller-missing", "export-as-course-read", "course-read-unaudited"),
             new Case("A17.vault.tampered-row-refused", V1Clauses.TamperedRowRefused, "tamper-ignored"),
             new Case("A17.vault.audit-failure-refuses", V1Clauses.AuditFailureRefuses, "audit-failure-ignored"),
-            new Case("A17.vault.exportable-is-one-way", V1Clauses.ExportableIsOneWay, "exportable-flips"),
-            new Case("A17.flow.certificates.walk", WalkClauses.Certificates, "readback-drops-type", "says-trusted", "back-after-check", "version-not-bumped", "no-judge-facts"),
+            new Case("A17.vault.exportable-is-one-way", V1Clauses.ExportableIsOneWay, "exercise-key-exportable", "export-allowed"),
+            new Case("A17.flow.certificates.walk", WalkClauses.Certificates, "readback-drops-type", "says-trusted", "version-not-bumped", "no-judge-facts"),
             new Case("A17.flow.ssh.walk", WalkClauses.Ssh, "readback-drops-type", "version-not-bumped"),
             new Case("A17.flow.payment.known-answer-walk", WalkClauses.Payment, "dukpt-judge-claimed", "readback-drops-type"),
             new Case("A17.flow.lesson-keys.walk", WalkClauses.LessonKeys, "readback-drops-type"),
@@ -49,11 +49,6 @@ namespace Acceptance
             new Case("A17.clock.new-certificate-not-expired", CertClauses.NewCertificateNotExpired, "clock-fixed", "expired-not-named"),
             new Case("A17.attacks.unavailable-names-code", CertClauses.UnavailableNamesCode, "attack-always-available"),
             new Case("A17.attacks.hit-named-field", CertClauses.HitNamedField, "attack-wrong-field"),
-            new Case("A17.referee.tls13-server-openssl", ProbeClauses.Tls13ServerOpenssl),
-            new Case("A17.referee.tls13-client-go-with-intermediate", ProbeClauses.Tls13ClientGoWithIntermediate),
-            new Case("A17.referee.tls11-server-openssl", ProbeClauses.Tls11ServerOpenssl),
-            new Case("A17.referee.ssh-host-ssh-exe", ProbeClauses.SshHostSshExe),
-            new Case("A17.referee.ssh-client-go", ProbeClauses.SshClientGo),
             new Case("A17.lesson-1.my-keys", MyKeysClauses.L1, "mine-run-differs"),
             new Case("A17.lesson-2.my-keys", MyKeysClauses.L2, "mine-run-differs"),
             new Case("A17.lesson-4.my-keys", MyKeysClauses.L4, "mine-run-differs"),
@@ -81,13 +76,6 @@ namespace Acceptance
             foreach (KeyValuePair<string, string> kv in c.Props) n.Props[kv.Key] = kv.Value;
             n.Props.Remove("host");
             n.Props["a17.attach"] = fake.Port + "," + fake.Token + "," + fake.Dir;
-            // The tour of lab 20, bound to the four events the exercise sends.
-            string tours = Path.Combine(n.WorkDir, "tours");
-            Directory.CreateDirectory(tours);
-            File.WriteAllText(Path.Combine(tours, "lesson-20.json"),
-                "{\"steps\":[{\"id\":\"L20-S1\",\"bind\":{\"kind\":\"event\",\"eventType\":\"vault.sign\"}},{\"id\":\"L20-S2\",\"bind\":{\"kind\":\"event\",\"eventType\":\"vault.derive\"}},"
-                + "{\"id\":\"L20-S3\",\"bind\":{\"kind\":\"event\",\"eventType\":\"vault.refused\"}},{\"id\":\"L20-S4\",\"bind\":{\"kind\":\"event\",\"eventType\":\"vault.audit\"}}]}");
-            n.Props["tours.dir"] = tours;
             return n;
         }
 

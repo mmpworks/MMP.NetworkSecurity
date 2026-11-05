@@ -72,7 +72,7 @@ namespace Acceptance
                     lock (_gate)
                     {
                         int lesson = (int)MiniJson.Num(m, "lesson", -1);
-                        if (lesson < 0 || (lesson > 11 && lesson != 20)) { SendText(ws, D("type", "error", "code", "LESSON_NOT_BUILT", "message", "lesson " + lesson + " is not built")); break; }
+                        if (lesson < 0 || lesson > 11) { SendText(ws, D("type", "error", "code", "LESSON_NOT_BUILT", "message", "lesson " + lesson + " is not built")); break; }
                         List<Dictionary<string, object>> problems = Problems(lesson);
                         if (problems.Count > 0)
                         {
@@ -83,7 +83,7 @@ namespace Acceptance
                         string[] needed;
                         try
                         {
-                            if (LessonTypes.TryGetValue(lesson, out needed)) foreach (string id in needed) CourseRead(_types[id], "lesson-" + lesson);
+                            if (LessonTypes.TryGetValue(lesson, out needed)) foreach (string id in needed) CourseRead(_types[id], "host/lab-" + lesson);
                         }
                         catch (VaultError ve)
                         {
@@ -91,7 +91,8 @@ namespace Acceptance
                             break;
                         }
                         session = new Session { Id = "s" + (++_next), Lesson = lesson, Seed = (int)MiniJson.Num(m, "seed", 20261105) };
-                        if (lesson == 20) BuildExercise(session); else { BuildEvents(session, session.Seed); session.FinishCode = ClockCode(lesson); }
+                        BuildEvents(session, session.Seed);
+                        session.FinishCode = ClockCode(lesson);
                         _sessions[session.Id] = session;
                         session.File = Path.Combine(Dir, "session-" + session.Id + ".ndjson");
                         bool fileShows = M("off-keeps-hex-in-file") ? true : _showKeys;

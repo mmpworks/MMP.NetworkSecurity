@@ -34,7 +34,7 @@ namespace Acceptance
             string openssl = Referees.OpenSsl(c);
             using (HostProc h = A17.Host(c, "a17-lessonkeys-ref"))
             {
-                A17.RunFlow(h, "my-lesson-keys", null);
+                A17.RunFlow(h, "my-lesson-keys");
                 string aesHex = MiniJson.Str(A17.Key(h, "lab.aes-key").Json, "hex"), sealHex = MiniJson.Str(A17.Key(h, "lab.seal-key").Json, "hex");
                 Check.True(!string.IsNullOrEmpty(aesHex) && !string.IsNullOrEmpty(sealHex), "the key route shows no bytes for lab.aes-key or lab.seal-key with Show keys ON");
                 string dir = A17.TempDir(c, "lessonkeys");

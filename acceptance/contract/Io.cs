@@ -103,6 +103,11 @@ namespace NetSec.Pki
     }
 }
 
+namespace NetSec.Trace
+{
+    public sealed class ListSink : ITraceSink { public void Write(TraceEvent e) { throw new NotImplementedException(); } public TraceEvent[] Events { get { throw new NotImplementedException(); } } }
+}
+
 namespace NetSec.Machine
 {
     public enum TamperPoint { Plain, Wire }

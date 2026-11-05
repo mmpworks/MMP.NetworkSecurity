@@ -20,14 +20,16 @@ namespace Acceptance
             return "openssl";
         }
 
-        /// <summary>What the Check step must say for a type (modes-design.md section 8.6).</summary>
+        /// <summary>The stable id the Check step carries in says (modes-design.md section 8.6); the copy file holds its words.</summary>
         static string Says(string typeId)
         {
             switch (Judge(typeId))
             {
-                case "ssh.exe": return "Checked with ssh.exe";
-                case "none": return "No outside tool can judge this";
-                default: return typeId == "token.issuer" || typeId.StartsWith("lab.") ? "Checked with OpenSSL" : "Checked against the root you gave it";
+                case "ssh.exe": return "checked-with-ssh-exe";
+                case "none": return "no-outside-judge";
+                default:
+                    if (typeId == "token.issuer") return "checked-signature-only";
+                    return typeId.StartsWith("lab.") ? "checked-with-openssl" : "checked-against-root";
             }
         }
 
@@ -42,8 +44,6 @@ namespace Acceptance
             }
         }
 
-        static bool HasOptions(string flowId) { return flowId == "my-ssh" || flowId == "my-payment" || flowId == "my-login"; }
-
         static Dictionary<string, double> Versions(HostProc h)
         {
             Dictionary<string, double> v = new Dictionary<string, double>();
@@ -55,75 +55,62 @@ namespace Acceptance
             return v;
         }
 
-        /// <summary>Walks one flow in "make them for me", checks every step, then runs it again to see a new version.</summary>
+        /// <summary>Walks one flow in "Make it for me" by step kind, checks every step, then runs it again to see a new version.</summary>
         public static string Walk(Ctx c, string flowId, string hostName)
         {
             string[] types = A17.TypesOf(flowId);
             using (HostProc h = A17.Host(c, hostName))
             {
                 A17.Flow f = A17.Flow.Start(h, flowId);
-                Check.Equal("first state", "Intro", f.State);
-                Check.Equal("kind of Intro", "explain", f.Kind);
-                Check.True(MiniJson.Write(f.Step).Contains("wizard.common.test-keys-only"), "the Intro of " + flowId + " does not carry the test-keys line (copy id wizard.common.test-keys-only)");
+                Check.Equal("kind of the first step", "explain", f.Kind);
+                Check.True(MiniJson.Write(f.Step).Contains("wizard.common.test-keys-only"), "the first step of " + flowId + " does not carry the test-keys line (copy id wizard.common.test-keys-only)");
                 f.Next();
-                Check.Equal("kind of ChooseSource", "choose", f.Kind);
-                Reply ch = f.Send("choose", A17.Obj("source", "make"));
-                Check.True(ch.Ok, "event choose (make) got " + ch);
-                if (HasOptions(flowId))
-                {
-                    Check.Equal("state after choosing make in " + flowId, "Options", f.State);
-                    Check.Equal("kind of Options", "choose", f.Kind);
-                    f.Next();
-                }
-                else Check.Equal("state after choosing make in " + flowId, "ReadBack", f.State);
+                Check.True(f.Kind == "choose" || f.Kind == "generate", "the step after the first is " + f.Kind + "; expected choose or generate");
+                f.MakeAll();
 
-                // ReadBack names every type of the flow, none dropped, and the fixed names the design lists.
-                Check.Equal("kind of ReadBack", "review", f.Kind);
+                // Review names every type of the flow, none dropped, and the fixed names the design lists.
+                Check.Equal("kind of Review", "review", f.Kind);
                 List<string> seen = new List<string>();
                 foreach (Dictionary<string, object> fact in f.Facts)
                 {
                     string id = MiniJson.Str(fact, "typeId");
                     seen.Add(id);
-                    Check.True(!string.IsNullOrEmpty(MiniJson.Str(fact, "fingerprint")), "ReadBack shows no fingerprint for " + id);
+                    Check.True(!string.IsNullOrEmpty(MiniJson.Str(fact, "fingerprint")), "Review shows no fingerprint for " + id);
                     string want = NameOf(id);
                     if (want != null) Check.Equal("name of " + id + " (read-only)", want, MiniJson.Str(fact, "name"));
                 }
-                foreach (string t in types) Check.True(seen.Contains(t), "ReadBack of " + flowId + " does not show " + t + ". Seen: " + string.Join(",", seen.ToArray()));
-                Check.Equal("types shown by ReadBack of " + flowId, types.Length, seen.Count);
+                foreach (string t in types) Check.True(seen.Contains(t), "Review of " + flowId + " does not show " + t + ". Seen: " + string.Join(",", seen.ToArray()));
+                Check.Equal("types shown by Review of " + flowId, types.Length, seen.Count);
 
-                // back works up to Place: from ReadBack it goes back, and the walk can go forward again.
-                Check.True(f.Allowed.Contains("back"), "ReadBack allows no back, but back works up to Place");
+                // back goes to the make screen, and making again is a new version. Going forward again reaches Review.
+                Check.True(f.Allowed.Contains("back"), "Review allows no back");
                 Reply back = f.Send("back", null);
-                Check.True(back.Ok, "event back at ReadBack got " + back);
-                Check.True(f.State != "ReadBack", "event back at ReadBack left the state at ReadBack");
-                if (f.State == "ChooseSource") { Check.True(f.Send("choose", A17.Obj("source", "make")).Ok, "choose after back was refused"); }
-                if (f.State == "Options") f.Next();
-                Check.Equal("state after going forward again", "ReadBack", f.State);
+                Check.True(back.Ok, "event back at Review got " + back);
+                Check.True(f.Kind == "choose" || f.Kind == "generate", "back from Review left the kind at " + f.Kind + "; expected the make screen");
+                f.MakeAll();
+                Check.Equal("kind of Review after making again", "review", f.Kind);
 
                 f.Next();
-                Check.Equal("state after ReadBack", "Place", f.State);
-                Check.Equal("kind of Place", "generate", f.Kind);
-                f.Next();
-                Check.Equal("state after Place", "Check", f.State);
-                Check.Equal("kind of Check", "prove", f.Kind);
-                Check.True(!f.Allowed.Contains("back"), "Check allows back, but back works up to Place only");
-                Reply chk = f.Send("check", null);
-                Check.True(chk.Ok && f.ErrorCodes.Count == 0, "the check of " + flowId + " got " + chk);
+                Check.Equal("kind of the check step", "prove", f.Kind);
+                f.RunCheck();
 
-                // Who judged each type, and what the screen says.
+                // Who judged each type, and what the step says (a stable id; the copy file holds the words).
                 foreach (string t in types)
                 {
                     Dictionary<string, object> fact = null;
                     foreach (Dictionary<string, object> x in f.Facts) if (MiniJson.Str(x, "typeId") == t && x.ContainsKey("judge")) fact = x;
-                    Check.True(fact != null, "the Check step of " + flowId + " names no judge for " + t);
+                    Check.True(fact != null, "the check step of " + flowId + " names no judge for " + t);
                     Check.Equal("judge of " + t, Judge(t), MiniJson.Str(fact, "judge"));
-                    string says = MiniJson.Str(fact, "says") ?? "";
-                    Check.True(says.Contains(Says(t)), "the Check step says '" + says + "' for " + t + "; expected it to say '" + Says(t) + "'");
-                    Check.True(says.IndexOf("trusted", StringComparison.OrdinalIgnoreCase) < 0, "the Check step says trusted for " + t + ": '" + says + "'. A pass says what it was checked against");
+                    Check.Equal("says of " + t, Says(t), MiniJson.Str(fact, "says"));
+                    Check.True(MiniJson.Bool(fact, "passed", false), "the check of " + t + " does not say passed");
+                    if (Judge(t) != "none")
+                    {
+                        Check.True(!string.IsNullOrEmpty(MiniJson.Str(fact, "command")), "the check of " + t + " shows no command of " + Judge(t));
+                        Check.True(!string.IsNullOrEmpty(MiniJson.Str(fact, "output")), "the check of " + t + " shows no output of " + Judge(t));
+                    }
                 }
                 f.Next();
-                Check.Equal("last state", "Done", f.State);
-                Check.Equal("kind of Done", "done", f.Kind);
+                Check.Equal("last kind", "done", f.Kind);
 
                 Dictionary<string, double> v1 = Versions(h);
                 foreach (string t in types)
@@ -132,12 +119,12 @@ namespace Acceptance
                     Check.Equal("state of " + t, "Verified", A17.StateOf(h, t));
                     Check.True(v1[t] >= 1, "version of " + t + " after the first run is " + v1[t]);
                 }
-                // Place writes a new version and keeps the old one.
+                // Placing writes a new version and keeps the old one.
                 A17.Flow second = A17.Flow.Start(h, flowId);
-                second.MakeForMe(null, null);
+                second.MakeForMe(null);
                 Dictionary<string, double> v2 = Versions(h);
                 foreach (string t in types) Check.Equal("version of " + t + " after the second run", v1[t] + 1, v2[t]);
-                return flowId + ": " + string.Join(">", f.States.ToArray()) + "; ReadBack shows all " + types.Length + " types; judges " + string.Join(",", Array.ConvertAll(types, Judge)) + "; a second run writes version +1";
+                return flowId + ": explain > make > review > prove > done; Review shows all " + types.Length + " types; judges " + string.Join(",", Array.ConvertAll(types, Judge)) + "; a second run writes version +1";
             }
         }
 
@@ -172,7 +159,7 @@ namespace Acceptance
 
             using (HostProc h = A17.Host(c, "a17-payment-ka"))
             {
-                A17.RunFlow(h, "my-payment", null);
+                A17.RunFlow(h, "my-payment");
                 Reply key = A17.Key(h, "dukpt.bdk");
                 string bdkHex = MiniJson.Str(key.Json, "hex");
                 Check.True(key.Ok && !string.IsNullOrEmpty(bdkHex), "GET key of dukpt.bdk shows no bytes with Show keys ON: " + key);

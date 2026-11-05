@@ -110,7 +110,11 @@ namespace Acceptance
 
         // ------------------------------------------------------------ the flows
 
-        /// <summary>One wizard run, driven event by event. Step is the last step the Host sent.</summary>
+        /// <summary>
+        /// One wizard run, driven by what each step says it is. The spine of modes-design.md 8.2 and the five screens of wizards-ux.md 3.2 name their states differently
+        /// (Make or ChooseSource and Place, Review or ReadBack, Check or Prove). Both agree on the step kinds: explain, choose or generate, file, review, prove, done.
+        /// So the driver reads the step kind and the events the step allows, and no clause depends on a state name.
+        /// </summary>
         public sealed class Flow
         {
             public HostProc H;
@@ -123,48 +127,55 @@ namespace Acceptance
             public string Kind { get { return MiniJson.Str(Step, "kind"); } }
             public int Seq { get { return (int)MiniJson.Num(Step, "stepSeq", -1); } }
 
-            public List<string> Allowed
+            static List<string> Strings(List<object> l)
             {
-                get
-                {
-                    List<string> a = new List<string>();
-                    List<object> l = MiniJson.Arr(Step, "allowed");
-                    if (l != null) foreach (object o in l) a.Add(o as string);
-                    return a;
-                }
+                List<string> a = new List<string>();
+                if (l != null) foreach (object o in l) a.Add(o as string);
+                return a;
             }
 
-            public List<string> ErrorCodes
+            static List<Dictionary<string, object>> Objects(List<object> l)
             {
-                get
-                {
-                    List<string> a = new List<string>();
-                    foreach (Dictionary<string, object> e in Errors) a.Add(MiniJson.Str(e, "code"));
-                    return a;
-                }
+                List<Dictionary<string, object>> a = new List<Dictionary<string, object>>();
+                if (l != null) foreach (object o in l) a.Add(MiniJson.AsObject(o));
+                return a;
             }
 
+            public List<string> Allowed { get { return Strings(MiniJson.Arr(Step, "allowed")); } }
+
+            /// <summary>The errors that stop the step: errors[] without a severity of warning.</summary>
             public List<Dictionary<string, object>> Errors
             {
                 get
                 {
                     List<Dictionary<string, object>> a = new List<Dictionary<string, object>>();
-                    List<object> l = MiniJson.Arr(Step, "errors");
-                    if (l != null) foreach (object o in l) a.Add(MiniJson.AsObject(o));
+                    foreach (Dictionary<string, object> e in Objects(MiniJson.Arr(Step, "errors"))) if (MiniJson.Str(e, "severity") != "warning") a.Add(e);
                     return a;
                 }
             }
 
-            public List<Dictionary<string, object>> Facts
+            /// <summary>The warnings that let the learner go on: warnings[], and any errors[] row with severity warning.</summary>
+            public List<Dictionary<string, object>> Warnings
             {
                 get
                 {
-                    List<Dictionary<string, object>> a = new List<Dictionary<string, object>>();
-                    List<object> l = MiniJson.Arr(Step, "facts");
-                    if (l != null) foreach (object o in l) a.Add(MiniJson.AsObject(o));
+                    List<Dictionary<string, object>> a = Objects(MiniJson.Arr(Step, "warnings"));
+                    foreach (Dictionary<string, object> e in Objects(MiniJson.Arr(Step, "errors"))) if (MiniJson.Str(e, "severity") == "warning") a.Add(e);
                     return a;
                 }
             }
+
+            public List<string> ErrorCodes { get { return Codes(Errors); } }
+            public List<string> WarningCodes { get { return Codes(Warnings); } }
+
+            static List<string> Codes(List<Dictionary<string, object>> rows)
+            {
+                List<string> a = new List<string>();
+                foreach (Dictionary<string, object> e in rows) a.Add(MiniJson.Str(e, "code"));
+                return a;
+            }
+
+            public List<Dictionary<string, object>> Facts { get { return Objects(MiniJson.Arr(Step, "facts")); } }
 
             public static Flow Start(HostProc h, string flowId)
             {
@@ -191,77 +202,113 @@ namespace Acceptance
                 return Last;
             }
 
-            /// <summary>Sends next and requires the Host to take it.</summary>
-            public void Next()
+            /// <summary>The first of the named events this step allows, or null.</summary>
+            public string PickOrNull(params string[] preferred)
             {
-                Reply r = Send("next", null);
-                Check.True(r.Ok, "event next at state " + State + " got " + r);
-                Check.True(ErrorCodes.Count == 0, "event next at state " + State + " gave errors " + string.Join(",", ErrorCodes.ToArray()));
+                List<string> allowed = Allowed;
+                foreach (string p in preferred) if (allowed.Contains(p)) return p;
+                return null;
+            }
+
+            public string Pick(params string[] preferred)
+            {
+                string p = PickOrNull(preferred);
+                if (p == null) throw new FailException("the " + Kind + " step (state " + State + ") allows [" + string.Join(",", Allowed.ToArray()) + "], and none of [" + string.Join(",", preferred) + "] is among them");
+                return p;
+            }
+
+            void Ok(Reply r, string what)
+            {
+                Check.True(r.Ok, what + " got " + r);
+                Check.True(ErrorCodes.Count == 0, what + " gave errors " + string.Join(",", ErrorCodes.ToArray()));
+            }
+
+            /// <summary>Goes on: next, or continue.</summary>
+            public void Next() { string ev = Pick("next", "continue"); Ok(Send(ev, null), "event " + ev + " at the " + Kind + " step"); }
+
+            /// <summary>Runs the check when the step has an event for it. A step that checks on its own already holds the result in facts[].</summary>
+            public void RunCheck()
+            {
+                string ev = PickOrNull("check", "prove", "run");
+                if (ev != null) Ok(Send(ev, null), "event " + ev);
+            }
+
+            /// <summary>One step of "Make it for me": the first make-like event the step allows.</summary>
+            void Make()
+            {
+                string ev = Pick("make", "choose", "next", "continue");
+                Ok(Send(ev, ev == "choose" ? Obj("source", "make") : null), "event " + ev + " at the " + Kind + " step");
             }
 
             /// <summary>
-            /// "Make them for me" through the whole spine: Intro, ChooseSource, [Options], ReadBack, Place, Check, Done. keepHidden lists the types the
-            /// learner asks to keep from showing. Stops at stopAt (a state name, or "Checked") when given, with that state as the current step.
+            /// "Make it for me" through the whole default path: explain, choose or generate, review, prove, done. Stops early at stopAt:
+            /// Intro (the first step), Make (the first choose step), Review, Check (the prove step, not run), Checked (the check has run).
             /// </summary>
-            public void MakeForMe(Dictionary<string, bool> keepHidden, string stopAt)
+            public void MakeForMe(string stopAt)
             {
-                Check.Equal("first state of " + FlowId, "Intro", State);
+                Check.Equal("kind of the first step of " + FlowId, "explain", Kind);
                 if (stopAt == "Intro") return;
                 Next();
-                Check.Equal("state after Intro", "ChooseSource", State);
-                if (stopAt == "ChooseSource") return;
-                Reply c = Send("choose", Obj("source", "make"));
-                Check.True(c.Ok, "event choose (make) got " + c);
-                Tail(keepHidden, stopAt);
+                Check.True(Kind == "choose" || Kind == "generate", "the step after Intro is " + Kind + "; expected choose or generate");
+                if (stopAt == "Make") return;
+                MakeAll();
+                Tail(stopAt);
             }
 
-            /// <summary>"Use my files": one key file per type, by path. Same spine after the files are read.</summary>
-            public void UseFiles(Dictionary<string, string> paths, Dictionary<string, bool> keepHidden, string stopAt)
+            /// <summary>From a choose or generate step to Review: "Make it for me", whatever number of screens the default path spends on it.</summary>
+            public void MakeAll()
             {
-                Check.Equal("first state of " + FlowId, "Intro", State);
+                int guard = 0;
+                while (Kind != "review" && guard++ < 5)
+                {
+                    Check.True(Kind == "choose" || Kind == "generate", "the make screens hold a " + Kind + " step; expected choose or generate");
+                    Make();
+                }
+            }
+
+            /// <summary>"Use my own files": the branch screen, one row per type, by path. Then the same path from Review.</summary>
+            public void UseFiles(Dictionary<string, string> paths, string stopAt)
+            {
+                Check.Equal("kind of the first step of " + FlowId, "explain", Kind);
                 Next();
-                Reply c = Send("choose", Obj("source", "files"));
-                Check.True(c.Ok, "event choose (files) got " + c);
-                Check.Equal("state after choosing files", "PickFiles", State);
-                Dictionary<string, object> p = new Dictionary<string, object>();
-                foreach (KeyValuePair<string, string> kv in paths) p[kv.Key] = kv.Value;
-                Reply f = Send("files", Obj("paths", p));
+                OpenFileBranch();
+                SubmitFiles(paths);
+                Check.True(Kind != "file" || PickOrNull("next", "continue") != null, "the branch screen still waits after the files were read");
+                int guard = 0;
+                while (Kind != "review" && guard++ < 3) Next();
+                Tail(stopAt);
+            }
+
+            public void OpenFileBranch()
+            {
+                string ev = PickOrNull("files-branch", "pick", "use-files");
+                Reply r = ev != null ? Send(ev, null) : Send(Pick("choose"), Obj("source", "files"));
+                Ok(r, "opening the file branch");
+                Check.Equal("kind of the file branch", "file", Kind);
+            }
+
+            public Reply SubmitFiles(Dictionary<string, string> paths)
+            {
+                Dictionary<string, object> pd = new Dictionary<string, object>();
+                foreach (KeyValuePair<string, string> kv in paths) pd[kv.Key] = kv.Value;
+                Reply f = Send(Pick("files", "submit"), Obj("paths", pd));
                 Check.True(f.Ok, "event files got " + f);
                 foreach (Dictionary<string, object> e in Errors)
-                    Check.True(MiniJson.Str(e, "severity") != "error", "event files gave the error " + MiniJson.Str(e, "code") + ": " + MiniJson.Str(e, "message"));
-                // A clean read may move on by itself, or wait for next. Both are fine.
-                if (State == "PickFiles") Next();
-                Tail(keepHidden, stopAt);
+                    throw new FailException("event files gave the error " + MiniJson.Str(e, "code") + ": " + MiniJson.Str(e, "message"));
+                return f;
             }
 
-            void Tail(Dictionary<string, bool> keepHidden, string stopAt)
+            void Tail(string stopAt)
             {
-                if (State == "Options")
-                {
-                    if (keepHidden != null)
-                        foreach (KeyValuePair<string, bool> kv in keepHidden)
-                        {
-                            Reply o = Send("option", Obj("typeId", kv.Key, "keepHidden", kv.Value));
-                            Check.True(o.Ok, "event option for " + kv.Key + " got " + o);
-                        }
-                    if (stopAt == "Options") return;
-                    Next();
-                }
-                Check.Equal("state before ReadBack", "ReadBack", State);
-                if (stopAt == "ReadBack") return;
+                Check.Equal("kind before Review", "review", Kind);
+                if (stopAt == "Review") return;
                 Next();
-                Check.Equal("state after ReadBack", "Place", State);
-                if (stopAt == "Place") return;
-                Next();
-                Check.Equal("state after Place", "Check", State);
+                Check.Equal("kind after Review", "prove", Kind);
                 if (stopAt == "Check") return;
-                // At Check the learner runs the check, and the Host runs the outside tool (section 8.6). Next goes on only after it passed.
-                Reply k = Send("check", null);
-                Check.True(k.Ok, "event check got " + k);
-                Check.True(ErrorCodes.Count == 0, "the check of " + FlowId + " gave errors " + string.Join(",", ErrorCodes.ToArray()));
+                RunCheck();
                 if (stopAt == "Checked") return;
                 Next();
-                Check.Equal("state after Check", "Done", State);
+                Check.Equal("kind after the check", "done", Kind);
             }
         }
 
@@ -291,10 +338,10 @@ namespace Acceptance
         }
 
         /// <summary>Runs a whole flow in "make them for me" and requires every type of it to be Mine and Verified afterwards.</summary>
-        public static Flow RunFlow(HostProc h, string flowId, Dictionary<string, bool> keepHidden)
+        public static Flow RunFlow(HostProc h, string flowId)
         {
             Flow f = Flow.Start(h, flowId);
-            f.MakeForMe(keepHidden, null);
+            f.MakeForMe(null);
             foreach (string t in TypesOf(flowId))
             {
                 Check.Equal("mode of " + t + " after " + flowId, "Mine", ModeOf(h, t));
@@ -366,58 +413,55 @@ namespace Acceptance
 
         // ------------------------------------------------------------ "Use my files", driven to the first refusal
 
-        /// <summary>What an import run reached. Codes and messages are every error the steps reported, in order.</summary>
+        /// <summary>What an import run reached. Codes and messages are every blocking error the steps reported, in order. Warnings are kept apart.</summary>
         public sealed class ImportResult
         {
-            public readonly List<string> Codes = new List<string>(), Messages = new List<string>();
+            public readonly List<string> Codes = new List<string>(), Messages = new List<string>(), Warnings = new List<string>();
             public bool Done;
             public Flow Flow;
             public bool Has(string code) { return Codes.Contains(code); }
-            public override string ToString() { return (Done ? "reached Done" : "stopped at " + (Flow == null ? "?" : Flow.State)) + (Codes.Count == 0 ? "" : " with " + string.Join(",", Codes.ToArray())); }
+            public override string ToString() { return (Done ? "reached Done" : "stopped at the " + (Flow == null ? "?" : Flow.Kind) + " step") + (Codes.Count == 0 ? "" : " with " + string.Join(",", Codes.ToArray())); }
         }
 
         static bool Collect(ImportResult r, Reply reply)
         {
             if (!reply.Ok) { r.Codes.Add(reply.Code ?? ("HTTP_" + reply.Status)); r.Messages.Add(reply.ToString()); return false; }
+            foreach (string w in r.Flow.WarningCodes) r.Warnings.Add(w);
             bool blocking = false;
             foreach (Dictionary<string, object> e in r.Flow.Errors)
             {
                 r.Codes.Add(MiniJson.Str(e, "code")); r.Messages.Add(MiniJson.Str(e, "message") ?? "");
-                if (MiniJson.Str(e, "severity") != "warning") blocking = true;
+                blocking = true;
             }
             return !blocking;
         }
 
         /// <summary>
-        /// Walks a flow with "Use my files" and does not throw on a refusal: it records the codes and stops at the first step with an error that is not a warning.
-        /// A refusal can come at the files event, at the next step, or at the check, and the callers look for a code at any of them.
+        /// Walks a flow with "Use my own files" and does not throw on a refusal: it records the codes and stops at the first step with an error (a warning does not stop it).
+        /// A refusal can come when the files are read, at Review, or at the check, and the callers look for a code at any of them.
         /// </summary>
-        public static ImportResult TryImport(HostProc h, string flowId, Dictionary<string, string> paths, Dictionary<string, bool> keepHidden)
+        public static ImportResult TryImport(HostProc h, string flowId, Dictionary<string, string> paths)
         {
             ImportResult r = new ImportResult();
             r.Flow = Flow.Start(h, flowId);
             Flow f = r.Flow;
-            if (!Collect(r, f.Send("next", null))) return r;
-            if (!Collect(r, f.Send("choose", Obj("source", "files")))) return r;
+            if (!Collect(r, f.Send(f.Pick("next", "continue"), null))) return r;
+            string open = f.PickOrNull("files-branch", "pick", "use-files");
+            if (!Collect(r, open != null ? f.Send(open, null) : f.Send(f.Pick("choose"), Obj("source", "files")))) return r;
             Dictionary<string, object> pd = new Dictionary<string, object>();
             foreach (KeyValuePair<string, string> kv in paths) pd[kv.Key] = kv.Value;
-            if (!Collect(r, f.Send("files", Obj("paths", pd)))) return r;
-            if (f.State == "PickFiles" && f.Allowed.Contains("next") && !Collect(r, f.Send("next", null))) return r;
-            if (f.State == "Options")
+            if (!Collect(r, f.Send(f.Pick("files", "submit"), Obj("paths", pd)))) return r;
+            int guard = 0;
+            while (f.Kind != "review" && f.Kind != "prove" && f.Kind != "done" && guard++ < 3)
+                if (!Collect(r, f.Send(f.Pick("next", "continue"), null))) return r;
+            if (f.Kind == "review" && !Collect(r, f.Send(f.Pick("next", "continue"), null))) return r;
+            if (f.Kind == "prove")
             {
-                if (keepHidden != null)
-                    foreach (KeyValuePair<string, bool> kv in keepHidden)
-                        if (!Collect(r, f.Send("option", Obj("typeId", kv.Key, "keepHidden", kv.Value)))) return r;
-                if (!Collect(r, f.Send("next", null))) return r;
+                string check = f.PickOrNull("check", "prove", "run");
+                if (check != null && !Collect(r, f.Send(check, null))) return r;
+                if (!Collect(r, f.Send(f.Pick("next", "continue"), null))) return r;
             }
-            while (f.State == "ReadBack" || f.State == "Place")
-                if (!Collect(r, f.Send("next", null))) return r;
-            if (f.State == "Check")
-            {
-                if (!Collect(r, f.Send("check", null))) return r;
-                if (!Collect(r, f.Send("next", null))) return r;
-            }
-            r.Done = f.State == "Done";
+            r.Done = f.Kind == "done";
             return r;
         }
 
@@ -438,6 +482,42 @@ namespace Acceptance
             int code = Proc.Run("python", "-I \"" + script + "\" " + command + " \"" + db + "\"", c.AcceptanceDir, 60000, out o);
             if (code != 0) throw new FailException("vaultdb.py " + command + " exited " + code + ": " + o.Trim());
             return MiniJson.Parse(o.Trim());
+        }
+
+        /// <summary>
+        /// The key bytes of every vault key whose name starts with prefix, taken out of vault.db by the suite with vault/master.key (modes-design.md section 4.1:
+        /// AES-256-GCM under a master key, name#version as the additional data; ASSUMED layout: wrapped = ciphertext then a 16-byte tag, nonce in its own column).
+        /// If the file does not unwrap that way the clause reads NOT RUN VAULT_LAYOUT_UNKNOWN.
+        /// </summary>
+        public static List<string> UnwrapVaultKeys(Ctx c, HostProc h, string prefix)
+        {
+            string master = Path.Combine(h.SecurityDir, "vault", "master.key");
+            if (!File.Exists(master)) throw new NotRunException("VAULT_LAYOUT_UNKNOWN", "no vault/master.key at " + master + " (modes-design.md section 5.1)");
+            byte[] mk = File.ReadAllBytes(master);
+            if (mk.Length != 32) throw new NotRunException("VAULT_LAYOUT_UNKNOWN", "vault/master.key holds " + mk.Length + " bytes; design 5.1 gives 32");
+            List<string> found = new List<string>();
+            foreach (object o in (List<object>)VaultDb(c, h, "key-versions-full"))
+            {
+                Dictionary<string, object> r = MiniJson.AsObject(o);
+                string name = MiniJson.Str(r, "name");
+                if (!name.StartsWith(prefix)) continue;
+                byte[] nonce = Hex.Decode(MiniJson.Str(r, "nonceHex")), wrapped = Hex.Decode(MiniJson.Str(r, "wrappedHex"));
+                if (wrapped.Length <= 16 || nonce.Length != 12) throw new NotRunException("VAULT_LAYOUT_UNKNOWN", name + ": nonce " + nonce.Length + " bytes, wrapped " + wrapped.Length + " bytes; expected 12 and more than 16");
+                byte[] ct = Hex.Slice(wrapped, 0, wrapped.Length - 16), tag = Hex.Slice(wrapped, wrapped.Length - 16, 16), pt = new byte[ct.Length];
+                try
+                {
+                    using (System.Security.Cryptography.AesGcm g = new System.Security.Cryptography.AesGcm(mk, 16))
+                        g.Decrypt(nonce, ct, tag, pt, Encoding.UTF8.GetBytes(name + "#" + MiniJson.Num(r, "version", 0).ToString("0")));
+                }
+                catch (System.Security.Cryptography.CryptographicException)
+                {
+                    throw new NotRunException("VAULT_LAYOUT_UNKNOWN", name + " does not unwrap with vault/master.key as AES-256-GCM with name#version as additional data");
+                }
+                found.Add(Hex.Encode(pt));
+                if (pt.Length > 32) found.Add(Hex.Encode(Hex.Slice(pt, pt.Length - 32, 32)));
+            }
+            if (found.Count == 0) throw new FailException("the vault file holds no key whose name starts with " + prefix);
+            return found;
         }
 
         public static List<Dictionary<string, object>> FileAuditRows(Ctx c, HostProc h)

@@ -9,6 +9,7 @@ namespace Acceptance
     /// A17, slice V0: the readiness rule, the machine that owns the wizard's moves, the personal-path warning, and one type end to end
     /// (token.issuer). Everything here talks to NetSec.Host over HTTP and WebSocket. See acceptance/CONTRACT.md section 5.
     /// Verified is the product's own word and never counts here: a clause that needs proof runs an outside program.
+    /// The wizard is driven by step kind (explain, choose or generate, file, review, prove, done), so the state names of the two design documents do not matter.
     /// </summary>
     public static class V0Clauses
     {
@@ -44,24 +45,23 @@ namespace Acceptance
                 Check.True(frame.Contains("my-login"), "the refusal does not name the flow my-login that makes the type: " + frame);
                 Check.True(refused.Events.Count == 0, "a refused lab still sent " + refused.Events.Count + " trace events: it ran anyway");
 
-                // Configured, not proven: the flow wrote the binding and the check has not run. An unchecked key can fail for an unnamed reason inside a lesson.
+                // Configured, not proven: the flow placed the keys and the check has not run. An unchecked key can fail for an unnamed reason inside a lesson.
                 A17.Flow f = A17.Flow.Start(h, "my-login");
-                f.MakeForMe(null, "Check");
-                Check.Equal("state of token.issuer after Place", "Configured", A17.StateOf(h, "token.issuer"));
+                f.MakeForMe("Check");
+                Check.Equal("state of token.issuer before the check", "Configured", A17.StateOf(h, "token.issuer"));
                 Reply p = A17.Readiness(h, 10);
                 Check.True(A17.ProblemCodes(p).Contains("token.issuer:SECURITY_TYPE_NOT_PROVEN"), "problems[] lacks token.issuer:SECURITY_TYPE_NOT_PROVEN, has [" + ProblemText(p) + "]");
                 SessionRun unproven = HostSession.Run(h, 10, "glass", null);
                 Check.Equal("error code of session.start on an unproven type", "SECURITY_TYPE_NOT_PROVEN", unproven.ErrorCode);
 
                 // The check passes: the same lab now runs, on the learner's key.
-                Reply chk = f.Send("check", null);
-                Check.True(chk.Ok, "event check got " + chk);
+                f.RunCheck();
                 Check.Equal("state of token.issuer after the check", "Verified", A17.StateOf(h, "token.issuer"));
                 Reply fin = A17.Readiness(h, 10);
                 Check.True(MiniJson.Bool(fin.Json, "mayRun", false), "after the check, readiness for lesson 10 is " + fin);
                 SessionRun mine = HostSession.Run(h, 10, "glass", null);
                 Check.True(mine.Error == null && mine.Finished != null, "lesson 10 on a verified own key did not finish: " + (mine.Frames.Count == 0 ? "no frames" : mine.Frames[mine.Frames.Count - 1]));
-                return "built-in control runs; Unconfigured gives SECURITY_TYPE_NOT_READY, Configured gives SECURITY_TYPE_NOT_PROVEN, both naming token.issuer and sending no event; Verified runs";
+                return "built-in control runs; Unconfigured gives SECURITY_TYPE_NOT_READY, Configured gives SECURITY_TYPE_NOT_PROVEN, both naming token.issuer and its flow and sending no event; Verified runs";
             }
         }
 
@@ -70,7 +70,7 @@ namespace Acceptance
         {
             using (HostProc h = A17.Host(c, "a17-disagree"))
             {
-                A17.RunFlow(h, "my-certificates", null);
+                A17.RunFlow(h, "my-certificates");
                 // Control: all five certificate types are the learner's, so lesson 5 may run.
                 Reply ctl = A17.Readiness(h, 5);
                 Check.True(ctl.Ok && MiniJson.Bool(ctl.Json, "mayRun", false), "control: with the five certificate types all Mine and Verified, readiness for lesson 5 is " + ctl);
@@ -109,30 +109,26 @@ namespace Acceptance
             using (HostProc h = A17.Host(c, "a17-import"))
             {
                 // Control: a path outside ~/.ssh gets no personal-path warning (it may fail for being unreadable, which is a different code).
-                A17.Flow ctl = ToPickFiles(h);
-                ctl.Send("files", A17.Obj("paths", new Dictionary<string, object> { { "ssh.host-ed25519", neutral } }));
-                Check.True(!ctl.ErrorCodes.Contains("KEY_PATH_PERSONAL"), "control: a path outside ~/.ssh got KEY_PATH_PERSONAL");
+                A17.Flow ctl = ToFileBranch(h);
+                ctl.Send(ctl.Pick("files", "submit"), A17.Obj("paths", new Dictionary<string, object> { { "ssh.host-ed25519", neutral } }));
+                Check.True(!ctl.WarningCodes.Contains("KEY_PATH_PERSONAL") && !ctl.ErrorCodes.Contains("KEY_PATH_PERSONAL"), "control: a path outside ~/.ssh got KEY_PATH_PERSONAL");
 
-                A17.Flow f = ToPickFiles(h);
-                f.Send("files", A17.Obj("paths", new Dictionary<string, object> { { "ssh.host-ed25519", personal } }));
-                Check.True(f.ErrorCodes.Contains("KEY_PATH_PERSONAL"), "a path under " + Path.Combine(profile, ".ssh") + " got no KEY_PATH_PERSONAL. Codes: [" + string.Join(",", f.ErrorCodes.ToArray()) + "]");
-                foreach (Dictionary<string, object> e in f.Errors)
-                    if (MiniJson.Str(e, "code") == "KEY_PATH_PERSONAL")
-                    {
-                        Check.Equal("severity of KEY_PATH_PERSONAL", "warning", MiniJson.Str(e, "severity"));
-                        Check.True(!string.IsNullOrEmpty(MiniJson.Str(e, "message")), "KEY_PATH_PERSONAL carries no message for the learner");
-                    }
-                return "a path under ~/.ssh gets the warning KEY_PATH_PERSONAL (severity warning, with a message); a path elsewhere does not";
+                A17.Flow f = ToFileBranch(h);
+                f.Send(f.Pick("files", "submit"), A17.Obj("paths", new Dictionary<string, object> { { "ssh.host-ed25519", personal } }));
+                Check.True(f.WarningCodes.Contains("KEY_PATH_PERSONAL"), "a path under " + Path.Combine(profile, ".ssh") + " got no KEY_PATH_PERSONAL warning. Warnings: [" + string.Join(",", f.WarningCodes.ToArray()) + "], errors: [" + string.Join(",", f.ErrorCodes.ToArray()) + "]");
+                Check.True(!f.ErrorCodes.Contains("KEY_PATH_PERSONAL"), "KEY_PATH_PERSONAL is an error. Steve's rule is a stated rule and a warning: the learner can go on");
+                foreach (Dictionary<string, object> w in f.Warnings)
+                    if (MiniJson.Str(w, "code") == "KEY_PATH_PERSONAL")
+                        Check.True(!string.IsNullOrEmpty(MiniJson.Str(w, "message")), "KEY_PATH_PERSONAL carries no message for the learner");
+                return "a path under ~/.ssh gets the warning KEY_PATH_PERSONAL (a warning, with a message); a path elsewhere does not";
             }
         }
 
-        static A17.Flow ToPickFiles(HostProc h)
+        static A17.Flow ToFileBranch(HostProc h)
         {
             A17.Flow f = A17.Flow.Start(h, "my-ssh");
             f.Next();
-            Reply r = f.Send("choose", A17.Obj("source", "files"));
-            Check.True(r.Ok, "event choose (files) got " + r);
-            Check.Equal("state after choosing files", "PickFiles", f.State);
+            f.OpenFileBranch();
             return f;
         }
 
@@ -144,60 +140,65 @@ namespace Acceptance
             using (HostProc h = A17.Host(c, "a17-login"))
             {
                 A17.Flow f = A17.Flow.Start(h, "my-login");
-                Check.Equal("first state", "Intro", f.State);
-                Check.True(f.Step != null && MiniJson.Write(f.Step).Contains("wizard.common.test-keys-only"), "the Intro step does not carry the test-keys line (copy id wizard.common.test-keys-only)");
-                Check.True(f.Allowed.Contains("next") && f.Allowed.Contains("cancel"), "Intro allows [" + string.Join(",", f.Allowed.ToArray()) + "], expected next and cancel");
+                Check.Equal("kind of the first step", "explain", f.Kind);
+                Check.True(MiniJson.Write(f.Step).Contains("wizard.common.test-keys-only"), "the first step does not carry the test-keys line (copy id wizard.common.test-keys-only)");
+                Check.True(f.PickOrNull("next", "continue") != null && f.Allowed.Contains("cancel"), "the first step allows [" + string.Join(",", f.Allowed.ToArray()) + "], expected a way forward and cancel");
 
-                // The machine refuses a move that has no row: Intro has no event "check".
+                // The machine refuses a move that has no row: the first step has no event "check".
                 int seq = f.Seq;
+                string state = f.State;
                 Reply bad = f.Send("check", null);
-                Check.True(!bad.Ok && bad.Code == "WIZARD_EVENT_NOT_ALLOWED", "event check at Intro got " + bad + "; expected WIZARD_EVENT_NOT_ALLOWED");
-                Check.True((bad.Body ?? "").Contains("Intro") && (bad.Body ?? "").Contains("check"), "WIZARD_EVENT_NOT_ALLOWED does not name both the state (Intro) and the event (check): " + bad);
+                Check.True(!bad.Ok && bad.Code == "WIZARD_EVENT_NOT_ALLOWED", "event check at the first step got " + bad + "; expected WIZARD_EVENT_NOT_ALLOWED");
+                Check.True((bad.Body ?? "").Contains(state) && (bad.Body ?? "").Contains("check"), "WIZARD_EVENT_NOT_ALLOWED does not name both the state (" + state + ") and the event (check): " + bad);
                 Check.Equal("step after a refused event", seq, f.Seq);
                 // A stale step number is refused too.
+                string forward = f.Pick("next", "continue");
                 f.Next();
-                Reply stale = f.SendSeq("next", seq, null);
+                Reply stale = f.SendSeq(forward, seq, null);
                 Check.True(!stale.Ok && stale.Code == "WIZARD_STEP_STALE", "a stale stepSeq got " + stale + "; expected WIZARD_STEP_STALE");
                 Reply gone = HostHttp.Get(h, "/api/security/runs/no-such-run");
                 Check.True(!gone.Ok && gone.Code == "WIZARD_RUN_NOT_FOUND", "an unknown run got " + gone + "; expected WIZARD_RUN_NOT_FOUND");
 
-                // The spine, one state at a time.
-                Check.Equal("state after Intro", "ChooseSource", f.State);
-                Check.Equal("kind of ChooseSource", "choose", f.Kind);
-                Reply ch = f.Send("choose", A17.Obj("source", "make"));
-                Check.True(ch.Ok, "event choose (make) got " + ch);
-                Check.Equal("state after choosing make", "Options", f.State);
-                Reply op = f.Send("option", A17.Obj("typeId", "token.issuer", "keepHidden", false));
-                Check.True(op.Ok, "event option got " + op);
-                f.Next();
-                Check.Equal("state after Options", "ReadBack", f.State);
-                Check.Equal("kind of ReadBack", "review", f.Kind);
-                Check.True(f.Allowed.Contains("back"), "ReadBack must allow back (back works up to Place)");
-                f.Next();
-                Check.Equal("state after ReadBack", "Place", f.State);
-                f.Next();
-                Check.Equal("state after Place", "Check", f.State);
-                Check.Equal("kind of Check", "prove", f.Kind);
-                Check.True(!f.Allowed.Contains("back"), "Check allows back, but back works up to Place only");
-                Check.Equal("state of token.issuer before the check", "Configured", A17.StateOf(h, "token.issuer"));
-                Check.Equal("state of device.enrolment before the check", "Configured", A17.StateOf(h, "device.enrolment"));
-                Reply chk = f.Send("check", null);
-                Check.True(chk.Ok && f.ErrorCodes.Count == 0, "the check got " + chk);
-                // Who judged each type, said on the step. The passkey-shaped login has no outside judge, and the step says so.
+                // The default path, by step kind. Placing happens when the learner chooses "Make it for me", before Review.
+                Check.True(f.Kind == "choose" || f.Kind == "generate", "the step after the first is " + f.Kind + "; expected choose or generate");
+                Check.Equal("state of token.issuer before the keys are made", "BuiltIn", A17.StateOf(h, "token.issuer"));
+                A17.Flow g = A17.Flow.Start(h, "my-login");
+                g.MakeForMe("Review");
+                Check.Equal("kind of Review", "review", g.Kind);
+                Check.True(g.Allowed.Contains("back"), "Review allows no back; back goes to the make screen and makes a new version");
+                Check.Equal("state of token.issuer when Review shows", "Configured", A17.StateOf(h, "token.issuer"));
+                Check.Equal("state of device.enrolment when Review shows", "Configured", A17.StateOf(h, "device.enrolment"));
+                g.Next();
+                Check.Equal("kind of the check step", "prove", g.Kind);
+                g.RunCheck();
+
+                // Who judged each type, said on the step (design 8.4): the token by OpenSSL with the real command and output, the passkey-shaped login by none.
                 bool sawToken = false, sawDevice = false;
-                foreach (Dictionary<string, object> fact in f.Facts)
+                foreach (Dictionary<string, object> fact in g.Facts)
                 {
                     string t = MiniJson.Str(fact, "typeId"), judge = MiniJson.Str(fact, "judge");
-                    if (t == "token.issuer") { sawToken = true; Check.Equal("judge of token.issuer", "openssl", judge); }
-                    if (t == "device.enrolment") { sawDevice = true; Check.Equal("judge of device.enrolment", "none", judge); }
+                    if (t == "token.issuer")
+                    {
+                        sawToken = true;
+                        Check.Equal("judge of token.issuer", "openssl", judge);
+                        Check.Equal("says of token.issuer", "checked-signature-only", MiniJson.Str(fact, "says"));
+                        Check.True((MiniJson.Str(fact, "command") ?? "").Contains("pkeyutl"), "the check of token.issuer shows no OpenSSL command: '" + MiniJson.Str(fact, "command") + "'");
+                        Check.True((MiniJson.Str(fact, "output") ?? "").Contains("Signature Verified Successfully"), "the check of token.issuer shows no OpenSSL output: '" + MiniJson.Str(fact, "output") + "'");
+                    }
+                    if (t == "device.enrolment")
+                    {
+                        sawDevice = true;
+                        Check.Equal("judge of device.enrolment", "none", judge);
+                        Check.Equal("says of device.enrolment", "no-outside-judge", MiniJson.Str(fact, "says"));
+                    }
+                    if (t == "token.issuer" || t == "device.enrolment") Check.True(MiniJson.Bool(fact, "passed", false), "the check of " + t + " does not say passed");
                 }
-                Check.True(sawToken && sawDevice, "the Check step names no judge for " + (sawToken ? "" : "token.issuer ") + (sawDevice ? "" : "device.enrolment"));
-                f.Next();
-                Check.Equal("last state", "Done", f.State);
+                Check.True(sawToken && sawDevice, "the check step names no judge for " + (sawToken ? "" : "token.issuer ") + (sawDevice ? "" : "device.enrolment"));
+                g.Next();
+                Check.Equal("last kind", "done", g.Kind);
                 Check.Equal("mode of token.issuer", "Mine", A17.ModeOf(h, "token.issuer"));
                 Check.Equal("mode of device.enrolment", "Mine", A17.ModeOf(h, "device.enrolment"));
-                string path = string.Join(">", f.States.ToArray());
-                return "Intro>ChooseSource>Options>ReadBack>Place>Check>Done in order (" + path + "); off-table event, stale step and unknown run refused by name; token.issuer judged by openssl, device.enrolment by none";
+                return "explain > choose or generate > review > prove > done by kind; an off-table event, a stale step and an unknown run are refused by name; token.issuer judged by openssl (command and output shown), device.enrolment by none (known-answer only)";
             }
         }
 
@@ -209,7 +210,7 @@ namespace Acceptance
             using (HostProc h = A17.Host(c, "a17-token"))
             {
                 string verify = Referees.GoTool(c, "tokenverify");
-                A17.RunFlow(h, "my-login", null);
+                A17.RunFlow(h, "my-login");
                 SessionRun run = HostSession.Run(h, 10, "glass", null);
                 RequireLesson(run, 10);
                 Check.True(run.Error == null && run.Finished != null, "lesson 10 on the learner's issuer key did not finish: " + (run.Frames.Count == 0 ? "no frames" : run.Frames[run.Frames.Count - 1]));

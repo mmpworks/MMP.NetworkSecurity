@@ -27,7 +27,7 @@ namespace Acceptance
 
             using (HostProc h = A17.Host(c, "a17-neg-good"))
             {
-                A17.ImportResult good = A17.TryImport(h, "my-certificates", a.Paths(true), null);
+                A17.ImportResult good = A17.TryImport(h, "my-certificates", a.Paths(true));
                 Check.True(good.Done, "a sound chain made by OpenSSL did not reach Done: " + Why(good));
                 Check.Equal("state of tls13.server after a sound chain", "Verified", A17.StateOf(h, "tls13.server"));
             }
@@ -36,7 +36,7 @@ namespace Acceptance
                 Dictionary<string, string> mismatched = a.Paths(true);
                 mismatched["tls13.server"] = b.ServerPem;
                 mismatched["tls13.server.key"] = b.ServerKey;
-                A17.ImportResult bad = A17.TryImport(h, "my-certificates", mismatched, null);
+                A17.ImportResult bad = A17.TryImport(h, "my-certificates", mismatched);
                 Check.True(!bad.Done, "a leaf signed by another root reached Done: the check judged a chain OpenSSL refuses as sound");
                 Check.True(bad.Codes.Count > 0 && !bad.Codes.Contains(""), "the refusal carries no code: " + Why(bad));
                 Check.True(A17.StateOf(h, "tls13.server") != "Verified", "tls13.server reads Verified although its leaf is not signed by the root");
@@ -54,12 +54,12 @@ namespace Acceptance
             TestPki ed = TestPki.Make(c, "alg-ed", new TestPki.Options()), rsa = TestPki.Make(c, "alg-rsa", new TestPki.Options { RootAlg = "rsa" });
             using (HostProc h = A17.Host(c, "a17-alg-control"))
             {
-                A17.ImportResult control = A17.TryImport(h, "my-certificates", ed.Paths(true), null);
+                A17.ImportResult control = A17.TryImport(h, "my-certificates", ed.Paths(true));
                 Check.True(control.Done && !control.Has("CERT_SIGNATURE_ALG_UNSUPPORTED") && !control.Has("CERT_SIGNATURE"), "control: an Ed25519 root made by OpenSSL was refused: " + Why(control));
             }
             using (HostProc h = A17.Host(c, "a17-alg-rsa"))
             {
-                A17.ImportResult r = A17.TryImport(h, "my-certificates", rsa.Paths(true), null);
+                A17.ImportResult r = A17.TryImport(h, "my-certificates", rsa.Paths(true));
                 string where = "at the flow";
                 if (!r.Has("CERT_SIGNATURE_ALG_UNSUPPORTED") && r.Done)
                 {
@@ -90,7 +90,7 @@ namespace Acceptance
             TestPki old = TestPki.Make(c, "clock-old", new TestPki.Options { Days = 60, NotBefore = "20200101000000Z", NotAfter = "20200201000000Z" });
             using (HostProc h = A17.Host(c, "a17-clock-new"))
             {
-                A17.ImportResult r = A17.TryImport(h, "my-certificates", fresh.Paths(true), null);
+                A17.ImportResult r = A17.TryImport(h, "my-certificates", fresh.Paths(true));
                 Check.True(r.Done, "a certificate valid from yesterday to 30 days ahead did not reach Done: " + Why(r));
                 foreach (int lesson in new int[] { 5, 10 })
                 {
@@ -106,7 +106,7 @@ namespace Acceptance
             using (HostProc h = A17.Host(c, "a17-clock-old"))
             {
                 // Control: a certificate that really ran out is named, so the clock is read and not ignored.
-                A17.ImportResult r = A17.TryImport(h, "my-certificates", old.Paths(true), null);
+                A17.ImportResult r = A17.TryImport(h, "my-certificates", old.Paths(true));
                 bool named = r.Has("CERT_EXPIRED");
                 if (!named && r.Done)
                 {
@@ -141,7 +141,7 @@ namespace Acceptance
             TestPki pki = TestPki.Make(c, "trustonly", new TestPki.Options());
             using (HostProc h = A17.Host(c, "a17-attacks-trust"))
             {
-                A17.ImportResult r = A17.TryImport(h, "my-certificates", pki.Paths(false), null);       // the root certificate only: a trust-only CA
+                A17.ImportResult r = A17.TryImport(h, "my-certificates", pki.Paths(false));       // the root certificate only: a trust-only CA
                 Check.True(r.Done, "a trust-only root (certificate without its key) did not reach Done: " + Why(r));
                 foreach (string id in NeedCaKey)
                 {
@@ -155,7 +155,7 @@ namespace Acceptance
             }
             using (HostProc h = A17.Host(c, "a17-attacks-ca"))
             {
-                A17.RunFlow(h, "my-certificates", null);
+                A17.RunFlow(h, "my-certificates");
                 foreach (string id in NeedCaKey)
                     Check.True(MiniJson.Bool(AttackRow(h, id), "available", true), "control: attack row " + id + " is unavailable although the CA key is here");
             }
@@ -182,7 +182,7 @@ namespace Acceptance
             {
                 Reply lessons = HostHttp.Get(h, "/api/lessons");
                 Check.True(lessons.Ok && lessons.Array != null, "GET /api/lessons got " + lessons);
-                A17.RunFlow(h, "my-certificates", null);
+                A17.RunFlow(h, "my-certificates");
                 int checkedRows = 0, rowsWithoutField = 0;
                 List<string> notBuilt = new List<string>();
                 foreach (object lo in lessons.Array)

@@ -84,7 +84,7 @@ namespace Acceptance
                 List<string> shape0 = Shape(baseline);
                 Check.True(shape0.Count > 0, "lesson " + lesson + " on built-in keys sent no events, so there is nothing to compare");
 
-                foreach (string flow in FlowsFor(lesson)) A17.RunFlow(h, flow, null);
+                foreach (string flow in FlowsFor(lesson)) A17.RunFlow(h, flow);
                 SessionRun mine = HostSession.Run(h, lesson, "glass", null);
                 Check.True(mine.Error == null && mine.Finished != null, "lesson " + lesson + " on own keys did not finish: " + (mine.Frames.Count == 0 ? "no frames" : mine.Frames[mine.Frames.Count - 1]));
                 Check.Equal("ending of lesson " + lesson, Ending(baseline), Ending(mine));

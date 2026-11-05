@@ -176,7 +176,7 @@ namespace Acceptance
             string openssl = Referees.OpenSsl(c);
             using (HostProc h = A17.Host(c, "a17-sk-mine"))
             {
-                A17.RunFlow(h, "my-login", null);
+                A17.RunFlow(h, "my-login");
                 Reply key = A17.Key(h, "token.issuer");
                 Check.True(key.Ok && key.Json != null, "GET key of token.issuer got " + key);
                 string hex = MiniJson.Str(key.Json, "hex");
@@ -221,58 +221,51 @@ namespace Acceptance
             }
         }
 
-        // ---------------------------------------------------------------- a key made non-exportable stays hidden, and the lab still runs on it
+        // ---------------------------------------------------------------- a non-exportable key shows a fingerprint, and its bytes are nowhere
 
         [Clause("A17.show-keys.non-exportable-hidden-when-on")]
         public static string NonExportableHiddenWhenOn(Ctx c)
         {
-            A17.TestKey issuer = A17.MakeEd25519(c, "nx-issuer"), device = A17.MakeEd25519(c, "nx-device");
             using (HostProc h = A17.Host(c, "a17-sk-nx"))
             {
-                A17.Flow f = A17.Flow.Start(h, "my-login");
-                f.UseFiles(new Dictionary<string, string> { { "token.issuer", issuer.Pem }, { "device.enrolment", device.Pem } },
-                           new Dictionary<string, bool> { { "token.issuer", true }, { "device.enrolment", false } }, null);
+                // Show keys is ON. Flows make exportable keys, and a lab shows them. Only the exercise's keys are non-exportable (design 4.3 and 6.3).
+                A17.RunFlow(h, "my-login");
+                Reply flowKey = A17.Key(h, "token.issuer");
+                string exportableHex = MiniJson.Str(flowKey.Json, "hex");
+                Check.True(flowKey.Ok && !string.IsNullOrEmpty(exportableHex), "control: the exportable flow key shows no bytes with Show keys ON: " + flowKey);
 
-                // Control: the key the learner left exportable shows exactly the bytes of the file the suite made.
-                Reply dev = A17.Key(h, "device.enrolment");
-                Check.True(dev.Ok && string.Equals(MiniJson.Str(dev.Json, "hex"), device.SeedHex, StringComparison.OrdinalIgnoreCase),
-                    "the exportable device key does not show the bytes of the imported file (expected " + device.SeedHex.Substring(0, 8) + ".., got " + dev + ")");
-                // The key made non-exportable shows a fingerprint, with Show keys ON.
-                Reply nx = A17.Key(h, "token.issuer");
-                Check.True(nx.Ok, "GET key of token.issuer got " + nx);
-                Check.True(string.IsNullOrEmpty(MiniJson.Str(nx.Json, "hex")), "the key route shows the bytes of a non-exportable key with Show keys ON");
-                Check.Equal("hidden marker of a non-exportable key", "non-exportable", MiniJson.Str(nx.Json, "hidden"));
-                Check.True(!string.IsNullOrEmpty(MiniJson.Str(nx.Json, "fingerprint")), "the key route gives no fingerprint for a non-exportable key");
+                // Everything the Host says about the vault and the exercise, collected as text.
+                StringBuilder said = new StringBuilder();
+                Reply keys = HostHttp.Get(h, "/api/security/vault/keys");
+                Check.True(keys.Ok, "GET vault/keys got " + keys);
+                said.Append(keys.Body).Append('\n');
+                foreach (string name in new string[] { "exercise/signing", "exercise/derive" })
+                {
+                    Dictionary<string, object> k = null;
+                    foreach (object o in MiniJson.Arr(keys.Json, "keys") ?? new List<object>()) if (MiniJson.Str(MiniJson.AsObject(o), "name") == name) k = MiniJson.AsObject(o);
+                    Check.True(k != null, "GET vault/keys lists no key named " + name);
+                    Check.Equal("hidden marker of " + name, "non-exportable", MiniJson.Str(k, "hidden"));
+                    Check.True(!string.IsNullOrEmpty(MiniJson.Str(k, "fingerprint")), name + " shows no fingerprint");
+                    Check.True(string.IsNullOrEmpty(MiniJson.Str(k, "hex")), name + " shows hex with Show keys ON");
+                }
+                foreach (string route in new string[] { "sign", "derive", "export", "audit-check" })
+                {
+                    Reply r = HostHttp.Post(h, "/api/security/vault/exercise/" + route, route == "sign" ? A17.Obj("text", "nx") : route == "derive" ? A17.Obj("label", "nx") : "{}");
+                    said.Append(r.Body).Append('\n');
+                }
+                said.Append(HostHttp.Get(h, "/api/security/vault/audit?after=0").Body).Append('\n');
+                said.Append(HostHttp.Get(h, "/api/security").Body).Append('\n');
+                SessionRun lab = HostSession.Run(h, 10, "glass", null);
+                if (lab.ErrorCode == "LESSON_NOT_BUILT") throw new NotRunException("LESSON_NOT_BUILT", "the Host reports lesson 10 as not built yet");
+                said.Append(A17.Everything(h, lab));
+                string all = said.ToString();
+                Check.True(all.IndexOf(exportableHex, StringComparison.OrdinalIgnoreCase) >= 0, "control: the exportable key's bytes appear nowhere in what the Host said, so the scan cannot see a leak");
 
-                SessionRun run = HostSession.Run(h, 10, "glass", null);
-                if (run.ErrorCode == "LESSON_NOT_BUILT") throw new NotRunException("LESSON_NOT_BUILT", "the Host reports lesson 10 as not built yet");
-                Check.True(run.Error == null && run.Finished != null, "lesson 10 on a non-exportable key did not finish: " + (run.Frames.Count == 0 ? "no frames" : run.Frames[run.Frames.Count - 1]));
-                string all = A17.Everything(h, run);
-                Check.True(all.IndexOf(device.SeedHex, StringComparison.OrdinalIgnoreCase) >= 0, "control: the exportable device key bytes do not appear in the ON session, so the scan cannot see a leak");
-                Check.True(all.IndexOf(issuer.SeedHex, StringComparison.OrdinalIgnoreCase) < 0, "the non-exportable issuer key bytes appear in the frames, /events or the session file");
-
-                bool hiddenEntry = false;
-                foreach (A17.SecretRef s in A17.Secrets(run))
-                    if (s.EventType == "key.in-use" && s.Name.EndsWith("token.issuer"))
-                    {
-                        hiddenEntry = true;
-                        Check.True(s.Hex.Length == 0, "the key.in-use entry of the non-exportable key carries hex");
-                        Check.Equal("hidden marker in key.in-use", "non-exportable", s.Hidden);
-                        Check.True(!string.IsNullOrEmpty(s.Fingerprint), "the key.in-use entry of the non-exportable key has no fingerprint");
-                    }
-                Check.True(hiddenEntry, "the trace holds no key.in-use entry for token.issuer");
-
-                // The lab still ran on that key: the Go verifier accepts the token under the public key of the file the suite made.
-                string token = null;
-                foreach (A17.SecretRef s in A17.Secrets(run)) if (s.Name == "auth.token" && s.Hex.Length > 0) token = Encoding.ASCII.GetString(Hex.Decode(s.Hex));
-                Check.True(token != null, "the trace holds no auth.token to judge");
-                string verify = Referees.GoTool(c, "tokenverify");
-                string pub = Path.Combine(A17.TempDir(c, "nx"), "issuer.pub.pem");
-                File.WriteAllText(pub, V0Clauses.Ed25519Pem(Hex.Decode(issuer.PublicHex)));
-                string outp;
-                Proc.Run(verify, "-pub \"" + pub + "\" -token " + token, A17.TempDir(c, "nx"), 30000, out outp);
-                Check.True(outp.Contains("TOKEN_OK"), "the lab did not run on the imported issuer key: tokenverify said " + outp.Trim());
-                return "an imported key kept from showing: key route and trace show a fingerprint with Show keys ON, its 32 bytes appear nowhere in frames, /events or the file, an exportable key beside it does show, and Go tokenverify accepts the lab's token under its public key";
+                // The bytes of the non-exportable keys, taken out of the vault file with the master key, by the suite.
+                List<string> secrets = A17.UnwrapVaultKeys(c, h, "exercise/");
+                foreach (string hex in secrets)
+                    Check.True(all.IndexOf(hex, StringComparison.OrdinalIgnoreCase) < 0, "the bytes of a non-exportable key (" + hex.Substring(0, 8) + "..) appear in what the Host said, with Show keys ON");
+                return "with Show keys ON the flow key shows its bytes, and both exercise keys show a fingerprint and non-exportable; the " + secrets.Count + " non-exportable key byte strings the suite unwrapped from the vault file with the master key appear in no route, no audit row and no lab frame or file";
             }
         }
 
@@ -285,7 +278,7 @@ namespace Acceptance
             using (HostProc h = A17.Host(c, "a17-sk-fp"))
             {
                 A17.Flow f = A17.Flow.Start(h, "my-login");
-                f.UseFiles(new Dictionary<string, string> { { "token.issuer", issuer.Pem }, { "device.enrolment", device.Pem } }, null, null);
+                f.UseFiles(new Dictionary<string, string> { { "token.issuer", issuer.Pem }, { "device.enrolment", device.Pem } }, null);
                 int checkedPairs = 0, equalPairs = 0, covered = 0;
                 bool sawDeviceByFile = false;
                 foreach (int lesson in AllLabs)

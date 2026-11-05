@@ -36,6 +36,7 @@ namespace Acceptance
             _showKeys = !M("default-off");
             foreach (string t in A17.AllTypes) _types[t] = new TypeState { TypeId = t };
             _builtinIssuer = NewKey("builtin-issuer");
+            EnsureExercise();
             Port = Proc.FreePort();
             _http.Prefixes.Add("http://127.0.0.1:" + Port + "/");
             _http.Start();
@@ -80,6 +81,7 @@ namespace Acceptance
             public Dictionary<string, bool> KeepHidden = new Dictionary<string, bool>();
             public Dictionary<string, string> Paths = new Dictionary<string, string>();
             public bool FileBlocked;
+            public List<Dictionary<string, object>> Warnings = new List<Dictionary<string, object>>();
         }
 
         static Dictionary<string, object> D(params object[] kv)
@@ -271,7 +273,7 @@ namespace Acceptance
 
         void KeyReply(HttpListenerContext ctx, TypeState t)
         {
-            try { CourseRead(t, "security-page"); }
+            try { CourseRead(t, "host/key-route"); }
             catch (VaultError e) { Fail(ctx, 409, e.Code, e.Message); return; }
             byte[] key = KeyBytes(t);
             bool nonExportable = Active(t) && t.KeepHidden;

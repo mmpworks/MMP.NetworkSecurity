@@ -47,7 +47,7 @@ namespace Acceptance
             Ctx n = Attach(c, c.RepoRoot, fake, tag);
             using (HostProc h = HostProc.Start(n, tag, null))
             {
-                if (learnerKey) A17.RunFlow(h, "my-login", null);
+                if (learnerKey) A17.RunFlow(h, "my-login");
                 SessionRun run = HostSession.Run(h, 10, "glass", null);
                 token = null; pubHex = null;
                 foreach (A17.SecretRef s in A17.Secrets(run))

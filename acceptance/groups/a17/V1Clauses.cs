@@ -9,20 +9,11 @@ namespace Acceptance
     /// A17, slice V1: the practice vault (modes-design.md section 4). It copies the behaviour of a vault and gives none of the protection.
     /// The anchor is the vault file: these clauses read and edit vault.db with Python's sqlite3 (checks/vaultdb.py), so an audit row counts
     /// only when it is in the file, whatever the Host reports. OpenSSL judges the exercise's signature.
+    /// Labs read a key through Export, and the audit list shows the caller. The exercise is three screens on narrow Host routes (design 4.3), not a lab.
     /// </summary>
     public static class V1Clauses
     {
-        static void RequireBuilt(SessionRun run, int lesson)
-        {
-            if (run.ErrorCode == "LESSON_NOT_BUILT") throw new NotRunException("LESSON_NOT_BUILT", "the Host reports lesson " + lesson + " as not built yet");
-        }
-
-        static List<Dictionary<string, object>> EventsOfType(SessionRun run, string type)
-        {
-            List<Dictionary<string, object>> r = new List<Dictionary<string, object>>();
-            foreach (Dictionary<string, object> ev in run.Events) if (MiniJson.Str(ev, "type") == type) r.Add(ev);
-            return r;
-        }
+        const string Exercise = "/api/security/vault/exercise/";
 
         static Dictionary<string, object> RowWhere(List<Dictionary<string, object>> rows, string op, string nameStart, string result)
         {
@@ -47,25 +38,36 @@ namespace Acceptance
             return null;
         }
 
-        // ---------------------------------------------------------------- the exercise: sign, derive, refuse, audit
+        static Reply Post(HostProc h, string route, string json) { return HostHttp.Post(h, Exercise + route, json); }
 
-        static SessionRun RunExercise(HostProc h)
+        static bool CodeOk(Reply r) { string code = r.Json == null ? null : MiniJson.Str(r.Json, "code"); return string.IsNullOrEmpty(code) || code == "OK"; }
+
+        static Dictionary<string, object> VaultKey(HostProc h, string name)
         {
-            SessionRun run = HostSession.Run(h, 20, "glass", null);
-            RequireBuilt(run, 20);
-            Check.True(run.Error == null && run.Finished != null, "the vault exercise (lab 20) did not finish: " + (run.Frames.Count == 0 ? "no frames" : run.Frames[run.Frames.Count - 1]));
-            return run;
+            Reply keys = HostHttp.Get(h, "/api/security/vault/keys");
+            Check.True(keys.Ok, "GET vault/keys got " + keys);
+            foreach (object o in MiniJson.Arr(keys.Json, "keys") ?? new List<object>())
+            {
+                Dictionary<string, object> k = MiniJson.AsObject(o);
+                if (MiniJson.Str(k, "name") == name) return k;
+            }
+            throw new FailException("GET vault/keys lists no key named " + name);
         }
+
+        // ---------------------------------------------------------------- the exercise: sign, derive, refuse, audit
 
         [Clause("A17.vault.export-refused-and-audited")]
         public static string ExportRefusedAndAudited(Ctx c)
         {
             using (HostProc h = A17.Host(c, "a17-vault-export"))
             {
-                SessionRun run = RunExercise(h);
-                List<Dictionary<string, object>> refused = EventsOfType(run, "vault.refused");
-                Check.True(refused.Count == 1, "the exercise sent " + refused.Count + " vault.refused events; expected 1");
-                Check.Equal("code of vault.refused", "VAULT_EXPORT_REFUSED", MiniJson.Str(refused[0], "code"));
+                Reply sign = Post(h, "sign", A17.Obj("text", "pay the pump owner"));
+                Check.True(sign.Ok && CodeOk(sign), "exercise sign got " + sign);
+                Reply derive = Post(h, "derive", A17.Obj("label", "pump-4"));
+                Check.True(derive.Ok && CodeOk(derive), "exercise derive got " + derive);
+                // The key leaves the box only if the box says yes. It says no, by name, with HTTP 409.
+                Reply export = Post(h, "export", "{}");
+                Check.True(export.Status == 409 && export.Code == "VAULT_EXPORT_REFUSED", "exercise export got " + export + "; expected HTTP 409 VAULT_EXPORT_REFUSED");
 
                 // The rows in the FILE, not the Host's report of them.
                 List<Dictionary<string, object>> rows = A17.FileAuditRows(c, h);
@@ -79,10 +81,8 @@ namespace Acceptance
                 Check.True(chain == null, chain);
 
                 // The Host's route reports the same refusal.
-                Reply route = HostHttp.Get(h, "/api/security/vault/audit?after=0");
-                Check.True(route.Ok, "GET vault/audit got " + route);
                 Check.True(RowWhere(A17.Audit(h), "export", "exercise/", "refused") != null, "GET vault/audit does not show the refused export that the file holds");
-                return "the exercise's export is refused with VAULT_EXPORT_REFUSED; the vault file holds the refused row beside ok rows for sign and derive; " + rows.Count + " rows link by prev_hash";
+                return "the exercise's export is refused with HTTP 409 VAULT_EXPORT_REFUSED; the vault file holds the refused row beside ok rows for sign and derive; " + rows.Count + " rows link by prev_hash";
             }
         }
 
@@ -92,24 +92,14 @@ namespace Acceptance
             string openssl = Referees.OpenSsl(c);
             using (HostProc h = A17.Host(c, "a17-vault-sign"))
             {
-                SessionRun run = RunExercise(h);
-                List<Dictionary<string, object>> signs = EventsOfType(run, "vault.sign");
-                Check.True(signs.Count == 1, "the exercise sent " + signs.Count + " vault.sign events; expected 1");
-                string name = MiniJson.Str(signs[0], "name"), inputHex = MiniJson.Str(signs[0], "inputHex"), sigHex = MiniJson.Str(signs[0], "signatureHex");
-                Check.True(!string.IsNullOrEmpty(inputHex) && !string.IsNullOrEmpty(sigHex), "vault.sign does not carry inputHex and signatureHex, so no outside tool can judge it");
-                Check.True(!string.IsNullOrEmpty(MiniJson.Str(signs[0], "inputHash")), "vault.sign carries no inputHash");
+                Reply sign = Post(h, "sign", A17.Obj("text", "pay the pump owner 20 dollars"));
+                Check.True(sign.Ok && CodeOk(sign), "exercise sign got " + sign);
+                string inputHex = MiniJson.Str(sign.Json, "inputHex"), sigHex = MiniJson.Str(sign.Json, "signatureHex"), pubHex = MiniJson.Str(sign.Json, "publicKeyHex");
+                Check.True(!string.IsNullOrEmpty(inputHex) && !string.IsNullOrEmpty(sigHex) && !string.IsNullOrEmpty(pubHex), "sign returns no inputHex, signatureHex and publicKeyHex, so no outside tool can judge it: " + sign);
+                Check.Equal("the signed message is the typed text", "pay the pump owner 20 dollars", Encoding.UTF8.GetString(Hex.Decode(inputHex)));
+                Check.True(!string.IsNullOrEmpty(MiniJson.Str(sign.Json, "command")) && !string.IsNullOrEmpty(MiniJson.Str(sign.Json, "output")), "sign shows no command and no output of the check the Host ran");
 
-                // The public key comes from the vault's key list, and the verdict comes from OpenSSL.
-                Reply keys = HostHttp.Get(h, "/api/security/vault/keys");
-                Check.True(keys.Ok && keys.Json != null, "GET vault/keys got " + keys);
-                string pubHex = null;
-                foreach (object o in MiniJson.Arr(keys.Json, "keys") ?? new List<object>())
-                {
-                    Dictionary<string, object> k = MiniJson.AsObject(o);
-                    if (MiniJson.Str(k, "name") == name) pubHex = MiniJson.Str(k, "publicHex");
-                }
-                Check.True(!string.IsNullOrEmpty(pubHex), "GET vault/keys lists no publicHex for " + name);
-
+                // The verdict comes from OpenSSL, run here, on the public key the Host gave.
                 string dir = A17.TempDir(c, "vault-sign");
                 string pub = Path.Combine(dir, "pub.pem"), msg = Path.Combine(dir, "msg.bin"), sig = Path.Combine(dir, "sig.bin"), o2;
                 File.WriteAllText(pub, V0Clauses.Ed25519Pem(Hex.Decode(pubHex)));
@@ -117,13 +107,16 @@ namespace Acceptance
                 File.WriteAllBytes(sig, Hex.Decode(sigHex));
                 int ok = Proc.Run(openssl, "pkeyutl -verify -pubin -inkey \"" + pub + "\" -rawin -in \"" + msg + "\" -sigfile \"" + sig + "\"", dir, 30000, out o2);
                 Check.True(ok == 0 && o2.Contains("Signature Verified Successfully"), "OpenSSL does not verify the exercise's signature: " + o2.Trim());
+                // The public key is the vault's: the key list names it too.
+                Dictionary<string, object> key = VaultKey(h, MiniJson.Str(sign.Json, "keyName"));
+                Check.True(string.IsNullOrEmpty(MiniJson.Str(key, "publicHex")) || MiniJson.Str(key, "publicHex").Equals(pubHex, StringComparison.OrdinalIgnoreCase), "the key list shows another public key than sign returned");
                 // Control: one changed byte in the message, same program.
                 byte[] bad = Hex.Decode(inputHex);
                 bad[0] ^= 0x01;
                 File.WriteAllBytes(msg, bad);
                 int refused = Proc.Run(openssl, "pkeyutl -verify -pubin -inkey \"" + pub + "\" -rawin -in \"" + msg + "\" -sigfile \"" + sig + "\"", dir, 30000, out o2);
                 Check.True(refused != 0, "control: OpenSSL accepted a signature over a changed message, so it is no judge here");
-                return "OpenSSL verifies the signature of " + name + " from the vault's public key and refuses it over a message with one byte changed";
+                return "OpenSSL verifies the signature of " + MiniJson.Str(sign.Json, "keyName") + " over the typed text from the public key the Host returned, and refuses it over a message with one byte changed";
             }
         }
 
@@ -132,65 +125,71 @@ namespace Acceptance
         {
             using (HostProc h = A17.Host(c, "a17-vault-walk"))
             {
-                // Lab 20 stays outside GET /api/lessons, as lab 0 does.
+                // The exercise is not a lab: it is absent from GET /api/lessons, and session.start for lesson 20 says no such lab is built.
                 Reply lessons = HostHttp.Get(h, "/api/lessons");
                 Check.True(lessons.Ok, "GET /api/lessons got " + lessons);
-                Check.True(!(lessons.Body ?? "").Contains("\"id\":20") && !(lessons.Body ?? "").Contains("\"lesson\":20"), "GET /api/lessons lists lab 20, which belongs to the vault page only");
-                SessionRun run = RunExercise(h);
-                List<string> order = new List<string>();
-                foreach (Dictionary<string, object> ev in run.Events)
-                {
-                    string t = MiniJson.Str(ev, "type");
-                    if (t != null && t.StartsWith("vault.")) order.Add(t);
-                }
-                Check.Equal("order of the exercise events", "vault.sign,vault.derive,vault.refused,vault.audit", string.Join(",", order.ToArray()));
-                List<Dictionary<string, object>> audit = EventsOfType(run, "vault.audit");
-                List<object> auditRows = MiniJson.Arr(audit[0], "rows");
-                Check.True(auditRows != null && auditRows.Count >= 3, "vault.audit lists " + (auditRows == null ? 0 : auditRows.Count) + " rows; expected the three calls at least");
+                Check.True(!(lessons.Body ?? "").Contains("\"lesson\":20") && !(lessons.Body ?? "").Contains("\"id\":20"), "GET /api/lessons lists lab 20; the exercise is routes and not a lab");
+                SessionRun lab20 = HostSession.Run(h, 20, "glass", null);
+                Check.Equal("session.start for lesson 20", "LESSON_NOT_BUILT", lab20.ErrorCode);
 
-                // The tour binds each of the four steps to one of these events.
-                string toursDir = c.Prop("tours.dir", Path.Combine(c.RepoRoot, "app", "src", "tours"));
-                string tour = Path.Combine(toursDir, "lesson-20.json");
-                if (!File.Exists(tour)) throw new NotRunException("PRODUCT_MISSING", tour + " does not exist yet (the tour of the vault exercise)");
-                object parsed = MiniJson.Parse(File.ReadAllText(tour));
-                List<object> steps = parsed as List<object> ?? MiniJson.Arr(MiniJson.AsObject(parsed), "steps");
-                Check.True(steps != null && steps.Count == 4, "the tour of lab 20 has " + (steps == null ? 0 : steps.Count) + " steps; expected 4 (sign, derive, refuse, audit)");
-                Tally t2 = new Tally();
-                foreach (object so in steps)
+                // The two keys exist at once, need no flow, and say what they are.
+                foreach (string name in new string[] { "exercise/signing", "exercise/derive" })
                 {
-                    Dictionary<string, object> s = MiniJson.AsObject(so);
-                    Dictionary<string, object> bind = MiniJson.Obj(s, "bind");
-                    string want = MiniJson.Str(bind, "eventType");
-                    bool found = false;
-                    foreach (Dictionary<string, object> ev in run.Events) if (MiniJson.Str(ev, "type") == want) found = true;
-                    t2.Expect(MiniJson.Str(s, "id") ?? want, found, "no live event of type '" + want + "' fits the step's bind");
+                    Dictionary<string, object> k = VaultKey(h, name);
+                    Check.True(!string.IsNullOrEmpty(MiniJson.Str(k, "fingerprint")), name + " shows no fingerprint");
+                    Check.Equal("hidden marker of " + name, "non-exportable", MiniJson.Str(k, "hidden"));
                 }
-                return "lab 20 sends sign, derive, refused, audit in order and stays out of GET /api/lessons; " + t2.Done();
+
+                // Step 1, sign. Step 2, derive: the same label gives the same key, another label gives another, and the key stays in the box.
+                Reply sign = Post(h, "sign", A17.Obj("text", "walk"));
+                Check.True(sign.Ok && CodeOk(sign), "sign got " + sign);
+                Reply d1 = Post(h, "derive", A17.Obj("label", "pump-4")), d2 = Post(h, "derive", A17.Obj("label", "pump-4")), d3 = Post(h, "derive", A17.Obj("label", "pump-5"));
+                Check.True(d1.Ok && d2.Ok && d3.Ok, "derive got " + d1 + " | " + d2 + " | " + d3);
+                string o1 = MiniJson.Str(d1.Json, "outputHex"), o3 = MiniJson.Str(d3.Json, "outputHex");
+                Check.True(!string.IsNullOrEmpty(o1) && o1 == MiniJson.Str(d2.Json, "outputHex"), "the same label gives two different derived keys: " + o1 + " and " + MiniJson.Str(d2.Json, "outputHex"));
+                Check.True(!string.IsNullOrEmpty(o3) && o3 != o1, "two labels give one derived key");
+                Check.Equal("label echoed by derive", "pump-4", MiniJson.Str(d1.Json, "label"));
+                // Step 3, refuse. Step 4, audit: the chain is whole, and a changed row is found.
+                Check.Equal("export code", "VAULT_EXPORT_REFUSED", Post(h, "export", "{}").Code);
+                Reply intact = Post(h, "audit-check", "{}");
+                Check.True(intact.Ok && CodeOk(intact), "audit-check got " + intact);
+                Check.True(MiniJson.Num(intact.Json, "firstBadSeq", 0) <= 0, "audit-check reports a bad row (" + MiniJson.Num(intact.Json, "firstBadSeq", 0) + ") before any row changed");
+                Check.True((MiniJson.Arr(intact.Json, "rows") ?? new List<object>()).Count >= 4, "audit-check lists " + (MiniJson.Arr(intact.Json, "rows") ?? new List<object>()).Count + " rows; expected the sign, derive and export calls");
+
+                List<Dictionary<string, object>> before = A17.FileAuditRows(c, h);
+                Dictionary<string, object> edited = MiniJson.AsObject(A17.VaultDb(c, h, "edit-audit"));
+                double editedSeq = MiniJson.Num(edited, "seq", 0);
+                Check.True(editedSeq > 0 && editedSeq < before.Count, "the suite changed no audit row");
+                Reply found = Post(h, "audit-check", "{}");
+                double bad = MiniJson.Num(found.Json, "firstBadSeq", 0);
+                Check.True(bad == editedSeq || bad == editedSeq + 1, "audit-check does not find the changed row " + editedSeq + "; it reports firstBadSeq " + bad + " (the row itself, or the row after it, whose prev_hash no longer fits)");
+                return "lab 20 is no lab; both exercise keys show a fingerprint and non-exportable; sign works, derive is steady per label, export is refused, audit-check passes then finds the audit row the suite changed (" + bad + ")";
             }
         }
 
-        // ---------------------------------------------------------------- labs read through CourseRead, and it is audited as such
+        // ---------------------------------------------------------------- labs read through Export, and the audit shows the caller
 
-        [Clause("A17.vault.course-read-audited")]
-        public static string CourseReadAudited(Ctx c)
+        [Clause("A17.vault.export-audited-with-caller")]
+        public static string ExportAuditedWithCaller(Ctx c)
         {
-            using (HostProc h = A17.Host(c, "a17-vault-course"))
+            using (HostProc h = A17.Host(c, "a17-vault-caller"))
             {
-                A17.RunFlow(h, "my-login", null);
+                A17.RunFlow(h, "my-login");
                 int before = A17.FileAuditRows(c, h).Count;
                 SessionRun run = HostSession.Run(h, 10, "glass", null);
-                RequireBuilt(run, 10);
+                if (run.ErrorCode == "LESSON_NOT_BUILT") throw new NotRunException("LESSON_NOT_BUILT", "the Host reports lesson 10 as not built yet");
                 Check.True(run.Error == null && run.Finished != null, "lesson 10 on a vault key did not finish");
                 List<Dictionary<string, object>> rows = A17.FileAuditRows(c, h);
                 Check.True(rows.Count > before, "lesson 10 added no audit row to the vault file");
-                Dictionary<string, object> read = RowWhere(rows, "course-read", "token.issuer", "ok");
-                Check.True(read != null, "the vault file holds no course-read row for token.issuer after lesson 10");
-                Check.True((MiniJson.Str(read, "caller") ?? "").StartsWith("lesson-10"), "the course-read row names the caller '" + MiniJson.Str(read, "caller") + "'; expected one that starts with lesson-10");
-                Check.True(RowWhere(rows, "export", "token.issuer", null) == null, "a lab's read of token.issuer was audited as an export. A course read is not an export");
-                Check.True(RowWhere(rows, "course-read", "exercise/", null) == null, "a course read touched an exercise/ key, which has no route to the bytes");
+                Dictionary<string, object> export = null;
+                foreach (Dictionary<string, object> r in rows)
+                    if (MiniJson.Str(r, "op") == "export" && (MiniJson.Str(r, "name") ?? "").StartsWith("token.issuer") && (MiniJson.Str(r, "caller") ?? "").StartsWith("host/lab-") && MiniJson.Str(r, "result") == "ok") export = r;
+                Check.True(export != null, "the vault file holds no export row for token.issuer by a caller 'host/lab-<n>' after lesson 10 (an exportable key left the box, and the audit says who took it)");
+                Check.True(RowWhere(rows, "export", "token.issuer", "refused") == null, "an export of token.issuer was refused: a flow key is exportable");
+                Check.True(RowWhere(rows, "export", "exercise/", "ok") == null, "an export of an exercise/ key succeeded, and those keys have no route to their bytes");
                 string chain = ChainProblem(rows);
                 Check.True(chain == null, chain);
-                return "lesson 10 on a vault key left a course-read row by lesson-10 in the vault file, and no export row for that key";
+                return "lesson 10 on a vault key left an ok export row for token.issuer by " + MiniJson.Str(export, "caller") + " in the vault file, and no refused row; the exercise keys were never exported";
             }
         }
 
@@ -201,9 +200,9 @@ namespace Acceptance
         {
             using (HostProc h = A17.Host(c, "a17-vault-tamper"))
             {
-                A17.RunFlow(h, "my-login", null);
+                A17.RunFlow(h, "my-login");
                 SessionRun ok = HostSession.Run(h, 10, "glass", null);
-                RequireBuilt(ok, 10);
+                if (ok.ErrorCode == "LESSON_NOT_BUILT") throw new NotRunException("LESSON_NOT_BUILT", "the Host reports lesson 10 as not built yet");
                 Check.True(ok.Error == null && ok.Finished != null, "control: lesson 10 on the untouched vault key did not finish");
 
                 Dictionary<string, object> changed = MiniJson.AsObject(A17.VaultDb(c, h, "tamper-wrapped"));
@@ -213,6 +212,8 @@ namespace Acceptance
                 Check.True(bad.Events.Count == 0, "a lab on a changed row still sent " + bad.Events.Count + " trace events");
                 Reply key = A17.Key(h, "token.issuer");
                 Check.True(!key.Ok && key.Code == "VAULT_UNWRAP_FAILED", "the key route on a changed row got " + key + "; expected VAULT_UNWRAP_FAILED");
+                // The exercise keys are not under the tamper, and they still work.
+                Check.True(Post(h, "sign", A17.Obj("text", "still works")).Ok, "the exercise sign stopped working after flow keys changed");
                 return "control runs; after the wrapped bytes of " + (int)MiniJson.Num(changed, "changed", 0) + " rows change, the lab and the key route refuse with VAULT_UNWRAP_FAILED and send no event";
             }
         }
@@ -224,9 +225,9 @@ namespace Acceptance
         {
             using (HostProc h = A17.Host(c, "a17-vault-auditfail"))
             {
-                A17.RunFlow(h, "my-login", null);
+                A17.RunFlow(h, "my-login");
                 SessionRun ok = HostSession.Run(h, 10, "glass", null);
-                RequireBuilt(ok, 10);
+                if (ok.ErrorCode == "LESSON_NOT_BUILT") throw new NotRunException("LESSON_NOT_BUILT", "the Host reports lesson 10 as not built yet");
                 Check.True(ok.Error == null && ok.Finished != null, "control: lesson 10 with a working audit did not finish");
 
                 A17.VaultDb(c, h, "block-audit");
@@ -234,15 +235,17 @@ namespace Acceptance
                 {
                     SessionRun bad = HostSession.Run(h, 10, "glass", null);
                     Check.True(bad.Error != null, "lesson 10 ran although no audit row could be written. A call whose audit cannot be written must be refused");
-                    Check.Equal("error code when the audit cannot be written", "VAULT_AUDIT_FAILED", bad.ErrorCode);       // ASSUMED name, see CONTRACT.md
+                    Check.Equal("error code when the audit cannot be written", "VAULT_AUDIT_FAILED", bad.ErrorCode);
                     Check.True(bad.Events.Count == 0, "the refused lab still sent " + bad.Events.Count + " trace events");
                     Reply key = A17.Key(h, "token.issuer");
                     Check.True(!key.Ok, "the key route served a key although no audit row could be written: " + key);
+                    Reply export = Post(h, "export", "{}");
+                    Check.True(export.Code == "VAULT_AUDIT_FAILED" || export.Code == "VAULT_EXPORT_REFUSED", "the exercise export with a blocked audit got " + export);
                 }
                 finally { A17.VaultDb(c, h, "unblock-audit"); }
                 SessionRun again = HostSession.Run(h, 10, "glass", null);
                 Check.True(again.Error == null && again.Finished != null, "after the audit works again, lesson 10 still fails: " + (again.Frames.Count == 0 ? "no frames" : again.Frames[again.Frames.Count - 1]));
-                return "with an audit insert that fails, the lab and the key route refuse and send no event; with it restored the lab runs again";
+                return "with an audit insert that fails, the lab and the key route refuse with VAULT_AUDIT_FAILED and send no event; with it restored the lab runs again";
             }
         }
 
@@ -253,30 +256,31 @@ namespace Acceptance
         {
             using (HostProc h = A17.Host(c, "a17-vault-oneway"))
             {
-                A17.Flow first = A17.Flow.Start(h, "my-login");
-                first.MakeForMe(new Dictionary<string, bool> { { "token.issuer", true } }, null);
-                Reply hidden = A17.Key(h, "token.issuer");
-                Check.True(hidden.Ok && string.IsNullOrEmpty(MiniJson.Str(hidden.Json, "hex")), "control: a key kept from showing shows its bytes: " + hidden);
+                // The policy is set when a key is made. Flows make exportable keys. Only the exercise's keys are non-exportable.
+                A17.RunFlow(h, "my-login");
+                Check.True(MiniJson.Bool(VaultKey(h, "token.issuer"), "exportable", false), "a flow key is not exportable, but flows make exportable keys");
+                foreach (string name in new string[] { "exercise/signing", "exercise/derive" })
+                    Check.True(!MiniJson.Bool(VaultKey(h, name), "exportable", true), name + " is exportable");
 
-                // The learner runs the flow again and asks for an exportable key. The vault key was made non-exportable, and that is one-way.
-                A17.Flow second = A17.Flow.Start(h, "my-login");
-                second.MakeForMe(new Dictionary<string, bool> { { "token.issuer", false } }, null);
-                Reply after = A17.Key(h, "token.issuer");
-                Check.True(after.Ok, "GET key after the second run got " + after);
-                Check.True(string.IsNullOrEmpty(MiniJson.Str(after.Json, "hex")), "a key made non-exportable shows its bytes after a second flow asked for an exportable one. Exportable is one-way");
-                Reply keys = HostHttp.Get(h, "/api/security/vault/keys");
-                Check.True(keys.Ok, "GET vault/keys got " + keys);
-                bool found = false;
-                foreach (object o in MiniJson.Arr(keys.Json, "keys") ?? new List<object>())
+                // Whatever the learner does next, it stays so: more flow runs, every exercise call, and an export asked for again and again.
+                A17.RunFlow(h, "my-login");
+                Post(h, "sign", A17.Obj("text", "x"));
+                Post(h, "derive", A17.Obj("label", "x"));
+                for (int i = 0; i < 3; i++)
                 {
-                    Dictionary<string, object> k = MiniJson.AsObject(o);
-                    if (MiniJson.Str(k, "name") != "token.issuer") continue;
-                    found = true;
-                    Check.True(!MiniJson.Bool(k, "exportable", true), "GET vault/keys lists token.issuer as exportable after it was made non-exportable");
-                    Check.True(MiniJson.Num(k, "versions", 0) >= 2 || (MiniJson.Arr(k, "versions") ?? new List<object>()).Count >= 2, "the second flow run did not add a version beside the first: " + MiniJson.Write(k));
+                    Reply export = Post(h, "export", "{}");
+                    Check.True(export.Status == 409 && export.Code == "VAULT_EXPORT_REFUSED", "export ask " + (i + 1) + " got " + export);
                 }
-                Check.True(found, "GET vault/keys lists no key named token.issuer");
-                return "a vault key made non-exportable stays non-exportable after a second flow run with the option off, and the second run adds a version";
+                foreach (string name in new string[] { "exercise/signing", "exercise/derive" })
+                {
+                    Dictionary<string, object> k = VaultKey(h, name);
+                    Check.True(!MiniJson.Bool(k, "exportable", true), name + " became exportable");
+                    Check.True(string.IsNullOrEmpty(MiniJson.Str(k, "hex")) && string.IsNullOrEmpty(MiniJson.Str(k, "privateHex")), name + " shows key bytes in the key list");
+                }
+                Check.True(MiniJson.Bool(VaultKey(h, "token.issuer"), "exportable", false), "the flow key stopped being exportable");
+                Reply key = A17.Key(h, "token.issuer");
+                Check.True(key.Ok && !string.IsNullOrEmpty(MiniJson.Str(key.Json, "hex")), "a flow key stopped showing its bytes: " + key);
+                return "flow keys are exportable and the exercise keys are not; after another flow run, every exercise call and three more export asks, the policy has not changed and export is refused each time";
             }
         }
     }

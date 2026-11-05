@@ -2,8 +2,8 @@
 The fake Host's practice vault, a real SQLite file with the tables of modes-design.md section 4.1, so the clauses can read and edit it.
 Usage: python -I fakevault.py <db> <command> [args]
   init
-  put <name> <version> <wrapped hex>
-  get <name> <version>               prints the wrapped bytes as hex, or - when the row is missing
+  put <name> <version> <wrapped hex> [nonce hex]
+  get <name> <version>               prints "<nonce hex> <wrapped hex>", or - when the row is missing
   audit <caller> <op> <name> <version> <result> <detail>    prints seq; exit 3 when the insert fails
   rows                                prints the audit rows as JSON
 """
@@ -29,11 +29,11 @@ def main(argv):
             con.commit()
         elif cmd == "put":
             con.execute("INSERT OR REPLACE INTO key_versions(name, version, nonce, wrapped, state, created_at) VALUES(?,?,?,?,?,datetime('now'))",
-                        (args[0], int(args[1]), b"\0" * 12, bytes.fromhex(args[2]), "active"))
+                        (args[0], int(args[1]), bytes.fromhex(args[3]) if len(args) > 3 else b"\0" * 12, bytes.fromhex(args[2]), "active"))
             con.commit()
         elif cmd == "get":
-            r = con.execute("SELECT wrapped FROM key_versions WHERE name=? AND version=?", (args[0], int(args[1]))).fetchone()
-            print(r[0].hex() if r else "-")
+            r = con.execute("SELECT nonce, wrapped FROM key_versions WHERE name=? AND version=?", (args[0], int(args[1]))).fetchone()
+            print((r[0].hex() + " " + r[1].hex()) if r else "-")
         elif cmd == "audit":
             caller, op, name, version, result, detail = args
             last = con.execute("SELECT seq, at, caller, op, name, version, result, detail, prev_hash FROM audit ORDER BY seq DESC LIMIT 1").fetchone()

@@ -27,6 +27,8 @@ GROUPS = {
     "nativeprod": {"kind": "csharp", "project": "groups/nativeprod/nativeprod.csproj", "assembly": "Acceptance.NativeProd", "builds": ["net10", "cf"], "needsCore": True},
     "bridge":     {"kind": "csharp", "project": "groups/bridge/bridge.csproj", "assembly": "Acceptance.Bridge", "builds": ["net10"], "needsCore": True},
     "host":       {"kind": "csharp", "project": "groups/host/host.csproj", "assembly": "Acceptance.Host", "builds": ["net10"], "needsCore": False},
+    "golden":     {"kind": "csharp", "project": "groups/golden/golden.csproj", "assembly": "Acceptance.Golden", "builds": ["net10", "cf"], "needsCore": True},
+    "a17probe":   {"kind": "csharp", "project": "groups/a17probe/a17probe.csproj", "assembly": "Acceptance.A17Probe", "builds": ["net10"], "needsCore": True},
     "a17":        {"kind": "csharp", "project": "groups/a17/a17.csproj", "assembly": "Acceptance.A17", "builds": ["net10"], "needsCore": False},
     "keys":       {"kind": "csharp", "project": "groups/keys/keys.csproj", "assembly": "Acceptance.Keys", "builds": ["net10"], "needsCore": False},
     "binproof":   {"kind": "csharp", "project": "groups/binproof/binproof.csproj", "assembly": "Acceptance.BinProof", "builds": ["net10"], "needsCore": False},

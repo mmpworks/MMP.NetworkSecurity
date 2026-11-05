@@ -6,7 +6,8 @@ using System.Security.Cryptography;
 
 namespace Acceptance
 {
-    // The wizard machine of the fake Host. See FakeHost.cs.
+    // The wizard machine of the fake Host: the five-screen path of wizards-ux.md 3.2 (Intro, ChooseSource, Place, ReadBack, Prove, Done) with the file branch
+    // PickFiles. The suite drives by step kind, so the screen names here could be the ones of modes-design.md 8.2 and no clause would notice. See FakeHost.cs.
     public sealed partial class FakeHost
     {
         static string[] FlowTypesOf(string flowId) { return A17.TypesOf(flowId); }
@@ -19,10 +20,10 @@ namespace Acceptance
             {
                 case "Intro": return new List<string> { "next", "cancel" };
                 case "ChooseSource": return new List<string> { "choose", "back", "cancel" };
-                case "PickFiles": return new List<string> { "files", "next", "back", "cancel" };
-                case "Options": return new List<string> { "option", "next", "back", "cancel" };
-                case "ReadBack": case "Place": return new List<string> { "next", "back", "cancel" };
-                case "Check":
+                case "PickFiles": return new List<string> { "files", "back", "cancel" };
+                case "Place": return new List<string> { "next", "back", "cancel" };
+                case "ReadBack": return new List<string> { "next", "back", "cancel" };
+                case "Prove":
                     List<string> a = new List<string> { "check", "next", "cancel" };
                     if (M("back-after-check")) a.Add("back");
                     return a;
@@ -37,10 +38,9 @@ namespace Acceptance
                 case "Intro": return "explain";
                 case "ChooseSource": return "choose";
                 case "PickFiles": return "file";
-                case "Options": return "choose";
-                case "ReadBack": return "review";
                 case "Place": return "generate";
-                case "Check": return "prove";
+                case "ReadBack": return "review";
+                case "Prove": return "prove";
                 default: return "done";
             }
         }
@@ -49,7 +49,7 @@ namespace Acceptance
         {
             List<object> allowed = new List<object>(AllowedIn(r).ToArray());
             Dictionary<string, object> s = D("runId", r.RunId, "flowId", r.FlowId, "state", r.State, "kind", KindOf(r.State), "stepSeq", (double)r.Seq,
-                "allowed", allowed, "errors", new List<object>(r.Errors.ToArray()), "facts", new List<object>(r.Facts.ToArray()));
+                "allowed", allowed, "errors", new List<object>(r.Errors.ToArray()), "warnings", new List<object>(r.Warnings.ToArray()), "facts", new List<object>(r.Facts.ToArray()));
             if (r.State == "Intro") s["copy"] = Strs("wizard.common.test-keys-only");
             if (r.State == "ReadBack") s["facts"] = ReadBackFacts(r);
             return s;
@@ -70,6 +70,20 @@ namespace Acceptance
             if (typeId.StartsWith("dukpt.") && M("dukpt-judge-claimed")) return "openssl";
             if (typeId.StartsWith("dukpt.") || typeId == "device.enrolment") return "none";
             return "openssl";
+        }
+
+        /// <summary>The stable id in says (modes-design.md section 8.6). The words live in the copy file.</summary>
+        string SaysOf(string typeId)
+        {
+            switch (JudgeOf(typeId))
+            {
+                case "ssh.exe": return "checked-with-ssh-exe";
+                case "none": return "no-outside-judge";
+                default:
+                    if (typeId == "token.issuer") return "checked-signature-only";
+                    if (typeId.StartsWith("lab.")) return "checked-with-openssl";
+                    return M("says-trusted") ? "trusted" : "checked-against-root";
+            }
         }
 
         static string NameOf(string typeId)
@@ -98,23 +112,11 @@ namespace Acceptance
             for (int i = 0; i < n; i++)
             {
                 string id = types[i];
-                using (System.Security.Cryptography.SHA256 sha = System.Security.Cryptography.SHA256.Create())
+                using (SHA256 sha = SHA256.Create())
                     facts.Add(D("typeId", id, "name", NameOf(id), "notAfter", "2049-12-31", "algorithm", AlgorithmOf(id),
                         "fingerprint", "SHA256:" + Convert.ToBase64String(sha.ComputeHash(System.Text.Encoding.ASCII.GetBytes(r.RunId + id))).TrimEnd('=')));
             }
             return facts;
-        }
-
-        string SaysOf(string typeId)
-        {
-            switch (JudgeOf(typeId))
-            {
-                case "ssh.exe": return "Checked with ssh.exe";
-                case "none": return typeId == "device.enrolment" ? "No outside tool can judge this. Our own check passed." : "No outside tool can judge this. Our code matches the published vectors.";
-                default:
-                    if (typeId == "token.issuer" || typeId.StartsWith("lab.")) return "Checked with OpenSSL";
-                    return M("says-trusted") ? "Trusted" : "Checked against the root you gave it";
-            }
         }
 
         void FlowEvent(HttpListenerContext ctx, FlowRun r, Dictionary<string, object> body)
@@ -125,21 +127,16 @@ namespace Acceptance
             if (seq != r.Seq && !M("stale-accepted")) { Fail(ctx, 409, "WIZARD_STEP_STALE", "stepSeq " + seq + " is old; the run is at " + r.Seq); return; }
             if (!AllowedIn(r).Contains(ev) && !M("machine-allows-any"))
             { Fail(ctx, 409, "WIZARD_EVENT_NOT_ALLOWED", "event '" + ev + "' is not allowed in state '" + r.State + "'"); return; }
-            r.Errors.Clear();
+            r.Errors.Clear(); r.Warnings.Clear();
             switch (ev)
             {
                 case "next":
                     switch (r.State)
                     {
                         case "Intro": Go(r, "ChooseSource"); break;
-                        case "Options": Go(r, "ReadBack"); break;
-                        case "PickFiles":
-                            if (r.FileBlocked || r.Paths.Count == 0) { r.Errors.Add(D("code", "KEY_FILE_UNREADABLE", "severity", "error", "message", "Pick a readable key file for each row first.")); break; }
-                            Go(r, HasOptions(r.FlowId) ? "Options" : "ReadBack");
-                            break;
-                        case "ReadBack": Go(r, "Place"); break;
-                        case "Place": Apply(r); Go(r, "Check"); break;
-                        case "Check":
+                        case "Place": Apply(r); Go(r, "ReadBack"); break;
+                        case "ReadBack": Go(r, "Prove"); break;
+                        case "Prove":
                             if (!r.Checked) { Fail(ctx, 409, "WIZARD_CHECK_NOT_DONE", "the check has not run"); return; }
                             Go(r, "Done");
                             break;
@@ -148,20 +145,19 @@ namespace Acceptance
                 case "choose":
                     r.Source = MiniJson.Str(data, "source");
                     if (r.Source == "files") Go(r, "PickFiles");
-                    else if (r.Source == "make") Go(r, HasOptions(r.FlowId) ? "Options" : "ReadBack");
+                    else if (r.Source == "make") Go(r, "Place");
                     else { Fail(ctx, 409, "WIZARD_SOURCE_UNAVAILABLE", "source " + r.Source + " is not offered by " + r.FlowId); return; }
-                    break;
-                case "option":
-                    r.KeepHidden[MiniJson.Str(data, "typeId")] = MiniJson.Bool(data, "keepHidden", false);
                     break;
                 case "files":
                     CheckPaths(r, data);
+                    if (!r.FileBlocked && r.Paths.Count > 0) { Apply(r); Go(r, "ReadBack"); }     // the branch checks the files, then places them
                     break;
                 case "check":
                     RunCheck(r);
                     break;
                 case "back":
-                    if (r.Back.Count > 0) { r.State = r.Back[r.Back.Count - 1]; r.Back.RemoveAt(r.Back.Count - 1); }
+                    if (r.State == "ReadBack") { r.Source = null; r.State = "ChooseSource"; r.Back.Clear(); r.Back.Add("Intro"); }      // back makes a new version
+                    else if (r.Back.Count > 0) { r.State = r.Back[r.Back.Count - 1]; r.Back.RemoveAt(r.Back.Count - 1); }
                     break;
                 case "cancel":
                     r.State = "Cancelled";
@@ -170,8 +166,6 @@ namespace Acceptance
             r.Seq++;
             Write(ctx, 200, D("runId", r.RunId, "step", StepJson(r)));
         }
-
-        static bool HasOptions(string flowId) { return flowId == "my-ssh" || flowId == "my-payment" || flowId == "my-login"; }
 
         static void Go(FlowRun r, string to) { r.Back.Add(r.State); r.State = to; }
 
@@ -188,7 +182,10 @@ namespace Acceptance
                 string p = kv.Value as string ?? "";
                 r.Paths[kv.Key] = p;
                 if (!M("no-personal-warning") && p.StartsWith(ssh, StringComparison.OrdinalIgnoreCase))
-                    r.Errors.Add(D("code", "KEY_PATH_PERSONAL", "severity", "warning", "typeId", kv.Key, "message", "This path is in your own .ssh folder. Use a test key."));
+                {
+                    Dictionary<string, object> w = D("code", "KEY_PATH_PERSONAL", "typeId", kv.Key, "message", "This path is in your own .ssh folder. Use a test key.");
+                    if (M("personal-path-is-error")) { w["severity"] = "error"; r.Errors.Add(w); r.FileBlocked = true; } else r.Warnings.Add(w);
+                }
                 if (!File.Exists(p))
                 {
                     r.Errors.Add(D("code", "KEY_FILE_UNREADABLE", "severity", "error", "typeId", kv.Key, "message", "The file cannot be read."));
@@ -211,10 +208,6 @@ namespace Acceptance
             {
                 TypeState t = _types[id];
                 t.Mode = "Mine"; t.Bound = true; t.Verified = false; if (!M("version-not-bumped") || t.Version == 0) t.Version++;
-                bool hidden;
-                r.KeepHidden.TryGetValue(id, out hidden);
-                // Exportable is set when the vault key is made, and it is one-way: a later run cannot turn a hidden key back into a showing one.
-                t.KeepHidden = (t.KeepHidden && !M("exportable-flips")) || hidden;
                 bool imported = r.Source == "files" && r.Paths.ContainsKey(id);
                 t.Provider = imported ? "file" : "vault";
                 ApplyCert(r, t, id, imported);
@@ -225,7 +218,7 @@ namespace Acceptance
                 }
                 else if (IsEd25519Type(id) && imported) t.Seed = ReadKey(r.Paths[id]).Seed;
                 else t.Seed = RandomBytes(id.StartsWith("dukpt.") || id.StartsWith("lab.") ? 16 : 32);
-                if (t.Provider == "vault") VaultStore(t, t.KeepHidden);
+                if (t.Provider == "vault") VaultStore(t);
             }
         }
 
@@ -245,9 +238,25 @@ namespace Acceptance
                 _types[id].Verified = true;
                 string judge = JudgeOf(id);
                 if (M("device-judge-claimed") && id == "device.enrolment") judge = "openssl";
-                if (!M("no-judge-facts")) r.Facts.Add(D("typeId", id, "judge", judge, "says", SaysOf(id)));
+                if (!M("no-judge-facts")) r.Facts.Add(D("typeId", id, "judge", judge, "says", SaysOf(id), "command", CommandOf(id, judge), "output", OutputOf(id, judge), "passed", true));
             }
             r.Checked = !failed;
+        }
+
+        static string CommandOf(string typeId, string judge)
+        {
+            if (judge == "none") return "";
+            if (typeId == "token.issuer") return "openssl pkeyutl -verify -pubin -inkey issuer.pub -rawin -in signing-input.bin -sigfile signature.bin";
+            if (judge == "ssh.exe") return "ssh.exe -F NUL -o BatchMode=yes -o StrictHostKeyChecking=yes echo hello";
+            return "openssl verify -CAfile root.pem " + typeId + ".pem";
+        }
+
+        static string OutputOf(string typeId, string judge)
+        {
+            if (judge == "none") return "";
+            if (typeId == "token.issuer") return "Signature Verified Successfully";
+            if (judge == "ssh.exe") return "hello";
+            return typeId + ".pem: OK";
         }
     }
 }

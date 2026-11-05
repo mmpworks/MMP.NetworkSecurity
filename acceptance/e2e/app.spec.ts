@@ -117,7 +117,7 @@ test('[A16.ui.os-transport-label-and-hidden-secrets] the chip reads OS TRANSPORT
   await sw.click();
   await expect(page.getByTestId('training-only-label')).toContainText(/OS TRANSPORT/);
   const rows = page.locator('[data-testid^="secret-row-"]');
-  expect(await rows.count(), 'secret rows shown in real mode').toBe(0);
+  expect(await rows.count(), 'secret rows shown on the OS transport').toBe(0);
 });
 
 /**
