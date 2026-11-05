@@ -49,6 +49,13 @@ namespace NetSec.Dukpt
         /// <summary>Gives the working key for the next counter, then erases the derivation key it came from. Each call uses a new counter.</summary>
         public DukptUse Next(DukptKeyUsage u, DukptKeyType t)
         {
+            return NextTogether(new DukptKeyUsage[] { u }, t)[0];
+        }
+
+        /// <summary>Gives one working key per usage, all from the next counter, then erases the derivation key they came from. One sale needs a PIN key and a MAC key under one KSN.</summary>
+        public DukptUse[] NextTogether(DukptKeyUsage[] usages, DukptKeyType t)
+        {
+            if (usages == null) throw new ArgumentNullException("usages");
             if (_nextCounter > uint.MaxValue)
                 throw new NetSecException(NetSecError.Of(ErrorCodes.DukptCounterExhausted, "This reader has used every counter value. It must get a new initial key."));
 
@@ -56,15 +63,19 @@ namespace NetSec.Dukpt
             int lowestBit = LowestOneBit(counter);
             byte[] derivationKey = _registers[lowestBit];
 
-            DukptUse use = new DukptUse();
-            use.Ksn = DukptDerivation.Ksn(_initialKeyId, counter);
-            use.Key = DukptDerivation.Working(derivationKey, _initialKeyId, counter, u, t);
+            DukptUse[] uses = new DukptUse[usages.Length];
+            for (int i = 0; i < usages.Length; i++)
+            {
+                uses[i] = new DukptUse();
+                uses[i].Ksn = DukptDerivation.Ksn(_initialKeyId, counter);
+                uses[i].Key = DukptDerivation.Working(derivationKey, _initialKeyId, counter, usages[i], t);
+            }
 
             bool mayAddBit = OneBits(counter) < MaxOneBits;
             if (mayAddBit) FillRegistersBelow(lowestBit, derivationKey, counter);
             Erase(lowestBit);
             _nextCounter = counter + (mayAddBit ? 1UL : 1UL << lowestBit);
-            return use;
+            return uses;
         }
 
         /// <summary>Copies of every key register held now.</summary>

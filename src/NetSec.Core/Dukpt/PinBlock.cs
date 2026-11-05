@@ -36,15 +36,39 @@ namespace NetSec.Dukpt
         public static bool TryDecryptFormat4(byte[] pinKey, byte[] block, string pan, out string pin)
         {
             pin = null;
+            byte[] field = OpenField(pinKey, block, pan);
+            return field != null && TryReadPin(field, out pin);
+        }
+
+        /// <summary>The clear 16-byte PIN field that EncryptFormat4 locks for this PIN and fill.</summary>
+        public static byte[] ClearFieldFormat4(string pin, byte[] random8)
+        {
+            if (random8 == null) throw new ArgumentNullException("random8");
+            if (random8.Length != RandomSize) throw new ArgumentException("The PIN field takes 8 random bytes.", "random8");
+            return PinField(pin, random8);
+        }
+
+        /// <summary>Opens a block and returns its clear field. False when the field has the wrong shape, by the same rule as TryDecryptFormat4.</summary>
+        public static bool TryOpenFieldFormat4(byte[] pinKey, byte[] block, string pan, out byte[] field)
+        {
+            field = OpenField(pinKey, block, pan);
+            string pin;
+            if (field != null && TryReadPin(field, out pin)) return true;
+            field = null;
+            return false;
+        }
+
+        static byte[] OpenField(byte[] pinKey, byte[] block, string pan)
+        {
             if (block == null) throw new ArgumentNullException("block");
-            if (block.Length != BlockSize) return false;
+            if (block.Length != BlockSize) return null;
             AesKey aes = new AesKey(pinKey);
             byte[] mixed = new byte[BlockSize];
             aes.DecryptBlock(block, 0, mixed, 0);
             Xor(mixed, PanField(pan));
             byte[] field = new byte[BlockSize];
             aes.DecryptBlock(mixed, 0, field, 0);
-            return TryReadPin(field, out pin);
+            return field;
         }
 
         /// <summary>Nibbles: format 4, PIN length, PIN digits, then fill A up to nibble 16. Then the 8 random bytes.</summary>

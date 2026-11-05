@@ -1,0 +1,256 @@
+{
+  "steps": [
+    {
+      "id": "L6-S01",
+      "lesson": 6,
+      "title": "One key for every sale",
+      "text": [
+        "A card reader sends your PIN to a bank. The PIN must travel locked, so the reader and the bank need a key.",
+        "If every sale used one key, a thief who got that key could read every PIN ever sent. {{term:dukpt}} fixes this. Its name means derived unique key per transaction.",
+        "With DUKPT, each sale gets a new key, made from a base key and a counter. After the sale, the reader erases the key it used. A stolen reader holds no key that opens past sales.",
+        "Built to show the parts. Do not copy."
+      ],
+      "glossary": ["dukpt"],
+      "bind": { "kind": "concept" },
+      "highlight": ["diagram:lane=reader", "diagram:lane=bank"],
+      "claims": [
+        {
+          "id": "L6-C01",
+          "text": "DUKPT gives each transaction a distinct key. If a present derived key is compromised, past and future keys stay uncompromised.",
+          "source": "Wikipedia, Derived unique key per transaction, Overview (secondary source, read 2026-11-05). ANSI X9.24-3-2017 is a paid standard and was not read."
+        }
+      ],
+      "unlock": { "mode": "ack" }
+    },
+    {
+      "id": "L6-S02",
+      "lesson": 6,
+      "title": "The bank keeps the base key",
+      "text": [
+        "The bank holds one secret, the {{term:bdk}}. That is short for base derivation key. Look for it in the bank column of the secrets panel.",
+        "The BDK stays at the bank for the whole run. The reader never gets a copy.",
+        "The bank also holds no key for each reader. It rebuilds any reader's key from the BDK when a sale arrives."
+      ],
+      "glossary": ["bdk"],
+      "bind": { "kind": "event", "eventType": "dukpt.key.derived", "match": { "actor": "bank", "message": "dukpt.bdk" } },
+      "highlight": ["secrets:row=bank.dukpt.bdk"],
+      "claims": [
+        {
+          "id": "L6-C02",
+          "text": "All initialization keys of a device family are derived from one base derivation key (BDK), and the recipient need only store the BDK.",
+          "source": "Wikipedia, Derived unique key per transaction, History and Keys sections (secondary source, read 2026-11-05)"
+        },
+        {
+          "id": "L6-C03",
+          "text": "In this lab the bank keeps the base key and derives each key again from the KSN. It holds no per-reader key.",
+          "source": "docs/lesson-6-names.md, Facts the tour needs, item 4 (branch feat/s2-dukpt); docs/prd.md, Decisions, D13"
+        }
+      ],
+      "unlock": { "mode": "event" }
+    },
+    {
+      "id": "L6-S03",
+      "lesson": 6,
+      "title": "The reader gets its own starting key",
+      "text": [
+        "The reader holds a starting key of its own, made from the BDK and the reader's id. The bank made the same key on its side.",
+        "Compare the reader and bank columns in the secrets panel. The two values match.",
+        "The match is the point. The two sides never send this key to each other. Each side derives it."
+      ],
+      "glossary": [],
+      "bind": { "kind": "event", "eventType": "dukpt.key.derived", "match": { "actor": "reader", "message": "dukpt.initial" } },
+      "highlight": ["secrets:row=reader.dukpt.initial", "secrets:row=bank.dukpt.initial"],
+      "unlock": { "mode": "event" }
+    },
+    {
+      "id": "L6-S04",
+      "lesson": 6,
+      "title": "The reader erases the starting key",
+      "text": [
+        "The reader now uses its starting key to fill a small set of key registers. A register is a slot that holds one key.",
+        "Then the reader erases the starting key. That key could rebuild every other key, so the reader cannot keep it.",
+        "Each register holds a key for a later sale. The reader uses them one at a time."
+      ],
+      "glossary": [],
+      "bind": { "kind": "event", "eventType": "dukpt.key.erased", "match": { "actor": "reader", "message": "dukpt.initial" } },
+      "highlight": ["secrets:row=reader.dukpt.initial"],
+      "unlock": { "mode": "event" }
+    },
+    {
+      "id": "L6-S05",
+      "lesson": 6,
+      "title": "How many keys the reader holds",
+      "text": [
+        "The reader reports how many keys it holds. Look at the held count in the event. After the load it is 32.",
+        "The event also names the counter for the next sale. Each sale moves that counter up by one."
+      ],
+      "glossary": [],
+      "bind": { "kind": "event", "eventType": "measure.result", "match": { "actor": "reader", "message": "Reader registers" } },
+      "highlight": ["diagram:lane=reader"],
+      "unlock": { "mode": "event" }
+    },
+    {
+      "id": "L6-S06",
+      "lesson": 6,
+      "title": "A sale leaves the reader",
+      "text": [
+        "Here is sale 1. The message holds a {{term:ksn}} and a {{term:pin-block}}. The KSN is 12 bytes: the reader's id, then the sale counter.",
+        "The KSN travels in the clear, because the bank needs it to rebuild the key. The PIN block is 16 bytes and travels locked.",
+        "Try it: switch to the eavesdropper view. Eve reads the KSN and sees the PIN block as noise."
+      ],
+      "glossary": ["ksn", "pin-block"],
+      "bind": { "kind": "event", "eventType": "wire.sent", "match": { "actor": "reader", "message": "Sale" } },
+      "highlight": ["inspector:field=ksn", "inspector:field=pinBlock"],
+      "tryIt": {
+        "id": "L6-S06-T1",
+        "label": "Switch to the eavesdropper view",
+        "action": { "type": "set-view", "value": "eavesdropper" },
+        "expect": { "type": "view", "value": "eavesdropper" }
+      },
+      "claims": [
+        {
+          "id": "L6-C04",
+          "text": "In the lab, the Sale message holds a 12-byte KSN (8-byte initial key id, then a 4-byte counter) in the clear and a 16-byte PIN block that is not visible on the wire.",
+          "source": "docs/lesson-6-names.md, The run, Sale table and the paragraph below it (branch feat/s2-dukpt)"
+        }
+      ],
+      "unlock": { "mode": "action", "ref": "L6-S06-T1" }
+    },
+    {
+      "id": "L6-S07",
+      "lesson": 6,
+      "title": "Both sides derive this sale's key",
+      "text": [
+        "The reader makes a PIN key for sale 1 from its registers. The bank makes the same key from the BDK and the KSN.",
+        "Compare the two columns. The values match, and the key never crossed the wire.",
+        "The reader locks the PIN block with this key, and the bank opens it with its copy."
+      ],
+      "glossary": [],
+      "bind": { "kind": "event", "eventType": "dukpt.key.derived", "match": { "actor": "reader", "message": "dukpt.pinKey.1" } },
+      "highlight": ["secrets:row=reader.dukpt.pinKey.1", "secrets:row=bank.dukpt.pinKey.1"],
+      "unlock": { "mode": "event" }
+    },
+    {
+      "id": "L6-S08",
+      "lesson": 6,
+      "title": "The used key burns",
+      "text": [
+        "Watch the key ladder. The rung the reader just used cracks, turns gray, and carries the label erased from reader memory.",
+        "A used key cannot be rebuilt from what the reader still holds. A thief who steals the reader today learns nothing about sale 1.",
+        "The bank keeps the base key and can still rebuild any key on request."
+      ],
+      "glossary": [],
+      "bind": { "kind": "event", "eventType": "dukpt.key.erased", "match": { "actor": "reader", "message": "dukpt.derivationKey.1" } },
+      "highlight": ["secrets:row=reader.dukpt.derivationKey.1"],
+      "claims": [
+        {
+          "id": "L6-C05",
+          "text": "After each use the device invalidates the key it just used and generates more future keys when needed.",
+          "source": "Wikipedia, Derived unique key per transaction, Communication, Origination (secondary source, read 2026-11-05)"
+        }
+      ],
+      "unlock": { "mode": "event" }
+    },
+    {
+      "id": "L6-S09",
+      "lesson": 6,
+      "title": "Erased in the lab, maybe copied in memory",
+      "text": [
+        "Look at the held count after each sale. In this run it goes 32, then 31, 31, 30, 31. It does not fall at every sale, because a sale erases one register and can fill lower ones with new keys.",
+        "Erasing a key in code does not prove the bytes left memory. A {{term:managed-heap}} can keep copies of an erased key, because the garbage collector moves live objects by copying them.",
+        "In real systems the base key usually sits inside tamper-resistant hardware. This lab shows the idea on the desktop and protects no key that way."
+      ],
+      "glossary": ["managed-heap"],
+      "bind": { "kind": "event", "eventType": "measure.result", "match": { "actor": "reader", "message": "Reader registers" } },
+      "highlight": ["diagram:lane=reader"],
+      "claims": [
+        {
+          "id": "L6-C06",
+          "text": "The .NET garbage collector compacts the managed heap by copying reachable objects to new locations.",
+          "source": "Microsoft Learn, Fundamentals of garbage collection, section 'Memory release' (read 2026-11-05)"
+        },
+        {
+          "id": "L6-C07",
+          "text": "The base derivation key (BDK) is usually stored inside a tamper-resistant security module (TRSM) or hardware security module (HSM).",
+          "source": "Wikipedia, Derived unique key per transaction, Keys section (secondary source, read 2026-11-05; ANSI X9.24-3-2017 is paid and was not read)"
+        },
+        {
+          "id": "L6-C08",
+          "text": "In this lab's run the reader's held count is 32 after the load, then 31, 31, 30, 31.",
+          "source": "docs/lesson-6-names.md, Order on the reader and the paragraph on held values (branch feat/s2-dukpt)"
+        }
+      ],
+      "unlock": { "mode": "event" }
+    },
+    {
+      "id": "L6-S10",
+      "lesson": 6,
+      "title": "The bank refuses a replayed sale",
+      "text": [
+        "The bank checks each KSN against the ones it has seen. On the normal run every sale is new, so the check passes.",
+        "Try it: send the bytes of sale 1 again. This is a {{term:replay}}. The bank has seen that counter, and the check named KSN already seen fails."
+      ],
+      "glossary": ["replay"],
+      "bind": { "kind": "event", "eventType": "check.result", "match": { "message": "KSN already seen" } },
+      "highlight": ["check:name=KSN already seen"],
+      "tryIt": {
+        "id": "L6-S10-T1",
+        "label": "Replay sale 1",
+        "action": { "type": "run-attack", "attackId": "L6-replay-sale" },
+        "expect": { "type": "check", "name": "KSN already seen", "result": "fail" }
+      },
+      "unlock": { "mode": "action", "ref": "L6-S10-T1" }
+    },
+    {
+      "id": "L6-S11",
+      "lesson": 6,
+      "title": "The bank checks the PIN block",
+      "text": [
+        "After the bank opens the PIN block, it checks the block's format. A block that came out wrong signals a bad key or a changed byte.",
+        "Try it: flip one bit in the PIN block of sale 1. The bank opens it with the right key, the format check fails, and the sale is refused."
+      ],
+      "glossary": [],
+      "bind": { "kind": "event", "eventType": "check.result", "match": { "message": "PIN block format check" } },
+      "highlight": ["check:name=PIN block format check"],
+      "tryIt": {
+        "id": "L6-S11-T1",
+        "label": "Flip one bit in the PIN block",
+        "action": { "type": "run-attack", "attackId": "L6-flip-pin-block" },
+        "expect": { "type": "check", "name": "PIN block format check", "result": "fail" }
+      },
+      "unlock": { "mode": "action", "ref": "L6-S11-T1" }
+    },
+    {
+      "id": "L6-S12",
+      "lesson": 6,
+      "title": "Ask the reader for a past key",
+      "text": [
+        "The last sale is done, and the bank has answered. Now test the burn from earlier.",
+        "Try it: after sale 2, ask the reader to build the key for sale 1. The reader holds no path back to that key, so it refuses with the check named key not in reader state."
+      ],
+      "glossary": [],
+      "bind": { "kind": "event", "eventType": "wire.sent", "match": { "actor": "bank", "message": "SaleDone" } },
+      "highlight": ["check:name=key not in reader state"],
+      "tryIt": {
+        "id": "L6-S12-T1",
+        "label": "Ask the reader for the key of sale 1",
+        "action": { "type": "run-attack", "attackId": "L6-ask-past-key" },
+        "expect": { "type": "check", "name": "key not in reader state", "result": "fail" }
+      },
+      "unlock": { "mode": "action", "ref": "L6-S12-T1" }
+    },
+    {
+      "id": "L6-S13",
+      "lesson": 6,
+      "title": "What to take away",
+      "text": [
+        "DUKPT gives every sale its own key. The reader erases each key after use, and the bank rebuilds keys from one base key and the KSN.",
+        "All keys in this lab are made up, and anyone can read the base key in the source. A real base key is usually kept inside secure hardware.",
+        "Built to show the parts. Do not copy."
+      ],
+      "glossary": [],
+      "bind": { "kind": "concept" },
+      "unlock": { "mode": "ack" }
+    }
+  ]
+}

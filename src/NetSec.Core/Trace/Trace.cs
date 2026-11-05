@@ -1,5 +1,6 @@
 using System;
 using System.Collections.Generic;
+using System.IO;
 using System.Text;
 using NetSec.Bytes;
 using NetSec.Platform;
@@ -103,6 +104,25 @@ namespace NetSec.Trace
     public sealed class NullSink : ITraceSink
     {
         public void Write(TraceEvent e) { }
+    }
+
+    /// <summary>Appends one JSON line per event, and flushes each one, so a killed process still leaves its trace. A lab process owns one for its life.</summary>
+    public sealed class NdjsonFileSink : ITraceSink
+    {
+        readonly StreamWriter _file;
+
+        public NdjsonFileSink(string path)
+        {
+            if (path == null) throw new ArgumentNullException("path");
+            _file = new StreamWriter(path, false, new UTF8Encoding(false));
+            _file.AutoFlush = true;
+        }
+
+        public void Write(TraceEvent e)
+        {
+            string line = TraceJson.ToLine(e);
+            lock (_file) _file.WriteLine(line);
+        }
     }
 
     public sealed class ListSink : ITraceSink
