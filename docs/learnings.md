@@ -141,6 +141,13 @@ Each correction goes here, newest slice last. Later slices read this file first.
 3. **A hop reads the trace id without proof, so it only labels with it.** The bank refuses before the MAC passes under no trace id, and names the claimed id in the detail.
 4. **The pad holds a loaded key.** `PinPadCore.InjectedInitialKey` stands for a key loader's work, and a test pins it to what the bank derives. The base key is in `NetSec.Core.dll` on every process, because `TrainingKeySource` derives it from public text. So the boundary is what each role's code reads, and no binary hides anything.
 5. **Open a live `tap` log with `FileShare.ReadWrite`.** The tap still holds it open.
+## Two-way pump
+
+1. **With no gate, the read loop keeps reading while a write waits.** Waiting for the outbox before each read made two ends that both send wait for each other, and no deadline ran. This changes design section 3. A gate keeps the drain wait, because a learner holds each event.
+2. **A write has its own deadline, `LINK_DEADLINE` with check `write deadline`.** The read clock restarts while this side has output to write, so a long upload is no silent peer. What reads produce stops at 16 MiB behind a stuck write.
+3. **`Enqueue` completes when its own output is out.** An outbox that must be empty may never be empty in a two-way flow.
+4. **A test link that completes reads at once runs the read loop inline inside `Run`, and `Run` then never returns.** Use `Futures.Run` in a test link that always has bytes.
+
 ## Pump deadline test
 
 1. **The side whose deadline fires reports `LINK_DEADLINE`. The side that then reads the close reports `PEER_CLOSED_EARLY`, and that is its true outcome.** A test that names one side's code must fix the order with two deadlines. `LabPair.Named` drops the second code, so a lab reports the real failure in either order.
