@@ -10,7 +10,7 @@ Inputs: `docs/modes-design.md` (sections 1, 2, 6, 8, 10), `docs/ux-design.md`, S
 3. **Every screen answers five questions in the same order:** what is this, why does it exist in the real world, what do I do now, what does success look like, and what do I do if it fails. One decision per screen, with a recommended default already selected.
 4. **The last step of every wizard is "prove it works".** It shows the real command and the real output of a separate tool (OpenSSL, `ssh.exe`) in everyday words, and states whether the proof came from an outside tool or from this course's own code.
 5. **The first slice is `token.issuer` (family F6, `modes-design.md` slice V0).** Section 4 walks `flow-my-login`, where it is one part, screen by screen with the words on each. Section 5 lists the other four flows. Section 5.5 adds a separate vault exercise of 3 screens.
-6. **The wizards say true things that are easy to skip.** A public CA will not sign `localhost`. A self-signed certificate is not a chain. A key typed here is a test key, and this course shows it on screen. Section 8 lists each statement and where it appears.
+6. **The wizards say true things that are easy to skip.** A public CA will not sign `localhost`. A self-signed certificate is not a chain. A key used here is a test key, and this course shows it on screen. Section 8 lists each statement and where it appears.
 7. **Labels never say "Real".** A switched-on type reads `My test key`. A green state never reads as "trusted": it reads `Checked by OpenSSL against the root you gave it`. Where no outside tool can judge (card keys, device keys), the screen says so, and the state reads `Saved, no outside check`. The course never checks its own key and calls it proof.
 8. **Disposition:** ready for review by Steve, Richard, and Echo. Echo can write acceptance clauses from the test ids in section 9. Section 12 holds the open questions. The design has 36 screens in all, and 5 on the default path of any flow (section 1.4).
 
@@ -95,7 +95,7 @@ Steve chose five grouped "make my set" flows. Each flow has a **default path of 
 |---|---|---|---|---|
 | 1 | Make my web security set (Host flow `my-certificates`) | `pki.root-ca`, `tls.trust`, `tls13.server`, `tls13.client`, `tls11.server` | 4, 5, 7, 9, 10 | `flow-my-certificates` |
 | 2 | Make my remote login set (Host flow `my-ssh`) | `ssh.host-ed25519`, `ssh.host-rsa`, `ssh.client`, `ssh.known-hosts` | 8, 9 | `flow-my-ssh` |
-| 3 | Type in my card PIN keys (Host flow `my-payment`) | `dukpt.bdk`, `dukpt.pad` | 6, 9 | `flow-my-payment` |
+| 3 | Make my card PIN keys (Host flow `my-payment`) | `dukpt.bdk`, `dukpt.pad` | 6, 9 | `flow-my-payment` |
 | 4 | Make my sign-in set (Host flow `my-login`) | `token.issuer`, `device.enrolment` (named "Device key entry") | 10 | `flow-my-login` |
 | 5 | Make my data keys (Host flow `my-lesson-keys`) | `lab.aes-key`, `lab.seal-key` | 1, 2 | `flow-my-lesson-keys` |
 
@@ -235,7 +235,7 @@ Every flow runs the Host's spine, drawn on five default screens: `Intro` (screen
 | Case | Behavior | Needs from the Host |
 |---|---|---|
 | Learner closes the sheet with `Keep my place` | The row says `Setup paused at step 3 of 5`. `Continue setup` reopens the same step | An open wizard survives the sheet |
-| Learner quits the app mid-wizard | On the next start the flow card still says `Setup paused`. Answers that are not secrets are kept in `.security/runs/`. A typed secret (a DUKPT part) is never kept: that step asks again | The Host lists `openRunId` per flow in `GET /api/security` (answered, `modes-design.md` 8.2) |
+| Learner quits the app mid-wizard | On the next start the flow card still says `Setup paused`. The Host keeps the run in `.security/runs/` with no secret in it, so the learner comes back to the same step | The Host lists `openRunId` per flow in `GET /api/security` (answered, `modes-design.md` 8.2) |
 | Learner wants built-in keys again | Row action `Use built-in key again`, always allowed, one click, one confirmation line: "Your key stays saved. The course stops using it." The Host's `PUT .../mode {Mock}` always works | Exists (`modes-design.md` 8.1) |
 | Learner flips the mode switch to `My test key` with no binding | The wizard opens at once. Closing it with `Keep my place` leaves the mode at `My test key`, state `Needs setup`, and the banner in 1.3 appears at the next lesson start | Exists |
 | A wizard finishes and a lesson sent the learner here | `Done` shows `Back to lesson 10`, which closes the sheet and starts the lesson | UI only |
@@ -346,17 +346,17 @@ Each flow runs the same five screens as section 4. This section lists what diffe
 | Check runs | `sshpeer -host-key host_key -authorized authorized_keys`, then `ssh.exe -F NUL -p <port> -i user_key -o IdentitiesOnly=yes -o UserKnownHostsFile=known_hosts -o GlobalKnownHostsFile=NUL -o StrictHostKeyChecking=yes learner@127.0.0.1 "echo hello"`, then a mismatch run that names `SSH_HOST_KEY_CHANGED`. Chips: `Checked by ssh.exe`. Every flow key is exportable, so Check exports a copy and ssh.exe judges it, for the user key too (`judge` belongs to the type) |
 | Fails when | `KEY_FILE_FORMAT` ("That file is not an OpenSSH private key. A real one starts with `-----BEGIN OPENSSH PRIVATE KEY-----`."). `KEY_FILE_ENCRYPTED`. `KEY_ALGORITHM_NOT_IN_ENGINE` ("Sign-in keys in this course must be Ed25519."). `KNOWN_HOSTS_LINE_BAD` ("The course could not read that line. It does not accept wildcards."). `KEY_PATH_PERSONAL` (a warning) |
 
-### 5.3 `flow-my-payment`: Type in my card PIN keys
+### 5.3 `flow-my-payment`: Make my card PIN keys
 
-This flow says in its name, on its first screen, and on its Check screen: **this is key entry. No outside tool can judge it.** A real key ceremony is the formal event where several people use a secure device to combine key parts. Here one person types the parts.
+This flow says on its first screen and on its Check screen: **No outside tool can judge these keys.** A real key ceremony is the formal event where several people use a secure device to combine key parts. This flow is not a ceremony. The course makes a test key for you, or reads a file you made. No one types a key.
 
 | Screen | Content |
 |---|---|
 | Make it for me makes | A test base key, 16 bytes, labeled `TEST` on screen. The PIN pad key, which comes from the base key and a key id, as a key loader would |
-| Branch (`flow-my-payment-files`) | Enter my own key parts (key entry): two fields (a third if wanted), 32 hex characters each, masked while typed, each with its check value, and the final check value to compare with your own paper. **Open question Q14 for richard-modes:** the Host's branch for `my-payment` is described as a file row, and this design uses typed parts. A key that cannot be read back exists only in the vault exercise (5.5) |
+| Branch (`flow-my-payment-files`) | One file row, for `dukpt.bdk`: a text file that holds one test base key as 32 hex characters. Beside it, one optional field: "The check value your vendor gave you". The check value is not a secret, so it needs no mask. `dukpt.pad` follows the base key and has no row. The `~/.ssh` warning of 3.6 runs on the path |
 | Review shows | The base key's fingerprint and check value. The PIN pad's key id. The line "Card numbers and PINs stay test values." |
-| Check runs | The published X9.24-3 vector first, then one sale from the pad to the bank. Judge: `none`. The chip reads `Saved, no outside check`. The screen says: "The course checked the key against published test vectors. No outside system can check a base key. One person typing the parts is not dual control, which needs two people to act together." |
-| Fails when | `DUKPT_COMPONENT_LENGTH` ("A component is 32 hex characters, which is 16 bytes. This one has <n> characters."). `DUKPT_KCV_MISMATCH` ("The check value does not match, which usually means a digit is wrong. Type that part again.") |
+| Check runs | The published X9.24-3 vector first, then one sale from the pad to the bank. Judge: `none`. The chip reads `Saved, no outside check`. The screen says: "The course checked the key against published test vectors. No outside system can check a base key. A real base key stays inside a secure device, and real teams need two people to act together. Here one test key sits in a file." |
+| Fails when | `DUKPT_KEY_SIZE` ("A base key is 32 hex characters, which is 16 bytes. This file has <n>."). `KEY_FILE_FORMAT` ("That file does not hold 32 hex characters. Save the test key as plain text with only those characters."). `DUKPT_KCV_MISMATCH` ("The key in this file does not match the check value you gave. Check that you picked the right file, or leave the check value empty.") |
 
 ### 5.4 `flow-my-lesson-keys`: Make my data keys
 
@@ -424,7 +424,6 @@ Rule for every Prove screen (Jared): show the command, its real output, and the 
 |---|---|---|
 | Read-back facts | The key bytes in a `Show all` fold, copy button | `fp:` fingerprint and length, "Hidden by the Show keys switch" |
 | Prove output | As the tool printed | The tool output is unchanged (it holds public data), key file paths only |
-| DUKPT component fields | Masked while typed, always. The check value shows | Same |
 | The setup screen header | Test-keys line says "Use test keys only. This course shows your keys on screen and in saved files." | Says "This course hides your keys on screen for now and shows short fingerprints instead. Saved files can still hold them." |
 | A non-exportable key | Shows the fingerprint only, no bytes, with the line "The course refuses to show it. A real HSM would refuse too. These files could still open it here." | Same |
 | The vault itself (map footer, vault exercise) | Label: "Practice vault. Not an HSM. Not FIPS validated." Non-export is a rule in this course's code. | Same |
@@ -456,7 +455,7 @@ Flipping the switch while a wizard is open replaces the facts block from the Hos
 | 19 | DPoP, a way to tie a token to the client that holds a key, stops token theft. Code running on the client can still make new proofs while it is online. | Lesson 10 callout, not a wizard | Jared, section 3.10 |
 | 20 | Enrolling the key a client just showed is not enrolment. The sign-in challenge here is modeled on a passkey's, and it is not the WebAuthn standard. No proof screen. | `device.enrolment` Intro | Jared, sections 3.11 and 3.12 |
 | 21 | The lessons run on a fixed clock. The TLS labs read 1 January 2030, and the token lab reads a fixed day in November 2026. A certificate must be valid on those dates. A 90-day certificate made today would look expired in the labs. | `flow-my-certificates-files` | `Tls13Lab.cs:40`, `Lesson07Tls11.cs:29`, `Lesson10Auth.cs:47` |
-| 22 | This is key entry, and a real key ceremony is a bigger event. A real ceremony uses a secure device and several people. Here one person types the parts. No outside tool can judge the result. | `flow-my-payment-intro`, `flow-my-payment-check`, `flow-my-login-check` | Steve, 2026-11-05; Jared section 3.7 |
+| 22 | A real key ceremony is a bigger event than this flow. A real ceremony uses a secure device and several people. Here the course makes a test key, or reads one file. No outside tool can judge the result. | `flow-my-payment-intro`, `flow-my-payment-check`, `flow-my-login-check` | Steve, 2026-11-05; Jared section 3.7 |
 
 ## 9. Screens and stable test ids
 
@@ -612,7 +611,7 @@ The screens are the ids in 9.1 and 9.1a. A test walks the default path of every 
 
 Each gets a `short` of 20 words or fewer at grade 8, in `app/src/glossary.json`. Every `{{term:id}}` in the copy file must resolve (the test in `ux-design.md` section 5).
 
-`token`, `issuer`, `audience`, `pem`, `ed25519`, `rsa`, `ecdsa`, `certificate`, `ca`, `root-ca`, `chain`, `intermediate`, `leaf`, `self-signed`, `trust-store`, `subject`, `san`, `fingerprint`, `public-key`, `private-key`, `key-pair`, `pkcs12`, `known-hosts`, `host-key`, `user-key`, `openssh`, `bdk`, `dukpt`, `key-component`, `kcv`, `xor`, `hsm`, `exportable`, `vault`, `referee`, `enrolment`, `dpop`, `mutual-tls`, `eku`, `wrapping-key`.
+`token`, `issuer`, `audience`, `pem`, `ed25519`, `rsa`, `ecdsa`, `certificate`, `ca`, `root-ca`, `chain`, `intermediate`, `leaf`, `self-signed`, `trust-store`, `subject`, `san`, `fingerprint`, `public-key`, `private-key`, `key-pair`, `pkcs12`, `known-hosts`, `host-key`, `user-key`, `openssh`, `bdk`, `dukpt`, `kcv`, `hsm`, `exportable`, `vault`, `referee`, `enrolment`, `dpop`, `mutual-tls`, `eku`, `wrapping-key`.
 
 ## 12. Open questions
 
@@ -630,6 +629,6 @@ Each gets a `short` of 20 words or fewer at grade 8, in `app/src/glossary.json`.
 | Q10 | Vault exercise | **Answered (richard-modes):** `POST /api/security/vault/exercise/{sign,derive,export,audit-check}`. Sign takes `{ text }`, derive takes `{ label }`. Keys `exercise/signing` and `exercise/derive` | Closed |
 | Q11 | A type with no outside judge | **Answered (richard-modes):** a lab may run. State `Verified`, `judge: none`, chip `Saved, no outside check`. `judge` belongs to the type | Closed |
 | Q12 | Warnings | **Answered (richard-modes):** `warnings[]` beside `errors[]`. The code is `KEY_PATH_PERSONAL`. No `KEY_FILE_PERMISSIONS` | Closed |
-| Q14 | The `my-payment` branch: typed key parts (key entry) or a file? | Typed parts, because a BDK has no common file format and Steve said no fake ceremony | richard-modes defines a vendor test-key file format |
+| Q14 | The `my-payment` branch | **Answered (richard-modes):** a file row for `dukpt.bdk` (32 hex characters) and an optional check value field. Nobody types a key | Closed |
 
 No new package is needed. The design uses Vue 3, Vuetify, and the existing glossary tooltips. The Electron file dialog is part of Electron.
