@@ -6,7 +6,7 @@ Conclusion: the lab and its 3 attack rows exist, and lesson 9 stays `built: fals
 
 ## 1. Lanes and streams
 
-`GET /api/lessons/9` returns the lanes `ce`, `gateway`, `server`. The events below with actor `reader` or `bank` have no lane. UX section 3 names only the three lanes, so the UI decides where those two show.
+`GET /api/lessons/9` returns the lanes `ce`, `gateway`, `server`. The events below with actor `reader` or `bank` have no lane. `ux-design.md` names only the three lanes, so the UI decides where those two show.
 
 | Stream | Actor | `hop` | What it holds |
 |---|---|---|---|
@@ -36,7 +36,7 @@ Every event carries the one `traceId`. Arrows on `hop1` name `ce` and `gateway`.
 
 ## 3. The onion (UX moment 7)
 
-The lab emits no nesting depth field. UX section 7 asks for `fields` with nesting depth, and I chose to bind each layer to an event, because the three layers come from three events. Nancy, please say if this does not fit.
+The lab emits no nesting depth field. `ux-design.md` moment 7 asks for `fields` with nesting depth, and I chose to bind each layer to an event, because the three layers come from three events. Nancy, please say if this does not fit.
 
 | `onion-layer-<n>` | Bind to | Shows |
 |---|---|---|
