@@ -51,6 +51,18 @@ namespace NetSec.Tests
         }
 
         [Fact]
+        public void A_context_with_no_ids_still_runs_under_one_trace_id()
+        {
+            ListSink sink = new ListSink();
+            LabContext c = new LabContext { Seed = 7, Gate = new FreeRunGate(), Sink = sink, Clock = new FixedClock(1), Random = new SeededRandom(7) };
+            IFuture<LabResult> future = new Lesson09Bridge().Run(c);
+            Assert.True(future.Wait(60000), "the lab did not finish in 60 s");
+            Assert.False(future.IsFaulted, "the lab faulted");
+            Assert.True(future.Result.Completed, future.Result.FailedCode);
+            Assert.Single(sink.Events.Select(e => e.TraceId).Distinct());
+        }
+
+        [Fact]
         public void Arrows_on_each_hop_name_the_lanes_of_that_hop()
         {
             Run run = Go();
