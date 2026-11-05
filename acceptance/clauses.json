@@ -119,7 +119,7 @@
    "builds": [
     "net10"
    ],
-   "needsCore": false
+   "needsCore": true
   },
   "host": {
    "kind": "csharp",
