@@ -1,0 +1,38 @@
+{
+  "reader": "reader-a15a",
+  "authors": [
+    "heather-s0-tour"
+  ],
+  "claims": [
+    {
+      "id": "L3-C01",
+      "verdict": "accurate",
+      "note": "Re-checked against tours at feat/tours-6-11 commit 8b3ae45. Source now cites RFC 7748 sections 5 and 6.1. Section 5: inputs and outputs of X25519 are 32-byte strings. Section 6.1: both parties reach the same K. Text and source agree.",
+      "checkedAgainst": "RFC 7748 sections 5, 6.1, fetched from rfc-editor.org this session"
+    },
+    {
+      "id": "L3-C02",
+      "verdict": "accurate",
+      "note": "Re-checked against tours at feat/tours-6-11 commit 8b3ae45. FIPS 203 section 8 Table 3, ML-KEM-768 row: encapsulation key 1184, ciphertext 1088. The abstract reads 'ML-KEM is believed to be secure, even against adversaries who possess a quantum computer'. Claim text now matches that wording.",
+      "checkedAgainst": "FIPS 203 section 8 Table 3 and abstract (fetched)"
+    },
+    {
+      "id": "L3-C03",
+      "verdict": "accurate",
+      "note": "FIPS 203 Algorithm 18 steps 8 to 10: if the re-encrypted ciphertext c' differs from c, K-bar is set to J(z || c), a hash of the implicit rejection value z and c, and the algorithm returns it. Section 6.3 calls this 'implicit rejection'. No error output exists.",
+      "checkedAgainst": "FIPS 203 section 6.3, Algorithm 18, fetched this session"
+    },
+    {
+      "id": "L3-C04",
+      "verdict": "accurate",
+      "note": "lessons-1-3-names.md Lesson 3 table, Hybrid row: shares 1,216 and 1,120, confirm 32, secret hybrid.shared 64 'ML-KEM first, then X25519'. Arithmetic: 1,184 + 32 = 1,216 and 1,088 + 32 = 1,120.",
+      "checkedAgainst": "docs/lessons-1-3-names.md Lesson 3 (read)"
+    },
+    {
+      "id": "L3-C05",
+      "verdict": "accurate",
+      "note": "docs/prd.md Teaching accuracy rules, rule 4: 'The hybrid protects key exchange only. Certificates stay classical.'",
+      "checkedAgainst": "docs/prd.md Teaching accuracy rules, rule 4 (read)"
+    }
+  ]
+}
