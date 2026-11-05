@@ -1,0 +1,24 @@
+<Project Sdk="Microsoft.NET.Sdk">
+  <!--
+    Compile-time stand-in for NetSec.Core. It carries the public signatures the acceptance suite uses and nothing else.
+    Every body throws NotImplementedException. run.ps1 -Contract builds each clause group against this assembly, which proves
+    the suite compiles against the signatures in program-design.md section 2. It is never used to produce a PASS.
+    The assembly name matches the product, so the same group binaries bind to the real NetSec.Core.dll when it exists.
+  -->
+  <PropertyGroup>
+    <TargetFramework>netstandard2.0</TargetFramework>
+    <AssemblyName>NetSec.Core</AssemblyName>
+    <RootNamespace>NetSec</RootNamespace>
+    <LangVersion>latest</LangVersion>
+    <GenerateAssemblyInfo>false</GenerateAssemblyInfo>
+    <EnableDefaultCompileItems>false</EnableDefaultCompileItems>
+  </PropertyGroup>
+  <ItemGroup>
+    <Compile Include="*.cs" />
+  </ItemGroup>
+  <ItemGroup Condition="'$(AsyncProxyDll)' != ''">
+    <Reference Include="MMP.AsyncProxy">
+      <HintPath>$(AsyncProxyDll)</HintPath>
+    </Reference>
+  </ItemGroup>
+</Project>

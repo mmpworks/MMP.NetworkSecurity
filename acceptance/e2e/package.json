@@ -1,0 +1,14 @@
+{
+  "name": "netsec-acceptance-e2e",
+  "private": true,
+  "version": "0.0.0",
+  "description": "Playwright specs for A13 and A16 (UI half). Written and pinned by the acceptance author. Builders never write here.",
+  "scripts": {
+    "test": "playwright test"
+  },
+  "devDependencies": {
+    "@playwright/test": "1.64.1",
+    "@types/node": "22.10.2",
+    "typescript": "5.7.2"
+  }
+}

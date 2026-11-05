@@ -1,0 +1,10 @@
+{
+  "schema": 1,
+  "note": "A role is a part of the build that prd.md lets the team cut when time runs out (cut order: passkey and capabilities, then the glass TLS 1.3 server role, then the SSH server role). A clause that needs a cut role reports NOT RUN ROLE_CUT with the role name. Only the acceptance author or the lead changes this file, in a pull request that names the reason. Builders never write under acceptance/ (D11).",
+  "roles": {
+    "auth.passkey":       { "state": "required", "cutOrder": 1, "reason": "" },
+    "auth.capabilities":  { "state": "required", "cutOrder": 1, "reason": "" },
+    "tls13.server":       { "state": "required", "cutOrder": 2, "reason": "" },
+    "ssh.server":         { "state": "required", "cutOrder": 3, "reason": "" }
+  }
+}

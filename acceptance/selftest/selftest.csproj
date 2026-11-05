@@ -1,0 +1,16 @@
+<Project Sdk="Microsoft.NET.Sdk">
+  <Import Project="..\groups\Group.props" />
+  <PropertyGroup>
+    <TargetFramework>net10.0</TargetFramework>
+    <AssemblyName>Acceptance.SelfTest</AssemblyName>
+  </PropertyGroup>
+  <ItemGroup>
+    <!-- The real clause bodies of groups that have a reference, run against the stand-ins in Subject.Bcl.cs and DSubject.Reference.cs. -->
+    <Compile Include="..\groups\prim\PrimClauses.cs" Link="prim\PrimClauses.cs" />
+    <Compile Include="..\groups\dukpt\DukptClauses.cs" Link="dukpt\DukptClauses.cs" />
+    <Compile Include="..\groups\dukpt\PadSession.cs" Link="dukpt\PadSession.cs" />
+    <Compile Include="..\groups\kschedule\KeyScheduleClauses.cs" Link="kschedule\KeyScheduleClauses.cs" />
+    <Compile Include="..\groups\binproof\BinProofClauses.cs" Link="binproof\BinProofClauses.cs" />
+    <Compile Include="..\groups\keys\KeysClauses.cs" Link="keys\KeysClauses.cs" />
+  </ItemGroup>
+</Project>
