@@ -101,7 +101,7 @@ const pulse = computed(() => replayTick.value)
           <template v-if="r.kind === 'arrow'">
             <line :x1="r.fromX" :x2="arrowEnd(r)" :y1="r.y" :y2="r.y" class="arrow" :class="r.protectedBytes ? 'enc' : 'readable'" marker-end="url(#arr)" />
             <text :x="mid(r)" :y="r.y - 9" text-anchor="middle" class="arrow-label" :class="{ unreadable: r.unreadable }">{{ r.label }}</text>
-            <text :x="mid(r)" :y="r.y + 16" text-anchor="middle" class="arrow-sub">{{ r.bytes }} bytes{{ r.protectedBytes ? ', encrypted' : '' }}</text>
+            <text :x="mid(r)" :y="r.y + 16" text-anchor="middle" class="arrow-sub">{{ r.hop ? r.hop + ', ' : '' }}{{ r.bytes }} bytes{{ r.protectedBytes ? ', encrypted' : '' }}</text>
           </template>
           <template v-else>
             <rect :x="r.fromX - 90" :y="r.y - 14" width="180" height="28" rx="6" class="note" :class="r.kind === 'note' ? 'enc-note' : ''" />
