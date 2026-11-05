@@ -83,6 +83,14 @@ namespace NetSec.Errors
         public const string MlKemKeyInvalid = "MLKEM_KEY_INVALID";
         public const string MlKemCiphertextInvalid = "MLKEM_CIPHERTEXT_INVALID";
         public const string TrainingKeyUnknown = "TRAINING_KEY_UNKNOWN";
+        public const string SecurityTypeNotReady = "SECURITY_TYPE_NOT_READY";
+        public const string SecurityTypeNotProven = "SECURITY_TYPE_NOT_PROVEN";
+        public const string SecurityTypesDisagree = "SECURITY_TYPES_DISAGREE";
+        public const string KeyFileUnreadable = "KEY_FILE_UNREADABLE";
+        public const string KeyFileFormat = "KEY_FILE_FORMAT";
+        public const string KeyFileEncrypted = "KEY_FILE_ENCRYPTED";
+        public const string KeySizeNot2048 = "KEY_SIZE_NOT_2048";
+        public const string KeyAlgorithmNotInEngine = "KEY_ALGORITHM_NOT_IN_ENGINE";
         public const string DukptCounterExhausted = "DUKPT_COUNTER_EXHAUSTED";
         public const string DukptKsnReplay = "DUKPT_KSN_REPLAY";
         public const string DukptMacMismatch = "DUKPT_MAC_MISMATCH";

@@ -4,6 +4,8 @@ using System.Text;
 using System.Text.Json;
 using NetSec.Errors;
 using NetSec.Host;
+using NetSec.Host.Security;
+using NetSec.Keys;
 using NetSec.Labs;
 using NetSec.Trace;
 
@@ -34,6 +36,9 @@ SessionManager sessions = new(sessionsDir);
 CeProcess ce = new();
 HostGuard guard = new(token);
 LessonRows lessons = new();
+WizardTable wizardTable = WizardTable.Load(Path.Combine(AppContext.BaseDirectory, "wizard-flows.json"));
+SecurityStore security = new(SecurityStore.ResolveRoot(Environment.GetEnvironmentVariable, AppContext.BaseDirectory), wizardTable);
+FlowRuns flowRuns = new(wizardTable, security, new FlowParts(security, Environment.GetEnvironmentVariable), Environment.GetFolderPath(Environment.SpecialFolder.UserProfile));
 
 app.Use(guard.Invoke);
 app.UseWebSockets();
@@ -44,6 +49,7 @@ app.MapGet("/api/health", () => Results.Json(new
     build = typeof(TraceEvent).Assembly.GetName().Version?.ToString(),
     referees = Array.Empty<string>(),
     droppedEvents = sessions.DroppedEvents,
+    showKeys = security.ShowKeys,
 }));
 app.MapGet("/api/lessons", () => Results.Json(lessons.All()));
 app.MapGet("/api/lessons/{n:int}", (int n) => lessons.One(n) is { } row
@@ -59,12 +65,13 @@ app.MapGet("/api/sessions/{id}/keylog", (string id) =>
 app.MapGet("/api/ce", () => Results.Json(ce.Status()));
 app.MapPost("/api/ce/start", async () => Results.Json(await ce.StartAsync()));
 app.MapPost("/api/ce/stop", () => { ce.Stop(); return Results.Json(ce.Status()); });
+SecurityRoutes.Map(app, security, flowRuns);
 
 app.Map("/ws", async ctx =>
 {
     if (!ctx.WebSockets.IsWebSocketRequest) { ctx.Response.StatusCode = 400; return; }
     using WebSocket socket = await ctx.WebSockets.AcceptWebSocketAsync();
-    await new HostSocket(socket, sessions).ServeAsync(ctx.RequestAborted);
+    await new HostSocket(socket, sessions, security).ServeAsync(ctx.RequestAborted);
 });
 
 app.Lifetime.ApplicationStopping.Register(ce.Stop);
@@ -125,7 +132,7 @@ namespace NetSec.Host
     }
 
     /// <summary>One WebSocket: commands in, frames out. Frames carry the sessionId, so a reconnected socket keeps the live stream.</summary>
-    public sealed class HostSocket(WebSocket socket, SessionManager sessions)
+    public sealed class HostSocket(WebSocket socket, SessionManager sessions, SecurityStore security)
     {
         LabSession? _current;
 
@@ -207,7 +214,14 @@ namespace NetSec.Host
             }
             int lesson = Number(m, "lesson", -1);
             int seed = Number(m, "seed", RandomSeed());
-            Begin(lesson, seed, Text(m, "mode") ?? "run", null, null, requestId);
+            // GEM:decide-at-authoritative-boundary: the one place a lesson may refuse a key, before any event. A lab never falls back to built-in keys in silence.
+            LabDecision ready = SecurityReadiness.Decide(LabCatalog.Needs(lesson), security.States());
+            if (!ready.MayRun)
+            {
+                Fail(requestId, ready.Problems[0].Code, string.Join(" ", ready.Problems.Select(p => p.Detail)));
+                return;
+            }
+            Begin(lesson, seed, Text(m, "mode") ?? "run", null, null, security.Credentials(), requestId);
         }
 
         void Attack(JsonElement m, string? requestId)
@@ -219,7 +233,7 @@ namespace NetSec.Host
                 ? AttackCatalog.All.FirstOrDefault(a => a.AttackId == attackId)
                 : FreeAttack(m, parent, forkId);
             if (attack is null) { Fail(requestId, "ATTACK_NOT_FOUND", "No such attack, or that byte cannot be flipped."); return; }
-            LabSession? fork = Begin(parent.Lesson, parent.Seed, Text(m, "mode") ?? "run", attack, forkId, requestId);
+            LabSession? fork = Begin(parent.Lesson, parent.Seed, Text(m, "mode") ?? "run", attack, forkId, parent.Credentials, requestId);
             if (fork is not null)
                 Send(new { type = "session.forked", requestId, sessionId = fork.SessionId, parentId = parent.SessionId, attackId = attack.AttackId });
         }
@@ -232,9 +246,9 @@ namespace NetSec.Host
             return plan is null ? null : new AttackDefinition { AttackId = "free-flip-byte", Lesson = parent.Lesson, Kind = kind, Plan = plan };
         }
 
-        LabSession? Begin(int lesson, int seed, string mode, AttackDefinition? attack, string? sessionId, string? requestId)
+        LabSession? Begin(int lesson, int seed, string mode, AttackDefinition? attack, string? sessionId, CredentialSet credentials, string? requestId)
         {
-            LabSession? session = sessions.Start(lesson, seed, mode, attack, sessionId, started =>
+            LabSession? session = sessions.Start(lesson, seed, mode, attack, sessionId, credentials, started =>
             {
                 _current = started;
                 Send(new
@@ -246,6 +260,8 @@ namespace NetSec.Host
                     transportKind = "glass",
                     trainingOnly = true,
                     sessionFile = started.SessionFile,
+                    showKeys = security.ShowKeys,
+                    security = credentials.Mine().Select(c => new { typeId = c.TypeId, mode = c.Mode.ToString(), provider = c.ProviderKind, version = c.Version, fingerprint = c.Fingerprint }),
                 });
             }, out NetSecError? error);
             if (session is null) Fail(requestId, error!.Code, error.Message);
