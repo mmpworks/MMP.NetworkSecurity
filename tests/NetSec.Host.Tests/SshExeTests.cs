@@ -8,7 +8,12 @@ using System.Text;
 using System.Threading;
 using MMP.AsyncProxy;
 using NetSec.Io;
+using NetSec.Keys;
+using NetSec.Machine;
 using NetSec.Pki;
+using NetSec.Platform;
+using NetSec.Ssh;
+using NetSec.Trace;
 using Xunit;
 
 namespace NetSec.Host.Tests
@@ -57,6 +62,39 @@ namespace NetSec.Host.Tests
             Assert.True(listener.Result.Wait(30000), "the server did not finish");
             Assert.True(listener.Result.Result.Completed, listener.Result.Result.Code + " " + listener.Result.Result.CheckName);
             Assert.Equal("on", listener.Result.Result.Events.Single(e => e.Type == "ssh.kex.strict").Message);
+        }
+
+        /// <summary>
+        /// Our server leaves the strict KEX marker out, so OpenSSH must run the old rules with it: no sequence reset, on either side. This is outside
+        /// code on the old device's path, from one side only. No peer without its own marker exists on this machine: docs/lesson-ssh-names.md.
+        /// </summary>
+        [Theory]
+        [InlineData(SshSuite.Modern, ModernFlags)]
+        [InlineData(SshSuite.Legacy, LegacyFlags)]
+        public void Ssh_exe_runs_a_command_on_our_server_with_strict_kex_off(SshSuite suite, string flags)
+        {
+            string dir = KeyFolder();
+            LinkListener socket = new LinkListener(new IPEndPoint(IPAddress.Loopback, 0));
+            IFuture<SocketLink> accepted = socket.Accept();
+            using Process ssh = Ssh(dir, socket.Port, flags, "echo hello", false);
+            Assert.True(accepted.Wait(30000), "ssh.exe did not connect");
+            socket.Close();
+
+            TrainingKeySource keys = new TrainingKeySource();
+            SshServerOptions options = SshSetup.Server(keys, suite, new SeededRandom(21), null);
+            options.NoStrictKex = true;
+            ListSink sink = new ListSink();
+            GlassSshSession server = new GlassSshSession(SshEngine.Server(options, new TraceStream("s", "s", "s", null, "server", new MonotonicClock()), null, "client"), accepted.Result, sink, new FreeRunGate(), null, 30000, null, null);
+            server.Run();
+
+            string output = ssh.StandardOutput.ReadToEnd();
+            string errors = ssh.StandardError.ReadToEnd();
+            Assert.True(ssh.WaitForExit(30000), "ssh.exe did not finish");
+            Assert.True(ssh.ExitCode == 0, "ssh.exe exited " + ssh.ExitCode + ": " + errors);
+            Assert.Equal("hello\n", output.Replace("\r\n", "\n"));
+            Assert.True(server.Finished.Wait(30000), "the server did not finish");
+            Assert.Null(server.Finished.Result.Error);
+            Assert.Equal("off", sink.Events.Single(e => e.Type == "ssh.kex.strict").Message);
         }
 
         [Fact]
