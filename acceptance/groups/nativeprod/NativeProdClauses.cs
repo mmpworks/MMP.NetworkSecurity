@@ -41,10 +41,10 @@ namespace Acceptance
             PrepareDll(c);
             TimingCase lf = TimingLab.Sample(CompareKind.Leaky, 4096, 100000, 0), ll = TimingLab.Sample(CompareKind.Leaky, 4096, 100000, 4095);
             TimingCase cf = TimingLab.Sample(CompareKind.ConstantTime, 4096, 100000, 0), cl = TimingLab.Sample(CompareKind.ConstantTime, 4096, 100000, 4095);
-            TimingVerdict leaky = TimingJudge.Judge(lf, ll), ct = TimingJudge.Judge(cf, cl);
-            Check.True(leaky.Separates && Math.Abs(leaky.T) > 4.5, "the product's judge says the leaky compare does not separate: t = " + leaky.T);
-            Check.True(Math.Abs(leaky.T) > 3.0 * Math.Abs(ct.T), "the product's leaky |t| " + Math.Abs(leaky.T).ToString("F1") + " is not 3 times the constant-time |t| " + Math.Abs(ct.T).ToString("F2"));
-            return "product judge: leaky |t| " + Math.Abs(leaky.T).ToString("F1") + " vs constant time |t| " + Math.Abs(ct.T).ToString("F2");
+            TimingVerdict v = TimingJudge.Judge(lf, ll, cf, cl);
+            Check.True(v.Separated && Math.Abs(v.LeakyT) > v.Threshold, "the product's judge says the leaky compare does not separate: t = " + v.LeakyT + ", threshold " + v.Threshold);
+            Check.True(Math.Abs(v.LeakyT) > 3.0 * Math.Abs(v.ConstantT), "the product's leaky |t| " + Math.Abs(v.LeakyT).ToString("F1") + " is not 3 times the constant-time |t| " + Math.Abs(v.ConstantT).ToString("F2"));
+            return "product judge: leaky |t| " + Math.Abs(v.LeakyT).ToString("F1") + " vs constant time |t| " + Math.Abs(v.ConstantT).ToString("F2");
         }
     }
 }

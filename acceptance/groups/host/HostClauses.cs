@@ -33,9 +33,12 @@ namespace Acceptance
                 h.LocalAppData = Path.Combine(c.WorkDir, name, "localappdata");
                 Directory.CreateDirectory(h.LocalAppData);
                 Dictionary<string, string> env = new Dictionary<string, string>();
-                env["NETSEC_PORT"] = h.Port.ToString(); env["NETSEC_TOKEN"] = h.Token; env["LOCALAPPDATA"] = h.LocalAppData;
+                env["LOCALAPPDATA"] = h.LocalAppData;
                 if (extraEnv != null) foreach (KeyValuePair<string, string> kv in extraEnv) env[kv.Key] = kv.Value;
-                h.P = Proc.Start("dotnet", "\"" + dll + "\"", Path.GetDirectoryName(dll), env);
+                string args = "--port " + h.Port + " --token " + h.Token;                                  // design section 11, "Processes" item 3
+                h.P = dll.EndsWith(".dll", StringComparison.OrdinalIgnoreCase)
+                    ? Proc.Start("dotnet", "\"" + dll + "\" " + args, Path.GetDirectoryName(dll), env)
+                    : Proc.Start(dll, args, Path.GetDirectoryName(dll), env);
                 if (!Net.WaitPort(h.Port, 60000)) { string o = h.P.AllOutput; h.P.Dispose(); throw new FailException("the Host did not open port " + h.Port + " in 60 s. Output: " + o); }
                 return h;
             }
@@ -86,7 +89,7 @@ namespace Acceptance
 
         sealed class SessionRun
         {
-            public string SessionId, TransportKind; public bool TrainingOnly;
+            public string SessionId, TransportKind, SessionFile; public bool TrainingOnly;
             public List<Dictionary<string, object>> Events = new List<Dictionary<string, object>>();
             public List<string> Frames = new List<string>();
             public Dictionary<string, object> Finished, Error;
@@ -99,7 +102,7 @@ namespace Acceptance
             {
                 ws.Options.SetRequestHeader("Origin", "http://localhost:5173");
                 ws.ConnectAsync(new Uri("ws://127.0.0.1:" + h.Port + "/ws?token=" + h.Token), CancellationToken.None).Wait(20000);
-                string start = "{\"type\":\"session.start\",\"requestId\":\"r1\",\"lesson\":" + lesson + ",\"seed\":7,\"mode\":\"run\",\"transport\":\"" + transport + "\"" + (extraJson ?? "") + "}";
+                string start = "{\"type\":\"session.start\",\"requestId\":\"r1\",\"lesson\":" + lesson + ",\"seed\":7,\"mode\":\"step\",\"transport\":\"" + transport + "\"" + (extraJson ?? "") + "}";
                 ws.SendAsync(new ArraySegment<byte>(Encoding.UTF8.GetBytes(start)), WebSocketMessageType.Text, true, CancellationToken.None).Wait();
                 DateTime end = DateTime.UtcNow.AddSeconds(90);
                 byte[] buf = new byte[1 << 16];
@@ -118,7 +121,14 @@ namespace Acceptance
                     run.Frames.Add(text);
                     Dictionary<string, object> m = MiniJson.AsObject(MiniJson.Parse(text));
                     string kind = MiniJson.Str(m, "type") ?? MiniJson.Str(m, "kind");
-                    if (kind == "session.started") { run.SessionId = MiniJson.Str(m, "sessionId"); run.TransportKind = MiniJson.Str(m, "transportKind"); object t; run.TrainingOnly = m.TryGetValue("trainingOnly", out t) && t is bool && (bool)t; }
+                    if (kind == "session.started")
+                    {
+                        run.SessionId = MiniJson.Str(m, "sessionId"); run.TransportKind = MiniJson.Str(m, "transportKind"); run.SessionFile = MiniJson.Str(m, "sessionFile");
+                        // The lesson waits in step mode. session.run lets it go to the end (design section 5).
+                        string go = "{\"type\":\"session.run\",\"requestId\":\"r2\",\"sessionId\":\"" + run.SessionId + "\"}";
+                        ws.SendAsync(new ArraySegment<byte>(Encoding.UTF8.GetBytes(go)), WebSocketMessageType.Text, true, CancellationToken.None).Wait();
+                        object t; run.TrainingOnly = m.TryGetValue("trainingOnly", out t) && t is bool && (bool)t;
+                    }
                     else if (kind == "trace") { Dictionary<string, object> ev = MiniJson.Obj(m, "event"); if (ev != null) run.Events.Add(ev); }
                     else if (kind == "session.finished") run.Finished = m;
                     else if (kind == "error") run.Error = m;
@@ -186,6 +196,8 @@ namespace Acceptance
                     Check.True(secrets.Count >= 5, "the referee key log holds " + secrets.Count + " secrets; the real-mode session did not reach it");
                     StringBuilder everything = new StringBuilder();
                     foreach (string f in real.Frames) everything.Append(f).Append('\n');
+                    Check.True(!string.IsNullOrEmpty(real.SessionFile) && File.Exists(real.SessionFile), "session.started.sessionFile is '" + real.SessionFile + "'; the real-mode session wrote no file the scan can read");
+                    everything.Append(File.ReadAllText(real.SessionFile)).Append('\n');
                     foreach (string file in Directory.GetFiles(h.LocalAppData, "*", SearchOption.AllDirectories))
                     {
                         if (file.IndexOf(real.SessionId, StringComparison.OrdinalIgnoreCase) >= 0 || file.EndsWith(".ndjson", StringComparison.OrdinalIgnoreCase))

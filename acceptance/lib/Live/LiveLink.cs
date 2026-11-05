@@ -13,61 +13,6 @@ using NetSec.Trace;
 
 namespace Acceptance
 {
-    /// <summary>
-    /// An IByteLink written by the acceptance author over a plain blocking socket. It is not the product's SocketLink,
-    /// so the engines are tested through an independent transport. It records every byte in both directions.
-    /// </summary>
-    public sealed class RecordingSocketLink : IByteLink
-    {
-        readonly Socket _s;
-        readonly object _gate = new object();
-        readonly MemoryStream _sent = new MemoryStream();
-        readonly MemoryStream _received = new MemoryStream();
-
-        public RecordingSocketLink(Socket s) { _s = s; }
-
-        public byte[] Sent { get { lock (_gate) { return _sent.ToArray(); } } }
-        public byte[] Received { get { lock (_gate) { return _received.ToArray(); } } }
-
-        public IFuture<int> Read(byte[] b, int off, int n)
-        {
-            return Futures.Run<int>(delegate ()
-            {
-                int got;
-                try { got = _s.Receive(b, off, n, SocketFlags.None); }
-                catch (SocketException) { return 0; }
-                catch (ObjectDisposedException) { return 0; }
-                if (got > 0) lock (_gate) { _received.Write(b, off, got); }
-                return got;
-            });
-        }
-
-        public IFuture Write(byte[] b, int off, int n)
-        {
-            return Futures.Run(delegate ()
-            {
-                int done = 0;
-                while (done < n)
-                {
-                    int w = _s.Send(b, off + done, n - done, SocketFlags.None);
-                    if (w <= 0) throw new IOException("socket closed during write");
-                    done += w;
-                }
-                lock (_gate) { _sent.Write(b, off, n); }
-            });
-        }
-
-        public void Close() { try { _s.Shutdown(SocketShutdown.Both); } catch (SocketException) { } _s.Close(); }
-
-        public static RecordingSocketLink ConnectTo(int port)
-        {
-            Socket s = new Socket(AddressFamily.InterNetwork, SocketType.Stream, ProtocolType.Tcp);
-            s.NoDelay = true;
-            s.Connect(IPAddress.Loopback, port);
-            return new RecordingSocketLink(s);
-        }
-    }
-
     /// <summary>A trace sink that keeps every event. The clauses read it after the run.</summary>
     public sealed class RecordingSink : ITraceSink
     {

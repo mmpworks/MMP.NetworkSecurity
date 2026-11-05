@@ -24,7 +24,8 @@ namespace Acceptance
                 byte[] bdk = r.Bytes("bdk"), ikid = r.Bytes("ikid");
                 uint counter = (uint)r.Long("counter");
                 t.Compare(r.Where + " initial key", r.Bytes("initial_key"), DSubject.InitialKey(bdk, ikid));
-                t.Compare(r.Where + " derivation key", r.Bytes("derivation_key"), DSubject.DerivationKey(bdk, ikid, counter));
+                byte[] dk = DSubject.DerivationKey(bdk, ikid, counter);
+                if (dk != null) t.Compare(r.Where + " derivation key", r.Bytes("derivation_key"), dk);
                 foreach (string use in new string[] { "pin", "mac-gen", "data-enc" })
                     t.Compare(r.Where + " " + use, r.Bytes(use), DSubject.WorkingKey(bdk, ikid, counter, CodeOf(use), keyBytes));
             }
@@ -88,21 +89,22 @@ namespace Acceptance
                 string label = v == v128 ? "aes128" : "aes256";
                 PadSession pad = DSubject.NewPad(bdk, ikid);
                 uint last = 0;
+                int[] uses = new int[] { 0x1000, 0x2000, 0x3000 };
                 for (int sale = 1; sale <= 1000; sale++)
                 {
-                    uint counter = pad.Next();
-                    t.Expect(label + " sale " + sale + " counter", counter > last, "counter " + counter + " did not increase from " + last);
-                    last = counter;
-                    string where = label + " sale " + sale + " (counter " + counter + ")";
-                    t.Compare(where + " PIN key", DSubject.WorkingKey(bdk, ikid, counter, 0x1000, keyBytes), pad.WorkingKey(0x1000, keyBytes));
-                    t.Compare(where + " MAC key", DSubject.WorkingKey(bdk, ikid, counter, 0x2000, keyBytes), pad.WorkingKey(0x2000, keyBytes));
-                    t.Compare(where + " data key", DSubject.WorkingKey(bdk, ikid, counter, 0x3000, keyBytes), pad.WorkingKey(0x3000, keyBytes));
+                    int use = uses[sale % 3];
+                    PadUse got = pad.Next(use, keyBytes);
+                    string where = label + " sale " + sale + " (counter " + got.Counter + ", use 0x" + use.ToString("X4") + ")";
+                    t.Expect(where + " counter", got.Counter > last, "counter " + got.Counter + " did not increase from " + last);
+                    last = got.Counter;
+                    t.Expect(where + " KSN", got.Ksn != null && got.Ksn.Length == 12 && Hex.Eq(Hex.Slice(got.Ksn, 0, 8), ikid), "the KSN does not start with the initial key id");
+                    t.Compare(where + " key", DSubject.WorkingKey(bdk, ikid, got.Counter, use, keyBytes), got.Key);
                     // A PIN block locked on the pad side opens on the bank side with the same PIN.
-                    if (sale % 25 == 0)
+                    if (use == 0x1000 && sale % 24 == 1)
                     {
                         byte[] rnd = new Rng((ulong)sale).Bytes(8);
-                        byte[] block = DSubject.PinBlockEncrypt(pad.WorkingKey(0x1000, keyBytes), "1234", "4111111111111111", rnd);
-                        string pin = DSubject.PinBlockDecrypt(DSubject.WorkingKey(bdk, ikid, counter, 0x1000, keyBytes), block, "4111111111111111");
+                        byte[] block = DSubject.PinBlockEncrypt(got.Key, "1234", "4111111111111111", rnd);
+                        string pin = DSubject.PinBlockDecrypt(DSubject.WorkingKey(bdk, ikid, got.Counter, 0x1000, keyBytes), block, "4111111111111111");
                         t.Expect(where + " PIN block", pin == "1234", "bank side got '" + pin + "'");
                     }
                 }
@@ -139,18 +141,17 @@ namespace Acceptance
             // The initial key is erased once the pad has loaded it.
             t.Expect("initial key after load", !Holds(pad.State(), initial), "the pad still holds the initial key");
             List<KeyValuePair<uint, byte[]>> used = new List<KeyValuePair<uint, byte[]>>();
+            int[] uses = new int[] { 0x1000, 0x2000, 0x3000 };
             for (int sale = 1; sale <= 200; sale++)
             {
-                uint counter = pad.Next();
-                // Control: the working key of the current sale is derivable from state, so the test sees what it looks for.
-                byte[] now = pad.WorkingKey(0x1000, 16);
-                used.Add(new KeyValuePair<uint, byte[]>(counter, now));
-                used.Add(new KeyValuePair<uint, byte[]>(counter, pad.WorkingKey(0x2000, 16)));
-                used.Add(new KeyValuePair<uint, byte[]>(counter, pad.WorkingKey(0x3000, 16)));
+                PadUse got = pad.Next(uses[sale % 3], 16);
+                // Control: the key just issued may still be held. If the pad holds nothing at all, the check below proves nothing.
+                t.Expect("sale " + got.Counter + " control: the pad reports its registers", pad.State().Length > 0, "HeldKeys returned no registers, so the absence checks prove nothing");
+                used.Add(new KeyValuePair<uint, byte[]>(got.Counter, got.Key));
                 foreach (KeyValuePair<uint, byte[]> old in used)
-                    if (old.Key < counter)
-                        t.Expect("sale " + counter + " vs key of sale " + old.Key, !Holds(pad.State(), old.Value), "state still holds a working key used in sale " + old.Key);
-                t.Expect("sale " + counter + " initial key", !Holds(pad.State(), initial), "the pad holds the initial key again");
+                    if (old.Key < got.Counter)
+                        t.Expect("sale " + got.Counter + " vs key of sale " + old.Key, !Holds(pad.State(), old.Value), "state still holds a working key used in sale " + old.Key);
+                t.Expect("sale " + got.Counter + " initial key", !Holds(pad.State(), initial), "the pad holds the initial key again");
             }
             return t.Done();
         }

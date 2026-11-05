@@ -46,22 +46,13 @@ namespace NetSec.Labs
     public static class LabCatalog { public static ILab Find(int lesson) { throw new NotImplementedException(); } }
 }
 
-namespace NetSec.Auth
-{
-    public static class Token
-    {
-        /// <summary>ASSUMED: a compact JWS (EdDSA, header.payload.signature) over a claims set, signed with the training key issuerKeyId.</summary>
-        public static string IssueEdDsa(ITrainingKeySource keys, string issuerKeyId, string subject, string[] roles, DateTime expiresUtc) { throw new NotImplementedException(); }
-    }
-}
-
 namespace NetSec.Native
 {
     public enum CompareKind { Leaky, ConstantTime }                                                     // ASSUMED members
 
     public sealed class TimingCase { public double[] TicksFirstByteDiff; }                              // shape not used by the suite
 
-    public sealed class TimingVerdict { public double T; public bool Separates; }                                          // ASSUMED shape: Welch t of the two cases, and whether |t| passes the stated threshold
+    public sealed class TimingVerdict { public double LeakyT, ConstantT, Threshold; public bool Separated; }                                          // ASSUMED shape: Welch t of the two cases, and whether |t| passes the stated threshold
 
     public static class NativeCompare
     {
@@ -78,6 +69,7 @@ namespace NetSec.Native
 
     public static class TimingJudge
     {
-        public static TimingVerdict Judge(TimingCase firstByteDiff, TimingCase lastByteDiff) { throw new NotImplementedException(); }
+        /// <summary>ASSUMED: leaky pair then constant-time pair, each as (difference in the first byte, difference in the last byte).</summary>
+        public static TimingVerdict Judge(TimingCase leakyFirst, TimingCase leakyLast, TimingCase constFirst, TimingCase constLast) { throw new NotImplementedException(); }
     }
 }
