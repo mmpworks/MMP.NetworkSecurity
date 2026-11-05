@@ -902,6 +902,28 @@
    "counts": true
   },
   {
+   "id": "A11.mtls.corrupt-client-cert-beside-control",
+   "base": "A11.mtls.corrupt-client-cert-beside-control",
+   "assertion": "A11",
+   "group": "auth",
+   "build": "host",
+   "slice": "S6",
+   "referee": "Go tokenverify",
+   "roles": [],
+   "counts": true
+  },
+  {
+   "id": "A11.mtls.go-referee-requires-client-cert",
+   "base": "A11.mtls.go-referee-requires-client-cert",
+   "assertion": "A11",
+   "group": "auth",
+   "build": "host",
+   "slice": "S6",
+   "referee": "Go tokenverify",
+   "roles": [],
+   "counts": true
+  },
+  {
    "id": "A11.mtls.missing-client-cert-beside-control",
    "base": "A11.mtls.missing-client-cert-beside-control",
    "assertion": "A11",
