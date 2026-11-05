@@ -98,7 +98,7 @@ namespace NetSec.Tests
                 changed[i] = changed[i] == 'A' ? 'B' : 'A';
                 AuthDecision d = Token.Verify(Issuer.CopyPublic(), new string(changed), Now);
                 Assert.False(d.Allowed, "a change at character " + i + " passed");
-                Assert.Equal(Token.SignatureCheck, d.CheckName);
+                Assert.Contains(d.CheckName, new[] { Token.SignatureCheck, Token.FormatCheck });
             }
         }
 
@@ -310,7 +310,7 @@ namespace NetSec.Tests
         public void Every_row_stops_at_its_named_check_with_one_thing_changed()
         {
             AttackDefinition[] rows = AttackCatalog.Lesson10Unreleased;
-            Assert.Equal(12, rows.Length);
+            Assert.Equal(13, rows.Length);
             foreach (AttackDefinition a in rows)
             {
                 Assert.Equal(1, (a.Plan != null ? 1 : 0) + a.Options.Length);

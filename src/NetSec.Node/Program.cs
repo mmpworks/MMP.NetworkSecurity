@@ -12,18 +12,16 @@ using NetSec.Platform;
 using NetSec.Trace;
 
 // One process of the bridge lab, by role. It prints READY port=<p> first and a final RESULT {json} line, and writes its trace to --trace-file.
-// acceptance/CONTRACT.md section 3 holds the command lines. Roles gateway and server wait for the SSH and TLS 1.3 engines.
-const int NoSuchRole = 2, RoleNotBuilt = 3;
+// acceptance/CONTRACT.md section 3 holds the command lines.
+const int NoSuchRole = 2;
 
 string role = Option("--role") ?? "";
 switch (role)
 {
     case "pinpad": return PinPad();
     case "bankhsm": return BankHsm();
-    case "gateway":
-    case "server":
-        Console.Error.WriteLine($"NODE_ROLE_NOT_BUILT: role {role} waits for the SSH and TLS 1.3 engines.");
-        return RoleNotBuilt;
+    case "gateway": return Gateway();
+    case "server": return Server();
     default:
         Console.Error.WriteLine("NODE_ROLE_UNKNOWN: use --role pinpad, bankhsm, gateway, or server.");
         return NoSuchRole;
@@ -44,7 +42,6 @@ LinkListener Listen() => new(new IPEndPoint(IPAddress.Loopback, int.TryParse(Opt
 int PinPad()
 {
     string pin = Option("--pin") ?? "1234", pan = Option("--pan") ?? "4111111111111111";
-    byte[] initialKeyId = Hex.Decode("1234567890123456");
     IRandomSource random = Random();
     ITraceSink sink = Sink();
     LinkListener listener = Listen();
@@ -53,8 +50,7 @@ int PinPad()
     byte[] idBytes = new byte[8];
     random.Fill(idBytes, 0, idBytes.Length);
     string traceId = "t" + Hex.Encode(idBytes);
-    byte[] bdk = new TrainingKeySource().Find(KeyIds.DukptBdk128).CopyMaterial();
-    DukptPinPad pad = new(DukptBank.DeriveInitialKey(bdk, initialKeyId), initialKeyId);
+    DukptPinPad pad = new(Hex.Decode(PinPadCore.InjectedInitialKey), Hex.Decode(PinPadCore.InjectedKeyId));
 
     SocketLink ce = Take(listener.Accept());
     PadSale sale = PinPadCore.Sell(pad, traceId, pin, pan, random);
@@ -68,6 +64,43 @@ int PinPad()
     reply.Wait(30000);
     ce.Close();
     return 0;
+}
+
+// Accepts one connection after another and serves each on its own, until the process ends.
+int ServeForever(Func<SocketLink, IFuture> serve)
+{
+    LinkListener listener = Listen();
+    Console.WriteLine($"READY port={listener.Port}");
+    while (true)
+    {
+        IFuture<SocketLink> accepted = listener.Accept();
+        accepted.Wait();
+        if (accepted.IsFaulted) return 1;
+        serve(accepted.Result);
+    }
+}
+
+int FlagMissing(string flag)
+{
+    Console.Error.WriteLine($"NODE_FLAG_MISSING: role {role} needs {flag} with a port.");
+    return NoSuchRole;
+}
+
+HopServerOptions HopOptions() => new() { Keys = new TrainingKeySource(), Random = Random(), Sink = Sink() };
+
+int Gateway()
+{
+    if (!int.TryParse(Option("--server"), out int next)) return FlagMissing("--server");
+    bool flip = Array.IndexOf(args, "--tamper-envelope") >= 0;
+    HopServerOptions options = HopOptions();
+    return ServeForever(link => BridgeHopServers.ServeGateway(link, options, next, flip));
+}
+
+int Server()
+{
+    if (!int.TryParse(Option("--bank"), out int bank)) return FlagMissing("--bank");
+    HopServerOptions options = HopOptions();
+    return ServeForever(link => BridgeHopServers.ServeServer(link, options, bank));
 }
 
 int BankHsm()

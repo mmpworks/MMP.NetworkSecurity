@@ -2,7 +2,7 @@
 
 Status: stable. Tours and UI bind to these names. A change goes through Richard. Date: 2026-11-05. The rules in `docs/lessons-1-3-names.md` (arrows, binds, fields, measures, try-its) apply here too.
 
-Lesson 10: Client proof and permission. Protocol `auth`. Lanes `client`, `issuer`, `server`. The lab has no TLS yet, so a token shows on the wire. The tour must say a real system sends it inside TLS.
+Lesson 10: Client proof and permission. Protocol `auth`. Lanes `client`, `issuer`, `server`. The lab starts with one mutual TLS handshake. The login and the calls then run in the clear, so a token shows on the wire. The tour must say a real system sends them inside TLS.
 
 ## Login: client and issuer
 
@@ -45,6 +45,7 @@ The token parts and proof parts have dots between them, one byte each. Their fie
 | `challenge issued` | `issuer` | The answer names the challenge this issuer sent in this login |
 | `challenge signature` | `issuer` | The enrolled key signed this challenge and origin |
 | `challenge already used` | `issuer` | This challenge has not been answered before |
+| `token format` | `server` | The token reads as one compact JWS, names EdDSA, and holds no `crit`. It shows only when it fails, and no attack row reaches it |
 | `token signature` | `server` | The issuer key signed the token |
 | `token expiry` | `server` | The token has not expired |
 | `token audience` | `server` | The token names this server in `aud` |
@@ -104,8 +105,17 @@ A test pins the handshake rows: `The_mutual_tls_phase_emits_the_event_types_the_
 |---|---|---|---|---|
 | `L10-remove-client-cert` | The client answers with an empty list | `TLS13_CERT_REQUIRED` | `certificate_required alert` | 116 |
 | `L10-corrupt-client-cert` | One changed bit in the certificate signature | `TLS13_BAD_CERTIFICATE` | `bad_certificate alert` | 42 |
+| `L10-wrong-client-name` | An attacker key with a certificate for `bank-hsm-admin`, issued under the training root | `TLS13_CLIENT_NAME_REFUSED` | `client name` | 49 |
 
-The server checks on a good handshake, in order: `certificate_required alert`, `chain to trust anchor`, `validity window`, `bad_certificate alert`, `CertificateVerify signature`, `Finished verify_data`.
+The server checks on a good handshake, in order: `certificate_required alert`, `chain to trust anchor`, `validity window`, `bad_certificate alert`, `client name`, `CertificateVerify signature`, `Finished verify_data`.
+
+**What each phase proves, and what it does not.**
+
+1. A chain shows only that a trusted CA vouched for this key. The server then compares the name in the certificate with the one it allows. That is the check `client name`, and RFC 8446 section 6.2 names alert `access_denied`, 49, for this refusal.
+2. The check compares a name only. If the CA issues the allowed name to the wrong key, the check passes.
+3. The lab holds two keys. The certificate key is the fixed training key `client-tls-ed25519`. The login key is drawn on each run and enrolled ahead of time. Nothing in this lab ties them together.
+4. The issuer does not read the client certificate. The handshake and the login run on separate connections. Only the lab's order stops a run with no certificate, so the certificate does not gate the token.
+5. The call phase runs on another connection and reads no certificate. The server there checks the token and the proof.
 
 RFC 8446 sections 4.4.2.4 and 6.2 name `certificate_required` for an empty list and `bad_certificate` for a corrupt certificate. `ux-design.md` section 7 and the A11 clauses follow these names.
 

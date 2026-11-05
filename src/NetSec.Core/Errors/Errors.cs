@@ -73,6 +73,7 @@ namespace NetSec.Errors
         public const string CeLinkNotBuilt = "CE_LINK_NOT_BUILT";
         public const string CeDeviceSilent = "CE_DEVICE_SILENT";
         public const string TransportNotBuilt = "TRANSPORT_NOT_BUILT";
+        public const string ChannelBufferFull = "CHANNEL_BUFFER_FULL";
         public const string LessonNotBuilt = "LESSON_NOT_BUILT";
         public const string RealModeNotBuilt = "REAL_MODE_NOT_BUILT";
         public const string DhPeerOutOfRange = "DH_PEER_OUT_OF_RANGE";

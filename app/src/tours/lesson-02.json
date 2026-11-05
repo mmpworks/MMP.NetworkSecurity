@@ -22,7 +22,7 @@
       "text": [
         "A {{term:hash}} turns any message into a fixed-size fingerprint. SHA-256 gives 32 bytes, which is 256 bits.",
         "The diagram shows the fingerprint of a message beside the fingerprint after one bit flip. Each cell is one bit, and it lights up when the two differ.",
-        "About half the cells light up. One tiny edit scrambles the whole fingerprint, so even a small edit is easy to spot."
+        "Many cells light up. In the default run it is 106 of 256, a bit under half, and a good hash averages close to half. One tiny edit scrambles the whole fingerprint, so even a small edit is easy to spot."
       ],
       "glossary": ["hash"],
       "bind": { "kind": "event", "eventType": "measure.result", "match": { "actor": "client", "message": "SHA-256 avalanche" } },
@@ -31,6 +31,11 @@
           "id": "L2-C01",
           "text": "SHA-256 produces a 256-bit (32-byte) digest.",
           "source": "FIPS 180-4, section 1 (introduction) and section 6.2"
+        },
+        {
+          "id": "L2-C07",
+          "text": "In the default run of the lab, 106 of the 256 cells differ after one bit flip.",
+          "source": "reader-a15a's run of the lab, step-text sweep (PR #57); docs/lessons-1-3-names.md, Lesson 2 events, SHA-256 avalanche (detail bits=<n>;of=256)"
         }
       ],
       "unlock": { "mode": "event" }
@@ -176,7 +181,7 @@
       "lesson": 2,
       "title": "Who made the seal?",
       "text": [
-        "All four seals passed on the normal run. A passing seal tells the receiver two things: the message is unchanged, and the sender held the key.",
+        "All four seals passed on the normal run. A passing HMAC or CMAC seal tells the receiver two things: the message is unchanged, and the sender held the key. The plain hash proves neither, and the keyed hash falls to length extension, as you saw earlier.",
         "It cannot tell which key holder sent it. The client and the server share one key, so either one could have made the seal.",
         "To prove to a third party who signed something, you need a signature. Lesson 4 covers signatures and certificates."
       ],

@@ -13,8 +13,8 @@ using Xunit;
 namespace NetSec.Host.Tests
 {
     /// <summary>
-    /// The part of the bridge that stands without SSH and TLS 1.3: PIN pad, the CF-compiled CE, and bank HSM as real processes, with a relay in
-    /// the middle that this test owns. It reads only process output, trace files, and the bytes that crossed its relay. No product code is linked.
+    /// The bridge's edges: PIN pad, the CF-compiled CE, and bank HSM as real processes, with a tap on the pad to CE hop and a relay in
+    /// the middle that this test owns. The acceptance suite runs all five processes. It reads only process output, trace files, and the bytes that crossed its relay. No product code is linked.
     /// </summary>
     public sealed class BridgeLiveTests : IDisposable
     {
@@ -68,7 +68,8 @@ namespace NetSec.Host.Tests
 
             public void Dispose()
             {
-                if (!P.HasExited) P.Kill(entireProcessTree: true);
+                // Windows answers Access is denied when the process is already exiting. The wait below covers that case.
+                try { if (!P.HasExited) P.Kill(entireProcessTree: true); } catch (System.ComponentModel.Win32Exception) { }
                 P.WaitForExit(5000);
                 P.Dispose();
             }
@@ -79,6 +80,7 @@ namespace NetSec.Host.Tests
         {
             readonly TcpListener _listener = new TcpListener(IPAddress.Loopback, 0);
             public readonly List<byte> Seen = new List<byte>();
+            public readonly List<byte> SeenDown = new List<byte>();
             public int Port => ((IPEndPoint)_listener.LocalEndpoint).Port;
 
             public Relay(int bankPort, int flipAt)
@@ -93,7 +95,7 @@ namespace NetSec.Host.Tests
                 using TcpClient to = new TcpClient();
                 await to.ConnectAsync(IPAddress.Loopback, bankPort);
                 Task up = Pump(from.GetStream(), to.GetStream(), flipAt, Seen);
-                Task down = Pump(to.GetStream(), from.GetStream(), -1, null);
+                Task down = Pump(to.GetStream(), from.GetStream(), -1, SeenDown);
                 await Task.WhenAny(up, down);
             }
 
@@ -120,11 +122,11 @@ namespace NetSec.Host.Tests
         sealed class Lab : IDisposable
         {
             public Child Bank, Pad, Ce;
-            public Relay Relay;
+            public Relay Relay, PadTap;
             public string BankTrace, CeTrace;
             public void Dispose()
             {
-                Ce?.Dispose(); Pad?.Dispose(); Bank?.Dispose(); Relay?.Dispose();
+                Ce?.Dispose(); Pad?.Dispose(); Bank?.Dispose(); Relay?.Dispose(); PadTap?.Dispose();
             }
         }
 
@@ -141,8 +143,9 @@ namespace NetSec.Host.Tests
             lab.Relay = new Relay(bank, flipAt);
             lab.Pad = new Child("dotnet", $"\"{node}\" --role pinpad --listen 0 --pin 1234 --pan 4111111111111111 --trace-file \"{Path.Combine(_dir, name + "-pad.ndjson")}\"{seed}");
             int pad = Port(await lab.Pad.Line("READY"));
+            lab.PadTap = new Relay(pad, -1);
             string ce = Under("src", "NetSec.CeDevice", "bin", "Release", "net35", "NetSec.CeDevice.exe");
-            lab.Ce = new Child(ce, $"--pinpad {pad} --gateway {lab.Relay.Port} --trace-file \"{lab.CeTrace}\" --link external-forward --suite modern --pool 25");
+            lab.Ce = new Child(ce, $"--pinpad {lab.PadTap.Port} --gateway {lab.Relay.Port} --trace-file \"{lab.CeTrace}\" --link external-forward --suite modern --pool 25");
             await lab.Ce.Line("CE-READY", 10000);
             return lab;
         }
@@ -156,6 +159,28 @@ namespace NetSec.Host.Tests
         }
 
         static JsonElement Json(string line) => JsonDocument.Parse(line.Substring(line.IndexOf(' ') + 1)).RootElement.Clone();
+
+        /// <summary>The whole clear field, its first 8 bytes alone (control, PIN length, digits), and the digits as text. A search for the whole field alone would miss a partial leak.</summary>
+        static void AssertNoPin(byte[] seen, string clearHex)
+        {
+            Assert.True(seen.Length > 0);
+            string hex = Convert.ToHexStringLower(seen);
+            Assert.DoesNotContain(clearHex, hex);
+            Assert.DoesNotContain(clearHex.Substring(0, 16), hex);
+            Assert.DoesNotContain("1234", System.Text.Encoding.ASCII.GetString(seen));
+        }
+
+        [Fact]
+        public void The_pad_role_reads_no_base_key()
+        {
+            string program = File.ReadAllText(Under("src", "NetSec.Node", "Program.cs")).Replace("\r\n", "\n");
+            int start = program.IndexOf("int PinPad()");
+            string body = program.Substring(start, program.IndexOf("\n}\n", start) - start);
+            Assert.DoesNotContain("Bdk", body);
+            Assert.DoesNotContain("TrainingKeySource", body);
+            Assert.DoesNotContain("DeriveInitialKey", body);
+            Assert.Contains("InjectedInitialKey", body);
+        }
 
         [Fact]
         public async Task A_cf_binary_relays_a_sealed_pin_and_the_bank_recovers_it()
@@ -172,11 +197,16 @@ namespace NetSec.Host.Tests
 
             byte[] seen;
             lock (lab.Relay.Seen) seen = lab.Relay.Seen.ToArray();
-            Assert.DoesNotContain(clear, Convert.ToHexStringLower(seen));
-            Assert.True(seen.Length > 0);
+            AssertNoPin(seen, clear);
+
+            // The claim names this hop: the PIN pad's bytes as the CE takes them.
+            byte[] fromPad;
+            lock (lab.PadTap.SeenDown) fromPad = lab.PadTap.SeenDown.ToArray();
+            AssertNoPin(fromPad, clear);
 
             string ceTrace = ReadShared(lab.CeTrace);
             Assert.DoesNotContain(clear, ceTrace);
+            Assert.DoesNotContain(clear.Substring(0, 16), ceTrace);
             string traceId = ce.GetProperty("traceId").GetString();
             Assert.Contains(traceId, ReadShared(lab.BankTrace));
             Assert.Contains("\"traceId\":\"" + traceId + "\"", ceTrace);
@@ -197,12 +227,12 @@ namespace NetSec.Host.Tests
         [Theory]
         [InlineData("gateway")]
         [InlineData("server")]
-        public async Task A_role_waiting_on_another_slice_says_so_by_code(string role)
+        public async Task A_middle_role_with_no_next_port_says_so_by_code(string role)
         {
             using Child node = new Child("dotnet", $"\"{Under("src", "NetSec.Node", "bin", "Release", "net10.0", "NetSec.Node.dll")}\" --role {role} --listen 0");
-            await node.Line("NODE_ROLE_NOT_BUILT");
+            await node.Line("NODE_FLAG_MISSING");
             Assert.True(await Task.Run(() => node.P.WaitForExit(30000)));
-            Assert.Equal(3, node.P.ExitCode);
+            Assert.Equal(2, node.P.ExitCode);
         }
     }
 }

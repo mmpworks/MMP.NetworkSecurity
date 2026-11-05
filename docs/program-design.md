@@ -24,6 +24,7 @@ Consultation. Gems used: `server-replaces-never-merges`, `fail-soft-must-count`,
 |---|---|---|
 | `src/NetSec.Core` | net10.0, C# 3 | All shared source. Assembly `NetSec.Core` |
 | `src/NetSec.Core.NetCF` | net35 on CF refs, C# 3, `NETCF` | No source: `Compile Include="..\NetSec.Core\**\*.cs"`. Assembly `NetSec.Core` |
+| `src/AsyncProxy.Local`, `src/AsyncProxy.Local.NetCF` | netstandard2.0, and net35 on CF refs, C# 3 | No source: they compile the sibling's `src/MMP.AsyncProxy`. Assembly `MMP.AsyncProxy`, in this worktree's own output. The sibling is only read |
 | `src/NetSec.CeDevice` | net35 on CF refs, C# 3, Exe | The CE process (section 6) |
 | `src/NetSec.Node` | net10.0, C# 14, Exe | Thin main: `--role pinpad, gateway, server, bankhsm`. Logic lives in `Core/Bridge` (D13) |
 | `src/NetSec.Host` | net10.0, C# 14 | Minimal API, WebSocket, sessions, process control, `OsTransportFactory` |
@@ -267,7 +268,7 @@ Command line: `--pinpad P --gateway G --trace T --trace-id ID --link glass-ssh|e
 
 **Binary proof, from outside.** A test reads the exe and DLLs with `System.Reflection.Metadata` and asserts `mscorlib` token `969db8053d3322ac`. `GET /api/ce` returns `{ running, pid, exePath, mscorlibToken, clr, ptr, label, profile, budget, link, ports }`. `--ce external` makes the Host skip the spawn and wait on the ports, which is the seam for a real board.
 
-**Bridge processes (D13, A10).** `BridgeSupervisor` in the Host starts all five, or attaches with `--external`.
+**Bridge processes (D13, A10).** Five processes. Decision, 2026-11-05: `BridgeSupervisor` is not built. This design was the only place that named it. The PRD, `ux-design.md` and `acceptance/CONTRACT.md` ask for no such thing. A10 starts the processes from outside. Lesson 9 runs the same code in one process, so a learner can step it. `/api/ce` runs the CE alone, through `CeProcess`. A later UI that starts all five from the app would need it.
 | Process | Build | Holds | Does |
 |---|---|---|---|
 | PIN-pad | `Node --role pinpad` | DUKPT initial key, registers | Makes the PIN block (ISO 9564 format 4), locks it, CMACs a `PinEnvelope {traceId, KSN, cipher, mac}`. Sends to CE over TCP |

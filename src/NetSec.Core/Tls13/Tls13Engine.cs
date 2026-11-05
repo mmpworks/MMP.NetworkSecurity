@@ -11,7 +11,7 @@ namespace NetSec.Tls13
     /// TLS 1.3, bytes in and bytes out. Feed joins bytes into records, opens them, joins the contents into messages, and hands each message to
     /// the table. It holds no socket and no clock. Data sent before the handshake ends waits here until the state is Open.
     /// </summary>
-    public sealed class Tls13Engine : IProtocolEngine
+    public sealed class Tls13Engine : ITlsEngine
     {
         const int CloseNotify = 0;
 
@@ -36,6 +36,8 @@ namespace NetSec.Tls13
 
         public static Tls13Engine CreateClient(Tls13Options options)
         {
+            if (options.CertificateChain != null && options.CertificateChain.Length != 0 && options.SigningSeed == null)
+                throw new ArgumentException("a client with a certificate chain needs the key that signs for it", "options");
             return new Tls13Engine(Tls13ClientTable.Table, Tls13ClientTable.Start, options);
         }
 
@@ -51,6 +53,7 @@ namespace NetSec.Tls13
         /// <summary>The alert number the peer sent, or -1.</summary>
         public int AlertReceived { get; private set; }
         public bool ReachedOpen { get; private set; }
+        public string VersionName { get { return "TLSv1.3"; } }
         public string[] KeyLogLines { get { return _session.KeyLogLines.ToArray(); } }
         public string SuiteName { get { return _session.Suite == null ? null : _session.Suite.Name; } }
         public string GroupName { get { return ReachedOpen ? Tls13GroupInfo.Name(_session.Options.Group) : null; } }
@@ -75,6 +78,7 @@ namespace NetSec.Tls13
                 case EngineCommandKind.Send: Send(c.Bytes); break;
                 case EngineCommandKind.Close: Close(); break;
                 case EngineCommandKind.PeerClosed: PeerClosed(); break;
+                case EngineCommandKind.Abort: if (!_machine.IsEnded) _machine.Fail(c.AbortCode, c.AbortCode, c.AbortDetail, null); break;
             }
             return Take();
         }

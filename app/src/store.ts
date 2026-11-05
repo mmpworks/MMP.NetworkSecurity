@@ -1,4 +1,4 @@
-import { computed, reactive, ref } from 'vue'
+import { computed, reactive, ref, watchEffect } from 'vue'
 import { hostGet, normalizeError, normalizeEvent, openSocket, resolveHostAddress, type HostSocket } from './host'
 import { evaluateUnlock, findBound, parseHighlight, TOURS, type Unlock } from './tour'
 import type { AppMode, HostError, LessonRow, TourStep, TraceEvent, Transport, ViewMode } from './types'
@@ -54,7 +54,7 @@ export const ui = reactive({
   engine: 'idle' as 'idle' | 'running' | 'stepping' | 'waiting' | 'finished',
   shortcuts: false,
   follow: true,
-  inspectorTab: 'bytes' as 'bytes' | 'picture' | 'measures',
+  inspectorTab: 'bytes' as 'bytes' | 'picture' | 'measures' | 'chain' | 'ladder' | 'hostkey',
 })
 
 export const tour = reactive({
@@ -92,16 +92,22 @@ export const step = computed<TourStep | null>(() => steps.value[tour.stepIndex] 
 export const isReal = computed(() => (active.value ? active.value.transportKind === 'real' : ui.transport === 'real'))
 export const trainingChip = computed(() => (isReal.value ? 'OS TRANSPORT' : 'TRAINING ONLY'))
 
-export const unlock = computed<Unlock>(() => {
+const rawUnlock = computed<Unlock>(() => {
   const s = step.value
   if (!s) return { open: false, reason: '' }
   if (tour.unreachable) return { open: false, reason: tour.unreachable }
   const events = allEvents.value
   const sinceTryIt = active.value?.id === tour.sessionId ? events.slice(tour.tryItStart) : events
   return evaluateUnlock(s, {
-    boundIndex: tour.bound[tour.stepIndex] ?? -1, events, view: ui.view, selectedSeq: ui.selectedSeq, actionDone: tour.actionDone, outcome: active.value?.parentId ? active.value.finished?.outcome ?? '' : '', eventsSinceTryIt: sinceTryIt,
+    boundIndex: tour.bound[tour.stepIndex] ?? -1, events, view: ui.view, selectedSeq: ui.selectedSeq, actionDone: tour.actionDone, outcome: active.value?.parentId ? active.value.finished?.outcome ?? '' : '', caughtCheck: active.value?.parentId && active.value.finished?.outcome === 'caught' ? active.value.finished.check : '', eventsSinceTryIt: sinceTryIt,
   })
 })
+
+// Once a step's unlock opens it stays open. A late frame from an attack fork can change the events under it, and a learner who already did the try-it
+// must not find Next disabled again a moment later.
+const opened = reactive<Record<string, boolean>>({})
+watchEffect(() => { const s = step.value; if (s && rawUnlock.value.open) opened[s.id] = true }, { flush: 'sync' })
+export const unlock = computed<Unlock>(() => (step.value && opened[step.value.id] ? { open: true, reason: '' } : rawUnlock.value))
 
 function nextReq(): string { const id = `r${++reqCounter}`; myRequests.add(id); return id }
 function fail(code: string, message: string, retryable = false) { ui.error = { code, message, retryable, requestId: '' } }
@@ -217,11 +223,9 @@ function onForked(f: any) {
   rec.parentId = String(f.parentId)
   rec.label = `attack: ${f.attackId ?? 'tamper'}`
   if (parent) { rec.lesson = parent.lesson; rec.seed = parent.seed }
-  ui.activeId = rec.id
+  // session.started already made the fork active. This frame can arrive after the learner pressed Next, so it never changes the active session.
   // An attack fork runs to its result, so the failing check shows without a second click.
   sock?.send({ type: 'session.run', sessionId: rec.id })
-  ui.viewUpTo = null
-  ui.selectedSeq = null
   wake()
 }
 
@@ -269,6 +273,7 @@ export function startSession(mode: AppMode) {
   tour.unreachable = ''
   tour.actionDone = false
   tour.tryItStart = 0
+  for (const k of Object.keys(opened)) delete opened[k]
   ui.activeId = ''
   ui.viewUpTo = null
   ui.selectedSeq = null
@@ -286,8 +291,9 @@ export function loadTrace(file: string) { if (file) sock?.send({ type: 'session.
 // ---- tour driver ----
 
 async function waitForSession(): Promise<boolean> {
-  for (let i = 0; i < 40 && !active.value; i++) { if (!(await nextActivity(500))) continue }
-  return !!active.value
+  const have = () => ui.sessions.some(x => x.id === tour.sessionId)
+  for (let i = 0; i < 40 && !have(); i++) { if (!(await nextActivity(500))) continue }
+  return have()
 }
 
 /** Moves the engine, one event at a time, until the bound event of step i is in the list. The engine then waits for the learner. */
@@ -303,15 +309,24 @@ async function enterStep(i: number) {
   tour.driving = true
   try {
     if (!(await waitForSession())) { tour.unreachable = 'The engine did not start a session'; return }
+    // The tour reads its own session, never the active one: an attack fork can be active while the learner moves on.
+    const ts = () => ui.sessions.find(x => x.id === tour.sessionId)
     const prev = Math.max(0, ...tour.bound.slice(0, i))
     for (let guard = 0; guard < 500; guard++) {
       // The first match at or after the previous step. A tour may teach in an order the engine did not emit, so a match before it also counts.
-      let idx = findBound(s, allEvents.value, prev)
-      if (idx < 0) idx = findBound(s, allEvents.value, 0)
+      const events = ts()?.events ?? []
+      let idx = findBound(s, events, prev)
+      if (idx < 0) idx = findBound(s, events, 0)
       if (idx >= 0) { tour.bound[i] = idx; ui.viewUpTo = s.pause === 'none' ? null : idx; ui.selectedSeq = null; markSeen(s); return }
-      if (active.value?.finished) { tour.unreachable = 'The session ended before the engine sent this message'; return }
-      stepEngine()
-      if (!(await nextActivity(15000))) { fail('STEP_TIMEOUT', 'The engine sent nothing for 15 seconds.', true); tour.unreachable = 'The engine is not answering'; return }
+      if (ts()?.finished) { tour.unreachable = 'The session ended before the engine sent this message'; return }
+      // A step command can be lost while an engine starts up (lesson 8 showed it). Send it again every 3 seconds, and give up after 15.
+      let answered = false
+      for (let attempt = 0; attempt < 5 && !answered; attempt++) {
+        sock?.send({ type: 'session.step', sessionId: tour.sessionId })
+        ui.engine = 'stepping'
+        answered = await nextActivity(3000)
+      }
+      if (!answered) { fail('STEP_TIMEOUT', 'The engine sent nothing for 15 seconds.', true); tour.unreachable = 'The engine is not answering'; return }
       if (ui.error) { tour.unreachable = 'The engine reported an error'; return }
     }
   } finally { tour.driving = false }
@@ -403,3 +418,6 @@ const highlights = computed(() => (tour.active ? step.value?.highlight ?? [] : [
 export function isHighlighted(panel: string, kind: string, name: string): boolean {
   return highlights.value.some(h => h.panel === panel && h.kind === kind && h.name === name)
 }
+
+/** Panels show everything up to the selected event. With no explicit selection they show everything shown, so a check that comes after the last byte still appears. */
+export const upToSeq = computed(() => (ui.selectedSeq != null ? selectedEvent.value?.seq ?? Infinity : Infinity))

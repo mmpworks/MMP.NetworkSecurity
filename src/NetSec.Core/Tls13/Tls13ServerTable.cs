@@ -117,13 +117,18 @@ namespace NetSec.Tls13
             ChainVerdict verdict = ChainCheck.RunForClient(chain, Tls13ClientTable.ParseAll(o.TrustAnchors), o.Now);
             if (!verdict.Passed) return Tls13Rules.Refuse(ClientCodeOf(verdict.Code), verdict.Detail);
             Certificate leaf = chain[0];
-            return StepDecision.Advance(
-                Effect.Absorb(message.Bytes),
-                Effect.Store(delegate { session.Leaf = leaf; }),
-                Tls13Rules.Pass(Tls13Codes.CertRequired),
-                Tls13Rules.Pass(ChainCheck.NoAnchor),
-                Tls13Rules.Pass(ChainCheck.Validity),
-                Tls13Rules.Pass(Tls13Codes.BadCertificate));
+            // RFC 8446 section 6.2: access_denied is for a valid certificate that access control then refuses.
+            if (o.ExpectedClientName != null && !leaf.SubjectIs(o.ExpectedClientName))
+                return Tls13Rules.Refuse(Tls13Codes.ClientNameRefused, "the chain is good, and this certificate does not carry the allowed name " + o.ExpectedClientName);
+            List<StepEffect> effects = new List<StepEffect>();
+            effects.Add(Effect.Absorb(message.Bytes));
+            effects.Add(Effect.Store(delegate { session.Leaf = leaf; }));
+            effects.Add(Tls13Rules.Pass(Tls13Codes.CertRequired));
+            effects.Add(Tls13Rules.Pass(ChainCheck.NoAnchor));
+            effects.Add(Tls13Rules.Pass(ChainCheck.Validity));
+            effects.Add(Tls13Rules.Pass(Tls13Codes.BadCertificate));
+            if (o.ExpectedClientName != null) effects.Add(Tls13Rules.Pass(Tls13Codes.ClientNameRefused));
+            return StepDecision.Advance(effects.ToArray());
         }
 
         static string ClientCodeOf(string chainCode)
@@ -139,8 +144,7 @@ namespace NetSec.Tls13
         static StepDecision ClientFinished(Tls13Session session, InboundMessage message)
         {
             Tls13Suite suite = session.Suite;
-            byte[] expected = Tls13KeySchedule.VerifyData(suite.Hash, session.Secrets.ClientHandshakeTrafficSecret, session.HashWith());
-            if (message.Body.Length != expected.Length || !ConstantTime.Equal(message.Body, 0, expected, 0, expected.Length))
+            if (!Tls13KeySchedule.VerifyFinished(suite.Hash, session.Secrets.ClientHandshakeTrafficSecret, session.HashWith(), message.Body))
                 return Tls13Rules.Refuse(Tls13Codes.FinishedMismatch, "the client Finished does not match this transcript");
             return StepDecision.Advance(
                 Effect.Absorb(message.Bytes),

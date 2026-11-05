@@ -99,6 +99,7 @@ namespace NetSec.Tests
             AuthDecision d = Token.Verify(Issuer.CopyPublic(), token, Now);
             Assert.False(d.Allowed);
             Assert.Equal("TOKEN_BAD_HEADER", d.Code);
+            Assert.Equal("token format", d.CheckName);
         }
 
         [Theory]
@@ -108,7 +109,9 @@ namespace NetSec.Tests
         [InlineData("!!.!!.!!")]
         public void Junk_is_named_malformed_and_never_a_failed_signature(string token)
         {
-            Assert.Equal("TOKEN_MALFORMED", Token.Verify(Issuer.CopyPublic(), token, Now).Code);
+            AuthDecision d = Token.Verify(Issuer.CopyPublic(), token, Now);
+            Assert.Equal("TOKEN_MALFORMED", d.Code);
+            Assert.Equal("token format", d.CheckName);
         }
 
         // ---------------------------------------------------------------- finding 3: a private key in the proof header

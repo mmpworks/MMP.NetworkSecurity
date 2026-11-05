@@ -59,8 +59,8 @@
       "lesson": 0,
       "title": "Same bytes in, same bytes out",
       "text": [
-        "Compare the two arrows. The byte counts match, and so do the bytes.",
-        "Pick each arrow and read its hex. The two lists are the same."
+        "Compare the two arrows. The byte counts match.",
+        "Pick each arrow and read its hex. The bytes match except the first one: 01 marks the hello and 02 marks the reply."
       ],
       "glossary": [],
       "bind": { "kind": "event", "eventType": "wire.sent", "match": { "actor": "server" } },
@@ -70,6 +70,11 @@
           "id": "L0-C01",
           "text": "The server returns the same bytes it received, and the engine holds no crypto.",
           "source": "src/NetSec.Core/Machine/EchoEngine.cs: the class comment (\"before any cryptography exists\"), ServerHello (sends the received body back) and ClientReply (compares the reply with the bytes sent)"
+        },
+        {
+          "id": "L0-C04",
+          "text": "The echo frame is a 1-byte type, a 2-byte length and the body. The hello has type 1 and the reply has type 2, so the reply matches the hello except for the first byte.",
+          "source": "src/NetSec.Core/Machine/EchoEngine.cs: HelloType = 1, ReplyType = 2, and the frame comment; reader-a15a's run of the lab (PR #57)"
         }
       ],
       "unlock": { "mode": "ack" }
