@@ -192,6 +192,74 @@ namespace NetSec.Tests
             Assert.Throws<InvalidOperationException>(() => s.Absorb(new byte[1], 0, 1));
         }
 
+        // SHA-256 padding for a message of n bytes: 0x80, zeros, then the length in bits as 8 big-endian bytes.
+        static byte[] Sha256Padding(int n)
+        {
+            byte[] pad = new byte[64 - (n + 8) % 64 + 8];
+            pad[0] = 0x80;
+            ulong bits = (ulong)n * 8;
+            for (int i = 0; i < 8; i++) pad[pad.Length - 1 - i] = (byte)(bits >> (8 * i));
+            return pad;
+        }
+
+        [Theory]
+        [InlineData(0, 0)]
+        [InlineData(1, 5)]
+        [InlineData(55, 9)]
+        [InlineData(56, 64)]
+        [InlineData(64, 65)]
+        [InlineData(119, 200)]
+        public void Resume_extends_a_digest_with_no_knowledge_of_the_message(int messageLength, int extensionLength)
+        {
+            byte[] message = Fill(messageLength), extension = Fill(extensionLength);
+            byte[] padding = Sha256Padding(messageLength);
+            byte[] digest = Run("sha256", message);
+            Assert.Equal(0, (messageLength + padding.Length) % 64);
+
+            IHash resumed = Hashes.Sha256Resume(digest, messageLength + padding.Length);
+            resumed.Update(extension, 0, extension.Length);
+
+            byte[] whole = Concat(Concat(message, padding), extension);
+            Assert.Equal(Hex.Encode(Bcl("sha256", whole)), Hex.Encode(resumed.Finish()));
+        }
+
+        [Fact]
+        public void Resume_from_the_start_values_is_a_new_hash()
+        {
+            byte[] start = Hex.Decode("6a09e667bb67ae853c6ef372a54ff53a510e527f9b05688c1f83d9ab5be0cd19");
+            byte[] data = Fill(70);
+            IHash resumed = Hashes.Sha256Resume(start, 0);
+            resumed.Update(data, 0, data.Length);
+            Assert.Equal(Hex.Encode(Run("sha256", data)), Hex.Encode(resumed.Finish()));
+        }
+
+        [Fact]
+        public void A_resumed_hash_clones_and_leaves_the_digest_unchanged()
+        {
+            byte[] digest = Run("sha256", Fill(10));
+            byte[] digestCopy = (byte[])digest.Clone();
+            byte[] tail = Fill(20);
+
+            IHash source = Hashes.Sha256Resume(digest, 64);
+            source.Update(tail, 0, tail.Length);
+            IHash clone = source.Clone();
+            clone.Update(tail, 0, tail.Length);
+            byte[] cloneDigest = clone.Finish();
+
+            source.Update(tail, 0, tail.Length);
+            Assert.Equal(Hex.Encode(source.Finish()), Hex.Encode(cloneDigest));
+            Assert.Equal(Hex.Encode(digestCopy), Hex.Encode(digest));
+        }
+
+        [Fact]
+        public void Resume_refuses_a_bad_digest_or_count()
+        {
+            Assert.Throws<ArgumentNullException>(() => Hashes.Sha256Resume(null, 64));
+            Assert.Throws<ArgumentException>(() => Hashes.Sha256Resume(new byte[31], 64));
+            Assert.Throws<ArgumentOutOfRangeException>(() => Hashes.Sha256Resume(new byte[32], 63));
+            Assert.Throws<ArgumentOutOfRangeException>(() => Hashes.Sha256Resume(new byte[32], -64));
+        }
+
         static byte[] Concat(byte[] a, byte[] b)
         {
             byte[] r = new byte[a.Length + b.Length];

@@ -35,6 +35,14 @@ namespace NetSec.Errors
         public const string LinkLost = "LINK_LOST";
         public const string PeerClosedEarly = "PEER_CLOSED_EARLY";
         public const string EchoMismatch = "ECHO_MISMATCH";
+        public const string MessageRefused = "MESSAGE_REFUSED";
+        public const string AesGcmTag = "AES_GCM_TAG";
+        public const string AesGcmNonceReuse = "AES_GCM_NONCE_REUSE";
+        public const string SealHashMismatch = "SEAL_HASH_MISMATCH";
+        public const string SealKeyedHashMismatch = "SEAL_KEYED_HASH_MISMATCH";
+        public const string SealHmacMismatch = "SEAL_HMAC_MISMATCH";
+        public const string SealCmacMismatch = "SEAL_CMAC_MISMATCH";
+        public const string KexConfirmMismatch = "KEX_CONFIRM_MISMATCH";
         public const string CeTransportUnavailable = "CE_TRANSPORT_UNAVAILABLE";
         public const string CeLinkNotBuilt = "CE_LINK_NOT_BUILT";
         public const string CeDeviceSilent = "CE_DEVICE_SILENT";
@@ -46,5 +54,6 @@ namespace NetSec.Errors
         public const string RsaMessageTooLong = "RSA_MESSAGE_TOO_LONG";
         public const string MlKemKeyInvalid = "MLKEM_KEY_INVALID";
         public const string MlKemCiphertextInvalid = "MLKEM_CIPHERTEXT_INVALID";
+        public const string TrainingKeyUnknown = "TRAINING_KEY_UNKNOWN";
     }
 }

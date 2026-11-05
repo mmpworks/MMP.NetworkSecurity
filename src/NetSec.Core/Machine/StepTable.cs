@@ -6,7 +6,7 @@ using NetSec.Trace;
 namespace NetSec.Machine
 {
     public enum StepOutcome { Advance, Stay, Fail }
-    public enum EffectKind { Absorb, Send, Secret, InstallKeys, Check, Deliver, Note, Store }
+    public enum EffectKind { Absorb, Send, Secret, InstallKeys, Check, Deliver, Note, Measure, Store }
     public enum Direction { Inbound, Outbound }
 
     public sealed class InboundMessage
@@ -41,6 +41,8 @@ namespace NetSec.Machine
         public readonly string[] From;
         public readonly int Channel;
         public readonly Direction Direction;
+        public readonly byte[] Wire;
+        public readonly string EventType;
         public readonly Action Store;
 
         internal StepEffect(EffectKind kind, string name, string text, byte[] bytes, byte[] iv, TraceField[] fields, string[] from, int channel, Direction direction)
@@ -49,6 +51,12 @@ namespace NetSec.Machine
         internal StepEffect(EffectKind kind, string name, string text, byte[] bytes, byte[] iv, TraceField[] fields, string[] from, int channel, Direction direction, Action store)
         {
             Kind = kind; Name = name; Text = text; Bytes = bytes; Iv = iv; Fields = fields; From = from; Channel = channel; Direction = direction; Store = store;
+        }
+
+        internal StepEffect(EffectKind kind, string name, string text, byte[] bytes, TraceField[] fields, string[] from, byte[] wire, string eventType)
+            : this(kind, name, text, bytes, null, fields, from, 0, Direction.Outbound)
+        {
+            Wire = wire; EventType = eventType;
         }
     }
 
@@ -61,6 +69,15 @@ namespace NetSec.Machine
         /// <summary>Keeps a value a rule worked out for a later rule. The rule returns this and the interpreter runs it, so a rule still changes nothing. It emits no event.</summary>
         public static StepEffect Store(Action store) { return new StepEffect(EffectKind.Store, null, null, null, null, null, null, 0, Direction.Outbound, store); }
         public static StepEffect Secret(string holder, string name, byte[] value, params string[] from) { return new StepEffect(EffectKind.Secret, name, holder, value, null, null, from, 0, Direction.Outbound); }
+
+        /// <summary>A message whose wire bytes differ from its plain bytes. Fields index the wire bytes. The Plain tamper point does not run.</summary>
+        public static StepEffect SendProtected(string message, byte[] plain, byte[] wire, TraceField[] fields) { return new StepEffect(EffectKind.Send, message, null, plain, fields, null, wire, null); }
+
+        /// <summary>A secret under a named event type, with the message it belongs to.</summary>
+        public static StepEffect SecretAs(string eventType, string message, string holder, string name, byte[] value, params string[] from) { return new StepEffect(EffectKind.Secret, name, holder + "|" + message, value, null, from, null, eventType); }
+
+        /// <summary>A number the UI shows and never invents. Detail is a name=value;name=value string.</summary>
+        public static StepEffect Measure(string message, string detail, byte[] plain) { return new StepEffect(EffectKind.Measure, message, detail, plain, null, null, null, null); }
         public static StepEffect InstallKeys(Direction d, string suite, byte[] key, byte[] iv) { return new StepEffect(EffectKind.InstallKeys, suite, null, key, iv, null, null, 0, d); }
         public static StepEffect Check(string name, string code) { return Make(EffectKind.Check, name, code, null); }
         public static StepEffect Deliver(int channel, byte[] plain) { return new StepEffect(EffectKind.Deliver, null, null, plain, null, null, null, channel, Direction.Inbound); }

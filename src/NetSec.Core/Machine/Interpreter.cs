@@ -13,6 +13,12 @@ namespace NetSec.Machine
         void Absorb(byte[] message);
         byte[] Protect(string message, byte[] body);
         void InstallKeys(Direction direction, string suite, byte[] key, byte[] iv);
+
+        /// <summary>The interpreter hands each secret here, so a later rule can read it.</summary>
+        void Remember(string name, byte[] value);
+
+        /// <summary>What the received event shows as plain: the receiver's view after any unlock.</summary>
+        byte[] PlainOf(InboundMessage message);
     }
 
     public static class MachineStates
@@ -119,6 +125,7 @@ namespace NetSec.Machine
             check.Detail = failure.Error.Message;
             TraceEventDraft draft = new TraceEventDraft();
             draft.Type = "check.result";
+            draft.Message = failure.Error.CheckName;
             draft.Step = failure.Error.Step;
             draft.Check = check;
             Emit(draft, null);
@@ -150,6 +157,7 @@ namespace NetSec.Machine
                 case EffectKind.Check: ApplyCheck(effect, step); break;
                 case EffectKind.Deliver: _app.Add(new DeliveredChunk(effect.Channel, effect.Bytes)); break;
                 case EffectKind.Note: ApplyNote(effect, step); break;
+                case EffectKind.Measure: ApplyMeasure(effect, step); break;
                 case EffectKind.Store: effect.Store(); break;
                 default: throw new InvalidOperationException("no case for effect kind " + effect.Kind);
             }
@@ -158,7 +166,7 @@ namespace NetSec.Machine
         void ApplySend(StepEffect effect, string step)
         {
             byte[] body = effect.Bytes;
-            if (_tamper != null)
+            if (_tamper != null && effect.Wire == null)
             {
                 TamperResult result = _tamper.Apply(TamperPoint.Plain, _stream.StreamId, _stream.NextSeq, effect.Name, body);
                 if (result != null && result.Bytes != null) body = result.Bytes;
@@ -169,21 +177,24 @@ namespace NetSec.Machine
             draft.Step = step;
             draft.Plain = body;
             draft.Fields = effect.Fields;
-            Emit(draft, _session.Protect(effect.Name, body));
+            Emit(draft, effect.Wire ?? _session.Protect(effect.Name, body));
         }
 
         void ApplySecret(StepEffect effect, string step)
         {
+            string[] holderAndMessage = effect.Text.Split('|');
             TraceSecret secret = new TraceSecret();
-            secret.Holder = effect.Text;
+            secret.Holder = holderAndMessage[0];
             secret.Name = effect.Name;
             secret.Bytes = effect.Bytes;
             secret.DerivedFrom = effect.From;
             TraceEventDraft draft = new TraceEventDraft();
-            draft.Type = "secret.derived";
+            draft.Type = effect.EventType ?? "secret.derived";
+            draft.Message = holderAndMessage.Length > 1 ? holderAndMessage[1] : null;
             draft.Step = step;
             draft.Secrets = new TraceSecret[] { secret };
             Emit(draft, null);
+            _session.Remember(effect.Name, effect.Bytes);
         }
 
         void ApplyInstallKeys(StepEffect effect, string step)
@@ -204,8 +215,20 @@ namespace NetSec.Machine
             check.Passed = true;
             TraceEventDraft draft = new TraceEventDraft();
             draft.Type = "check.result";
+            draft.Message = effect.Name;
             draft.Step = step;
             draft.Check = check;
+            Emit(draft, null);
+        }
+
+        void ApplyMeasure(StepEffect effect, string step)
+        {
+            TraceEventDraft draft = new TraceEventDraft();
+            draft.Type = "measure.result";
+            draft.Message = effect.Name;
+            draft.Detail = effect.Text;
+            draft.Plain = effect.Bytes;
+            draft.Step = step;
             Emit(draft, null);
         }
 
@@ -224,7 +247,7 @@ namespace NetSec.Machine
             draft.Type = message.EventType ?? _session.ReceivedType;
             draft.Message = message.Name;
             draft.Step = row == null ? null : row.Step;
-            draft.Plain = message.Bytes;
+            draft.Plain = _session.PlainOf(message);
             draft.Fields = message.Fields;
             Emit(draft, null);
         }

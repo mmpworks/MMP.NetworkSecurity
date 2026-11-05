@@ -64,6 +64,11 @@ namespace NetSec.Tls13
             Transcript = joined;
         }
 
+        /// <summary>Rules read secrets from Secrets, which a Store effect sets, so a remembered name adds nothing here.</summary>
+        public void Remember(string name, byte[] value) { }
+
+        public byte[] PlainOf(InboundMessage message) { return message.Bytes; }
+
         public void InstallKeys(Direction direction, string suite, byte[] key, byte[] iv)
         {
             RecordProtection protection = new RecordProtection(key, iv);

@@ -31,6 +31,7 @@ namespace NetSec.Tls13
             _stream = options.Stream;
             _peer = options.Peer;
             _machine = new Interpreter<Tls13Session>(table, _session, startState, _stream, _peer, options.Tamper);
+            AlertReceived = -1;
         }
 
         public static Tls13Engine CreateClient(Tls13Options options)
@@ -56,7 +57,6 @@ namespace NetSec.Tls13
 
         public EngineOutput Start()
         {
-            AlertReceived = -1;
             Guarded(delegate { _machine.Dispatch(InboundMessage.Start); });
             return Take();
         }
