@@ -5,7 +5,7 @@
       "lesson": 8,
       "title": "SSH: two proofs, no certificate authority",
       "text": [
-        "SSH solves the same trust problem as TLS in a different way. There is no certificate authority. The client remembers each server's key, and the server checks each user's key.",
+        "SSH solves the same trust problem as TLS in a different way. This lab uses no certificate authority. SSH can use one, but it does not need one. The client remembers each server's key, and the server checks each user's key.",
         "So SSH asks for two proofs. The server proves itself with its host key. The client proves itself with its own key pair, and this is how a client authenticates to a server in SSH.",
         "SSH is also one of the two ways an old device may reach a new server. Lesson 9 builds on this one.",
         "Built to show the parts. Do not copy."
@@ -13,6 +13,13 @@
       "glossary": [],
       "bind": { "kind": "concept" },
       "highlight": ["diagram:lane=client", "diagram:lane=server"],
+      "claims": [
+        {
+          "id": "L8-C21",
+          "text": "SSH can tie host keys to names with a local database or with a certification authority; this lab pins the host key and uses no CA.",
+          "source": "RFC 4251, section 4.1 (Host Keys); docs/lesson-ssh-names.md, Events, ssh.hostkey.seen and ssh.hostkey.first-use rows"
+        }
+      ],
       "unlock": { "mode": "ack" }
     },
     {
@@ -204,11 +211,11 @@
       "lesson": 8,
       "title": "Every packet carries a seal",
       "text": [
-        "The receiver checks the seal on each packet. The check is named packet MAC. It passes on the normal run.",
+        "The receiver checks the seal on each packet. The check is named packet MAC. On the normal run the lab shows no event for it. Only a failure shows up.",
         "Try it: flip one byte of the protected login packet. The seal no longer fits, and the check fails."
       ],
       "glossary": [],
-      "bind": { "kind": "event", "eventType": "check.result", "match": { "message": "packet MAC" } },
+      "bind": { "kind": "event", "eventType": "wire.sent", "match": { "actor": "client", "message": "UserauthSigned" } },
       "highlight": ["check:name=packet MAC"],
       "tryIt": {
         "id": "L8-S09-T1",
@@ -216,6 +223,13 @@
         "action": { "type": "run-attack", "attackId": "L8-flip-packet" },
         "expect": { "type": "check", "name": "packet MAC", "result": "fail" }
       },
+      "claims": [
+        {
+          "id": "L8-C22",
+          "text": "On the control run the lab emits no packet MAC check event; only a failure shows the name, the same as AEAD tag in lesson 5.",
+          "source": "reader-a15a's run of the lab, step-text sweep (PR #57); docs/lesson-ssh-names.md, Attacks, L8-flip-packet"
+        }
+      ],
       "unlock": { "mode": "action", "ref": "L8-S09-T1" }
     },
     {
