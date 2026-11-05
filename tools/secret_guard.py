@@ -26,9 +26,9 @@ PEM_BLOCK = re.compile(
     "-----BEGIN [A-Z0-9 ]*" + MARKER + "-----(?P<body>(?:(?!-----BEGIN ).){0,65536}?)-----END [A-Z0-9 ]*" + MARKER + "-----",
     re.DOTALL,
 )
-# A key's body is base64, whatever wraps its lines: escapes, quotes, XML, comment marks. The smallest key here, an Ed25519 seed in PKCS#8, is 64 characters.
+# A key's body is base64, whatever wraps its lines: escapes, quotes, XML, comment marks. Each line of a key is one long run, and a word of prose is short.
 BASE64_RUN = re.compile(r"[A-Za-z0-9+/=]+")
-SMALLEST_KEY = 64
+SHORTEST_KEY_RUN = 16
 # Golden traces hold built-in training keys, which are public by design. A session file on a learner's keys is what the rule exists for.
 GOLDEN_FOLDER = "acceptance/golden/"
 
@@ -60,7 +60,7 @@ def holds_key(data):
     """A UTF-16 file reads as text once its NUL bytes are gone. Latin-1 keeps every byte as one character."""
     text = data.replace(b"\0", b"").decode("latin-1")
     for match in PEM_BLOCK.finditer(text):
-        if sum(len(run) for run in BASE64_RUN.findall(match.group("body"))) >= SMALLEST_KEY:
+        if any(len(run) >= SHORTEST_KEY_RUN for run in BASE64_RUN.findall(match.group("body"))):
             return True
     return False
 
