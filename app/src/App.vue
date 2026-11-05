@@ -3,7 +3,7 @@ import { computed, onBeforeUnmount, onMounted, ref, watch } from 'vue'
 import { Pane, Splitpanes } from 'splitpanes'
 import { vuetify } from './theme'
 import {
-  CE_LABEL, GLASS_NOTE, active, addr, allEvents, cePanel, clearError, connect, hostState, onTheme, pauseEngine, retryConnect, runEngine, selectEvent, selectedEvent,
+  CE_LABEL, GLASS_NOTE, TARGET_DEVICES, active, addr, allEvents, cePanel, clearError, connect, hostState, onTheme, pauseEngine, retryConnect, runEngine, selectEvent, selectedEvent,
   setMode, setTheme, shownEvents, stepEngine, switchSession, tour, tourBack, tourNext, tourReplay, trainingChip, ui,
 } from './store'
 import type { ViewMode } from './types'
@@ -130,6 +130,9 @@ const shortcuts: [string, string][] = [
             <span v-else>The OS handles the keys and this course shows none of them.</span>
           </v-tooltip>
           <v-chip :color="hostColor" data-testid="host-chip">{{ hostChip }}</v-chip>
+          <label class="target-label">Target device
+            <select v-model="ui.target" class="ns-select" data-testid="target-select"><option v-for="d in TARGET_DEVICES" :key="d.id" :value="d.id" :disabled="!d.enabled">{{ d.label }}</option></select>
+          </label>
           <v-spacer />
           <v-btn-toggle :model-value="ui.mode" mandatory density="compact" data-testid="mode-switch" @update:model-value="v => v && setMode(v)">
             <v-btn value="tour" data-testid="mode-tour">Tour</v-btn><v-btn value="free" data-testid="mode-free">Free play</v-btn>
