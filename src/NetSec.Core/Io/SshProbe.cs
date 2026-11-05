@@ -87,7 +87,7 @@ namespace NetSec.Io
             string session = r.SessionId ?? r.TraceId ?? "glass";
             TraceStream stream = new TraceStream(session + "/" + actor + "/ssh", session, r.TraceId, r.Hop, actor, new MonotonicClock());
             SshEngine engine = isClient
-                ? SshEngine.Client(Client(keys, r.Suite, r.Random, r.PeerName, r.PeerPort, r.KnownHosts, r.KnownHosts == null), stream, r.Tamper, peer)
+                ? SshEngine.Client(Client(keys, r.Suite, r.Random, r.PeerName, r.PeerPort, r.KnownHosts, r.TrustFirstUse), stream, r.Tamper, peer)
                 : SshEngine.Server(Server(keys, r.Suite, r.Random, r.AllowTunnel), stream, r.Tamper, peer);
             return new GlassSshSession(engine, r.Link, r.Sink, r.Gate, r.Tamper, ReadDeadlineMs, null, r.OpenTarget ?? SocketTarget);
         }
@@ -147,7 +147,7 @@ namespace NetSec.Io
                 yield break;
             }
 
-            SshClientOptions options = SshSetup.Client(new TrainingKeySource(), r.SshSuite, RandomOf(r), r.PeerName ?? r.Host, r.Port, ReadText(r.KnownHostsFile), r.KnownHostsFile == null);
+            SshClientOptions options = SshSetup.Client(new TrainingKeySource(), r.SshSuite, RandomOf(r), r.PeerName ?? r.Host, r.Port, ReadText(r.KnownHostsFile), false);
             if (r.ClientKeyId != null) options.UserKey = new TrainingKeySource().Find(r.ClientKeyId);
             TraceStream stream = new TraceStream("probe/client/ssh", "probe", "probe", null, "client", new MonotonicClock());
             GlassSshSession session = new GlassSshSession(SshEngine.Client(options, stream, r.Tamper, "server"), connect.Result, sink, new FreeRunGate(), r.Tamper, DeadlineMs, null, null);

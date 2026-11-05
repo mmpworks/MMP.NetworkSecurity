@@ -54,9 +54,22 @@ namespace NetSec.Ssh
         public EngineOutput Feed(byte[] b, int off, int n)
         {
             _session.Reader.Append(b, off, n);
+            Guarded(delegate { while (!_machine.IsEnded && DispatchNext()) { } });
+            return _machine.TakeOutput();
+        }
+
+        public EngineOutput Command(EngineCommand c)
+        {
+            if (!_machine.IsEnded) Guarded(delegate { Run(c); });
+            return _machine.TakeOutput();
+        }
+
+        /// <summary>Every named failure of a parse or a seal ends here, from a feed or from a command.</summary>
+        void Guarded(Action work)
+        {
             try
             {
-                while (!_machine.IsEnded && DispatchNext()) { }
+                work();
             }
             catch (ParseFailure failure)
             {
@@ -70,13 +83,6 @@ namespace NetSec.Ssh
             {
                 _machine.Fail(ErrorCodes.MessageRefused, "message shape", refused.Message, null);
             }
-            return _machine.TakeOutput();
-        }
-
-        public EngineOutput Command(EngineCommand c)
-        {
-            if (!_machine.IsEnded) Run(c);
-            return _machine.TakeOutput();
         }
 
         void Run(EngineCommand c)
@@ -129,6 +135,7 @@ namespace NetSec.Ssh
                 case SshCodes.PacketLength: return SshChecks.PacketLength;
                 case SshCodes.Version: return SshChecks.Version;
                 case SshCodes.HostKeyBad: return SshChecks.HostKeyShape;
+                case SshCodes.SequenceExhausted: return SshChecks.Sequence;
                 default: return "message shape";
             }
         }

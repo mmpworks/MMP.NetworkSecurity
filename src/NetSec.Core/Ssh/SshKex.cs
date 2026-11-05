@@ -16,13 +16,16 @@ namespace NetSec.Ssh
 
         const string None = "none";
 
+        // The pre-standard names of draft-miller-sshm-strict-kex section 3.1. OpenSSH 9.6 on and Go x/crypto use these, and both sides must offer them.
+        const string StrictClient = "kex-strict-c-v00@openssh.com", StrictServer = "kex-strict-s-v00@openssh.com";
+
         public const string PrivateName = "ssh.ephemeral.private", SharedName = "ssh.shared.K", HashName = "ssh.exchange.H", SessionName = "ssh.session.id";
 
         public static byte[] BuildKexInit(SshSession s)
         {
             SshAlgorithms a = s.Algorithms;
             return new ByteWriter().U8(SshMsg.KexInit).Put(s.Draw(CookieSize))
-                .Prefixed(a.Kex).Prefixed(a.HostKey)
+                .Prefixed(a.Kex + "," + (s.IsClient ? StrictClient : StrictServer)).Prefixed(a.HostKey)
                 .Prefixed(a.Cipher).Prefixed(a.Cipher)
                 .Prefixed(a.Mac).Prefixed(a.Mac)
                 .Prefixed(None).Prefixed(None)
@@ -41,13 +44,28 @@ namespace NetSec.Ssh
             r.Take("cookie", "random", CookieSize);
             string[] want = { a.Kex, a.HostKey, a.Cipher, a.Cipher, a.Mac, a.Mac, None, None };
             for (int i = 0; i < want.Length; i++)
-                if (!SshExchange.ListHas(r.Prefixed("list", "data"), want[i]))
+            {
+                byte[] list = r.Prefixed("list", "data");
+                if (!SshExchange.ListHas(list, want[i]))
                     return StepDecision.Fail(SshCodes.NoCommonAlg, SshChecks.Algorithm, "the peer does not list " + want[i]);
+                if (i == 0) s.StrictKex = SshExchange.ListHas(list, s.IsClient ? StrictServer : StrictClient);
+            }
             r.Prefixed("languages", "data");
             r.Prefixed("languages", "data");
             if (r.U8("guess", "data") != 0)
                 return StepDecision.Fail(SshCodes.NoCommonAlg, SshChecks.Algorithm, "the peer sent a guessed key exchange packet, and this lab takes none");
+            if (s.StrictKex && s.Reader.Sequence != 1)
+                return StepDecision.Fail(SshCodes.KexStrict, SshChecks.StrictKex, "strict KEX needs KexInit first, and " + (s.Reader.Sequence - 1) + " packets came before it");
             return null;
+        }
+
+        /// <summary>
+        /// Off when the peer does not offer it, because an old device must still connect. The Terrapin prefix attack (CVE-2023-48795) still fails then on
+        /// these two suites: the MAC covers the plain text, and a deleted packet moves the cipher stream. Adding chacha20-poly1305 or an -etm MAC would need it on.
+        /// </summary>
+        public static StepEffect StrictNote(SshSession s)
+        {
+            return Effect.Note("ssh.kex.strict", s.StrictKex ? "on" : "off");
         }
 
         public static StepEffect[] WeakNotes(SshSession s)

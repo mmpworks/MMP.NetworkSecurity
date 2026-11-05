@@ -122,6 +122,21 @@ namespace NetSec.Labs
             }
         }
 
+        /// <summary>A client for a lab that pairs TLS 1.3 with another engine (lesson 7).</summary>
+        public Tls13Engine Client(LabContext c, ITamperHook plan, bool offerOnlyTls11)
+        {
+            Tls13Options o = ClientOptions(c, plan, new TrainingCa(new TrainingKeySource()));
+            o.OfferOnlyTls11 = offerOnlyTls11;
+            return Tls13Engine.CreateClient(o);
+        }
+
+        /// <summary>A server for a lab that pairs TLS 1.3 with another engine (lesson 7).</summary>
+        public Tls13Engine Server(LabContext c, ITamperHook plan)
+        {
+            ITrainingKeySource keys = new TrainingKeySource();
+            return Tls13Engine.CreateServer(ServerOptions(c, plan, LeafFor(null, new TrainingCa(keys), keys), keys));
+        }
+
         Tls13Options Common(LabContext c, ITamperHook plan, string actor, string peer)
         {
             Tls13Options o = new Tls13Options();

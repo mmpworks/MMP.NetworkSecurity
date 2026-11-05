@@ -120,6 +120,18 @@ namespace NetSec.Crypto
 
         public static bool VerifySha256(RsaPublic key, byte[] message, byte[] signature) { return Verify(key, Sha256Prefix, Hashes.Sha256(), message, signature); }
 
+        /// <summary>The TLS 1.1 signature block: 36 bytes of MD5 then SHA-1, with no DigestInfo (RFC 4346 section 7.4.3).</summary>
+        public static byte[] SignMd5Sha1(RsaPrivate key, byte[] md5ThenSha1)
+        {
+            if (key == null) throw new ArgumentNullException("key");
+            return key.Raw(EncodeDigestBlock(key.ModulusLength, new byte[0], md5ThenSha1));
+        }
+
+        public static bool VerifyMd5Sha1(RsaPublic key, byte[] md5ThenSha1, byte[] signature)
+        {
+            return VerifyDigest(key, new byte[0], md5ThenSha1, signature);
+        }
+
         static byte[] Sign(RsaPrivate key, byte[] prefix, IHash hash, byte[] message)
         {
             if (key == null) throw new ArgumentNullException("key");
@@ -132,12 +144,19 @@ namespace NetSec.Crypto
         /// </summary>
         static bool Verify(RsaPublic key, byte[] prefix, IHash hash, byte[] message, byte[] signature)
         {
+            if (message == null) throw new ArgumentNullException("message");
+            hash.Update(message, 0, message.Length);
+            return VerifyDigest(key, prefix, hash.Finish(), signature);
+        }
+
+        static bool VerifyDigest(RsaPublic key, byte[] prefix, byte[] digest, byte[] signature)
+        {
             if (key == null) throw new ArgumentNullException("key");
             if (signature == null) throw new ArgumentNullException("signature");
             if (signature.Length != key.ModulusLength) return false;
             if (BigUInt.FromBytes(signature).CompareTo(key.N) >= 0) return false;
             byte[] actual = key.Raw(signature);
-            byte[] expected = EncodeSignatureBlock(key.ModulusLength, prefix, hash, message);
+            byte[] expected = EncodeDigestBlock(key.ModulusLength, prefix, digest);
             int difference = 0;
             for (int i = 0; i < expected.Length; i++) difference |= actual[i] ^ expected[i];
             return difference == 0;
@@ -148,7 +167,11 @@ namespace NetSec.Crypto
         {
             if (message == null) throw new ArgumentNullException("message");
             hash.Update(message, 0, message.Length);
-            byte[] digest = hash.Finish();
+            return EncodeDigestBlock(k, prefix, hash.Finish());
+        }
+
+        static byte[] EncodeDigestBlock(int k, byte[] prefix, byte[] digest)
+        {
             int paddingLength = k - prefix.Length - digest.Length - 3;
             if (paddingLength < MinimumPadding) throw new NetSecException(NetSecError.Of(ErrorCodes.RsaMessageTooLong, "the digest does not fit under this modulus"));
             byte[] block = new byte[k];
