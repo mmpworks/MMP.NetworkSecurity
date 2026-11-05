@@ -415,6 +415,7 @@ namespace NetSec.Tests
             for (int i = 0; i < 40; i++) last = client.Send(open.Result, Enumerable.Repeat((byte)i, 100 * 1024).ToArray());
             Assert.True(last.Wait(60000));
             for (int i = 0; i < 300 && record.Count < 40 * 100 * 1024; i++) Thread.Sleep(100);
+            Assert.False(client.Finished.IsCompleted, client.Finished.IsCompleted ? "the session ended: " + client.Finished.Result.Error?.Code : "");
             Assert.Equal(40 * 100 * 1024, record.Count);
             Assert.True(record.InOrder(100 * 1024), "the pieces arrived out of order");
         }
