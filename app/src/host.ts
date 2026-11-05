@@ -48,6 +48,7 @@ export function normalizeEvent(frame: any): TraceEvent {
     secrets: arr(e.secrets).map((s): TraceSecret => ({ holder: str(s.holder), name: str(s.name), hex: str(s.hex).toLowerCase(), derivedFrom: arr(s.derivedFrom).map(str) })),
     check,
     waiting,
+    detail: str(e.detail),
   }
 }
 
