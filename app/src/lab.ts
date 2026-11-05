@@ -40,3 +40,9 @@ export function avalancheOf(plainHex: string): Avalanche | null {
 export function percent(part: number, whole: number): number {
   return whole > 0 ? Math.round((part / whole) * 100) : 0
 }
+
+/** The picture sent under a message name, found among the shown events. A measure or an unlock event of the same message points at it. */
+export function pictureByMessage(events: readonly TraceEvent[], message: string): Picture | null {
+  for (const e of events) if (e.message === message) { const p = pictureOf(e); if (p) return p }
+  return null
+}

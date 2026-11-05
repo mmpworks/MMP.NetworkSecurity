@@ -1,11 +1,11 @@
 <script setup lang="ts">
 import { computed, onMounted, ref, watch } from 'vue'
-import { pictureOf } from '../lab'
+import { pictureByMessage } from '../lab'
 import { selectedEvent, shownEvents, ui } from '../store'
 import { parseDetail } from '../lab'
 
 // Lesson 1: the same 64 by 64 picture, clear and locked. The pixels come from the event's `plain` and from its `cipher` field, never from a file.
-const pic = computed(() => pictureOf(selectedEvent.value))
+const pic = computed(() => pictureByMessage(shownEvents.value, selectedEvent.value?.message ?? ''))
 const eve = computed(() => ui.view === 'eavesdropper')
 const clear = ref<HTMLCanvasElement | null>(null)
 const locked = ref<HTMLCanvasElement | null>(null)

@@ -23,6 +23,7 @@ const publicValues = computed(() => {
   const out: { key: string; name: string; hex: string }[] = []
   for (const e of shownEvents.value) {
     if (e.seq > upTo.value) break
+    if (e.type !== 'wire.sent') continue
     for (const f of e.fields) if (f.visibleToWire && (f.kind === 'random' || f.kind === 'key')) out.push({ key: `${e.seq}.${f.name}`, name: f.name, hex: e.wire.slice(f.offset * 2, (f.offset + Math.min(f.length, 16)) * 2) })
   }
   return out

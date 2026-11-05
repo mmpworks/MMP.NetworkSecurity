@@ -41,7 +41,7 @@ export async function walkTour(page: Page, lesson: number, shots?: string): Prom
       const tryIt = page.getByTestId('tour-try-it-action')
       if (await tryIt.isVisible()) await tryIt.click()
     }
-    const reason = (await page.getByTestId('next-reason').count()) ? await page.getByTestId('next-reason').textContent() : ''
+    const reason = await page.getByTestId('next-reason').textContent({ timeout: 500 }).catch(() => '')
     await expect(next, `Next never enabled at ${ids[i]}; reason: ${reason}`).toBeEnabled({ timeout: 45_000 })
     if (i < ids.length - 1) await next.click()
   }

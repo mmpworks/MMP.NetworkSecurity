@@ -35,7 +35,7 @@ const sessionTabs = computed(() => ui.sessions.filter(s => s.lesson === ui.lesso
 const hasPicture = computed(() => shownEvents.value.some(e => pictureOf(e)))
 const hasMeasure = computed(() => shownEvents.value.some(e => e.type === 'measure.result'))
 watch(selectedEvent, e => {
-  if (pictureOf(e)) ui.inspectorTab = 'picture'
+  if (e && e.message.startsWith('Picture') && hasPicture.value) ui.inspectorTab = 'picture'
   else if (e?.type === 'measure.result') ui.inspectorTab = 'measures'
   else if (e) ui.inspectorTab = 'bytes'
 })
