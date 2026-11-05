@@ -46,3 +46,76 @@ export function pictureByMessage(events: readonly TraceEvent[], message: string)
   for (const e of events) if (e.message === message) { const p = pictureOf(e); if (p) return p }
   return null
 }
+
+// ---- lesson 4: the certificate chain ----
+
+export type Status = 'pending' | 'pass' | 'fail'
+
+export interface ChainView {
+  root: TraceEvent | null
+  leaf: TraceEvent | null
+  proof: TraceEvent | null
+  checks: Record<string, Status>
+  rootToLeaf: Status
+  leafToProof: Status
+}
+
+/** The latest result of each named check up to `upTo`. A fail stays a fail. */
+export function checkStatuses(events: readonly TraceEvent[], upTo: number): Record<string, Status> {
+  const out: Record<string, Status> = {}
+  for (const e of events) {
+    if (e.seq > upTo) break
+    if (e.check && out[e.check.name] !== 'fail') out[e.check.name] = e.check.result
+  }
+  return out
+}
+
+const both = (a: Status | undefined, b: Status | undefined): Status => (a === 'fail' || b === 'fail' ? 'fail' : a === 'pass' && b === 'pass' ? 'pass' : 'pending')
+
+export function chainOf(events: readonly TraceEvent[], upTo: number): ChainView {
+  const shown = events.filter(e => e.seq <= upTo)
+  const checks = checkStatuses(shown, upTo)
+  return {
+    root: shown.find(e => e.type === 'ca.certificate.issued' && e.message === 'RootCertificate') ?? null,
+    leaf: shown.find(e => e.type === 'ca.certificate.issued' && e.message === 'ServerCertificate') ?? null,
+    proof: shown.find(e => e.type === 'tls.handshake.sent' && e.message === 'CertificateVerify') ?? null,
+    checks,
+    rootToLeaf: both(checks['chain to trust anchor'], checks['signature verify']),
+    leafToProof: checks['CertificateVerify signature'] ?? 'pending',
+  }
+}
+
+// ---- lessons 5 and 6: key ladders ----
+
+export interface Rung { key: string; holder: string; name: string; state: 'held' | 'erased'; derivedFrom: string[]; seq: number }
+
+const TLS_LADDER = /^(early_secret|handshake_secret|master_secret|[cs]_hs_traffic|[cs]_ap_traffic|exp_master|x25519_shared|mlkem_shared|hybrid_shared)$/
+
+export const isLadderEvent = (e: TraceEvent): boolean =>
+  e.type.startsWith('dukpt.key.') || (e.type === 'secret.derived' && e.secrets.some(s => TLS_LADDER.test(s.name)))
+
+/** Rungs in the order the engine emitted them. An erase event marks the rung erased, or adds it as erased when it was never derived. */
+export function ladderRungs(events: readonly TraceEvent[], upTo: number): Rung[] {
+  const rungs = new Map<string, Rung>()
+  for (const e of events) {
+    if (e.seq > upTo) break
+    if (e.type === 'dukpt.key.erased') {
+      const key = `${e.actor}.${e.message}`
+      const prior = rungs.get(key)
+      rungs.set(key, { key, holder: e.actor, name: e.message, state: 'erased', derivedFrom: prior?.derivedFrom ?? [], seq: prior?.seq ?? e.seq })
+    } else if (isLadderEvent(e)) {
+      for (const s of e.secrets) { const key = `${s.holder}.${s.name}`; if (!rungs.has(key)) rungs.set(key, { key, holder: s.holder, name: s.name, state: 'held', derivedFrom: s.derivedFrom, seq: e.seq }) }
+    }
+  }
+  return [...rungs.values()]
+}
+
+/** The reader's register count, from the latest `Reader registers` measure. */
+export function registers(events: readonly TraceEvent[], upTo: number): { held: number; next: number } | null {
+  let out: { held: number; next: number } | null = null
+  for (const e of events) {
+    if (e.seq > upTo) break
+    if (e.type === 'measure.result' && e.message === 'Reader registers') { const d = parseDetail(e.detail); out = { held: Number(d.held ?? 0), next: Number(d.next ?? 0) } }
+  }
+  return out
+}

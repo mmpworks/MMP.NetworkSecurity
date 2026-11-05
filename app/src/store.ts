@@ -54,7 +54,7 @@ export const ui = reactive({
   engine: 'idle' as 'idle' | 'running' | 'stepping' | 'waiting' | 'finished',
   shortcuts: false,
   follow: true,
-  inspectorTab: 'bytes' as 'bytes' | 'picture' | 'measures',
+  inspectorTab: 'bytes' as 'bytes' | 'picture' | 'measures' | 'chain' | 'ladder',
 })
 
 export const tour = reactive({
@@ -99,7 +99,7 @@ export const unlock = computed<Unlock>(() => {
   const events = allEvents.value
   const sinceTryIt = active.value?.id === tour.sessionId ? events.slice(tour.tryItStart) : events
   return evaluateUnlock(s, {
-    boundIndex: tour.bound[tour.stepIndex] ?? -1, events, view: ui.view, selectedSeq: ui.selectedSeq, actionDone: tour.actionDone, outcome: active.value?.parentId ? active.value.finished?.outcome ?? '' : '', eventsSinceTryIt: sinceTryIt,
+    boundIndex: tour.bound[tour.stepIndex] ?? -1, events, view: ui.view, selectedSeq: ui.selectedSeq, actionDone: tour.actionDone, outcome: active.value?.parentId ? active.value.finished?.outcome ?? '' : '', caughtCheck: active.value?.parentId && active.value.finished?.outcome === 'caught' ? active.value.finished.check : '', eventsSinceTryIt: sinceTryIt,
   })
 })
 

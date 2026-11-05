@@ -28,6 +28,8 @@ export const isWireSent = (e: TraceEvent): boolean => e.type === 'wire.sent'
 // Protected means the engine marked part of the wire bytes as hidden from the wire (visibleToWire false). A tampered byte also makes
 // plain differ from wire, so comparing the two would call a tamper "encrypted".
 export const isProtected = (e: TraceEvent): boolean => e.wire.length > 0 && e.fields.some(f => !f.visibleToWire)
+// Events that draw a marker on one lane: key installs, certificates issued, keys erased, alerts.
+export const isNoteEvent = (e: TraceEvent): boolean => e.type.startsWith('keys.') || e.type === 'ca.certificate.issued' || e.type === 'dukpt.key.erased' || e.type === 'tls.alert.sent'
 export const byteCount = (hex: string): number => hex.length >> 1
 
 export function laneNames(events: readonly TraceEvent[], declared: readonly string[]): string[] {
@@ -57,7 +59,7 @@ export function layoutDiagram(events: readonly TraceEvent[], declared: readonly 
       })
     } else if (e.check && view !== 'eavesdropper') {
       rows.push({ seq: e.seq, y, kind: 'check', fromX: xOf(e.actor), toX: xOf(e.actor), label: e.check.name, bytes: 0, protectedBytes: false, unreadable: false, check: e.check, head: '' })
-    } else if (e.type.startsWith('keys.') && view !== 'eavesdropper') {
+    } else if (isNoteEvent(e) && view !== 'eavesdropper') {
       rows.push({ seq: e.seq, y, kind: 'note', fromX: xOf(e.actor), toX: xOf(e.actor), label: e.message || e.type, bytes: 0, protectedBytes: true, unreadable: false, check: null, head: '' })
     }
   }
