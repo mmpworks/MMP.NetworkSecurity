@@ -1,11 +1,11 @@
 {
   "summary": {
     "schema": 1,
-    "timestamp": "2026-11-05T05:02:17.2456287-06:00",
+    "timestamp": "2026-11-05T05:07:19.0370123-06:00",
     "machine": "BEAST",
     "command": "run.ps1 -Clauses A12",
     "productRoot": "E:\\dev\\ns-s7",
-    "productCommit": "f616436",
+    "productCommit": "502784a",
     "acceptanceCommit": "a85c872",
     "freshClone": false,
     "productPresent": true,
@@ -42,7 +42,7 @@
       "status": "PASS",
       "reason": "",
       "detail": "cl.exe builds the DLL as C++ and the same file as C, warnings as errors; 103424 bytes",
-      "ms": 5175
+      "ms": 3885
     },
     {
       "id": "A12.native.load-direct.cf",
@@ -54,7 +54,7 @@
       "status": "PASS",
       "reason": "",
       "detail": "6 of 6 vectors",
-      "ms": 5094
+      "ms": 3555
     },
     {
       "id": "A12.native.load-direct.net10",
@@ -77,8 +77,8 @@
       "referee": "cl.exe and a live run",
       "status": "NOT RUN",
       "reason": "NATIVE_DLL_NOT_BUILT",
-      "detail": "run groups/native first with the same --work folder (A12.native.build-cl); expected E:\\dev\\ns-s7\\acceptance\\.work\\run-20261105-050139\\native-x64\\netsec_ct.dll",
-      "ms": 19
+      "detail": "run groups/native first with the same --work folder (A12.native.build-cl); expected E:\\dev\\ns-s7\\acceptance\\.work\\run-20261105-050651\\native-x64\\netsec_ct.dll",
+      "ms": 4
     },
     {
       "id": "A12.product.native-compare-loads.net10",
@@ -89,8 +89,8 @@
       "referee": "cl.exe and a live run",
       "status": "NOT RUN",
       "reason": "NATIVE_DLL_NOT_BUILT",
-      "detail": "run groups/native first with the same --work folder (A12.native.build-cl); expected E:\\dev\\ns-s7\\acceptance\\.work\\run-20261105-050139\\native-x64\\netsec_ct.dll",
-      "ms": 10
+      "detail": "run groups/native first with the same --work folder (A12.native.build-cl); expected E:\\dev\\ns-s7\\acceptance\\.work\\run-20261105-050651\\native-x64\\netsec_ct.dll",
+      "ms": 8
     },
     {
       "id": "A12.product.timing-judge-agrees",
@@ -101,7 +101,7 @@
       "referee": "cl.exe and a live run",
       "status": "NOT RUN",
       "reason": "NATIVE_DLL_NOT_BUILT",
-      "detail": "run groups/native first with the same --work folder (A12.native.build-cl); expected E:\\dev\\ns-s7\\acceptance\\.work\\run-20261105-050139\\native-x64\\netsec_ct.dll",
+      "detail": "run groups/native first with the same --work folder (A12.native.build-cl); expected E:\\dev\\ns-s7\\acceptance\\.work\\run-20261105-050651\\native-x64\\netsec_ct.dll",
       "ms": 0
     },
     {
@@ -113,8 +113,8 @@
       "referee": "cl.exe and a live run",
       "status": "PASS",
       "reason": "",
-      "detail": "samples 100000 per case, buffer 4096 bytes. which=0 (leaky) |t|=851.6 (uncropped 399.5), which=1 (constant time) |t|=2.64 (uncropped 8.10). Thresholds: leaky |t| > 4.5 and above 3 x constant-time |t|. Optimizer-dependent (accuracy rule 5).",
-      "ms": 515
+      "detail": "samples 100000 per case, buffer 4096 bytes. which=0 (leaky) |t|=756.1 (uncropped 76.1), which=1 (constant time) |t|=78.63 (uncropped 17.76). Thresholds: leaky |t| > 4.5 and above 3 x constant-time |t|. Optimizer-dependent (accuracy rule 5).",
+      "ms": 619
     },
     {
       "id": "A12.tour.states-no-constant-time-guarantee",
