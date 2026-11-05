@@ -23,7 +23,7 @@ Steve's words, 2026-11-05: "When we are out of Mock mode for a given security ty
 |---|---|---|---|
 | Security setup button | After the `host-chip`, before the mode switch | `security-setup-button` | Opens the Security setup screen. Shows a small count badge when any type is Real and not ready (`security-badge`) |
 | Keys chip | Beside `training-only-label` | `keys-chip` | Reads `Keys: practice` when all 15 types are Mock. Reads `Keys: 3 real` when 3 types are Real. Click opens the Security setup screen |
-| Show keys switch | Right of the view switch | `show-keys-switch` | One switch, default ON, same in Mock and Real. Label: `Show keys`. Tooltip: "On: this course shows your keys on screen and in saved files. Off: it shows a short fingerprint instead." The same store value drives the copy on the Security setup screen |
+| Show keys switch | Right of the view switch | `show-keys-switch` | One switch, default ON, same in Mock and Real. Label: `Show keys`. Tooltip: "On: this course shows your keys on screen and in saved files. Off: it shows a short fingerprint instead, a code that stands for the key." The same store value drives the copy on the Security setup screen |
 | OS transport button | Existing `transport-switch` | `transport-switch` | The text changes from "Real mode" to "OS transport" (`modes-design.md` 7.1), so the word "Real" means one thing: a real key |
 
 `training-only-label` stays as it is. The two chips answer two questions: whose code speaks the protocol, and whose key signs.
@@ -80,7 +80,7 @@ A lesson that reads a Real type that is not `Verified` does not start. The Host 
 
 | Part | Words (copy id `sec.refusal.*`) | Test id |
 |---|---|---|
-| Banner | "Lesson 10 needs 2 keys that are not ready yet." | `security-needs-banner` |
+| Banner | "Lesson 10 needs 2 keys that still need setting up." | `security-needs-banner` |
 | One line per type | "Server certificate: needs setup. [Set up now]" | `needs-row-<typeId>`, `needs-setup-<typeId>` |
 | Second button | `Use practice keys for this lesson` (flips only the needed types to Mock, after a one-line confirmation) | `needs-use-practice` |
 
@@ -92,7 +92,7 @@ The lesson rail shows a small key badge on a lesson whose types are not ready (`
 
 | Step | What the learner sees | Who decides |
 |---|---|---|
-| 0 | Everything is Practice. Nothing needs doing. The first-run line on the Security setup screen: "Every lesson works now with built-in practice keys. Set up your own keys only when you want to." | Host: all types Mock |
+| 0 | Everything is Practice. Nothing needs doing. The first-run line on the Security setup screen: "Every lesson works now with built-in practice keys. Set up your own keys whenever you like." | Host: all types Mock |
 | 1 | Learner opens Security setup, picks a lesson in the goal card | Learner |
 | 2 | The screen lists the types that lesson needs, in order, each with its state | Host: `LabCatalog.Needs(lesson)` plus dependency order |
 | 3 | `Start` opens the first wizard in that list. When it finishes, the next one opens with a `Next: <title>` button | Host: wizard machine |
@@ -114,7 +114,7 @@ The Host computes the order and sends it. This table is for review and for the c
 | `dukpt.pad` | `dukpt.bdk` | The pad's key derives from the base key |
 | `token.issuer`, `device.enrolment`, `lab.aes-key`, `lab.seal-key` | none | Each stands alone |
 
-Two rules the Host enforces and the UI explains in words. If the types disagree, the lab refuses with `SECURITY_TYPES_DISAGREE`. Example: the server certificate is Real and the trust list is Practice. The banner says: "The server's certificate is your own. The list of trusted authorities is still the practice one, so the certificate would never be trusted. Set up the trust list, or switch the server back to practice."
+Two rules the Host enforces and the UI explains in words. If the types disagree, the lab refuses with `SECURITY_TYPES_DISAGREE`. Example: the server certificate is Real and the trust list is Practice. The banner says: "The server uses your own certificate. The list of trusted authorities (the groups that may vouch for a certificate) is still the practice list, so your certificate would never be trusted. Set up the trust list, or switch the server back to practice."
 
 ### 2.3 Which type first
 
@@ -201,11 +201,11 @@ Eight screens. Ids are `wiz-token-issuer-<n>` with the Host's state in brackets.
 | Block | Words |
 |---|---|
 | Title | Set up: the key that signs tokens |
-| What this is | A {{token}} is a small signed note that says who you are and what you may do. This setup gives the course your own key to sign those notes. |
-| Why it exists | In a real system, one service signs tokens and every other service checks the signature. If the signing key leaks, anyone can make tokens. So the key is guarded. |
-| What you do now | Read this, then choose `Continue`. You will make or pick a key, name the issuer, and test it. It takes about 3 minutes. |
-| What good looks like | At the end, lesson 10 signs its tokens with your key, and OpenSSL agrees the signatures are good. |
-| Test-keys line (first, before any choice) | Use test keys only. This course shows your keys on screen and in saved files. *(When Show keys is Off the line reads: "This course hides key bytes on screen for now. Saved files can still hold them.")* |
+| What this is | A {{token}} is a small note that says who you are and what you may do. The note carries a signature, and the key you set up here makes that signature. |
+| Why it exists | In a real system, one service signs the tokens and every other service checks the signature. If the signing key leaks, anyone can make tokens that pass the check. That is why real teams guard it. |
+| What you do now | Read this, then choose `Continue`. Next you will make or pick a key, choose two names, and test it. This takes about 3 minutes. |
+| What good looks like | At the end, lesson 10 signs its tokens with your key. A separate tool called OpenSSL checks the signatures and agrees they are good. |
+| Test-keys line (first, before any choice) | Use test keys only. This course shows your keys on screen and in saved files. *(When Show keys is Off the line reads: "This course hides your keys on screen for now and shows short fingerprints instead. Saved files can still hold them.")* |
 | Buttons | `Cancel setup`, `Continue` (default) |
 | Fails when | Nothing here fails. |
 
@@ -213,10 +213,10 @@ Eight screens. Ids are `wiz-token-issuer-<n>` with the Host's state in brackets.
 
 | Block | Words |
 |---|---|
-| What this is | The signing key is a long secret number. You can have the course make a new one, or use a file you already have. |
-| Why it exists | Real teams do both. A team makes a key once, keeps it safe, and points the service at it. |
-| What you do now (one decision) | **Make a test key for me** (Recommended). Or: Use a key file I already have. |
-| What good looks like | You will see the key's fingerprint in two screens, so you can tell which key you chose. |
+| What this is | A signing key is a long secret number. The course can make a new one for you, or you can use a key file you already have. |
+| Why it exists | Real teams do both. A team makes a key once, keeps it safe, and tells the service where to find it. |
+| What you do now (one decision) | Choose one. **Make a test key for me** is Recommended, so pick it if you are unsure. The other choice is Use a key file I already have. |
+| What good looks like | You will see the key's fingerprint on two later screens. It is a short code that stands for the key, so you can tell which key you chose. |
 | Choices | `make` (default), `file` |
 | Fails when | Nothing here fails. |
 
@@ -224,38 +224,38 @@ Eight screens. Ids are `wiz-token-issuer-<n>` with the Host's state in brackets.
 
 | Block | Words |
 |---|---|
-| What this is | The course will make an {{ed25519}} key. Ed25519 is a modern signing method with short keys. |
-| Why it exists | The token checks in this course read Ed25519 signatures only, so this is the kind that works here. |
+| What this is | The course will make an {{ed25519}} key. Ed25519 is a modern way to sign things, and its keys are short. |
+| Why it exists | The token checks in this course read Ed25519 signatures only. So this is the kind of key that works here. |
 | What you do now | Choose `Make the key`. The key is saved in the `.security` folder of this project. |
 | What good looks like | You see `Key made` and the key's fingerprint. |
-| Fails when | `KEY_FILE_UNREADABLE`: "The course could not save the key file. Check that the project folder can be written, then try again." |
+| Fails when | `KEY_FILE_UNREADABLE`: "The course could not save the key file. Check that you can save files in the project folder, then try again." |
 
 ### Screen 3 of 8, path B: Pick a file (`wiz-token-issuer-file`, kind `file`)
 
 | Block | Words |
 |---|---|
-| What this is | A {{pem}} file is a text file that holds a key between two lines that start with five dashes. |
-| Why it exists | PEM is the common way to move a key between tools. OpenSSL makes it. |
-| What you do now | Choose `Choose a file`. A window opens. Pick the private key file. The path goes to the course, not the bytes. |
+| What this is | A {{pem}} file is a text file. The key sits between two lines that start with five dashes. |
+| Why it exists | PEM is the usual way to move a key from one tool to another. OpenSSL, a widely used tool, can make one. |
+| What you do now | Choose `Choose a file`. A window opens. Pick your private key file. Only its path goes to the course, meaning where the file lives on your disk. |
 | What good looks like | You see `Read it: an Ed25519 key` and its fingerprint. |
-| Fails when | `KEY_FILE_UNREADABLE`: "The course could not open that file. Pick it again, or move it into the project folder." `KEY_FILE_FORMAT`: "That file is not a PEM key. Make one with `openssl genpkey -algorithm ed25519 -out issuer.pem`, then pick it." `KEY_FILE_ENCRYPTED`: "That key has a passphrase. This course cannot ask for it. For a test key, remove it with `openssl pkey -in issuer.pem -out issuer-open.pem`, then pick the new file." `KEY_ALGORITHM_NOT_IN_ENGINE`: "That key is RSA (or ECDSA). Token checks here read Ed25519 only. Make an Ed25519 key instead." |
+| Fails when | `KEY_FILE_UNREADABLE`: "The course could not open that file. Pick it again, or move it into the project folder." `KEY_FILE_FORMAT`: "The course could not read that file as a PEM key. To make one, run `openssl genpkey -algorithm ed25519 -out issuer.pem`, then pick the new file." `KEY_FILE_ENCRYPTED`: "That key is locked with a passphrase, and this course has no place to type one. For a test key, you can remove the passphrase with `openssl pkey -in issuer.pem -out issuer-open.pem`, then pick the new file." `KEY_ALGORITHM_NOT_IN_ENGINE`: "That key is RSA or ECDSA, and the token checks here read Ed25519 only. Make an Ed25519 key instead." |
 
 ### Screen 4 of 8: Name the issuer (`wiz-token-issuer-issuer`, kind `entry`)
 
 | Block | Words |
 |---|---|
-| What this is | The {{issuer}} is the name written inside every token that says who signed it. It is a web address. |
-| Why it exists | A service that checks a token needs to know whose signature to trust. The issuer name tells it which key to use. |
+| What this is | The {{issuer}} is a name written inside every token. It tells the reader who signed the token. Here the name is a web address. |
+| Why it exists | A service that checks a token must know whose signature to trust. The issuer name tells it which key to use. |
 | What you do now | Keep the suggested name `https://pump.training/issuer`, or type another web address. |
 | What good looks like | The name starts with `https://`. |
-| Fails when | `ISSUER_NAME_BAD`: "An issuer name must be a web address that starts with https://. Try `https://pump.training/issuer`." *(Code to add in the Host list; open question Q6.)* |
+| Fails when | `ISSUER_NAME_BAD`: "The issuer name needs to be a web address that starts with `https://`. Try `https://pump.training/issuer`." *(Code to add in the Host list; open question Q6.)* |
 
 ### Screen 5 of 8: Name the audience (`wiz-token-issuer-audience`, kind `entry`)
 
 | Block | Words |
 |---|---|
-| What this is | The {{audience}} says which service a token is meant for. |
-| Why it exists | A token for the pump API must not work on the billing service. Each service checks that its own name is in the audience. |
+| What this is | The {{audience}} is a name written inside the token that says which service the token is meant for. |
+| Why it exists | A token made for the pump API must not work on the billing service. Each service checks that its own name is in the audience. |
 | What you do now | Keep `https://pump.training/api`, or type another web address. |
 | What good looks like | The name starts with `https://`. |
 | Fails when | Same as screen 4. |
@@ -264,8 +264,8 @@ Eight screens. Ids are `wiz-token-issuer-<n>` with the Host's state in brackets.
 
 | Block | Words |
 |---|---|
-| What this is | This is a summary of what you chose. Nothing is saved yet. |
-| Why it exists | Real teams read a key's details before they use it, because a wrong key causes a failure far from the cause. |
+| What this is | Below is what you chose so far. Nothing is saved yet. |
+| Why it exists | Real teams read a key's details before they use it. A wrong key causes a failure far from where the mistake happened. |
 | What you do now | Check the facts. Choose `Back` to change one, or `Continue` to save. |
 | Facts shown (from the Host) | Kind: Ed25519. Fingerprint: `SHA256:...`. Public key (shown when Show keys is On; a fingerprint when Off). Issuer. Audience. Where it will be saved. A line: "This is a test key. This course shows it on screen." |
 | What good looks like | The fingerprint matches the one on the earlier screen. |
@@ -279,7 +279,7 @@ Eight screens. Ids are `wiz-token-issuer-<n>` with the Host's state in brackets.
 | Why it exists | Real systems keep old key versions, so a bad change can be undone. |
 | What you do now | Choose `Save my key`. |
 | What good looks like | You see `Saved as version 1`. |
-| Fails when | `KEY_FILE_UNREADABLE`: "The course could not write the project folder. Check disk space and folder rights, then try again. Your earlier key is unchanged." |
+| Fails when | `KEY_FILE_UNREADABLE`: "The course could not save to the project folder. Check that the disk has free space and that you can save files in the folder, then try again. Your earlier key is unchanged." |
 
 ### Screen 8 of 8: Prove it works (`wiz-token-issuer-prove`, `Prove`, kind `prove`)
 
@@ -289,14 +289,14 @@ Eight screens. Ids are `wiz-token-issuer-<n>` with the Host's state in brackets.
 | Why it exists | If the course checked itself, a mistake could hide. A different tool has no reason to agree. |
 | What you do now | Choose `Check it with OpenSSL`. |
 | What good looks like | You see the real command, the real answer, and `OpenSSL agrees`. |
-| Shown after the run | The command, for example `openssl pkeyutl -verify -pubin -inkey issuer.pub -rawin -in signing-input.bin -sigfile signature.bin`. The tool's output, for example `Signature Verified Successfully`. In words: "OpenSSL read the public half of your key, and said the signature on the token is good." A tier line: `Proof by an outside tool.` |
-| Fails when | `REFEREE_MISSING`: "OpenSSL was not found. Git for Windows includes it. Set the path in `NETSEC_OPENSSL`, or install Git for Windows, then run the check again." `PROOF_FAILED`: "OpenSSL said the signature is bad. This means the key and the token do not match. Choose `Back to the start` and make the key again. The output is below." |
+| Shown after the run | The command, for example `openssl pkeyutl -verify -pubin -inkey issuer.pub -rawin -in signing-input.bin -sigfile signature.bin`. The tool's output, for example `Signature Verified Successfully`. In words: "OpenSSL read the public half of your key (the half that is safe to share) and said the signature on the token is good." A tier line: `Proof by an outside tool.` |
+| Fails when | `REFEREE_MISSING`: "The course could not find OpenSSL on this computer. Git for Windows includes a copy. Install Git for Windows, or set `NETSEC_OPENSSL` to the path of OpenSSL, then run the check again. Your key is saved and counts as proven once the check passes." `PROOF_FAILED`: "OpenSSL said the signature is bad. The key and the token do not match. Your earlier key is still saved. Choose `Back to the start` and make the key again. The output is below." |
 
 ### Done (`wiz-token-issuer-done`, `Done`, kind `done`)
 
 | Block | Words |
 |---|---|
-| What happened | Your token signing key is `Proven`. Lesson 10 now signs its tokens with it. |
+| What happened | Your token signing key is `Proven`. Lesson 10 now signs its tokens with your key. |
 | What you do now | `Run lesson 10` (when you came from a lesson), `Set up the next key`, `Back to the map`, or `Use practice key again`. |
 
 ## 5. The other 14 types, step by step
@@ -305,18 +305,18 @@ Each row lists the Host's steps in order, with the decision on each. Every scree
 
 | Type (family) | Plain title | Source choices (default first) | Screens after Intro, one decision each | Typical failures and fix |
 |---|---|---|---|---|
-| `pki.root-ca` (F1) | Certificate authority | Make one for me. Import PEM. PKCS#12 (RSA). OS store (RSA) | 1 Key kind: Ed25519 (default) or RSA (note: Ed25519 runs in the course's own engines, RSA runs through the OS transport). 2 Name: `MMP Training Root`. 3 Years valid: 5. 4 Read it back (is a CA: yes). 5 Save. 6 Prove: `openssl verify -CAfile root.pem root.pem`, then a test leaf | `KEY_FILE_FORMAT`: make one with OpenSSL, command shown. `CERT_NOT_A_CA`: "This certificate is not allowed to sign others. Pick a CA certificate." `CERT_SIGNATURE_ALG_UNSUPPORTED`: "The course can check Ed25519 signatures. This root uses RSA or ECDSA. Make an Ed25519 root." |
-| `tls13.server` (F1) | Server certificate (TLS 1.3) | Make one for me. Import PEM. PKCS#12 (RSA). OS store (RSA) | 1 Names the server answers to: `localhost` (default). 2 Which authority signs it: my root (default). 3 Days valid: 90. 4 Read it back. 5 Save. 6 Prove: `openssl s_client -tls1_3 -CAfile <anchors> -verify_return_error` | `CERT_NAME_MISSING`: "The certificate does not name `localhost`." `KEY_CERT_MISMATCH`: "This certificate and key are not a pair. Pick the key that made it." `CHAIN_INCOMPLETE`: "The authority between your certificate and the root is missing. Add it to the file." |
+| `pki.root-ca` (F1) | Certificate authority | Make one for me. Import PEM. PKCS#12 (RSA). OS store (RSA) | 1 Key kind: Ed25519 (default) or RSA (note: Ed25519 runs in the course's own engines, RSA runs through the OS transport). 2 Name: `MMP Training Root`. 3 Years valid: 5. 4 Read it back (is a CA: yes). 5 Save. 6 Prove: `openssl verify -CAfile root.pem root.pem`, then a test leaf | `KEY_FILE_FORMAT`: make one with OpenSSL, command shown. `CERT_NOT_A_CA`: "This certificate cannot sign other certificates, so it cannot act as an authority. Pick a certificate made for a certificate authority (CA)." `CERT_SIGNATURE_ALG_UNSUPPORTED`: "The course can check Ed25519 signatures only, and this root uses RSA or ECDSA. Make an Ed25519 root." |
+| `tls13.server` (F1) | Server certificate (TLS 1.3) | Make one for me. Import PEM. PKCS#12 (RSA). OS store (RSA) | 1 Names the server answers to: `localhost` (default). 2 Which authority signs it: my root (default). 3 Days valid: 90. 4 Read it back. 5 Save. 6 Prove: `openssl s_client -tls1_3 -CAfile <anchors> -verify_return_error` | `CERT_NAME_MISSING`: "This certificate does not list `localhost` as a name it answers to. Make or pick one that does." `KEY_CERT_MISMATCH`: "This key and this certificate are not a matching pair. Pick the key that made it." `CHAIN_INCOMPLETE`: "The certificate of the authority between yours and the root is missing from the file. Add it to the file." |
 | `tls.trust` (F2) | List of trusted authorities | Follow my root (default). Import certificates | 1 Source. 2 If import: pick files, read each back (name, expiry, is a CA). 3 Save. 4 Prove: `openssl verify -CAfile <anchors> <server certificate>` | `CERT_EXPIRED`: "This authority's certificate ended on <date>. Pick a newer one." `CERT_NOT_A_CA`. |
-| `tls13.client` (F1) | Device certificate (mutual TLS) | Make one for me. Import PEM | 1 Device name: `pump-reader-4`. 2 Signer: my root. 3 Days valid: 90. 4 Include the middle authority? shown only when the signer is not the root (default Yes). 5 Read back. 6 Save. 7 Prove: `openssl s_server -tls1_3 -Verify 1 -CAfile <anchors>` against the course's client | `CHAIN_INCOMPLETE`: "The server cannot find who signed your certificate. A client under a middle authority must send that authority too. Add it." (Jared: Go refused a leaf-only client with `certificate signed by unknown authority`.) `CERT_USAGE_WRONG`: "This certificate is for servers. A device needs one for clients." |
-| `tls11.server` (F1, RSA only) | Old-style server certificate (TLS 1.1) | Make one for me. Import PEM. PKCS#12 | 1 Key kind: RSA 2048, no choice, with the reason on screen ("TLS 1.1 key transport uses RSA"). 2 Names: `localhost`. 3 Signer: my root. 4 Read back. 5 Save. 6 Prove: `openssl s_client -tls1_1 -cipher AES128-SHA:@SECLEVEL=0 -CAfile <anchors>` | `PKCS12_PASSWORD`: "That file needs a password. Type it, or export again with none." `KEY_ALGORITHM_NOT_IN_ENGINE`: "TLS 1.1 here needs an RSA key." |
-| `ssh.host-ed25519` (F3) | Server identity key (modern) | Make one for me. Import OpenSSH | 1 Source. 2 If import: pick `ssh_host_ed25519_key`. 3 Read back: public line and `SHA256:` fingerprint. 4 Save. 5 Prove: `ssh.exe -F NUL -o BatchMode=yes -o UserKnownHostsFile=<pin> ... echo hello` | `KEY_FILE_FORMAT`: "Not an OpenSSH private key. It starts with `-----BEGIN OPENSSH PRIVATE KEY-----`." `KEY_FILE_ENCRYPTED`. |
+| `tls13.client` (F1) | Device certificate (mutual TLS) | Make one for me. Import PEM | 1 Device name: `pump-reader-4`. 2 Signer: my root. 3 Days valid: 90. 4 Include the middle authority? shown only when the signer is not the root (default Yes). 5 Read back. 6 Save. 7 Prove: `openssl s_server -tls1_3 -Verify 1 -CAfile <anchors>` against the course's client | `CHAIN_INCOMPLETE`: "The server cannot find who signed your certificate. A client signed by a middle authority must send that authority's certificate too. Add it." (Jared: Go refused a leaf-only client with `certificate signed by unknown authority`.) `CERT_USAGE_WRONG`: "This certificate is for servers. A device needs one for clients." |
+| `tls11.server` (F1, RSA only) | Old-style server certificate (TLS 1.1) | Make one for me. Import PEM. PKCS#12 | 1 Key kind: RSA 2048, no choice, with the reason on screen ("TLS 1.1 here shares its secret using RSA, so this key has to be RSA"). 2 Names: `localhost`. 3 Signer: my root. 4 Read back. 5 Save. 6 Prove: `openssl s_client -tls1_1 -cipher AES128-SHA:@SECLEVEL=0 -CAfile <anchors>` | `PKCS12_PASSWORD`: "That file is protected by a password. Type it, or export the file again without one." `KEY_ALGORITHM_NOT_IN_ENGINE`: "TLS 1.1 in this course needs an RSA key." |
+| `ssh.host-ed25519` (F3) | Server identity key (modern) | Make one for me. Import OpenSSH | 1 Source. 2 If import: pick `ssh_host_ed25519_key`. 3 Read back: public line and `SHA256:` fingerprint. 4 Save. 5 Prove: `ssh.exe -F NUL -o BatchMode=yes -o UserKnownHostsFile=<pin> ... echo hello` | `KEY_FILE_FORMAT`: "That file is not an OpenSSH private key. A real one starts with `-----BEGIN OPENSSH PRIVATE KEY-----`." `KEY_FILE_ENCRYPTED`. |
 | `ssh.host-rsa` (F3) | Server identity key (legacy RSA) | Make one for me. Import OpenSSH | Same as above, with a line on screen: "RSA host keys here sign with SHA-1, which is weak. Lesson 8 uses it to show a legacy round." | Same as above |
-| `ssh.client` (F3) | User key for signing in | Make one for me. Import OpenSSH. Add "for the CE process": file only | 1 Source. 2 Who uses it: the course's own client (default) or the CE process (file only). 3 Read back. 4 Save. 5 Prove: `ssh.exe` with the key file for a file key. A vault key shows `Proof by this course's own code, a weaker proof.` | `KEY_ALGORITHM_NOT_IN_ENGINE`: "Sign-in keys here are Ed25519 only." |
-| `ssh.known-hosts` (F4) | Remembered server key (pin) | Follow my host key (default). Paste a `known_hosts` line. Learn on first connect | 1 Source. 2 Show the fingerprint, ask the learner to compare it by another way, for example read it back from the server file (decision: `It matches` or `It does not match`). 3 Save. 4 Prove: connect to the host key type's server. Then a mismatch demonstration that names `SSH_HOST_KEY_CHANGED` | `KNOWN_HOSTS_LINE_BAD`: "That line does not parse. Wildcards are refused. Use `host key-type base64`." |
-| `dukpt.bdk` (F5) | Base key for card PIN keys | Enter components (default). Import a vendor test key | 1 Why components: "Two or three people each hold a part, so no one holds the whole key." 2 Component 1 (masked field, 32 hex characters), shows its check value. 3 Component 2, check value. 4 A third component? (Yes or No; default No). 5 Combine: the key is the XOR of the parts, made inside the box. Learner compares the final check value with the one on their own paper. 6 Can the key be read back later? `Yes, so I can see it` (default) or `No, like a real HSM` (one-way, with the line "This key cannot be read. A real HSM would refuse too."). 7 Read back. 8 Save. 9 Prove: a control first (the published X9 test base key must give the published vector), then a round trip with your key | `DUKPT_COMPONENT_LENGTH`: "A component is 32 hex characters (16 bytes). You typed <n>." `DUKPT_KCV_MISMATCH`: "The check value differs. You mistyped a digit. Retype that component." |
-| `dukpt.pad` (F5, derived) | PIN pad key | Follows the base key. No other choice | 1 Explain: the pad gets its key from the base key and a key id, as a key loader would. 2 Read back: a new key id each run. 3 Prove: one sale, pad to bank | `VAULT_KEY_UNKNOWN`: "Set up the base key first." (with a link) |
-| `device.enrolment` (F7) | Device sign-in key (passkey-shaped) | Make one for me. Import PEM | 1 Subject name: `pump-reader-4`. 2 Source. 3 Read back: the enrolment row the issuer will hold (subject, public key). 4 Save. 5 Prove: OpenSSL checks a challenge answer signed with the device key | `KEY_ALGORITHM_NOT_IN_ENGINE`: "Device keys are Ed25519 here." |
+| `ssh.client` (F3) | User key for signing in | Make one for me. Import OpenSSH. Add "for the CE process": file only | 1 Source. 2 Who uses it: the course's own client (default) or the CE process (file only). 3 Read back. 4 Save. 5 Prove: `ssh.exe` with the key file for a file key. A vault key shows `Proof by this course's own code, a weaker proof.` | `KEY_ALGORITHM_NOT_IN_ENGINE`: "Sign-in keys in this course must be Ed25519." |
+| `ssh.known-hosts` (F4) | Remembered server key (pin) | Follow my host key (default). Paste a `known_hosts` line. Learn on first connect | 1 Source. 2 Show the fingerprint, ask the learner to compare it by another way, for example read it back from the server file (decision: `It matches` or `It does not match`). 3 Save. 4 Prove: connect to the host key type's server. Then a mismatch demonstration that names `SSH_HOST_KEY_CHANGED` | `KNOWN_HOSTS_LINE_BAD`: "The course could not read that line. It does not accept wildcards. Write the line as `host key-type base64`." |
+| `dukpt.bdk` (F5) | Base key for card PIN keys | Enter components (default). Import a vendor test key | 1 Why components: "Two or three people each hold a part, so no one holds the whole key." 2 Component 1 (masked field, 32 hex characters), shows its check value. 3 Component 2, check value. 4 A third component? (Yes or No; default No). 5 Combine: the key is the XOR of the parts, made inside the box. Learner compares the final check value with the one on their own paper. 6 Can the key be read back later? `Yes, so I can see it` (default) or `No, like a real HSM` (one-way, with the line "This key cannot be read. A real HSM would refuse too."). 7 Read back. 8 Save. 9 Prove: a control first (the published X9 test base key must give the published vector), then a round trip with your key | `DUKPT_COMPONENT_LENGTH`: "A component is 32 hex characters, which is 16 bytes. This one has <n> characters." `DUKPT_KCV_MISMATCH`: "The check value does not match. That usually means a digit was mistyped. Retype that component." |
+| `dukpt.pad` (F5, derived) | PIN pad key | Follows the base key. No other choice | 1 Explain: the pad gets its key from the base key and a key id, as a key loader would. 2 Read back: a new key id each run. 3 Prove: one sale, pad to bank | `VAULT_KEY_UNKNOWN`: "The PIN pad gets its key from the base key. Set up the base key first." (with a link) |
+| `device.enrolment` (F7) | Device sign-in key (passkey-shaped) | Make one for me. Import PEM | 1 Subject name: `pump-reader-4`. 2 Source. 3 Read back: the enrolment row the issuer will hold (subject, public key). 4 Save. 5 Prove: OpenSSL checks a challenge answer signed with the device key | `KEY_ALGORITHM_NOT_IN_ENGINE`: "Device keys in this course must be Ed25519." |
 | `lab.aes-key` (F8) | Data key for lesson 1 | Make a wrapping key for me | 1 One screen: make the key. 2 Prove: wrap, unwrap, compare with the .NET library | `VAULT_UNWRAP_FAILED` |
 | `lab.seal-key` (F8) | Data key for lesson 2 | Make a wrapping key for me | Same as above | `VAULT_UNWRAP_FAILED` |
 
@@ -337,7 +337,7 @@ Every Prove screen has the same four parts, in this order: the real command in a
 |---|---|---|
 | Pass | Green check and `OpenSSL agrees` (or the tool's name). The type becomes `Proven` | `Done` |
 | `PROOF_FAILED` | Red cross, the output, and the one-sentence cause from the copy file | `Back to the start` or `Cancel setup`. The earlier key stays saved |
-| `REFEREE_MISSING` | An amber note, not a failure of the key: "The test tool is missing. Your key is saved but not proven." | Fix steps in section 8 row 9. The type stays `Set up, not proven` |
+| `REFEREE_MISSING` | An amber note, not a failure of the key: "The test tool is missing. Your key is saved and counts as proven once the check passes." | Fix steps in section 8 row 9. The type stays `Set up, not proven` |
 
 ## 7. Show keys on every wizard screen
 
@@ -346,7 +346,7 @@ Every Prove screen has the same four parts, in this order: the real command in a
 | Read-back facts | The key bytes in a `Show all` fold, copy button | `fp:` fingerprint and length, "Hidden by the Show keys switch" |
 | Prove output | As the tool printed | The tool output is unchanged (it holds public data), key file paths only |
 | DUKPT component fields | Masked while typed, always. The check value shows | Same |
-| The setup screen header | Test-keys line says "This course shows your keys on screen and in saved files." | Says "This course hides key bytes on screen for now. Saved files can still hold them." |
+| The setup screen header | Test-keys line says "This course shows your keys on screen and in saved files." | Says "This course hides your keys on screen for now and shows short fingerprints instead. Saved files can still hold them." |
 | A non-exportable key | Shows the fingerprint and the line "This key cannot be read. A real HSM would refuse too." | Same |
 
 Flipping the switch while a wizard is open replaces the facts block from the Host. The wizard does not move.
@@ -355,15 +355,15 @@ Flipping the switch while a wizard is open replaces the facts block from the Hos
 
 | # | Statement | Where it appears | Source |
 |---|---|---|---|
-| 1 | A public certificate authority will not sign a certificate for `localhost`. Public CAs check that you control a public name, and `localhost` is nobody's. So a server certificate here comes from a CA you make. | `pki.root-ca` Intro and `tls13.server` screen 2 | `modes-design.md` 1.8; the course's training CA |
+| 1 | A public certificate authority will not sign a certificate for `localhost`. A public CA signs only after you show you control a public name, and `localhost` belongs to nobody. So the server certificate here comes from a certificate authority you make yourself. | `pki.root-ca` Intro and `tls13.server` screen 2 | `modes-design.md` 1.8; the course's training CA |
 | 2 | A self-signed certificate is not a chain. It vouches for itself, so nothing outside it proves it. A chain ends in a root that the checker already trusts. | `pki.root-ca` Intro, `tls.trust` Intro | PRD framing; `ChainCheck` |
-| 3 | The course's own engines check Ed25519 signatures only. An RSA or ECDSA certificate fails with a named code. RSA runs through the OS transport. ECDSA is not supported in the course's engines. | `KEY_ALGORITHM_NOT_IN_ENGINE` and `CERT_SIGNATURE_ALG_UNSUPPORTED` boxes, kind choice screens | `modes-design.md` 1.8, 8.5 |
-| 4 | A leaf under a middle authority must be sent with that authority, for a client too. A leaf alone gets `certificate signed by unknown authority`. | `tls13.client` screen 4 and `CHAIN_INCOMPLETE` | Jared's finding, `modes-design.md` 8.5 |
+| 3 | The course's own engines check Ed25519 signatures only. An RSA or ECDSA certificate stops with a named error code. RSA runs through the OS transport. ECDSA is not supported in the course's engines. | `KEY_ALGORITHM_NOT_IN_ENGINE` and `CERT_SIGNATURE_ALG_UNSUPPORTED` boxes, kind choice screens | `modes-design.md` 1.8, 8.5 |
+| 4 | A certificate signed by a middle authority must be sent together with that authority's certificate. This holds for a client too. Sent alone, it gets the error `certificate signed by unknown authority`. | `tls13.client` screen 4 and `CHAIN_INCOMPLETE` | Jared's finding, `modes-design.md` 8.5 |
 | 5 | Use test keys only. This course shows your keys on screen and in saved files. Nothing here can tell a test key from a production key. | Every Intro, before any choice | `modes-design.md` 8.2 |
-| 6 | The key store is a plain file, and anyone with both files reads every key. It is not a production vault. | `Place` screens | `modes-design.md` O5 |
+| 6 | The key store is a plain file, and anyone who holds both files can read every key. It is not a production vault. | `Place` screens | `modes-design.md` O5 |
 | 7 | Card numbers and PINs stay test values. The wizard has no field for them. | `dukpt.bdk` Intro, `dukpt.pad` Intro | `modes-design.md` 1.6, O10 |
-| 8 | A key made non-exportable cannot be read back, one way, as in a real HSM. | `dukpt.bdk` screen 6, vault key choices | `modes-design.md` 6.3 |
-| 9 | If the test tool is missing, the key is saved but not proven, and lessons will not run on it. | Prove screen, `REFEREE_MISSING` | `modes-design.md` 2.3 |
+| 8 | A key you mark as non-exportable cannot be read back. This is a one-way step, as in a real HSM. | `dukpt.bdk` screen 6, vault key choices | `modes-design.md` 6.3 |
+| 9 | If the test tool is missing, your key is saved but not yet proven, and lessons will not run on it until it is. | Prove screen, `REFEREE_MISSING` | `modes-design.md` 2.3 |
 | 10 | A proof by the course's own code is weaker than a proof by an outside tool. | `prove-tier` | `modes-design.md` 8.6 |
 
 ## 9. Screens and stable test ids
@@ -461,10 +461,11 @@ Distinct screen ids in this design: 6 shared, 12 in F1, 2 in F2, 3 in F3, 3 in F
 | Set up: the key that signs tokens       Step 6 of 8  [x]   |
 | ---------------------------------------------------------- |
 | WHAT THIS IS                                               |
-|  This is a summary of what you chose. Nothing is saved yet.|
+|  Below is what you chose so far. Nothing is saved yet.     |
 | WHY IT EXISTS IN THE REAL WORLD                            |
-|  Real teams read a key's details before they use it,       |
-|  because a wrong key causes a failure far from the cause.  |
+|  Real teams read a key's details before they use it.       |
+|  A wrong key causes a failure far from where the mistake   |
+|  happened.                                                 |
 | WHAT YOU DO NOW                                            |
 |  Check the facts. Choose Back to change one, or Continue.  |
 |    Kind          Ed25519                                   |
@@ -491,6 +492,7 @@ Distinct screen ids in this design: 6 shared, 12 in F1, 2 in F2, 3 in F3, 3 in F
 |  [X] OpenSSL said the signature is bad.                    |
 |      The key and the token do not match.                   |
 |      Choose "Back to the start" and make the key again.    |
+|      Your earlier key is still saved.                      |
 |      Proof by an outside tool.         [Details v]         |
 | ---------------------------------------------------------- |
 | [Back to the start]                     [Cancel setup]     |
