@@ -31,8 +31,8 @@ Consultation. Gems used: `server-replaces-never-merges`, `fail-soft-must-count`,
 | `src/NetSec.Host` | net10.0, C# 14 | Minimal API, WebSocket, sessions, process control, `OsTransportFactory` |
 | `native/` | C-compatible C++ | `netsec_ct.dll` (section 7) |
 | `app/` | Electron, Vue 3, Vuetify | UI per `ux-design.md`. Tours in `app/src/tours/` |
-| `referees/bcl` | net10.0, C# 14 | Line oracle on stdin and stdout, so net48 tests reach `MLKem` and `AesGcm` with no skip |
-| `referees/go` | Go 1.26, `x/crypto` v0.58.0 | `tlspeer`, `sshpeer`, `gogateway`, `tap`, `tokenverify` |
+| `acceptance/referees/bcl` | net10.0, C# 14 | Line oracle on stdin and stdout, so net48 tests reach `MLKem` and `AesGcm` with no skip |
+| `acceptance/referees/go` | Go 1.26, `x/crypto` v0.58.0 | `tlspeer`, `sshpeer`, `gogateway`, `tap`, `tokenverify` |
 | `tests/NetSec.Tests` | net10.0, net48, C# latest | Builder unit suite. net48 uses `HintPath` to CF binaries, as in MMP.AsyncProxy |
 | `acceptance/` | net10.0, net48, pwsh | D11. Separate author. **Builders never write here.** `run.ps1`, `clauses.json`, pinned skip list |
 | `tools/` | pwsh, python | `gate.ps1`, `layer_check.py`, `tour_lint.py`, `lessons_status.py` |
@@ -362,9 +362,9 @@ python tools/lessons_status.py docs/_runs
 | Slice | Clauses | Extras before the base gate |
 |---|---|---|
 | S0 | A9 | `dotnet build src/NetSec.Host -c Release`; `dotnet build src/NetSec.CeDevice -c Release $cf`; `cd app; npm ci; npm run build` |
-| S1 | A1, A2 | `dotnet build referees/bcl -c Release` |
+| S1 | A1, A2 | `dotnet build acceptance/referees/bcl -c Release` |
 | S2 | A3, A16 | none. If x9.org is unreachable, A3 records NOT RUN |
-| S3 | A4, A5, A6, A10a | `cd referees/go; go build -o bin/ ./...` |
+| S3 | A4, A5, A6, A10a | `cd acceptance/referees/go; go build -o bin/ ./...` |
 | S4 | A1, A7, A8 | Go build. `ssh.exe` key: `icacls <key> /inheritance:r /grant:r "%USERNAME%:R"` |
 | S5 | A10, A10a | Go build. `dotnet build src/NetSec.Node -c Release` |
 | S6 | A11 | Go build |
