@@ -35,6 +35,10 @@ namespace NetSec.Errors
         public const string LinkLost = "LINK_LOST";
         public const string PeerClosedEarly = "PEER_CLOSED_EARLY";
         public const string EchoMismatch = "ECHO_MISMATCH";
+        public const string NativeLibMissing = "NATIVE_LIB_MISSING";
+        public const string NativeSampleFailed = "NATIVE_SAMPLE_FAILED";
+        public const string TimingNotSeparated = "TIMING_NOT_SEPARATED";
+        public const string TimingGuessStopped = "TIMING_GUESS_STOPPED";
         public const string CeTransportUnavailable = "CE_TRANSPORT_UNAVAILABLE";
         public const string CeLinkNotBuilt = "CE_LINK_NOT_BUILT";
         public const string CeDeviceSilent = "CE_DEVICE_SILENT";

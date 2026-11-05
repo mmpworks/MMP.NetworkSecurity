@@ -1,0 +1,132 @@
+{
+  "summary": {
+    "schema": 1,
+    "timestamp": "2026-11-05T04:45:19.5887372-06:00",
+    "machine": "BEAST",
+    "command": "run.ps1 -Clauses A12",
+    "productRoot": "E:\\dev\\ns-s7",
+    "productCommit": "feb1468",
+    "acceptanceCommit": "18ca011",
+    "freshClone": false,
+    "productPresent": true,
+    "M": 202,
+    "selected": 8,
+    "pass": 4,
+    "fail": 0,
+    "notRun": 4,
+    "reasons": [
+      {
+        "key": "NOT RUN NATIVE_DLL_NOT_BUILT",
+        "count": 3
+      },
+      {
+        "key": "NOT RUN PRODUCT_MISSING",
+        "count": 1
+      }
+    ],
+    "selfChecks": {
+      "selected": 0,
+      "pass": 0,
+      "fail": 0,
+      "notRun": 0
+    }
+  },
+  "results": [
+    {
+      "id": "A12.native.build-cl",
+      "assertion": "A12",
+      "slice": "S7",
+      "group": "native",
+      "build": "host",
+      "referee": "cl.exe and a live run",
+      "status": "PASS",
+      "reason": "",
+      "detail": "cl.exe builds the DLL as C++ and the same file as C, warnings as errors; 103424 bytes",
+      "ms": 3363
+    },
+    {
+      "id": "A12.native.load-direct.cf",
+      "assertion": "A12",
+      "slice": "S7",
+      "group": "native",
+      "build": "cf",
+      "referee": "cl.exe and a live run",
+      "status": "PASS",
+      "reason": "",
+      "detail": "6 of 6 vectors",
+      "ms": 3066
+    },
+    {
+      "id": "A12.native.load-direct.net10",
+      "assertion": "A12",
+      "slice": "S7",
+      "group": "native",
+      "build": "net10",
+      "referee": "cl.exe and a live run",
+      "status": "PASS",
+      "reason": "",
+      "detail": "6 of 6 vectors",
+      "ms": 3
+    },
+    {
+      "id": "A12.product.native-compare-loads.cf",
+      "assertion": "A12",
+      "slice": "S7",
+      "group": "nativeprod",
+      "build": "cf",
+      "referee": "cl.exe and a live run",
+      "status": "NOT RUN",
+      "reason": "NATIVE_DLL_NOT_BUILT",
+      "detail": "run groups/native first with the same --work folder (A12.native.build-cl); expected E:\\dev\\ns-s7\\acceptance\\.work\\run-20261105-044455\\native-x64\\netsec_ct.dll",
+      "ms": 4
+    },
+    {
+      "id": "A12.product.native-compare-loads.net10",
+      "assertion": "A12",
+      "slice": "S7",
+      "group": "nativeprod",
+      "build": "net10",
+      "referee": "cl.exe and a live run",
+      "status": "NOT RUN",
+      "reason": "NATIVE_DLL_NOT_BUILT",
+      "detail": "run groups/native first with the same --work folder (A12.native.build-cl); expected E:\\dev\\ns-s7\\acceptance\\.work\\run-20261105-044455\\native-x64\\netsec_ct.dll",
+      "ms": 6
+    },
+    {
+      "id": "A12.product.timing-judge-agrees",
+      "assertion": "A12",
+      "slice": "S7",
+      "group": "nativeprod",
+      "build": "host",
+      "referee": "cl.exe and a live run",
+      "status": "NOT RUN",
+      "reason": "NATIVE_DLL_NOT_BUILT",
+      "detail": "run groups/native first with the same --work folder (A12.native.build-cl); expected E:\\dev\\ns-s7\\acceptance\\.work\\run-20261105-044455\\native-x64\\netsec_ct.dll",
+      "ms": 0
+    },
+    {
+      "id": "A12.timing.leaky-separates-from-constant-time",
+      "assertion": "A12",
+      "slice": "S7",
+      "group": "native",
+      "build": "host",
+      "referee": "cl.exe and a live run",
+      "status": "PASS",
+      "reason": "",
+      "detail": "samples 100000 per case, buffer 4096 bytes. which=0 (leaky) |t|=951.5 (uncropped 227.0), which=1 (constant time) |t|=43.31 (uncropped 13.17). Thresholds: leaky |t| > 4.5 and above 3 x constant-time |t|. Optimizer-dependent (accuracy rule 5).",
+      "ms": 482
+    },
+    {
+      "id": "A12.tour.states-no-constant-time-guarantee",
+      "assertion": "A12",
+      "slice": "S7",
+      "group": "docs",
+      "build": "host",
+      "referee": "cl.exe and a live run",
+      "status": "NOT RUN",
+      "reason": "PRODUCT_MISSING",
+      "detail": "no tour files at app/src/tours/lesson-*.json yet",
+      "ms": 0
+    }
+  ]
+}

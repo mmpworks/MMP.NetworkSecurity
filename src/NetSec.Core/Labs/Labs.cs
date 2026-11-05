@@ -141,6 +141,7 @@ namespace NetSec.Labs
         /// <summary>The lab for a lesson number, or null when the lesson is not built yet.</summary>
         public static ILab Find(int lesson)
         {
+            if (lesson == 11) return new TimingAttackLab();
             return lesson == 0 ? new EchoLab() : null;
         }
     }
@@ -163,8 +164,24 @@ namespace NetSec.Labs
                 toy.Expect = AttackOutcome.Rejected;
                 toy.ExpectCode = ErrorCodes.EchoMismatch;
                 toy.ExpectCheck = EchoEngine.CompareCheck;
-                return new AttackDefinition[] { toy };
+                return new AttackDefinition[] { toy, GuessRow("L11-guess-leaky", TimingAttackLab.GuessLeaky, AttackOutcome.NoCheck, null, null), GuessRow("L11-guess-constant-time", TimingAttackLab.GuessConstantTime, AttackOutcome.Rejected, ErrorCodes.TimingGuessStopped, TimingAttackLab.ConstantTimeCheck) };
             }
+        }
+
+        static AttackDefinition GuessRow(string id, string target, AttackOutcome expect, string code, string check)
+        {
+            LabOption option = new LabOption();
+            option.Name = TimingAttackLab.GuessOption;
+            option.Value = target;
+            AttackDefinition row = new AttackDefinition();
+            row.AttackId = id;
+            row.Lesson = 11;
+            row.Kind = "timing-guess";
+            row.Options = new LabOption[] { option };
+            row.Expect = expect;
+            row.ExpectCode = code;
+            row.ExpectCheck = check;
+            return row;
         }
     }
 }
