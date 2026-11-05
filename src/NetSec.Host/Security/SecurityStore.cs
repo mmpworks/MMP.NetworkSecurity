@@ -2,6 +2,7 @@ using System.Security.Cryptography;
 using System.Text.Json;
 using NetSec.Keys;
 using NetSec.Pki;
+using NetSec.Vault;
 
 namespace NetSec.Host.Security;
 
@@ -15,6 +16,35 @@ public sealed class SecurityStore
     public const string ModeBuiltIn = "BuiltIn", ModeMine = "Mine";
     public const string StateBuiltIn = "BuiltIn", StateUnconfigured = "Unconfigured", StateConfigured = "Configured", StateVerified = "Verified", StateBroken = "Broken";
     const string ProviderFile = "file";
+    public const string ProviderVault = "vault";
+
+    /// <summary>The caller name a flow's own review and check use when they read a key out of the vault.</summary>
+    public const string CallerFlow = "host/flow";
+    public const string CallerMoveV0 = "host/move-v0-file";
+
+    /// <summary>
+    /// The one readiness answer, used by GET /api/security/readiness and by session.start alike. After the state rules pass,
+    /// each vault key the lesson reads is probed, so a changed row or master.key is refused here by name rather than later at the export.
+    /// </summary>
+    public LabDecision Decide(string[] typesTheLabReads)
+    {
+        LabDecision byState = SecurityReadiness.Decide(typesTheLabReads, States());
+        if (!byState.MayRun) return byState;
+        TypeProblem[] vault = typesTheLabReads
+            .Select(t => (Type: t, Entry: Entry(t)))
+            .Where(p => p.Entry.Mode == ModeMine && p.Entry.Binding?.Provider == ProviderVault)
+            .Select(p => (p.Type, Code: Vault.Probe(p.Type, p.Entry.Binding!.Version)))
+            .Where(p => p.Code is not null)
+            .Select(p => new TypeProblem(p.Type, p.Code!, $"{p.Type} version {Entry(p.Type).Binding!.Version} does not open in the vault ({p.Code}). Run the flow {FlowOf(p.Type)} again."))
+            .ToArray();
+        return vault.Length == 0 ? byState : new LabDecision(vault);
+    }
+
+    /// <summary>The types whose keys live in the vault (slice V1: the my-login flow). The others stay key files until their slice moves them.</summary>
+    static readonly HashSet<string> VaultTypes = [SecurityTypes.TokenIssuer, SecurityTypes.DeviceEnrolment];
+
+    /// <summary>A flow's key may leave the vault, because a glass engine reads its bytes. Only the vault exercise makes keys that cannot.</summary>
+    static readonly VaultKeyPolicy FlowKeyPolicy = new(VaultAlgorithms.Ed25519, true, [VaultOps.Export]);
 
     static readonly JsonSerializerOptions Json = new(JsonSerializerOptions.Web) { WriteIndented = true };
 
@@ -24,13 +54,16 @@ public sealed class SecurityStore
     ModesFile _modes;
 
     public string Root { get; }
+    public IVault Vault { get; }
 
     public SecurityStore(string root, WizardTable table)
     {
         Root = root;
+        Vault = new SqliteVault(Path.Combine(root, "vault"));
         _modesPath = Path.Combine(root, "modes.json");
         _flowOf = table.Flows.SelectMany(f => f.Types.Select(t => (t, f.FlowId))).ToDictionary(p => p.t, p => p.FlowId);
         _modes = File.Exists(_modesPath) ? ReadModes(_modesPath) : Empty();
+        MoveV0KeyFiles();
     }
 
     static ModesFile ReadModes(string path)
@@ -85,6 +118,7 @@ public sealed class SecurityStore
     /// <summary>Writes a new version of a type's key and makes it the active one. The old version stays on disk, so a failed check loses nothing.</summary>
     public void PlaceKey(string typeId, string pem)
     {
+        if (VaultTypes.Contains(typeId)) { PlaceInVault(typeId, KeyFileReader.Parse(pem, typeId).CopyMaterial()); return; }
         lock (_gate)
         {
             TypeEntry e = EntryOf(_modes, typeId);
@@ -95,6 +129,49 @@ public sealed class SecurityStore
             File.WriteAllText(full, pem);
             Put(typeId, e with { Mode = ModeMine, Binding = new KeyBinding(ProviderFile, version, relative, HashOf(full)) });
         }
+    }
+
+    /// <summary>The key goes in as a new version of the vault key named for the type. The key's policy was set when the first version went in, and stays.</summary>
+    /// <summary>
+    /// A folder made before slice V1 holds the my-login keys as key.pem files. On first start each one moves into the vault, under the caller
+    /// host/move-v0-file so the audit list names the move, and the file goes once the vault holds it. A checked key stays checked: the bytes are the same.
+    /// A file that will not read, or a vault that will not take it, stays where it is, and the type shows its problem by name as before.
+    /// </summary>
+    void MoveV0KeyFiles()
+    {
+        foreach (string typeId in VaultTypes)
+        {
+            TypeEntry e = Entry(typeId);
+            if (e.Mode != ModeMine || e.Binding is not { Provider: ProviderFile, KeyFile: { } file } || StateOf(typeId) == StateBroken) continue;
+            string full = FullPath(file);
+            bool wasChecked = e.CheckedVersion == e.Binding.Version;
+            try { PlaceInVault(typeId, KeyFileReader.ReadPrivateKey(full, typeId).CopyMaterial(), CallerMoveV0); }
+            catch (NetSec.Errors.NetSecException) { continue; }
+            lock (_gate)
+            {
+                TypeEntry moved = EntryOf(_modes, typeId);
+                if (wasChecked) Put(typeId, moved with { CheckedVersion = moved.Binding!.Version });
+            }
+            File.Delete(full);
+        }
+    }
+
+    void PlaceInVault(string typeId, byte[] seed, string? caller = null)
+    {
+        caller ??= "host/flow-" + FlowOf(typeId);
+        int version = Vaulted(() =>
+        {
+            if (!Vault.Exists(typeId)) Vault.CreateKey(typeId, FlowKeyPolicy, caller);
+            return Vault.Import(typeId, seed, caller);
+        });
+        lock (_gate) Put(typeId, EntryOf(_modes, typeId) with { Mode = ModeMine, Binding = new KeyBinding(ProviderVault, version, null, null) });
+    }
+
+    /// <summary>A vault refusal keeps its own code (VAULT_UNWRAP_FAILED, VAULT_AUDIT_FAILED, ...) on its way to the screen and the session.</summary>
+    static T Vaulted<T>(Func<T> call)
+    {
+        try { return call(); }
+        catch (VaultException e) { throw new NetSec.Errors.NetSecException(NetSec.Errors.NetSecError.Of(e.Code, e.Message)); }
     }
 
     /// <summary>A type with no private half of its own, such as a trust list that follows its root.</summary>
@@ -131,29 +208,42 @@ public sealed class SecurityStore
     }).ToArray();
 
     /// <summary>The snapshot a session runs on: each own key whose mode is Mine, among the types the lesson reads. A broken key in any other type cannot stop this lesson.</summary>
-    public CredentialSet Credentials(string[] typesTheLabReads) => new(new TrainingKeySource(), typesTheLabReads.Select(Open).OfType<Credential>().ToArray());
+    /// <summary>The caller (host/lab-&lt;n&gt;) goes on the vault's audit row of each key the set takes out.</summary>
+    public CredentialSet Credentials(string[] typesTheLabReads, string caller) =>
+        new(new TrainingKeySource(), typesTheLabReads.Select(t => Open(t, caller)).OfType<Credential>().ToArray());
 
-    /// <summary>The learner's key for a type, whatever its mode. Null when none is placed.</summary>
-    public ITrainingKey? PlacedKey(string typeId)
+    /// <summary>The learner's key for a type, whatever its mode. Null when none is placed. A vault key comes out by Export, audited under the caller.</summary>
+    public ITrainingKey? PlacedKey(string typeId, string caller = CallerFlow)
     {
         KeyBinding? b = Entry(typeId).Binding;
+        if (b?.Provider == ProviderVault) return new SeedKey(typeId, Vaulted(() => Vault.Export(typeId, caller, b.Version)));
         return b?.KeyFile is null ? null : KeyFileReader.ReadPrivateKey(FullPath(b.KeyFile), typeId);
     }
 
-    Credential? Open(string typeId)
+    Credential? Open(string typeId, string caller)
     {
         TypeEntry e = Entry(typeId);
         if (e.Mode != ModeMine || e.Binding is null) return null;
         ITrainingKey? key;
-        try { key = PlacedKey(typeId); }
-        catch (NetSec.Errors.NetSecException x)
+        try { key = PlacedKey(typeId, caller); }
+        catch (NetSec.Errors.NetSecException x) when (!x.Error.Code.StartsWith("VAULT_", StringComparison.Ordinal))
         {
             throw new NetSec.Errors.NetSecException(NetSec.Errors.NetSecError.Of(NetSec.Errors.ErrorCodes.SecurityTypeNotReady, $"{typeId} cannot be read: {x.Error.Message} Run the flow {FlowOf(typeId)} again."));
         }
         return new Credential(typeId, CredentialMode.Mine, e.Binding.Provider, e.Binding.Version, key is null ? "" : FingerprintOf(key.CopyPublic()), key);
     }
 
-    public static string FingerprintOf(byte[] publicPart) => "SHA256:" + Convert.ToBase64String(SHA256.HashData(publicPart)).TrimEnd('=');
+    public static string FingerprintOf(byte[] publicPart) => Fingerprints.OfPublic(publicPart);
+
+    /// <summary>An Ed25519 seed taken out of the vault, in the shape the glass engines read.</summary>
+    sealed class SeedKey(string keyId, byte[] seed) : ITrainingKey
+    {
+        readonly byte[] _public = NetSec.Crypto.Ed25519.PublicFrom(seed);
+        public string KeyId => keyId;
+        public KeyAlgorithm Algorithm => KeyAlgorithm.Ed25519;
+        public byte[] CopyMaterial() => (byte[])seed.Clone();
+        public byte[] CopyPublic() => (byte[])_public.Clone();
+    }
 
     string FullPath(string relative) => Path.Combine(Root, relative);
 

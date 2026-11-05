@@ -1,0 +1,22 @@
+<Project Sdk="Microsoft.NET.Sdk">
+
+  <!-- The practice vault (docs/modes-design.md section 4). It copies the behaviour of a vault and gives none of the protection.
+       Microsoft.Data.Sqlite.Core with the e_sqlite3 bundle, not Microsoft.Data.Sqlite: that one pulls a SQLite with advisory GHSA-2m69-gcr7-jv3q (design 4.4). -->
+
+  <PropertyGroup>
+    <TargetFramework>net10.0</TargetFramework>
+    <LangVersion>14</LangVersion>
+    <Nullable>enable</Nullable>
+    <ImplicitUsings>enable</ImplicitUsings>
+    <AssemblyName>NetSec.Vault</AssemblyName>
+    <RootNamespace>NetSec.Vault</RootNamespace>
+    <IsPackable>false</IsPackable>
+  </PropertyGroup>
+
+  <ItemGroup>
+    <PackageReference Include="Microsoft.Data.Sqlite.Core" Version="10.0.9" />
+    <PackageReference Include="SQLitePCLRaw.bundle_e_sqlite3" Version="3.0.3" />
+    <ProjectReference Include="..\NetSec.Core\NetSec.Core.csproj" />
+  </ItemGroup>
+
+</Project>

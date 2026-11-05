@@ -75,6 +75,7 @@ app.MapGet("/api/ce", () => Results.Json(ce.Status()));
 app.MapPost("/api/ce/start", async () => Results.Json(await ce.StartAsync()));
 app.MapPost("/api/ce/stop", () => { ce.Stop(); return Results.Json(ce.Status()); });
 SecurityRoutes.Map(app, security, flowRuns);
+VaultRoutes.Map(app, security.Vault, new VaultExercise(security.Vault, new OpenSslTool(Environment.GetEnvironmentVariable), Path.Combine(security.Root, "proof")));
 
 app.Map("/ws", async ctx =>
 {
@@ -224,14 +225,14 @@ namespace NetSec.Host
             int lesson = Number(m, "lesson", -1);
             int seed = Number(m, "seed", RandomSeed());
             // GEM:decide-at-authoritative-boundary: the one place a lesson may refuse a key, before any event. A lab never falls back to built-in keys in silence.
-            LabDecision ready = SecurityReadiness.Decide(LabCatalog.Needs(lesson), security.States());
+            LabDecision ready = security.Decide(LabCatalog.Needs(lesson));
             if (!ready.MayRun)
             {
                 Fail(requestId, ready.Problems[0].Code, string.Join(" ", ready.Problems.Select(p => p.Detail)));
                 return;
             }
             CredentialSet credentials;
-            try { credentials = security.Credentials(LabCatalog.Needs(lesson)); }
+            try { credentials = security.Credentials(LabCatalog.Needs(lesson), "host/lab-" + lesson); }
             catch (NetSecException e)
             {
                 Fail(requestId, e.Error.Code, e.Error.Message);

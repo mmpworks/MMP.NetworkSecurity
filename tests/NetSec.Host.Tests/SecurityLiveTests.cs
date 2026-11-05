@@ -112,14 +112,21 @@ public class SecurityLiveTests
     {
         using Host host = new();
         await host.MakeFlow("my-login");
-        File.WriteAllText(Path.Combine(host.SecurityDir, "files", "token.issuer", "v1", "key.pem"), "this is no key");
+        // The my-login keys live in the vault (slice V1), so a person with the file breaks one by changing its wrapped row.
+        using (Microsoft.Data.Sqlite.SqliteConnection db = new("Data Source=" + Path.Combine(host.SecurityDir, "vault", "vault.db") + ";Pooling=False"))
+        {
+            db.Open();
+            using Microsoft.Data.Sqlite.SqliteCommand q = db.CreateCommand();
+            q.CommandText = "UPDATE key_versions SET wrapped = zeroblob(length(wrapped)) WHERE name = 'token.issuer'";
+            Assert.Equal(1, q.ExecuteNonQuery());
+        }
 
         Assert.Equal("session.finished", Last(await host.Session(0)));
         Assert.Equal("session.finished", Last(await host.Session(4)));
 
         List<JsonElement> refused = await host.Session(10);
         Assert.Equal("error", Last(refused));
-        Assert.Equal("SECURITY_TYPE_NOT_READY", refused[^1].GetProperty("code").GetString());
+        Assert.Equal("VAULT_UNWRAP_FAILED", refused[^1].GetProperty("code").GetString());
         Assert.Contains("token.issuer", refused[^1].GetProperty("message").GetString());
     }
 
@@ -127,9 +134,9 @@ public class SecurityLiveTests
     public async Task A_key_route_on_a_broken_key_answers_by_name()
     {
         using Host host = new();
-        await host.MakeFlow("my-login");
-        File.WriteAllText(Path.Combine(host.SecurityDir, "files", "token.issuer", "v1", "key.pem"), "this is no key");
-        (int status, string body) = await host.Get("/api/security/types/token.issuer/key");
+        await host.MakeFlow("my-certificates");
+        File.WriteAllText(Path.Combine(host.SecurityDir, "files", "tls13.server", "v1", "key.pem"), "this is no key");
+        (int status, string body) = await host.Get("/api/security/types/tls13.server/key");
         Assert.True(status is >= 400 and < 500, status + ": " + body);
         Assert.Equal("KEY_FILE_FORMAT", JsonDocument.Parse(body).RootElement.GetProperty("code").GetString());
     }

@@ -11,6 +11,9 @@ public static class SecurityRoutes
 {
     const string TestKeysLine = "wizard.common.test-keys-only";
 
+    /// <summary>The caller name on the vault audit row each read of this route writes.</summary>
+    public const string KeyRouteCaller = "host/key-route";
+
     public static void Map(WebApplication app, SecurityStore store, FlowRuns runs)
     {
         app.MapGet("/api/security", () => Results.Json(new
@@ -31,7 +34,7 @@ public static class SecurityRoutes
         app.MapGet("/api/security/types/{typeId}/key", (string typeId) => KeyReply(store, typeId));
         app.MapGet("/api/security/readiness", (int lesson) =>
         {
-            LabDecision d = SecurityReadiness.Decide(LabCatalog.Needs(lesson), store.States());
+            LabDecision d = store.Decide(LabCatalog.Needs(lesson));
             return Results.Json(new { mayRun = d.MayRun, problems = d.Problems.Select(p => new { typeId = p.TypeId, code = p.Code, detail = p.Detail }) });
         });
         app.MapGet("/api/security/show-keys", () => Results.Json(new { on = store.ShowKeys }));
@@ -81,7 +84,7 @@ public static class SecurityRoutes
         if (Array.IndexOf(SecurityTypes.All, typeId) < 0) return Refuse(404, "SECURITY_TYPE_UNKNOWN", $"No security type has the id {typeId}.");
         TypeEntry e = store.Entry(typeId);
         ITrainingKey? key;
-        try { key = e.Mode == SecurityStore.ModeMine ? store.PlacedKey(typeId) : BuiltInKey(typeId); }
+        try { key = e.Mode == SecurityStore.ModeMine ? store.PlacedKey(typeId, KeyRouteCaller) : BuiltInKey(typeId); }
         catch (NetSecException x) { return Refuse(409, x.Error.Code, x.Error.Message); }
         byte[]? publicPart = key?.CopyPublic();
         return Results.Json(new
