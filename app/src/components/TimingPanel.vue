@@ -12,7 +12,7 @@ const label = (c: TimingCase) => `${c.compare}, differs at byte ${c.diffPosition
 
 <template>
   <div class="timing" data-testid="timing-panel">
-    <div v-if="t.failed" class="attack-result" data-testid="timing-failed">The lab stopped: {{ t.failed.check?.name || t.failed.message || t.failed.type }}<span v-if="t.failed.check" class="muted"> ({{ t.failed.check.code }})</span></div>
+    <div v-if="t.failed" class="attack-result" data-testid="timing-failed">The lab stopped at {{ t.failed.check?.name || t.failed.type }}: {{ t.failed.message }}<span v-if="t.failed.check" class="muted"> ({{ t.failed.check.code }})</span></div>
     <div v-if="t.machine" class="muted" data-testid="timing-machine">This machine: CLR {{ t.machine.clr }}, {{ t.machine.pointerBytes * 8 }}-bit.</div>
     <div v-if="!t.cases.length && !t.verdict && !t.guesses.length && !t.failed" class="empty-note">The lab has not measured anything yet.</div>
 
