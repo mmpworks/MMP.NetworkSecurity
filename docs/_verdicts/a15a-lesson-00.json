@@ -1,0 +1,26 @@
+{
+  "reader": "reader-a15a",
+  "authors": [
+    "heather-s0-tour"
+  ],
+  "claims": [
+    {
+      "id": "L0-C01",
+      "verdict": "inaccurate",
+      "note": "Claim is true in code: EchoEngine.cs says it has no lock, and ServerHello sends the received body back unchanged. The cited source does not say it. program-design.md section 8 row S0 only lists 'EchoEngine through EnginePump, one live toy lesson'. Fix: cite src/NetSec.Core/Machine/EchoEngine.cs (class summary) or add the sentence to program-design.md.",
+      "checkedAgainst": "docs/program-design.md section 8 (read); src/NetSec.Core/Machine/EchoEngine.cs (read)"
+    },
+    {
+      "id": "L0-C02",
+      "verdict": "accurate",
+      "note": "prd.md D4 reads 'Every engine step emits a trace event with bytes, parsed fields, and the secrets in use'. ux-design.md Conclusion item 2 reads 'Every pixel that moves comes from one trace event. The UI invents no bytes, no secrets, and no check results.' Code: Interpreter.cs comment says each effect emits its trace event in one switch.",
+      "checkedAgainst": "docs/prd.md D4 (read); docs/ux-design.md Conclusion item 2 (read); src/NetSec.Core/Machine/Interpreter.cs (read)"
+    },
+    {
+      "id": "L0-C03",
+      "verdict": "accurate",
+      "note": "ux-design.md section 2 moment 2: protected rows turn to amber noise labelled unreadable. Code: ByteInspector.vue hides only fields with visibleToWire false in the Eavesdropper view; other fields and arrows keep their readable state.",
+      "checkedAgainst": "docs/ux-design.md section 2 moment 2 (read); app/src/components/ByteInspector.vue, SequenceDiagram.vue (read)"
+    }
+  ]
+}

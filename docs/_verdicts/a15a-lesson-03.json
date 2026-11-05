@@ -1,0 +1,38 @@
+{
+  "reader": "reader-a15a",
+  "authors": [
+    "heather-s0-tour"
+  ],
+  "claims": [
+    {
+      "id": "L3-C01",
+      "verdict": "accurate",
+      "note": "RFC 7748 section 6.1: 'Both now share K = X25519(a, X25519(b, 9)) = X25519(b, X25519(a, 9))'. The 32-byte size comes from section 5 ('the inputs and outputs are 32-byte strings (for X25519)') and the 32-byte scalars in 6.1. Suggest 'sections 5 and 6.1'.",
+      "checkedAgainst": "RFC 7748 sections 5, 6.1, fetched from rfc-editor.org this session"
+    },
+    {
+      "id": "L3-C02",
+      "verdict": "inaccurate",
+      "note": "Sizes are correct but in the wrong table. FIPS 203 section 8 Table 3 gives ML-KEM-768: encapsulation key 1184, decapsulation key 2400, ciphertext 1088, shared secret 32. Table 2 holds parameters (k, eta, d_u, d_v, RBG strength) and no sizes. The clause 'no known quantum algorithm breaks it' is not in section 8. FIPS 203 abstract says 'ML-KEM is believed to be secure, even against adversaries who possess a quantum computer'. Fix: cite 'FIPS 203, section 8, Table 3' for sizes and 'FIPS 203, abstract' for the quantum clause.",
+      "checkedAgainst": "FIPS 203 section 8 Tables 2 and 3, abstract, section 1.2, PDF fetched from nvlpubs.nist.gov this session"
+    },
+    {
+      "id": "L3-C03",
+      "verdict": "accurate",
+      "note": "FIPS 203 Algorithm 18 steps 8 to 10: if the re-encrypted ciphertext c' differs from c, K-bar is set to J(z || c), a hash of the implicit rejection value z and c, and the algorithm returns it. Section 6.3 calls this 'implicit rejection'. No error output exists.",
+      "checkedAgainst": "FIPS 203 section 6.3, Algorithm 18, fetched this session"
+    },
+    {
+      "id": "L3-C04",
+      "verdict": "accurate",
+      "note": "lessons-1-3-names.md Lesson 3 table, Hybrid row: shares 1,216 and 1,120, confirm 32, secret hybrid.shared 64 'ML-KEM first, then X25519'. Arithmetic: 1,184 + 32 = 1,216 and 1,088 + 32 = 1,120.",
+      "checkedAgainst": "docs/lessons-1-3-names.md Lesson 3 (read)"
+    },
+    {
+      "id": "L3-C05",
+      "verdict": "accurate",
+      "note": "docs/prd.md Teaching accuracy rules, rule 4: 'The hybrid protects key exchange only. Certificates stay classical.'",
+      "checkedAgainst": "docs/prd.md Teaching accuracy rules, rule 4 (read)"
+    }
+  ]
+}
