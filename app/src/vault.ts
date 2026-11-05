@@ -73,7 +73,7 @@ export async function loadVaultKeys() {
     const b = await hostGet(addr, '/api/security/vault/keys')
     vault.keys = list(b.keys).map(toKey)
     vault.loaded = true
-  } catch (e: any) { vault.fault = { code: e?.status === 404 ? 'PRODUCT_MISSING' : 'HOST_VAULT_FAILED', message: 'The course could not read the vault list from the engine.', retryable: true, requestId: '' } }
+  } catch (e: any) { vault.fault = e?.body?.code ? refusal(e.body) : { code: e?.status === 404 ? 'PRODUCT_MISSING' : 'HOST_VAULT_FAILED', message: 'The course could not read the vault list from the engine.', retryable: true, requestId: '' } }
 }
 
 export async function openVault() { vault.open = true; vault.screen = 'sign-derive'; await loadVaultKeys() }
@@ -117,7 +117,7 @@ export async function showAudit() {
       after = page[page.length - 1].seq
     }
     vault.audit = rows
-  } catch { vault.fault = { code: 'HOST_VAULT_FAILED', message: 'The course could not read the audit list.', retryable: true, requestId: '' } }
+  } catch (e: any) { vault.fault = e?.body?.code ? refusal(e.body) : { code: 'HOST_VAULT_FAILED', message: 'The course could not read the audit list.', retryable: true, requestId: '' } }
 }
 
 export async function checkChain() {
