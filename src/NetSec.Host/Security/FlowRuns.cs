@@ -123,7 +123,7 @@ public sealed class FlowRuns
         Dictionary<string, string> chosen = paths.EnumerateObject().Where(p => p.Value.ValueKind == JsonValueKind.String).ToDictionary(p => p.Name, p => p.Value.GetString()!);
         foreach ((string typeId, string path) in chosen)
         {
-            if (Path.GetFullPath(path).StartsWith(_personalSsh, StringComparison.OrdinalIgnoreCase))
+            if (IsPersonal(path))
                 warnings.Add(new StepMessage(PathPersonal, "This file is in your own .ssh folder, so it may be a key you use every day. This course shows every key. Use a test key.", typeId));
             ReadOne(typeId, path, errors);
         }
@@ -133,6 +133,14 @@ public sealed class FlowRuns
             if (chosen.TryGetValue(typeId, out string? path)) _store.PlaceKey(typeId, File.ReadAllText(path));
             else _parts.Make(typeId);
         }
+    }
+
+    /// <summary>A blank or malformed path is no personal path. ReadOne then names it as unreadable.</summary>
+    bool IsPersonal(string path)
+    {
+        try { return Path.GetFullPath(path).StartsWith(_personalSsh, StringComparison.OrdinalIgnoreCase); }
+        catch (ArgumentException) { return false; }
+        catch (NotSupportedException) { return false; }
     }
 
     static void ReadOne(string typeId, string path, List<StepMessage> errors)

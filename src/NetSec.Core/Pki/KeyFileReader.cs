@@ -21,6 +21,8 @@ namespace NetSec.Pki
             try { raw = ReadAll(path); }
             catch (IOException e) { throw Refuse(ErrorCodes.KeyFileUnreadable, path + " cannot be read: " + e.Message); }
             catch (UnauthorizedAccessException e) { throw Refuse(ErrorCodes.KeyFileUnreadable, path + " cannot be read: " + e.Message); }
+            catch (ArgumentException e) { throw Refuse(ErrorCodes.KeyFileUnreadable, "This path cannot be read: " + e.Message); }
+            catch (NotSupportedException e) { throw Refuse(ErrorCodes.KeyFileUnreadable, "This path cannot be read: " + e.Message); }
             return Parse(Encoding.UTF8.GetString(raw, 0, raw.Length), keyId);
         }
 

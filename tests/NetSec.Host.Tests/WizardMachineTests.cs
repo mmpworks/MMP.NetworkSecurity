@@ -173,6 +173,20 @@ public class WizardMachineTests
         Assert.Equal("Review", reply.Run.State);
     }
 
+    [Theory]
+    [InlineData("")]
+    [InlineData("   ")]
+    public void A_blank_path_is_named_as_unreadable_and_is_no_server_error(string path)
+    {
+        using Rig rig = new();
+        FlowRun run = rig.Runs.Start("my-login")!.Run;
+        run = Move(rig.Runs, run, "next", NoData).Run;
+        run = Move(rig.Runs, run, "use-files", NoData).Run;
+        RunReply reply = Move(rig.Runs, run, "files", PathsData(SecurityTypes.TokenIssuer, path));
+        Assert.Contains(reply.Errors, e => e.Code == "KEY_FILE_UNREADABLE");
+        Assert.Equal("PickFiles", reply.Run.State);
+    }
+
     [Fact]
     public void A_run_resumes_after_a_restart_with_its_own_step()
     {
