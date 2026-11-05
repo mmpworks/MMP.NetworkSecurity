@@ -80,7 +80,7 @@ sys.exit(1 if bad else 0)
         [Clause("SELF.a17-repo-guard-bites")]
         public static string RepoGuardBites(Ctx c)
         {
-            string marker = "-----BEGIN PRIV" + "ATE KEY-----\nAAAA\n-----END PRIV" + "ATE KEY-----\n";
+            string marker = "-----BEGIN PRIV" + "ATE KEY-----\nMC4CAQAwBQYDK2VwBCIEIAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAA\n-----END PRIV" + "ATE KEY-----\n";
             Expect(Outcome(On(c, MakeRepo(c, "good", "good", true, null), "good")), "PASS", "a clean repository with a sound guard");
             int bites = 0;
             Expect(Outcome(On(c, MakeRepo(c, "pem", "good", true, d => { File.WriteAllText(Path.Combine(d, "src", "leak.pem"), marker); }), "pem")), "FAIL", "a tracked file with a private key header"); bites++;

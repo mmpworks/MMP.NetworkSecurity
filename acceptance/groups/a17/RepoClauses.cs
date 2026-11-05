@@ -24,6 +24,10 @@ namespace Acceptance
 
         static string Marker { get { return "PRIV" + "ATE KEY"; } }
 
+        // A PEM block of key material: the header line, a body of base64, and the footer. A sentence that names the header (a document, a test message)
+        // has no body and no footer, so it is no key. The words are put together here so this file holds no header itself.
+        static readonly Regex PemBlock = new Regex("-----BEGIN [A-Z ]*" + "PRIV" + "ATE KEY-----[A-Za-z0-9+/=\\s]{16,}?-----END [A-Z ]*" + "PRIV" + "ATE KEY-----", RegexOptions.Singleline);
+
         static string Git(string dir, string args)
         {
             string o;
@@ -46,7 +50,6 @@ namespace Acceptance
             ignoreProblem = null;
             List<string> problems = new List<string>();
             List<string> files = Tracked(root);
-            byte[] marker = Encoding.ASCII.GetBytes(Marker);
             foreach (string f in files)
             {
                 if (ForbiddenPath.IsMatch(f)) { problems.Add(f + ": a path that holds keys or session data is tracked"); continue; }
@@ -54,7 +57,7 @@ namespace Acceptance
                 string full = Path.Combine(root, f.Replace('/', Path.DirectorySeparatorChar));
                 FileInfo fi = new FileInfo(full);
                 if (!fi.Exists || fi.Length > 8 * 1024 * 1024) continue;
-                if (IndexOf(File.ReadAllBytes(full), marker) >= 0) problems.Add(f + ": holds a PEM private key header and is not on the allow-list");
+                if (PemBlock.IsMatch(Encoding.GetEncoding("iso-8859-1").GetString(File.ReadAllBytes(full)))) problems.Add(f + ": holds a PEM private key block and is not on the allow-list");
             }
             string ignore = Path.Combine(root, ".gitignore");
             if (!File.Exists(ignore) || !Regex.IsMatch(File.ReadAllText(ignore), @"(?m)^\s*/?\.security/?\s*$"))
