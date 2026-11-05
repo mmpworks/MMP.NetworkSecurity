@@ -90,14 +90,14 @@
     },
     {
       "id": "L8-C15",
-      "verdict": "inaccurate",
-      "note": "Tours read at main 32f6219 (PR 54 merged); lab run at main 32f6219. The NVD description of CVE-2023-48795 (fetched from the NVD API) says an attacker can 'bypass integrity checks such that some packets are omitted (from the extension negotiation message), and a client and server may consequently end up with a connection for which some security features have been downgraded or disabled'. The claim says the packets are 'from the start of the handshake'. NVD names the extension negotiation message, and the tour step says 'the start of the protected stream'. Fix: 'some packets from the start of the protected stream are omitted (NVD names the extension negotiation message)'. The rest of the claim matches NVD.",
+      "verdict": "accurate",
+      "note": "Re-read at main 5440eeb. The claim now reads 'some packets from the start of the protected stream are omitted (NVD names the extension negotiation message)', which matches the NVD description of CVE-2023-48795 ('some packets are omitted (from the extension negotiation message)', 'security features have been downgraded or disabled'). Earlier wording problem closed. Tours read at main 32f6219 (PR 54 merged); lab run at main 32f6219. The NVD description of CVE-2023-48795 (fetched from the NVD API) says an attacker can 'bypass integrity checks such that some packets are omitted (from the extension negotiation message), and a client and server may consequently end up with a connection for which some security features have been downgraded or disabled'. The claim says the packets are 'from the start of the handshake'. NVD names the extension negotiation message, and the tour step says 'the start of the protected stream'. Fix: 'some packets from the start of the protected stream are omitted (NVD names the extension negotiation message)'. The rest of the claim matches NVD.",
       "checkedAgainst": "NVD CVE-2023-48795 description (fetched this session)"
     },
     {
       "id": "L8-C16",
       "verdict": "accurate",
-      "note": "Tours read at main 32f6219 (PR 54 merged); lab run at main 32f6219. Run on main 32f6219: both rounds emit ssh.kex.strict 'on' for client and server. Unit test A_peer_with_no_strict_marker_leaves_it_off passes (event says 'off'). I reproduced the sweep with a throwaway program (strict KEX switched off in a scratch copy): clear Ignore injected before the server KexInit, then the server's first encrypted packet dropped, then one more encrypted packet sent. Modern suite: 0 of 4,000 accepted (4,000 refused). Legacy suite: 0 of 1,000 accepted (1,000 refused); I stopped at 1,000 for time, so Jared's 4,000 is confirmed for Modern and Legacy is 1,000. Positive control, no attack: 200 of 200 accepted on each suite. Ignore injected and nothing deleted: refused 30 of 30 (Modern) and 10 of 10 (Legacy), so an injected Ignore does kill such a session. One nuance: every refusal came from the packet length check (SSH_PACKET_LENGTH), because the moved cipher stream garbles the encrypted length field before the MAC runs. The claim's reason, 'the MAC covers the plain text and a deleted packet moves the cipher stream', is right in its second half; suggest 'the length field is encrypted'. NVD names ChaCha20-Poly1305 and CBC with encrypt-then-MAC as the exposed modes; neither is in the lab. The names doc dates Jared's sweep 'before strict KEX', which the claim does not say.",
+      "note": "Re-read at main 5440eeb: source line now cites the reproduced sweep and matches my numbers (Modern 0 of 4,000, Legacy 0 of 1,000, Ignore alone 30 of 30 and 10 of 10). Tours read at main 32f6219 (PR 54 merged); lab run at main 32f6219. Run on main 32f6219: both rounds emit ssh.kex.strict 'on' for client and server. Unit test A_peer_with_no_strict_marker_leaves_it_off passes (event says 'off'). I reproduced the sweep with a throwaway program (strict KEX switched off in a scratch copy): clear Ignore injected before the server KexInit, then the server's first encrypted packet dropped, then one more encrypted packet sent. Modern suite: 0 of 4,000 accepted (4,000 refused). Legacy suite: 0 of 1,000 accepted (1,000 refused); I stopped at 1,000 for time, so Jared's 4,000 is confirmed for Modern and Legacy is 1,000. Positive control, no attack: 200 of 200 accepted on each suite. Ignore injected and nothing deleted: refused 30 of 30 (Modern) and 10 of 10 (Legacy), so an injected Ignore does kill such a session. One nuance: every refusal came from the packet length check (SSH_PACKET_LENGTH), because the moved cipher stream garbles the encrypted length field before the MAC runs. The claim's reason, 'the MAC covers the plain text and a deleted packet moves the cipher stream', is right in its second half; suggest 'the length field is encrypted'. NVD names ChaCha20-Poly1305 and CBC with encrypt-then-MAC as the exposed modes; neither is in the lab. The names doc dates Jared's sweep 'before strict KEX', which the claim does not say.",
       "checkedAgainst": "docs/lesson-ssh-names.md at main 32f6219 (read); throwaway sweep program against NetSec.Core with strict KEX off in a scratch copy; unit test run (6 tests passed)"
     },
     {
@@ -123,6 +123,30 @@
       "verdict": "accurate",
       "note": "Tours read at main 32f6219 (PR 54 merged); lab run at main 32f6219. RFC 4254 section 5.2: 'The window size specifies how many bytes the other party can send before it must wait for the window to be adjusted.' Unit test A_stalled_reader_stops_the_sender_at_the_window_and_a_read_resumes_it ran and passed: the server sent 3 MiB, the client received exactly the 2,097,152-byte window and sent no WindowAdjust; after the client reported consumption, all 3 MiB arrived.",
       "checkedAgainst": "RFC 4254 section 5.2 (fetched this session); unit tests run on main 32f6219 (6 passed)"
+    },
+    {
+      "id": "L8-C21",
+      "verdict": "accurate",
+      "note": "Tours read at main 6e0c1e5 (PR 60 merged); lab run at main 6e0c1e5. RFC 4251 section 4.1 gives two trust models: a local host-key database, and a host name-to-key association certified by a trusted CA. The lab pins the host key (check known_hosts match) and the control run shows no CA step.",
+      "checkedAgainst": "RFC 4251 section 4.1 (fetched this session); lab run, lesson 8"
+    },
+    {
+      "id": "L8-C22",
+      "verdict": "accurate",
+      "checkedAgainst": "docs/lesson-ssh-names.md on fix/ssh-relay-room d801e49 (read); lab run, lesson 8; unit test Each_direction_shows_one_passing_mac_check_on_its_first_protected_packet (both suites) passed",
+      "note": "Tour read at origin/fix/tour-8-limits commit b1a6a2f (PR 83, open); lab run at origin/fix/ssh-relay-room d801e49 (PR 77, open). Lab run at PR 77: the control run holds exactly one passing 'packet MAC' event per direction per round (server#30 and client#34 in the modern round, the same in the legacy round), each placed before the first protected ssh.message.received of that direction; 4 events in all against 40 before. The check runs on every packet (names doc); later passes stay quiet. L8-flip-packet still fails packet MAC. The tour sentence says 'on the first protected packet'; the claim says 'before the first protected packet is received'; both match the trace."
+    },
+    {
+      "id": "L8-C23",
+      "verdict": "accurate",
+      "checkedAgainst": "docs/lesson-ssh-names.md on fix/ssh-relay-room d801e49 (read); unit test A_ninth_channel_faults_only_its_own_open... passed; throwaway tests against NetSec.Core (scratch copy of PR 77), run this session",
+      "note": "Tour read at origin/fix/tour-8-limits commit b1a6a2f (PR 83, open); lab run at origin/fix/ssh-relay-room d801e49 (PR 77, open). Reproduced with a read deadline of 3,000 ms in place of 30,000: (1) a client sends 6 MiB into a tunnel whose target never takes a byte: the session ends after 3,065 ms with LINK_DEADLINE, and the send never completes; (2) an idle tunnel with no traffic: the session ends after 3,000 ms with LINK_DEADLINE. The 30 second figure is the default deadline (SshProbe.ReadDeadlineMs = 30000, the lab's LabPair.DeadlineMs). Ninth channel: the unit test opens 8 channels, the ninth open faults with SshCodes.ChannelLimit, the session stays up and the first channel still delivers its byte."
+    },
+    {
+      "id": "L8-C24",
+      "verdict": "accurate",
+      "checkedAgainst": "docs/lesson-ssh-names.md on fix/ssh-relay-room d801e49 (read); capture of the KexInit of ssh.exe 9.5p2, Git ssh 10.3p1 and PuTTY plink 0.80 against a listening socket; unit tests A_peer_with_no_strict_marker_completes_a_session_under_the_old_rules (4 cases) and Ssh_exe_runs_a_command_on_our_server_with_strict_kex_off (2 suites) passed",
+      "note": "Tour read at origin/fix/tour-8-limits commit b1a6a2f (PR 83, open); lab run at origin/fix/ssh-relay-room d801e49 (PR 77, open). Run this session: all three outside clients on this machine offer kex-strict-c-v00@openssh.com (Windows ssh.exe 9.5p2, Git ssh 10.3p1, PuTTY plink 0.80), so no peer without the marker exists here, as the claim says. Our code with the marker off against our code: 4 cases passed, both suites, both directions, event 'off' on both sides, exec echo works. ssh.exe against our server with the marker off: passed on Modern and Legacy, exit 0, output 'hello', event 'off'. Not re-run: 'our client against Go' with the marker off; no committed test covers it. It follows from the code (StrictKex = OffersStrictKex && peer offers), so a marker-off client runs the old rules whatever Go offers. The limit statement (a real old peer stays unproved; nothing ran on CE) is conservative and correct. Small correction to the names doc, not the tour: it says Git ssh 10.3p1 and plink 0.80 'neither ran here'; I ran their KexInit and both offer the marker."
     }
   ],
   "textRead": {
@@ -137,20 +161,24 @@
         "severity": "medium",
         "wrong": "There is no certificate authority.",
         "right": "This lab uses no certificate authority. SSH can use one, but it does not need one.",
-        "evidence": "RFC 4251 section 4.1 lists two trust models, a local key database and a host key certified by a trusted CA."
+        "evidence": "RFC 4251 section 4.1 lists two trust models, a local key database and a host key certified by a trusted CA.",
+        "status": "fixed, re-read ok at 6e0c1e5"
       },
       {
         "step": "L8-S09",
         "severity": "high",
         "wrong": "The check is named packet MAC. It passes on the normal run.",
         "right": "The check is named packet MAC. On the normal run the lab shows no event for it, as with the AEAD tag in lesson 5. Only a failure shows up.",
-        "evidence": "Lab run on main c0a105b: zero check.result events named packet MAC in the control run (both rounds). The step also binds to check.result packet MAC, which never fires on a normal run."
+        "evidence": "Lab run on main c0a105b: zero check.result events named packet MAC in the control run (both rounds). The step also binds to check.result packet MAC, which never fires on a normal run.",
+        "status": "fixed in the lab, re-read ok at 6e0c1e5: PR 66 made every protected packet emit a passing packet MAC check (40 events in the control run); the step text stands and its bind now hits"
       }
     ],
     "notes": [
       "Lesson 9 is referenced by L8-S01 and has no tour yet; plan statement.",
-      "Bind defect: L8-S09 binds to check.result 'packet MAC'; no such event exists in the control run.",
-      "New text read and run on main 32f6219: S03 (Modern means newer), S04 strict KEX (events on in both rounds; sweep and Ignore tests reproduced), S07 no pin refuses (run), S08 packet length (RFC 4253 6.3), S12 channel window (unit test run). No new problems."
-    ]
+      "New text read and run on main 32f6219: S03 (Modern means newer), S04 strict KEX (events on in both rounds; sweep and Ignore tests reproduced), S07 no pin refuses (run), S08 packet length (RFC 4253 6.3), S12 channel window (unit test run). No new problems.",
+      "Bind defect closed: check.result packet MAC now fires on the normal run (PR 66).",
+      "Re-read at PR 83 (b1a6a2f) against the lab at PR 77 (d801e49): S09 (packet MAC once per direction, bind hits 4 events), S11 (30 second deadline ends a parked sender and an idle tunnel; ninth channel refused by name), S14 (old-device limit; outside clients all offer the marker). No new problems; 14 steps."
+    ],
+    "problemsOpen": 0
   }
 }

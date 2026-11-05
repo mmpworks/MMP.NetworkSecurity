@@ -101,10 +101,10 @@ const pulse = computed(() => replayTick.value)
           <template v-if="r.kind === 'arrow'">
             <line :x1="r.fromX" :x2="arrowEnd(r)" :y1="r.y" :y2="r.y" class="arrow" :class="r.protectedBytes ? 'enc' : 'readable'" marker-end="url(#arr)" />
             <text :x="mid(r)" :y="r.y - 9" text-anchor="middle" class="arrow-label" :class="{ unreadable: r.unreadable }">{{ r.label }}</text>
-            <text :x="mid(r)" :y="r.y + 16" text-anchor="middle" class="arrow-sub">{{ r.bytes }} bytes{{ r.protectedBytes ? ', encrypted' : '' }}</text>
+            <text :x="mid(r)" :y="r.y + 16" text-anchor="middle" class="arrow-sub">{{ r.hop ? r.hop + ', ' : '' }}{{ r.bytes }} bytes{{ r.protectedBytes ? ', encrypted' : '' }}</text>
           </template>
           <template v-else>
-            <rect :x="r.fromX - 90" :y="r.y - 14" width="180" height="28" rx="6" class="note" :class="r.kind === 'note' ? 'enc-note' : ''" />
+            <rect :x="r.fromX - Math.max(180, r.label.length * 7 + 24) / 2" :y="r.y - 14" :width="Math.max(180, r.label.length * 7 + 24)" height="28" rx="6" class="note" :class="r.kind === 'note' ? 'enc-note' : ''" />
             <text :x="r.fromX" :y="r.y + 5" text-anchor="middle" class="arrow-label">{{ r.label }}</text>
           </template>
           <g v-if="r.check" :data-testid="`diagram-check-${r.seq}`" :class="r.check.result === 'fail' ? 'chk-fail' : 'chk-pass'">

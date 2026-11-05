@@ -157,3 +157,101 @@ export function hostKeys(events: readonly TraceEvent[], upTo: number): HostKeySe
   }
   return out
 }
+
+// ---- lessons 10 and 11: tokens and timing ----
+
+/** UTF-8 text of an event's hex bytes. Timing and claims events carry JSON text in `plain`. */
+export function textOfHex(hex: string): string {
+  try { return new TextDecoder().decode(Uint8Array.from(hexToBytes(hex))) } catch { return '' }
+}
+
+export function jsonOfEvent<T = Record<string, unknown>>(e: TraceEvent | null): T | null {
+  if (!e || !e.plain) return null
+  try { return JSON.parse(textOfHex(e.plain)) as T } catch { return null }
+}
+
+/** base64url text to a string. Returns null when the text is not valid base64url. */
+export function b64urlText(s: string): string | null {
+  try {
+    const std = s.replace(/-/g, '+').replace(/_/g, '/')
+    const bin = atob(std + '='.repeat((4 - (std.length % 4)) % 4))
+    return new TextDecoder().decode(Uint8Array.from(bin, c => c.charCodeAt(0)))
+  } catch { return null }
+}
+
+export interface TokenPart { name: 'header' | 'claims' | 'signature'; text: string; decoded: string | null }
+export interface TokenView { kind: 'token' | 'proof'; parts: TokenPart[] }
+
+/** The three parts of a compact token (or a DPoP proof) as the fields name them. Offsets index `wire`. */
+export function tokenParts(e: TraceEvent | null, kind: 'token' | 'proof'): TokenView | null {
+  if (!e || !e.wire) return null
+  const parts: TokenPart[] = []
+  for (const [name, field] of [['header', `${kind}Header`], ['claims', `${kind}Claims`], ['signature', `${kind}Signature`]] as const) {
+    const f = e.fields.find(x => x.name === field)
+    if (!f) continue
+    const text = new TextDecoder().decode(Uint8Array.from(hexToBytes(e.wire.slice(f.offset * 2, (f.offset + f.length) * 2))))
+    parts.push({ name, text, decoded: name === 'signature' ? null : b64urlText(text) })
+  }
+  return parts.length ? { kind, parts } : null
+}
+
+export const CLAIM_WORDS: Record<string, string> = {
+  iss: 'who issued it', aud: 'who it is for', sub: 'who it is about', roles: 'roles', cap: 'extra permissions', iat: 'issued at', exp: 'expires', jti: 'one-time id',
+  cnf: 'bound to this key', htm: 'the HTTP method', htu: 'the address', ath: 'hash of the token',
+}
+
+export const isTimeClaim = (k: string): boolean => k === 'iat' || k === 'exp'
+
+export interface Hist { ns: number; count: number }
+export interface TimingCase { compare: string; bufferSize: number; diffPosition: number; samples: number; meanNs: number; medianNs: number; p99Ns: number; histogram: Hist[]; aboveP99: number }
+export interface TimingVerdict { leakyT: number | null; constantTimeT: number | null; controlT: number | null; managedT: number | null; minT: number; factor: number; constantTimeOverMinT: boolean; separated: boolean }
+export interface TimingGuess { compare: string; correctBytes: number; totalBytes: number; blockBytes: number; samplesPerGuess: number; bytes: { value: number; marginNs: number }[] }
+
+export interface TimingView {
+  machine: { clr: string; pointerBytes: number } | null
+  cases: { e: TraceEvent; c: TimingCase }[]
+  managed: { e: TraceEvent; c: TimingCase }[]
+  verdict: { e: TraceEvent; v: TimingVerdict } | null
+  guesses: { e: TraceEvent; g: TimingGuess }[]
+  failed: TraceEvent | null
+}
+
+export function timingOf(events: readonly TraceEvent[], upTo: number): TimingView {
+  const view: TimingView = { machine: null, cases: [], managed: [], verdict: null, guesses: [], failed: null }
+  for (const e of events) {
+    if (e.seq > upTo) break
+    if (e.type === 'timing.lab.started') view.machine = jsonOfEvent(e)
+    else if (e.type === 'timing.samples') { const c = jsonOfEvent<TimingCase>(e); if (c) view.cases.push({ e, c }) }
+    else if (e.type === 'timing.managed') { const c = jsonOfEvent<TimingCase>(e); if (c) view.managed.push({ e, c }) }
+    else if (e.type === 'timing.verdict') { const v = jsonOfEvent<TimingVerdict>(e); if (v) view.verdict = { e, v } }
+    else if (e.type === 'timing.guess.finished') { const g = jsonOfEvent<TimingGuess>(e); if (g) view.guesses.push({ e, g }) }
+    else if (e.type === 'timing.failed') view.failed = e
+  }
+  return view
+}
+
+// ---- lesson 9: the onion ----
+
+export interface OnionLayer { n: 1 | 2 | 3; name: string; state: 'absent' | 'closed' | 'open' | 'broken' }
+export interface Onion { layers: OnionLayer[]; gatewayNote: string }
+
+/** Three wrappers around one PIN. Each layer binds to one event (docs/lesson-9-names.md section 3). A layer reads `open` when the party that removes it has acted. */
+export function onionOf(events: readonly TraceEvent[], upTo: number): Onion {
+  const seen = events.filter(e => e.seq <= upTo)
+  const has = (f: (e: TraceEvent) => boolean) => seen.some(f)
+  const locked = has(e => e.type === 'pin.block.locked')
+  const ssh = has(e => e.type === 'wire.sent' && e.hop === 'hop1' && e.message === 'ChannelData')
+  const tls = has(e => e.type === 'wire.sent' && e.hop === 'hop2' && e.message === 'ApplicationData')
+  const relayed = seen.find(e => e.type === 'gateway.envelope.relayed')
+  const bankActed = has(e => e.actor === 'bank')
+  const pinCheck = seen.find(e => e.check?.name === 'PIN block MAC at bank')
+  const pinState = !locked ? 'absent' : pinCheck?.check?.result === 'fail' ? 'broken' : pinCheck?.check?.result === 'pass' ? 'open' : 'closed'
+  return {
+    layers: [
+      { n: 1, name: 'PIN block, locked by DUKPT', state: pinState },
+      { n: 2, name: 'inside SSH (hop 1)', state: !ssh ? 'absent' : relayed ? 'open' : 'closed' },
+      { n: 3, name: 'inside TLS 1.3 (hop 2)', state: !tls ? 'absent' : bankActed ? 'open' : 'closed' },
+    ],
+    gatewayNote: relayed?.detail ?? '',
+  }
+}

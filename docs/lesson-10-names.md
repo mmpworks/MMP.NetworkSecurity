@@ -121,4 +121,4 @@ RFC 8446 sections 4.4.2.4 and 6.2 name `certificate_required` for an empty list 
 
 ## Release
 
-Lesson 10 stays unbuilt until its tour lands: `LabCatalog.Find(10)` is null, and `AttackCatalog.All` holds no lesson 10 row. The commit that lands `app/src/tours/lesson-10.json` adds `case 10` to `LabCatalog.Find` and joins `Lesson10Rows` to `All`. Until then `session.start` for lesson 10 answers `LESSON_NOT_BUILT`, and the A11 row clauses cannot find their rows.
+Lesson 10 is released: `LabCatalog.Find(10)` returns the lab, and `AttackCatalog.All` holds its 13 rows. `session.start` for lesson 10 runs it.

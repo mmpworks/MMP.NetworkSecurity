@@ -130,6 +130,13 @@ Each correction goes here, newest slice last. Later slices read this file first.
 18. **The sequence number stops by name at 2^32.** RFC 4253 section 6.4 lets it wrap. RFC 4344 section 3.1 says not to send 2^32 packets under one key, and this engine has no rekey. The check runs in the writer and the reader, so a command path needs the same failure guard as a feed.
 19. **A test can pass for the wrong reason on a closed channel.** The first second-confirmation test ran the exec to its end, so the channel had gone and the failure came from that. A rule-breaking test must assert the state it attacks is still live.
 
+## S4, SSH, Jared's re-check
+
+1. **A wait must have a waker that does not depend on the thing being removed.** PR #51 kept the room signal on the relay object, and removing the relay stranded a read parked on it. The signal now belongs to the channel number in `GlassSshSession`. Each exit wakes it: a window opens, the peer closes the channel, or the session ends.
+2. **`Send` now means "held, and there is room".** A large send goes in 1 MiB pieces, with the wait between them, and sends on one channel keep their order through a per-channel tail. The engine's 4 MiB limit stays as the guard for a caller that does not wait.
+3. **A ninth local channel faults its own open.** The session and its other channels go on.
+4. **The old rules ran against outside code from one side at a time.** `NoStrictKex` on our side and an outside peer that offers the marker gives `off` on both. That is what can run here. A peer with no marker of its own stays unproved. For the real device: read its version banner first.
+
 ## S5, the bridge
 
 1. **The gateway opens hop 2 at the first byte.** `ssh.exe -L` opens a tunnel for any local connection, and the suite's port check is one. An eager open started a TLS handshake that the check then cut, and that named `PEER_CLOSED_EARLY` in a good run. `FirstWriteOpensLink` opens nothing for an empty tunnel.
@@ -150,3 +157,5 @@ Each correction goes here, newest slice last. Later slices read this file first.
 ## Gate hang limit
 
 1. **Each `dotnet test` step in the gate now ends a stuck test at 3 minutes and names it.** The slowest test takes 11.4 s at 100% CPU. `--blame-hang-dump-type none` keeps the run on net48 and writes no dump. The name sits in the last lines of the step, so the gate report keeps it. A9 runs its own `dotnet test` with a 30-minute limit per build, so after a hang the gate still waits for A9.
+
+**S5 addendum.** One gateway speaks one suite, set by `--suite` on the gateway role. A CE on the other suite stops at `SSH_NO_COMMON_ALG`. Steve's device is the legacy case: run the gateway and the CE with `--suite legacy`. This flag is an addition to the command line in `acceptance/CONTRACT.md`, and the default stays modern.

@@ -86,7 +86,13 @@ int FlagMissing(string flag)
     return NoSuchRole;
 }
 
-HopServerOptions HopOptions() => new() { Keys = new TrainingKeySource(), Random = Random(), Sink = Sink() };
+HopServerOptions HopOptions() => new()
+{
+    Keys = new TrainingKeySource(),
+    Random = Random(),
+    Sink = Sink(),
+    Suite = Option("--suite") == "legacy" ? SshSuite.Legacy : SshSuite.Modern,
+};
 
 int Gateway()
 {

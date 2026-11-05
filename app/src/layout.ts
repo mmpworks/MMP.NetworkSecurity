@@ -20,6 +20,8 @@ export interface Row {
   unreadable: boolean
   check: TraceCheck | null
   head: string
+  /** `hop1` or `hop2` on the bridge lesson, empty elsewhere. */
+  hop?: string
 }
 export interface Layout { lanes: Lane[]; rows: Row[]; width: number; height: number; learned: number; total: number }
 
@@ -29,8 +31,11 @@ export const isWireSent = (e: TraceEvent): boolean => e.type === 'wire.sent'
 // plain differ from wire, so comparing the two would call a tamper "encrypted".
 export const isProtected = (e: TraceEvent): boolean => e.wire.length > 0 && e.fields.some(f => !f.visibleToWire)
 // Events that draw a marker on one lane: key installs, certificates issued, keys erased, alerts.
+// The bridge lesson (9) has actors that own no lane: the PIN pad sits on the CE device and the bank behind the server (docs/lesson-9-names.md section 1).
+const LANE_ALIAS: Record<string, string> = { reader: 'ce', bank: 'server' }
+
 export const isNoteEvent = (e: TraceEvent): boolean =>
-  e.type.startsWith('keys.') || e.type.startsWith('ssh.weak.') || ['ca.certificate.issued', 'dukpt.key.erased', 'tls.alert.sent', 'ssh.hostkey.seen', 'ssh.exec.exit'].includes(e.type)
+  e.type.startsWith('keys.') || ['pin.block.locked', 'ce.envelope.taken', 'gateway.envelope.relayed', 'ce.reply.relayed'].includes(e.type) || e.type.startsWith('ssh.weak.') || ['ca.certificate.issued', 'dukpt.key.erased', 'tls.alert.sent', 'ssh.hostkey.seen', 'ssh.exec.exit'].includes(e.type)
 
 /** The protocol of an event: the third part of its stream id (`<session>/client/tls11` and `<session>/client/tls11/wire` both give `tls11`). */
 export const protocolOf = (e: TraceEvent): string => e.streamId.split('/')[2] ?? ''
@@ -46,7 +51,7 @@ export function laneNames(events: readonly TraceEvent[], declared: readonly stri
 export function layoutDiagram(events: readonly TraceEvent[], declared: readonly string[], view: 'endpoints' | 'eavesdropper'): Layout {
   const names = laneNames(events, declared)
   const lanes: Lane[] = names.map((name, i) => ({ name, x: LEFT + i * LANE_GAP }))
-  const xOf = (n: string): number => lanes.find(l => l.name === n.toLowerCase())?.x ?? LEFT
+  const xOf = (n: string): number => { const k = n.toLowerCase(); return lanes.find(l => l.name === (LANE_ALIAS[k] && !lanes.some(x => x.name === k) ? LANE_ALIAS[k] : k))?.x ?? LEFT }
   const rows: Row[] = []
   let learned = 0
   let total = 0
@@ -66,12 +71,12 @@ export function layoutDiagram(events: readonly TraceEvent[], declared: readonly 
       const hidden = view === 'eavesdropper' && prot
       rows.push({
         seq: e.seq, y, kind: 'arrow', fromX: xOf(e.from), toX: xOf(e.to),
-        label: hidden ? 'unreadable' : e.message || e.type, bytes: byteCount(e.wire), protectedBytes: prot, unreadable: hidden, check: view === 'eavesdropper' ? null : e.check, head: e.wire.slice(0, 16),
+        label: hidden ? 'unreadable' : e.message || e.type, bytes: byteCount(e.wire), protectedBytes: prot, unreadable: hidden, check: view === 'eavesdropper' ? null : e.check, head: e.wire.slice(0, 16), hop: e.hop,
       })
     } else if (e.check && view !== 'eavesdropper') {
       rows.push({ seq: e.seq, y, kind: 'check', fromX: xOf(e.actor), toX: xOf(e.actor), label: e.check.name, bytes: 0, protectedBytes: false, unreadable: false, check: e.check, head: '' })
     } else if (isNoteEvent(e) && view !== 'eavesdropper') {
-      rows.push({ seq: e.seq, y, kind: 'note', fromX: xOf(e.actor), toX: xOf(e.actor), label: e.message || e.type, bytes: 0, protectedBytes: true, unreadable: false, check: null, head: '' })
+      rows.push({ seq: e.seq, y, kind: 'note', fromX: xOf(e.actor), toX: xOf(e.actor), label: e.detail || e.message || e.type, bytes: 0, protectedBytes: true, unreadable: false, check: null, head: '' })
     }
   }
   return { lanes, rows, width: LEFT * 2 + Math.max(0, lanes.length - 1) * LANE_GAP, height: HEAD_H + 60 + rows.length * ROW_H, learned, total }

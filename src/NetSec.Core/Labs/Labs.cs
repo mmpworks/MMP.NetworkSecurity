@@ -121,6 +121,7 @@ namespace NetSec.Labs
                 case 6: return new Lesson06Dukpt();
                 case 7: return new Lesson07Tls11();
                 case 8: return new Lesson08Ssh();
+                case 10: return new Lesson10Auth();
                 default: return null;
             }
         }
@@ -179,37 +180,7 @@ namespace NetSec.Labs
             WithOption("L8-wrong-user-key", 8, Lesson08Ssh.OptionWrongUserKey, "attacker", AttackOutcome.Rejected, SshCodes.AuthRefused, SshChecks.AuthSignature),
             WithOption("L8-refused-tunnel", 8, Lesson08Ssh.OptionRefusedTunnel, "yes", AttackOutcome.Rejected, SshCodes.TunnelRefused, SshChecks.TunnelAllowList),
             Flip("L8-legacy-flip-signature", 8, SshNames.KexdhReply, SshRsaSignatureOffset, SshCodes.ExchangeSignature, SshChecks.ExchangeSignature),
-        };
 
-        // Packet header 5, type 1, host key 4 + 51, share 4 + 32, signature length 4, name 4 + 11, value length 4, then 10 bytes into the signature value.
-        const int SshEd25519SignatureOffset = 130;
-
-        // Past the first encrypted block, which holds the length. A flip there reaches the MAC check rather than the length check.
-        const int SshProtectedBodyOffset = 20;
-
-        // Header 5, type 1, RSA host key 4 + 279, f 4 + 256 or 257, signature length 4, name 4 + 7, value length 4: the 256-byte value starts near 569. This lands inside it for either size of f.
-        const int SshRsaSignatureOffset = 669;
-
-        public static AttackDefinition[] All { get { return (AttackDefinition[])Rows.Clone(); } }
-
-        /// <summary>
-        /// Lesson 10's rows. They join All, and the lab joins LabCatalog, in the commit that lands its tour, so no learner reaches a token lab
-        /// without the accuracy text. Tests run them from here.
-        /// </summary>
-        /// <summary>Lesson 9's rows, which join All when its tour lands, as lesson 10's do.</summary>
-        public static AttackDefinition[] Lesson9Unreleased { get { return (AttackDefinition[])Lesson9Rows.Clone(); } }
-
-        static readonly AttackDefinition[] Lesson9Rows =
-        {
-            Flip("L9-tamper-hop1", 9, SshNames.ChannelData, SshProtectedBodyOffset, SshCodes.PacketMac, SshChecks.PacketMac),
-            Flip("L9-tamper-hop2", 9, "ApplicationData", Tls13Lab.RecordCipherOffset, Tls13Codes.AeadTag, Tls13Codes.CheckName(Tls13Codes.AeadTag)),
-            WithOption("L9-flip-pin-block", 9, Lesson09Bridge.OptionFlipPinBlock, "yes", AttackOutcome.Rejected, ErrorCodes.DukptMacMismatch, NetSec.Bridge.BankHsmCore.MacCheck),
-        };
-
-        public static AttackDefinition[] Lesson10Unreleased { get { return (AttackDefinition[])Lesson10Rows.Clone(); } }
-
-        static readonly AttackDefinition[] Lesson10Rows =
-        {
             Flip("L10-change-token-claim", 10, "ReadTotals", Lesson10Auth.ClaimsOffset + 5, ErrorCodes.TokenBadSignature, NetSec.Auth.Token.SignatureCheck),
             WithOption("L10-expired-token", 10, Lesson10Auth.OptionTokenExpired, "yes", AttackOutcome.Rejected, ErrorCodes.TokenExpired, NetSec.Auth.Token.ExpiryCheck),
             WithOption("L10-replay-proof", 10, Lesson10Auth.OptionReplayProof, "yes", AttackOutcome.Rejected, ErrorCodes.DpopReplay, NetSec.Auth.DpopProof.ReplayCheck),
@@ -223,6 +194,27 @@ namespace NetSec.Labs
             WithOption("L10-unissued-challenge", 10, Lesson10Auth.OptionAnswerUnissued, "yes", AttackOutcome.Rejected, ErrorCodes.ChallengeNotIssued, NetSec.Auth.Challenge.IssuedCheck),
             WithOption("L10-unknown-device", 10, Lesson10Auth.OptionUnknownDevice, "yes", AttackOutcome.Rejected, ErrorCodes.DeviceNotEnrolled, NetSec.Auth.Challenge.EnrolledCheck),
             WithOption("L10-wrong-audience", 10, Lesson10Auth.OptionTokenAudience, "https://other.training/api", AttackOutcome.Rejected, ErrorCodes.TokenBadAudience, NetSec.Auth.Token.AudienceCheck),
+        };
+
+        // Packet header 5, type 1, host key 4 + 51, share 4 + 32, signature length 4, name 4 + 11, value length 4, then 10 bytes into the signature value.
+        const int SshEd25519SignatureOffset = 130;
+
+        // Past the first encrypted block, which holds the length. A flip there reaches the MAC check rather than the length check.
+        const int SshProtectedBodyOffset = 20;
+
+        // Header 5, type 1, RSA host key 4 + 279, f 4 + 256 or 257, signature length 4, name 4 + 7, value length 4: the 256-byte value starts near 569. This lands inside it for either size of f.
+        const int SshRsaSignatureOffset = 669;
+
+        public static AttackDefinition[] All { get { return (AttackDefinition[])Rows.Clone(); } }
+
+        /// <summary>Lesson 9's rows, which join All when its tour lands.</summary>
+        public static AttackDefinition[] Lesson9Unreleased { get { return (AttackDefinition[])Lesson9Rows.Clone(); } }
+
+        static readonly AttackDefinition[] Lesson9Rows =
+        {
+            Flip("L9-tamper-hop1", 9, SshNames.ChannelData, SshProtectedBodyOffset, SshCodes.PacketMac, SshChecks.PacketMac),
+            Flip("L9-tamper-hop2", 9, "ApplicationData", Tls13Lab.RecordCipherOffset, Tls13Codes.AeadTag, Tls13Codes.CheckName(Tls13Codes.AeadTag)),
+            WithOption("L9-flip-pin-block", 9, Lesson09Bridge.OptionFlipPinBlock, "yes", AttackOutcome.Rejected, ErrorCodes.DukptMacMismatch, NetSec.Bridge.BankHsmCore.MacCheck),
         };
 
         static AttackDefinition Flip(string id, int lesson, string message, int offset, string code, string check)
