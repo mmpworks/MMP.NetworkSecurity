@@ -22,18 +22,15 @@ FORBIDDEN_PATH = re.compile(
 # The words are joined here so this file holds no header of its own.
 MARKER = "PRIV" + "ATE KEY"
 PEM_BLOCK = re.compile(
-    "-----BEGIN [A-Z0-9 ]*" + MARKER + "-----(?P<body>.{16,65536}?)-----END [A-Z0-9 ]*" + MARKER + "-----",
+    # The body cannot cross another BEGIN, so a header named in prose cannot open a match that swallows a real key after it.
+    "-----BEGIN [A-Z0-9 ]*" + MARKER + "-----(?P<body>(?:(?!-----BEGIN ).){0,65536}?)-----END [A-Z0-9 ]*" + MARKER + "-----",
     re.DOTALL,
 )
-# An encrypted traditional key has these two lines before its base64 body.
-PEM_HEADER_LINE = re.compile(r"(?m)^\s*(?:Proc-Type|DEK-Info):.*$")
-# A key inside a source string carries its line breaks as escapes, and its lines may sit in separate quoted strings.
-ESCAPED_BREAK = re.compile(r"\\[nr]")
-STRING_FURNITURE = re.compile(r"[\s\"']")
-ALL_BASE64 = re.compile(r"[A-Za-z0-9+/=]{16,}")
+# A key's body is base64, whatever wraps its lines: escapes, quotes, XML, comment marks. The smallest key here, an Ed25519 seed in PKCS#8, is 64 characters.
+BASE64_RUN = re.compile(r"[A-Za-z0-9+/=]+")
+SMALLEST_KEY = 64
 # Golden traces hold built-in training keys, which are public by design. A session file on a learner's keys is what the rule exists for.
 GOLDEN_FOLDER = "acceptance/golden/"
-LARGEST_SCANNED = 8 * 1024 * 1024
 
 
 def index_paths():
@@ -42,7 +39,7 @@ def index_paths():
 
 
 def index_blobs(paths):
-    """Yields (path, bytes or None) from the index. None means git could not give the blob, or it is too large to scan."""
+    """Yields (path, bytes or None) from the index. None means git could not give the blob."""
     names = "".join(":" + p + "\n" for p in paths).encode("utf-8", "surrogateescape")
     with subprocess.Popen(["git", "cat-file", "--batch"], stdin=subprocess.PIPE, stdout=subprocess.PIPE) as git:
         out, _ = git.communicate(names)
@@ -55,7 +52,7 @@ def index_blobs(paths):
             yield path, None
             continue
         size = int(header[2])
-        yield path, out[at:at + size] if size <= LARGEST_SCANNED else b""
+        yield path, out[at:at + size]
         at += size + 1
 
 
@@ -63,9 +60,7 @@ def holds_key(data):
     """A UTF-16 file reads as text once its NUL bytes are gone. Latin-1 keeps every byte as one character."""
     text = data.replace(b"\0", b"").decode("latin-1")
     for match in PEM_BLOCK.finditer(text):
-        body = ESCAPED_BREAK.sub("\n", match.group("body"))
-        body = STRING_FURNITURE.sub("", PEM_HEADER_LINE.sub("", body))
-        if ALL_BASE64.fullmatch(body):
+        if sum(len(run) for run in BASE64_RUN.findall(match.group("body"))) >= SMALLEST_KEY:
             return True
     return False
 
