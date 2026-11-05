@@ -34,7 +34,7 @@ const pairs = computed(() => {
   for (const r of rows.value) byName.set(r.name, [...(byName.get(r.name) ?? []), r])
   return [...byName.entries()].filter(([, v]) => new Set(v.map(r => r.holder)).size >= 2).map(([name, v]) => ({ name, rows: v, match: v.every(r => r.hex === v[0].hex) }))
 })
-const cells = (hex: string) => Array.from({ length: Math.min(32, hex.length >> 1) }, (_, i) => hex.slice(i * 2, i * 2 + 2))
+const cells = (hex: string) => Array.from({ length: Math.min(64, hex.length >> 1) }, (_, i) => hex.slice(i * 2, i * 2 + 2))
 
 const open = reactive(new Set<string>())
 const toggle = (k: string) => { if (open.has(k)) open.delete(k); else open.add(k) }
