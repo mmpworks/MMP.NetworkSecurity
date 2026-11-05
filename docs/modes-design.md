@@ -6,7 +6,7 @@ Author: Richard. Date: 2026-11-05. Status: revised after Steve's decisions and I
 
 1. **The course holds 34 security items. 23 of them sit behind 15 types, and every one of the 15 can take a learner's own test key.** The other 11 items stay as they are. Section 1 lists all 34.
 2. **Steve's O1: option C. Keys reach the engines as bytes, through a facade. The engines do not change, and A16's type clauses stay green.** `CredentialSet` implements `ITrainingKeySource`, so `GlassTransportFactory` keeps its one constructor.
-3. **Sign-inside and refuse-export are taught in one separate vault exercise:** sign, derive, refuse, audit. The labs do not use those paths.
+3. **Sign-inside and refuse-export are taught in one separate vault exercise:** sign, derive, refuse, audit. A non-exportable key runs only there, and never in a glass engine.
 4. **Five "make my set" flows, kept as data, cover the 15 types.** DUKPT and the passkey-shaped login stay available, and the screen says no outside tool can judge them.
 5. **One app-wide Show keys toggle, default ON, for built-in and own keys alike.** Test id `show-keys-switch`. OFF puts fingerprints in place of key bytes at the Host's trace boundary.
 6. **The UI says "My test key", never "Real".** The `SslStream` path is the "OS transport", and that button changes too.
@@ -184,7 +184,8 @@ public static class LabCatalog { public static string[] Needs(int lesson); }   /
 | A `Mine` type is `Unconfigured` or `Broken` | **Refuses** with `SECURITY_TYPE_NOT_READY`, naming each type and its flow |
 | Types disagree | **Refuses** with `SECURITY_TYPES_DISAGREE`. Example: `tls13.server` is `Mine` and `tls.trust` is `BuiltIn`, so the chain cannot reach an anchor |
 | An attack row needs what the item lacks | The row shows `available: false` with its code, and the lab itself runs |
-| Show keys is OFF, or a key is non-exportable | Runs. Neither one changes what the lab does |
+| Show keys is OFF | Runs. The toggle does not change what the lab does |
+| A binding names a non-exportable vault key | **Refuses** with `VAULT_EXPORT_REFUSED`. No flow makes such a binding, so this is a guard |
 
 A lab never falls back to built-in keys in silence. The run would report success on the wrong key. Decision point: `session.start` (gem `decide-at-authoritative-boundary`).
 
@@ -223,7 +224,6 @@ public sealed class Credential {              // One security type, resolved. Im
     public readonly string TypeId, ProviderKind, Fingerprint;
     public readonly CredentialMode Mode;
     public readonly int Version;
-    public readonly bool ShowBytes;           // False for a key made non-exportable
     public readonly bool CanIssue;            // The CA key is here, so bad-certificate attack rows can run
     public readonly bool Imported;            // Drives the lab clock, section 3.4
     public readonly ITrainingKey Key;         // Null for a type with no private half
@@ -270,6 +270,8 @@ Which code is net10 only: the vault, the flows, RSA key generation (BCL `RSA.Cre
 | `SessionManager.cs:159` | No credentials | Sets `Credentials` |
 | Engines, `Tls13Options.SigningSeed`, `SshHostSigner`, `Token.Issue`, `DukptBank`, `BankHsmCore`, `GlassTransportFactory` | | **No change** |
 | `Probe`, `SshProbe`, `TrainingPki`, `Node`, `CeDevice` | Training keys | No change. `acceptance/` grades with them. Node and CE on own keys are cut (section 9.3) |
+
+Under option C, no engine needs an operations interface. `IKeyHandle` needs no RSA decrypt or derive call, because TLS 1.1 key transport and DUKPT run on bytes as they do today. The exercise calls `IVault` directly.
 
 For a generated key, `new TrainingCa(credentials)` then issues as it does today, from the learner's CA key, with the same names and dates. So its layout matches the built-in one in every byte count.
 
@@ -326,8 +328,7 @@ public interface IVault {
     byte[] PublicKey(string name, int? version);
     byte[] Sign(string name, byte[] message, string caller);          // The exercise only
     byte[] Derive(string name, byte[] input, string caller);          // The exercise only
-    byte[] Export(string name, string caller);               // VAULT_EXPORT_REFUSED for a non-exportable key
-    byte[] CourseRead(string name, string caller);           // How a lab gets bytes. Always works. Audited as course-read, never as export
+    byte[] Export(string name, string caller);               // How a lab gets an exportable key's bytes. VAULT_EXPORT_REFUSED for a non-exportable key. Audited with the caller
     AuditRow[] Audit(long afterSeq, int limit);
 }
 public sealed class VaultKeyPolicy { public string Algorithm; public bool Exportable; public string[] AllowedOps; }
@@ -355,7 +356,7 @@ Wrapping: AES-256-GCM under a master key, with `name#version` as the additional 
 | Audit, including refusals | Yes | Yes |
 | Wrapped at rest | Yes | Yes |
 | Sign and derive inside | Yes | **In the exercise only** |
-| Refuse export | Yes | **Yes, on `Export`.** `CourseRead` is the labs' route, and no real vault has one |
+| Export | An exportable key can leave. A non-exportable one cannot | **The same.** Flows make exportable keys, and labs read them by `Export`. Only the exercise's keys are non-exportable |
 | Sealing, roles, wrapped-only import, scheduled deletion | Yes | **Cut this round.** Jared's table lists them, and section 9.3 leaves the door open |
 | Tamper-resistant hardware, FIPS, a separate process | Yes | No |
 
@@ -370,7 +371,7 @@ A separate lab, id 20, outside `GET /api/lessons`, as lesson 0 is (learnings S0 
 | 3 Refuse | `vault.refused`: `VAULT_EXPORT_REFUSED` | Asks for the key, and the box says no |
 | 4 Audit | `vault.audit` | All three calls, with the refusal |
 
-It makes its own keys, `exercise/signing` and `exercise/bdk`, non-exportable, so it needs no flow first. `CourseRead` refuses the `exercise/` names, so this exercise really has no route to the bytes.
+It makes its own keys, `exercise/signing` and `exercise/bdk`, non-exportable, so it needs no flow first. `Export` refuses them, so nothing has a route to their bytes. **These are the only non-exportable keys in the course, and no glass engine runs on them.**
 
 ### 4.4 Package and spike
 
@@ -498,13 +499,14 @@ Today's traces show few long-term keys, built-in ones too. Only `Lesson06Dukpt.c
 |---|---|
 | Written by the Host | It adds nothing to an engine stream, so `streamSeq`, tamper addresses, `atSeq` forks, and the golden traces stay as they are |
 | Skips the step gate | A tour gains no step |
-| Bytes come from `Credential.Key.CopyMaterial()` | The Host holds the same set the lab holds. For a vault key, that bytes read was one `CourseRead`, and the audit list shows it as a course read |
+| Bytes come from `Credential.Key.CopyMaterial()` | The Host holds the same set the lab holds. For a vault key, opening the set called `Export(name, "host/lab-<n>")` |
+| Audit rows on every session start | Each lab start writes one export row per vault key it reads, with the toggle ON or OFF. That is accurate: an exportable key left the box. The audit list shows the caller name, so the row does not read as an attack |
 
-**One exception, on accuracy: a key made non-exportable shows its fingerprint, even with the toggle ON.** The lab still runs on its bytes, by Steve's O1. The Host's boundary replaces any secret whose bytes equal a `ShowBytes = false` key, with `hidden: "non-exportable"` and the public fingerprint. Beside it the Secrets panel shows this line, word for word:
+**One exception, on accuracy: a non-exportable key shows only its fingerprint, even with the toggle ON.** Such a key runs only in the vault exercise (section 4.3), so no lab holds its bytes, and the Host has none to hide. The exercise's events and the vault page carry the public fingerprint with `hidden: "non-exportable"`, and `GET /api/security/types/{typeId}/key` has no bytes to give. Beside it the UI shows this line, word for word:
 
 > The course refuses to show it. A real HSM would refuse too. These files could still open it here.
 
-The learner chose this, on its own flow step. **Flows generate keys as exportable by default,** so every key shows unless the learner picks this. Per-sale and session keys derived from it still show, as section 1.5 lists.
+**Flows generate exportable keys, with no other choice this round,** so every key a lab uses can show. The refusal is taught once, in the exercise.
 
 ### 6.4 The boundary
 
@@ -514,13 +516,13 @@ One pure function in Core and one line at each exit in the Host. Rules, engines,
 public sealed class TraceSecret { /* existing */ public string Fingerprint; public int Length; public string Hidden; }   // Hidden: null, "toggle", "non-exportable"
 public static class TraceRedaction {            // NetSec.Trace, C# 3. Same input, same output
     public static string Fingerprint(byte[] secret);      // "fp:" and the first 8 bytes of SHA-256, as hex
-    public static TraceEvent Hide(TraceEvent e, Func<byte[], bool> hideThis);   // A new event. A chosen secret loses Bytes and gains the three fields. All else is the same
+    public static TraceEvent Hide(TraceEvent e);          // A new event. Each secret loses Bytes and gains the three fields. All else is the same
 }
 ```
 
 | Exit | Today | Change |
 |---|---|---|
-| `SessionManager.cs:43` `LabSession.Write` | One line to store, file, and broadcast | Makes two lines, shown and hidden. `StoredEvent` holds both. File and broadcast take the one the toggle names at that moment. The shown line has already lost any non-exportable key |
+| `SessionManager.cs:43` `LabSession.Write` | One line to store, file, and broadcast | Makes two lines, shown and hidden. `StoredEvent` holds both. File and broadcast take the one the toggle names at that moment |
 | `SessionManager.cs:55` `After` | Stored line | Picks by the toggle now |
 | `Program.cs:275` `session.load` | File line to frame | `HideLine(string)` in the Host, on the JSON, when OFF |
 | `Program.cs:259` `session.save` | Returns the path | Section 6.2 |
@@ -610,7 +612,7 @@ UI choices belong to Nancy. This section is data only. Words live in `app/src/wi
 | `my-certificates` | My certificates | `pki.root-ca`, `tls.trust`, `tls13.server`, `tls13.client`, `tls11.server` | 5 | OpenSSL. **Checked against the root you gave it** |
 | `my-ssh` | My SSH keys | `ssh.host-ed25519`, `ssh.host-rsa`, `ssh.known-hosts`, `ssh.client` | 4 | `ssh.exe` |
 | `my-payment` | My payment keys | `dukpt.bdk`, `dukpt.pad` | 2 | **No outside tool.** Our code matches the published X9 vectors |
-| `my-login` | My login keys | `token.issuer`, `device.enrolment` | 2 | OpenSSL for the token signature. **No outside tool for the passkey-shaped login** |
+| `my-login` | My login keys | `token.issuer`, `device.enrolment` | 2 | Go `tokenverify` for the token. **No outside tool for the passkey-shaped login** |
 | `my-lesson-keys` | Keys for lessons 1 and 2 | `lab.aes-key`, `lab.seal-key` | 2 | OpenSSL |
 
 Total: 15 of 15. No type is dropped.
@@ -626,7 +628,6 @@ Every flow runs these states:
 | `Intro` | `explain` | What this set is. The test-keys line |
 | `ChooseSource` | `choose` | "Make them for me" (default) or "Use my files" |
 | `PickFiles` | `file` | Only for "Use my files". One row per type. A path under `~/.ssh` gets `KEY_PATH_PERSONAL` |
-| `Options` | `choose` | Only `my-ssh`, `my-payment`, `my-login`: "Keep this key from showing", default off, with the non-exportable line |
 | `ReadBack` | `review` | Every type: names (read-only), dates, algorithm, fingerprint |
 | `Place` | `generate` | Writes a new version of each type and keeps the old one |
 | `Check` | `prove` | Section 8.6 |
@@ -712,14 +713,14 @@ Each branch ends in one sentence on what happened and what to do, with detail to
 | `tls11.server` | `openssl s_client -tls1_1 -cipher AES128-SHA:@SECLEVEL=0 -CAfile <anchors>` against the glass server. SECLEVEL=0 is not a normal setting, and the screen says so | OpenSSL | Same |
 | `ssh.host-*`, `ssh.known-hosts` | `ssh.exe -F NUL -o BatchMode=yes -o StrictHostKeyChecking=yes -o UserKnownHostsFile=<pin>` runs `echo hello` on the glass server | `ssh.exe` | Checked with `ssh.exe` |
 | `ssh.client` | Same run, `-i <key>` | `ssh.exe` | Checked with `ssh.exe` |
-| `token.issuer` | `openssl pkeyutl -verify -pubin -rawin` on a fresh token's signing input. The spike ran this form | OpenSSL | Checked with OpenSSL |
+| `token.issuer` | `tokenverify -pub <issuer.pub> -token <fresh token>`, the tool A11 uses (`AuthClauses.cs:156-172`). Then the same token with one changed claim byte must fail with `TOKEN_BAD_SIGNATURE` | Go `tokenverify` | Checked with Go `tokenverify` |
 | `device.enrolment` | Our own check of a challenge answer | **None** | **"No outside tool can judge this. Our own check passed."** |
 | `dukpt.bdk`, `dukpt.pad` | Our derive code on the published X9 test BDK gives the published vector, then a PIN-pad to bank round trip under this key | **None live** | **"No outside tool can judge this. Our code matches the published vectors."** |
 | `lab.aes-key`, `lab.seal-key` | `openssl mac -cipher AES-128-CBC ... CMAC` against Core's tag. `lab.aes-key` also: `openssl enc -aes-128-ecb -nopad -K` on one block against `Modes` | OpenSSL | Checked with OpenSSL |
 
 Not run yet: `-x509_strict` against a chain from `TrainingCa`, since Jared ran it on openssl-made chains. If `TrainingCa`'s leaf lacks a field that mode wants, V4 drops the flag and says so.
 
-Tools: `openssl` and `ssh.exe` at the pinned paths in design section 9, overridable by `NETSEC_OPENSSL` and `NETSEC_SSH`. `/api/health` `referees` is empty today (`Program.cs:45`), and it should report these two. The product does not call `acceptance/referees/go`, because the Host must not depend on the suite's folder (D11). **The clauses judge from `acceptance/`, on their own. A product check is a help to the learner, and it is no evidence for the plan.**
+Tools: `openssl` and `ssh.exe` at the pinned paths in design section 9, overridable by `NETSEC_OPENSSL` and `NETSEC_SSH`. `/api/health` `referees` is empty today (`Program.cs:45`), and it should report these two. `tokenverify` is the one Go tool a flow runs. `tools/bootstrap.ps1` gains one step: `go build -o tools/bin/tokenverify.exe ./tokenverify`, run from `acceptance/referees/go`. It reads that source and writes nothing under `acceptance/`. `tools/bin/` is gitignored. The Host finds the program at `NETSEC_TOKENVERIFY`, or else at `tools/bin`, and reports it in `/api/health`. If it is absent, the flow says `REFEREE_MISSING`, with the command to run. The Host holds no project reference to the suite's folder (D11). **The clauses judge from `acceptance/`, on their own. A product check is a help to the learner, and it is no evidence for the plan.**
 
 ### 8.7 Tour text bound to the key
 
@@ -745,7 +746,7 @@ Each slice is vertical and merges to a running `main`. Builders never write `acc
 |---|---|---|
 | **Pre** | #90 and #91 merged. **Echo records golden traces in `acceptance/`, first, from that main. No builder records them.** Echo writes A17 and the A16 wording edits. D15 and D6 in the PRD | `run.ps1 -Contract` compiles. A rerun of Echo's recorder matches, twice |
 | **V0 skeleton, one type** | `Credential`, `CredentialSet`, `builtin` and `file` providers, `SecurityReadiness`, `modes.json`, routes, `WizardMachine`, `wizard-flows.json`, one security page, `secret_guard.py`. **`token.issuer` end to end**, `my-login` with one type | Golden equal. Lesson 10 runs on a canary issuer with the fixed names. Go `tokenverify` in `acceptance/` accepts its token. Refusal shows beside a passing control |
-| **V1 vault** | `NetSec.Vault`, `CourseRead`, audit page, the vault exercise (lab 20), `device.enrolment`, `my-login` whole | Export refused and audited. Course read audited as such. OpenSSL judges the exercise's signature |
+| **V1 vault** | `NetSec.Vault`, audit page, the vault exercise (lab 20), `device.enrolment`, `my-login` whole | Export refused and audited. A lab's export shows its caller. OpenSSL judges the exercise's signature |
 | **V2 OS transport, own PR** | `OsTransportFactory`, lesson 5 path, chip fix, button text | **`A16.os-transport.*` passes** |
 | **V3 Show keys** | `TraceRedaction`, `LabSession.Write`, `key.in-use`, `show-keys-switch`, `SecretsPanel` compare | ON and OFF, same seed, all 12 labs: no ON secret in an OFF frame or file |
 | **V4 certificates** | `my-certificates`, 5 types. `LabClock`. `CERT_SIGNATURE_ALG_UNSUPPORTED`. `TamperPlan.Field`, attack availability | Lessons 4, 5, 7, 10 on canary keys. Mutual TLS under an issuing CA with its intermediate, beside a leaf-only control. **Lesson 10 is now whole on own keys** |
@@ -778,7 +779,7 @@ Each slice is vertical and merges to a running `main`. Builders never write `acc
 | Slice | New clauses | Count |
 |---|---|---|
 | V0 | `A17.mock.golden-trace-equal` on net10 and on net48 (2), `A17.readiness.refuses-by-name`, `A17.readiness.types-disagree`, `A17.repo.no-key-tracked`, `A17.import.warns-on-personal-ssh-path`, `A17.flow.login.walk`, `A17.referee.token-issuer-go` | 8 |
-| V1 | `A17.vault.export-refused-and-audited`, `.course-read-audited`, `.tampered-row-refused`, `.audit-failure-refuses`, `.exportable-is-one-way`, `.exercise-sign-judged-by-openssl`, `.exercise-walk` | 7 |
+| V1 | `A17.vault.export-refused-and-audited`, `.export-audited-with-caller`, `.tampered-row-refused`, `.audit-failure-refuses`, `.exportable-is-one-way`, `.exercise-sign-judged-by-openssl`, `.exercise-walk` | 7 |
 | V2 | None. It closes the renamed A16 clause | 0 |
 | V3 | `A17.show-keys.default-on`, `.off-holds-no-secret`, `.mine-shows-exportable`, `.non-exportable-hidden-when-on`, `.fingerprint-compare`, `A17.ui.show-keys-switch` | 6 |
 | V4 | `A17.flow.certificates.walk`, `A17.referee.tls13-server-openssl`, `.tls13-client-go-with-intermediate`, `.tls11-server-openssl`, `A17.proof.root-negative-control`, `A17.chain.alg-unsupported-named`, `A17.clock.new-certificate-not-expired`, `A17.attacks.hit-named-field`, `A17.attacks.unavailable-names-code` | 9 |
@@ -810,12 +811,12 @@ Note for Echo: if a clause uses `PerBuild`, M grows. Only the golden pair is cou
 
 | # | Decision | Result | What would change it |
 |---|---|---|---|
-| O1 | How a key meets a glass engine | **Decided by Steve: C, bytes through the facade.** Engines stay. The exercise teaches operations | Steve asks for sign-inside in a lesson |
+| O1 | How a key meets a glass engine | **Decided by Steve: C, bytes through the facade.** Engines stay. The exercise teaches operations, and its non-exportable keys never reach an engine | Steve asks for sign-inside in a lesson |
 | O2 | Chains on glass | **Ed25519-signed only this round.** RSA and ECDSA chains go to the OS transport, with a named refusal | Steve wants a chain he did not make on glass |
 | O3 | Where items live | **Default stands: gitignored `.security/` in the project** | The repo goes public. Then `%LOCALAPPDATA%`, a one-line change |
 | O4 | Facade in or out of process | **In-process.** 2.35 ms per call. `IVault` keeps the door open | A lesson that attacks a compromised Host |
 | O5 | Master key | **Plain file,** per Steve's "not super-secure". The vault page says so | Steve wants sealing taught |
-| O6 | Showing keys | **Decided by Steve:** the toggle, section 6. Non-exportable keys show a fingerprint, per the lead's ruling | Closed |
+| O6 | Showing keys | **Decided by Steve:** the toggle, section 6. A non-exportable key shows only a fingerprint, even when ON, per the lead's ruling. `VAULT_EXPORT_REFUSED` stands | Closed |
 | O7 | Axes | **Two.** Section 7 | Closed |
 | O8 | Wizards | **Decided by Steve: 5 flows as data, all 15 types** | Closed |
 | O9 | DUKPT and passkey | **Decided by Steve: stay available,** and the screen says no outside tool can judge them | Closed |
@@ -830,14 +831,14 @@ Note for Echo: if a clause uses `PerBuild`, M grows. Only the golden pair is cou
 | Style | Modular monolith plus lab node processes, unchanged. One new module, `NetSec.Vault` |
 | Closest shape, keys | HashiCorp Vault transit: "encryption as a service", versioned keys, sign and verify (page read this session). Jared read `exportable` and sealing in Vault's API docs |
 | Closest shape, flows | An XState-style machine that owns its moves (house rule, `1rMgw0Q5MgY`) |
-| Where we differ | One learner, one machine, loopback, test keys. The labs read key bytes through a route no real vault has, and the course says so. We show the audit log and the keys on purpose, since teaching is the job |
+| Where we differ | One learner, one machine, loopback, test keys. Labs export each key on each run, which a real system would avoid, and the audit list shows it. We show the audit log and the keys on purpose, since teaching is the job |
 | When this is wrong | A team sharing a vault, or a production key in the folder |
 
 | Arithmetic | Value |
 |---|---|
-| Assumption | 1 learner, 20 lesson runs a day, up to 15 course reads a run |
+| Assumption | 1 learner, 20 lesson runs a day, up to 15 exports a run |
 | Rate | Average well under 1 call per second. Measured ceiling: about 425 sign calls per second, with an audit row each (1000 in 2348 ms) |
-| Added time per run | About 35 ms at 15 reads, and a person reads the result |
+| Added time per run | About 35 ms at 15 exports, and a person reads the result |
 | Key rows | 15 types, 5 versions, about 300 B each: about 22 KB |
 | Audit growth | About 100 B per row (1011 rows in 106 KB). 300 rows a day is 30 KB a day, about 33 MB in 3 years. No pruning needed |
 | Result | One SQLite file. No cache, no queue, no pool |
@@ -856,7 +857,6 @@ Ready to build after Pre. Echo takes sections 6.6, 7.1, 9.1, and 9.2. Nancy take
 | Jared's doc | This doc | Authority |
 |---|---|---|
 | Section 3.12: keep the passkey shape on Mock | Available, with the no-outside-judge line | Steve, O9 |
-| Section 4: the course view shows a non-export key's bytes always | Fingerprint and the line in section 6.3 | Lead's ruling |
 | Section 4: sealing, roles, wrapped import, deletion | Cut this round | Lead's cut list, Steve's "not super-secure" |
 | Section 1: the word "Real" | "My test key" | Lead's list, item c |
 
