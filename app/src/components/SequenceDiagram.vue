@@ -84,7 +84,7 @@ const pulse = computed(() => replayTick.value)
           <pattern id="hatch" width="6" height="6" patternUnits="userSpaceOnUse" patternTransform="rotate(45)"><line x1="0" y1="0" x2="0" y2="6" class="hatch-line" /></pattern>
           <marker id="arr" viewBox="0 0 10 10" refX="9" refY="5" markerWidth="7" markerHeight="7" orient="auto-start-reverse"><path d="M0,0 L10,5 L0,10 z" fill="context-stroke" /></marker>
         </defs>
-        <g v-for="l in layout.lanes" :key="l.name" :data-testid="`diagram-lane-${l.name}`">
+        <g v-for="l in layout.lanes" :key="l.name" :data-testid="`diagram-lane-${l.name}`" :class="{ hl: isHighlighted('diagram', 'lane', l.name) }">
           <rect :x="l.x - 70" y="8" width="140" height="34" rx="8" class="lane-head" />
           <text :x="l.x" y="30" text-anchor="middle" class="lane-name">{{ l.name }}</text>
           <line :x1="l.x" :x2="l.x" :y1="HEAD_H" :y2="layout.height" class="lane-line" />
@@ -102,9 +102,9 @@ const pulse = computed(() => replayTick.value)
             <text :x="r.fromX" :y="r.y + 5" text-anchor="middle" class="arrow-label">{{ r.label }}</text>
           </template>
           <g v-if="r.check" :data-testid="`diagram-check-${r.seq}`" :class="r.check.result === 'fail' ? 'chk-fail' : 'chk-pass'">
-            <circle :cx="r.kind === 'arrow' ? r.toX : r.fromX + 104" :cy="r.y" r="11" />
+            <circle :cx="r.kind === 'arrow' ? r.toX : r.fromX + 104" :cy="r.y" r="11" :data-testid="r.check.result === 'fail' ? 'check-fail-badge' : 'check-pass-badge'" />
             <text :x="r.kind === 'arrow' ? r.toX : r.fromX + 104" :y="r.y + 5" text-anchor="middle" class="chk-mark">{{ r.check.result === 'fail' ? '✕' : '✓' }}</text>
-            <text :x="(r.kind === 'arrow' ? r.toX : r.fromX + 104) + 16" :y="r.y + 4" class="chk-name">{{ r.check.name }}</text>
+            <text :x="(r.kind === 'arrow' ? r.toX : r.fromX + 104) + 16" :y="r.y + 4" class="chk-name" data-testid="check-name">{{ r.check.name }}</text>
           </g>
         </g>
         <!-- The packet chip rides the newest arrow. It shows the first 8 bytes of that event's wire hex. -->

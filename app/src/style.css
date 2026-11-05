@@ -152,3 +152,7 @@ body { background: var(--bg); color: var(--text); overflow: hidden; }
 .splitpanes--vertical > .splitpanes__splitter { width: 6px; background: var(--bg); }
 .splitpanes--horizontal > .splitpanes__splitter { height: 6px; background: var(--bg); }
 .splitpanes__pane { background: transparent; }
+.lane-head-g.hl .lane-head, g.hl > .lane-head { stroke: var(--focus); stroke-width: 3; }
+.v-btn.hl { outline: 2px solid var(--focus); }
+.hex-ascii { white-space: nowrap; }
+.hex-row { width: max-content; min-width: 100%; }

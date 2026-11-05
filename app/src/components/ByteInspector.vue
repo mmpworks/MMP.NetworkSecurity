@@ -70,7 +70,7 @@ const canFlip = computed(() => ui.selectedByte != null && !!ev.value && !isReal.
       <span class="side-title">BYTES</span>
       <span v-if="ev" class="muted">{{ ev.message || ev.type }} · {{ bytes.length }} bytes · {{ showPlain ? 'before protection' : 'on the wire' }}</span>
       <v-spacer />
-      <v-btn v-if="ev?.plain" size="x-small" data-testid="inspector-toggle-wire-plain" @click="ui.showPlain = !showPlain">{{ showPlain ? 'Show wire' : 'Show plain' }}</v-btn>
+      <v-btn v-if="ev?.plain" size="x-small" :class="{ hl: isHighlighted('inspector', 'toggle', 'wire-plain') }" data-testid="inspector-toggle-wire-plain" @click="ui.showPlain = !showPlain">{{ showPlain ? 'Show wire' : 'Show plain' }}</v-btn>
       <v-btn size="x-small" color="error" :disabled="!canFlip" data-testid="flip-byte-button" @click="flipSelectedByte">Flip this byte</v-btn>
     </div>
     <div v-if="!ev || !bytes.length" class="empty-note">{{ ev ? 'This event moves no bytes.' : 'Bytes appear here when the engine sends a message.' }}</div>

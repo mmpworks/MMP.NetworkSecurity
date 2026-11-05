@@ -125,10 +125,13 @@ async function refreshHostData() {
   try {
     const body = await hostGet(addr, '/api/lessons')
     const rows: any[] = Array.isArray(body) ? body : body?.lessons ?? []
-    lessons.value = DEFAULT_TITLES.map((title, i) => {
-      const r = rows.find(x => x.lesson === i + 1)
+    // Lesson 0 is the warm-up. It shows only when the Host lists it.
+    const numbers = [...(rows.some(x => x.lesson === 0) ? [0] : []), ...DEFAULT_TITLES.map((_, i) => i + 1)]
+    lessons.value = numbers.map(n => {
+      const r = rows.find(x => x.lesson === n)
+      const title = n === 0 ? 'Warm-up' : DEFAULT_TITLES[n - 1]
       return {
-        lesson: i + 1, title: r?.title || title, built: !!r?.built, lanes: Array.isArray(r?.lanes) ? r.lanes.map(String) : [],
+        lesson: n, title: r?.title || title, built: !!r?.built, lanes: Array.isArray(r?.lanes) ? r.lanes.map(String) : [],
         attacks: Array.isArray(r?.attacks) ? r.attacks.map((a: any) => (typeof a === 'string' ? { attackId: a, label: a } : { attackId: String(a.attackId ?? a.id), label: String(a.label ?? a.attackId ?? a.id), expectCheck: a.expectCheck, expectCode: a.expectCode })) : [],
       }
     })
@@ -272,9 +275,9 @@ async function enterStep(i: number) {
   tour.driving = true
   try {
     if (!(await waitForSession())) { tour.unreachable = 'The engine did not start a session'; return }
-    const prev = Math.max(-1, ...tour.bound.slice(0, i))
+    const prev = Math.max(0, ...tour.bound.slice(0, i))
     for (let guard = 0; guard < 500; guard++) {
-      const idx = findBound(s, allEvents.value, prev + 1)
+      const idx = findBound(s, allEvents.value, prev)
       if (idx >= 0) { tour.bound[i] = idx; ui.viewUpTo = s.pause === 'none' ? null : idx; ui.selectedSeq = null; markSeen(s); return }
       if (active.value?.finished) { tour.unreachable = 'The session ended before the engine sent this message'; return }
       stepEngine()
