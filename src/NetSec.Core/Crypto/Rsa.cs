@@ -50,7 +50,7 @@ namespace NetSec.Crypto
         public static byte[] Apply(byte[] value, BigUInt exponent, BigUInt n)
         {
             if (value == null) throw new ArgumentNullException("value");
-            BigUInt v = BigUInt.FromBigEndian(value);
+            BigUInt v = BigUInt.FromBytes(value);
             if (v.CompareTo(n) >= 0) throw new NetSecException(NetSecError.Of(ErrorCodes.RsaValueOutOfRange, "the RSA input is not below the modulus"));
             return v.ModPow(exponent, n).ToBigEndian(LengthOf(n));
         }
@@ -101,7 +101,7 @@ namespace NetSec.Crypto
             if (cipher == null) throw new ArgumentNullException("cipher");
             plain = null;
             if (cipher.Length != key.ModulusLength) return false;
-            if (BigUInt.FromBigEndian(cipher).CompareTo(key.N) >= 0) return false;
+            if (BigUInt.FromBytes(cipher).CompareTo(key.N) >= 0) return false;
             byte[] block = key.Raw(cipher);
             if (block[0] != 0 || block[1] != 2) return false;
             int separator = 2;
@@ -135,7 +135,7 @@ namespace NetSec.Crypto
             if (key == null) throw new ArgumentNullException("key");
             if (signature == null) throw new ArgumentNullException("signature");
             if (signature.Length != key.ModulusLength) return false;
-            if (BigUInt.FromBigEndian(signature).CompareTo(key.N) >= 0) return false;
+            if (BigUInt.FromBytes(signature).CompareTo(key.N) >= 0) return false;
             byte[] actual = key.Raw(signature);
             byte[] expected = EncodeSignatureBlock(key.ModulusLength, prefix, hash, message);
             int difference = 0;

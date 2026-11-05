@@ -14,10 +14,10 @@ namespace NetSec.Crypto
         }
 
         /// <summary>FIPS 203 ek, 1184 bytes. Returns a copy.</summary>
-        public byte[] EncapsulationKey { get { return (byte[])_ek.Clone(); } }
+        public byte[] Ek { get { return (byte[])_ek.Clone(); } }
 
         /// <summary>FIPS 203 dk, 2400 bytes. Returns a copy.</summary>
-        public byte[] DecapsulationKey { get { return (byte[])_dk.Clone(); } }
+        public byte[] Dk { get { return (byte[])_dk.Clone(); } }
     }
 
     public sealed class MlKemSealed

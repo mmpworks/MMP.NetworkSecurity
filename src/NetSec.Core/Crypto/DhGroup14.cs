@@ -9,7 +9,7 @@ namespace NetSec.Crypto
     {
         const int Length = 256;
 
-        static readonly BigUInt P = BigUInt.FromBigEndian(Hex.Decode(
+        static readonly BigUInt P = BigUInt.FromBytes(Hex.Decode(
             "FFFFFFFFFFFFFFFFC90FDAA22168C234C4C6628B80DC1CD129024E088A67CC74" +
             "020BBEA63B139B22514A08798E3404DDEF9519B3CD3A431B302B0A6DF25F1437" +
             "4FE1356D6D51C245E485B576625E7EC6F44C42E9A637ED6B0BFF5CB6F406B7ED" +
@@ -26,7 +26,7 @@ namespace NetSec.Crypto
         public static byte[] Public(byte[] x)
         {
             if (x == null) throw new ArgumentNullException("x");
-            return Generator.ModPow(BigUInt.FromBigEndian(x), P).ToBigEndian(Length);
+            return Generator.ModPow(BigUInt.FromBytes(x), P).ToBigEndian(Length);
         }
 
         /// <summary>
@@ -37,10 +37,10 @@ namespace NetSec.Crypto
         {
             if (x == null) throw new ArgumentNullException("x");
             if (peer == null) throw new ArgumentNullException("peer");
-            BigUInt y = BigUInt.FromBigEndian(peer);
+            BigUInt y = BigUInt.FromBytes(peer);
             if (y.CompareTo(Two) < 0 || y.CompareTo(P.Subtract(Two)) > 0)
                 throw new NetSecException(NetSecError.Of(ErrorCodes.DhPeerOutOfRange, "the DH peer value is outside [2, p-2]"));
-            return y.ModPow(BigUInt.FromBigEndian(x), P).ToBigEndian(Length);
+            return y.ModPow(BigUInt.FromBytes(x), P).ToBigEndian(Length);
         }
     }
 }

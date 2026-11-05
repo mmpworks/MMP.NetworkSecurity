@@ -32,7 +32,7 @@ namespace NetSec.Crypto
         }
 
         /// <summary>Reads a big-endian value. Leading zero bytes change nothing.</summary>
-        public static BigUInt FromBigEndian(byte[] bytes)
+        public static BigUInt FromBytes(byte[] bytes)
         {
             if (bytes == null) throw new ArgumentNullException("bytes");
             uint[] limbs = new uint[(bytes.Length + 3) / 4];

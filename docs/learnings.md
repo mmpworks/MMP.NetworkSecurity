@@ -20,3 +20,8 @@ Each correction goes here, newest slice last. Later slices read this file first.
 ## S1
 
 1. **The `prim` group compiles as one program, so A1 and A2 stay NOT RUN until every Crypto type exists.** `Subject.Product.cs` names all of section 2.3. A partial Crypto folder fails the compile, and all 64 clauses report PRODUCT_MISSING, including the primitives that work. To read a partial result, add the rest of `acceptance/contract/Crypto.cs` as an uncommitted file (its bodies throw `NotImplementedException`, which maps to NOT RUN), run the clauses, and delete the file. The full gate reports the acceptance step as FAIL until both S1 lanes merge.
+2. **The `FromBytes`, `Ek`, and `Dk` names hold, not `FromBigEndian` or `EncapsulationKey`.** The acceptance suite changed these names in `fdfcf81`. Read the merged `acceptance/contract/Crypto.cs` before you code to an older `CONTRACT.md` line.
+3. **`X25519.Mult` does not refuse an all-zero result.** RFC 7748 leaves that check to the protocol. S3 must add it to the TLS 1.3 key share and S4 to the SSH exchange.
+4. **`Ed25519.Verify` accepts a small-order public key.** A public key at y = 1 with R = B and S = 1 verifies for any message. RFC 8032 allows this. A protocol that needs a stronger rule adds its own check. `Verify` does refuse S at or above L and a public key with y at or above p.
+5. **`RsaPrivate` holds n and d only, so it runs the full-size exponent.** Parsing a PKCS#8 key can drop the CRT values. On a real device this makes a private operation slower than a CRT one by a factor of about 4 (standard estimate, not measured here).
+6. **A2 tests valid ML-KEM exchanges only.** Implicit rejection and the key checks are reached by 36 NIST ACVP records in `tests/NetSec.Tests/vectors/mlkem768-acvp.txt`.

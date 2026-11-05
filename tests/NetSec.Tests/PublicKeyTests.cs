@@ -43,7 +43,7 @@ namespace NetSec.Tests
             for (int i = 0; i < 2000; i++)
             {
                 byte[] a = Shaped(rng, 80), b = Shaped(rng, 40);
-                BigUInt x = BigUInt.FromBigEndian(a), y = BigUInt.FromBigEndian(b);
+                BigUInt x = BigUInt.FromBytes(a), y = BigUInt.FromBytes(b);
                 BigInteger bx = Bcl(a), by = Bcl(b);
                 Assert.Equal(bx + by, Bcl(x.Add(y)));
                 Assert.Equal(bx * by, Bcl(x.Multiply(y)));
@@ -59,8 +59,8 @@ namespace NetSec.Tests
         public void Division_runs_the_add_back_branch_on_the_known_input()
         {
             // This input runs the add-back once: a port of the control flow to Python counted it. The first guess stays 1 too high.
-            BigUInt dividend = BigUInt.FromBigEndian(Hex.Decode("7fffffff800000000000000000000000"));
-            BigUInt divisor = BigUInt.FromBigEndian(Hex.Decode("800000000000000000000001"));
+            BigUInt dividend = BigUInt.FromBytes(Hex.Decode("7fffffff800000000000000000000000"));
+            BigUInt divisor = BigUInt.FromBytes(Hex.Decode("800000000000000000000001"));
             BigUInt rest;
             BigUInt quotient = dividend.DivRem(divisor, out rest);
             Assert.Equal(BigInteger.Divide(Bcl(dividend), Bcl(divisor)), Bcl(quotient));
@@ -76,7 +76,7 @@ namespace NetSec.Tests
                 byte[] b = Shaped(rng, 64), e = Shaped(rng, 16), m = Shaped(rng, 64);
                 m[m.Length - 1] |= 1;
                 BigInteger expected = BigInteger.ModPow(Bcl(b), Bcl(e), Bcl(m));
-                Assert.Equal(expected, Bcl(BigUInt.FromBigEndian(b).ModPow(BigUInt.FromBigEndian(e), BigUInt.FromBigEndian(m))));
+                Assert.Equal(expected, Bcl(BigUInt.FromBytes(b).ModPow(BigUInt.FromBytes(e), BigUInt.FromBytes(m))));
             }
         }
 
@@ -92,7 +92,7 @@ namespace NetSec.Tests
         [Fact]
         public void Bytes_round_trip_with_leading_zeros_and_fixed_width()
         {
-            BigUInt value = BigUInt.FromBigEndian(Hex.Decode("000000012345"));
+            BigUInt value = BigUInt.FromBytes(Hex.Decode("000000012345"));
             Assert.Equal("012345", Hex.Encode(value.ToBigEndian()));
             Assert.Equal("00012345", Hex.Encode(value.ToBigEndian(4)));
             Assert.Equal(17, value.BitLength);
@@ -103,7 +103,7 @@ namespace NetSec.Tests
         [Fact]
         public void Subtract_refuses_a_negative_result_and_borrows_across_limbs()
         {
-            BigUInt big = BigUInt.FromBigEndian(Hex.Decode("0100000000"));
+            BigUInt big = BigUInt.FromBytes(Hex.Decode("0100000000"));
             Assert.Equal("ffffffff", Hex.Encode(big.Subtract(BigUInt.One).ToBigEndian()));
             Assert.Throws<ArgumentException>(() => BigUInt.One.Subtract(big));
         }
@@ -204,8 +204,8 @@ namespace NetSec.Tests
         }
 
         static Dictionary<string, string> Key() { return VectorFile.Read("rsa-openssl.nsv", "rsa-sign")[0]; }
-        static RsaPublic Public() { Dictionary<string, string> k = Key(); return new RsaPublic(BigUInt.FromBigEndian(k.Bytes("n")), BigUInt.FromBigEndian(k.Bytes("e"))); }
-        static RsaPrivate Private() { Dictionary<string, string> k = Key(); return new RsaPrivate(BigUInt.FromBigEndian(k.Bytes("n")), BigUInt.FromBigEndian(k.Bytes("d"))); }
+        static RsaPublic Public() { Dictionary<string, string> k = Key(); return new RsaPublic(BigUInt.FromBytes(k.Bytes("n")), BigUInt.FromBytes(k.Bytes("e"))); }
+        static RsaPrivate Private() { Dictionary<string, string> k = Key(); return new RsaPrivate(BigUInt.FromBytes(k.Bytes("n")), BigUInt.FromBytes(k.Bytes("d"))); }
 
         [Fact]
         public void Sign_and_verify_round_trip_with_both_hashes()
@@ -353,8 +353,8 @@ namespace NetSec.Tests
             foreach (string[] v in Vectors("keygen"))
             {
                 MlKemPair pair = MlKem768.KeyGen(Hex.Decode(v[1]), Hex.Decode(v[2]));
-                Assert.Equal(v[3], Hex.Encode(pair.EncapsulationKey), ignoreCase: true);
-                Assert.Equal(v[4], Hex.Encode(pair.DecapsulationKey), ignoreCase: true);
+                Assert.Equal(v[3], Hex.Encode(pair.Ek), ignoreCase: true);
+                Assert.Equal(v[4], Hex.Encode(pair.Dk), ignoreCase: true);
                 count++;
             }
             Assert.Equal(3, count);
@@ -439,22 +439,22 @@ namespace NetSec.Tests
             random.Fill(z, 0, 32);
             random.Fill(m, 0, 32);
             MlKemPair pair = MlKem768.KeyGen(d, z);
-            Assert.Equal(1184, pair.EncapsulationKey.Length);
-            Assert.Equal(2400, pair.DecapsulationKey.Length);
-            MlKemSealed sealedKey = MlKem768.Encaps(pair.EncapsulationKey, m);
+            Assert.Equal(1184, pair.Ek.Length);
+            Assert.Equal(2400, pair.Dk.Length);
+            MlKemSealed sealedKey = MlKem768.Encaps(pair.Ek, m);
             Assert.Equal(1088, sealedKey.Ciphertext.Length);
-            Assert.Equal(sealedKey.SharedSecret, MlKem768.Decaps(pair.DecapsulationKey, sealedKey.Ciphertext));
+            Assert.Equal(sealedKey.SharedSecret, MlKem768.Decaps(pair.Dk, sealedKey.Ciphertext));
 
             byte[] tampered = sealedKey.Ciphertext;
             tampered[100] ^= 1;
-            Assert.NotEqual(sealedKey.SharedSecret, MlKem768.Decaps(pair.DecapsulationKey, tampered));
+            Assert.NotEqual(sealedKey.SharedSecret, MlKem768.Decaps(pair.Dk, tampered));
         }
 
         [Fact]
         public void A_wrong_ciphertext_length_is_refused_by_code()
         {
             MlKemPair pair = MlKem768.KeyGen(new byte[32], new byte[32]);
-            NetSecException e = Assert.Throws<NetSecException>(() => MlKem768.Decaps(pair.DecapsulationKey, new byte[1087]));
+            NetSecException e = Assert.Throws<NetSecException>(() => MlKem768.Decaps(pair.Dk, new byte[1087]));
             Assert.Equal(ErrorCodes.MlKemCiphertextInvalid, e.Error.Code);
         }
 
@@ -462,8 +462,8 @@ namespace NetSec.Tests
         public void Key_and_sealed_properties_hand_out_copies()
         {
             MlKemPair pair = MlKem768.KeyGen(new byte[32], new byte[32]);
-            pair.EncapsulationKey[0] ^= 1;
-            Assert.Equal(pair.EncapsulationKey, MlKem768.KeyGen(new byte[32], new byte[32]).EncapsulationKey);
+            pair.Ek[0] ^= 1;
+            Assert.Equal(pair.Ek, MlKem768.KeyGen(new byte[32], new byte[32]).Ek);
         }
     }
 
