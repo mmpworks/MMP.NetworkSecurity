@@ -212,7 +212,8 @@
       "lesson": 6,
       "title": "The bank checks the PIN block",
       "text": [
-        "After the bank opens the PIN block, it checks the block's format. A block that came out wrong signals a bad key or a changed byte.",
+        "After the bank opens the PIN block, it checks the block's format. A block that came out wrong often signals a bad key or a changed byte.",
+        "The format check is not a seal, and it does not limit tries. A refused sale leaves its KSN free, so an attacker can try the same KSN again and again. Lesson 9 adds a seal over the whole envelope that closes this gap.",
         "Try it: flip one bit in the PIN block of sale 1. The bank tries to open it, the format check fails, and the sale is refused. The bank gets no PIN digits from it."
       ],
       "glossary": [],
@@ -224,6 +225,13 @@
         "action": { "type": "run-attack", "attackId": "L6-flip-pin-block" },
         "expect": { "type": "check", "name": "PIN block format check", "result": "fail" }
       },
+      "claims": [
+        {
+          "id": "L6-C10",
+          "text": "In lesson 6 the bank's format check does not limit tries: a refused sale leaves its KSN free, and 2,000 tries on one KSN were still free. The bridge's PIN envelope carries a CMAC, which closes this in lesson 9.",
+          "source": "PR #35 body, table row 'A forged block burns a real sale's KSN' and advisory 3 (the format check is not integrity); Jared's DUKPT re-check as relayed by team-lead on 2026-11-05 (2,000 tries); docs/program-design.md, section 6, PIN-pad row (PinEnvelope with a CMAC)"
+        }
+      ],
       "unlock": { "mode": "action", "ref": "L6-S11-T1" }
     },
     {
