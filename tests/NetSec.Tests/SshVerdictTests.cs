@@ -109,6 +109,24 @@ namespace NetSec.Tests
         static byte[] OpenSession(int sender) => new ByteWriter().U8(SshMsg.ChannelOpen).Prefixed("session").U32(sender).U32(Window).U32(32768).ToArray();
         static byte[] OpenFailure(int recipient) => new ByteWriter().U8(SshMsg.ChannelOpenFailure).U32(recipient).U32(1).Prefixed("no").Prefixed("").ToArray();
 
+        // ---------------------------------------------------------------- A14: the tour binds the passing check
+
+        [Theory]
+        [InlineData(false)]
+        [InlineData(true)]
+        public void Each_protected_packet_received_shows_a_passing_mac_check(bool legacy)
+        {
+            Duel d = Open(legacy ? SshAlgorithms.Legacy : SshAlgorithms.Modern);
+            d.ClientCommand(new EngineCommand(EngineCommandKind.Exec, 0, null, "echo hello"));
+            foreach (List<TraceEvent> events in new[] { d.ClientEvents, d.ServerEvents })
+            {
+                int sealedPackets = events.Count(e => e.Type == "ssh.message.received" && e.Fields != null && e.Fields.Length > 0 && e.Fields[0].Name == "encryptedPacket");
+                int passes = events.Count(e => e.Type == "check.result" && e.Check.Passed && e.Message == SshChecks.PacketMac);
+                Assert.True(sealedPackets > 0);
+                Assert.Equal(sealedPackets, passes);
+            }
+        }
+
         // ---------------------------------------------------------------- blocker 1: no pin
 
         [Fact]
