@@ -213,7 +213,7 @@
       "title": "The bank checks the PIN block",
       "text": [
         "After the bank opens the PIN block, it checks the block's format. A block that came out wrong often signals a bad key or a changed byte.",
-        "The format check is not a seal, and it does not limit tries. A refused sale leaves its KSN free, so an attacker can try the same KSN again and again. Lesson 9 adds a seal over the whole envelope that closes this gap.",
+        "The format check is not a seal, and it does not limit tries. A refused sale leaves its KSN free, so an attacker can try the same KSN again and again. In the bridge lab (lesson 9), a seal over the whole envelope closes this gap.",
         "Try it: flip one bit in the PIN block of sale 1. The bank tries to open it, the format check fails, and the sale is refused. The bank gets no PIN digits from it."
       ],
       "glossary": [],
@@ -228,8 +228,8 @@
       "claims": [
         {
           "id": "L6-C10",
-          "text": "In lesson 6 the bank's format check does not limit tries: a refused sale leaves its KSN free, and 2,000 tries on one KSN were still free. The bridge's PIN envelope carries a CMAC, which closes this in lesson 9.",
-          "source": "PR #35 body, table row 'A forged block burns a real sale's KSN' and advisory 3 (the format check is not integrity); Jared's DUKPT re-check as relayed by team-lead on 2026-11-05 (2,000 tries); docs/program-design.md, section 6, PIN-pad row (PinEnvelope with a CMAC)"
+          "text": "In lesson 6 the bank's format check does not limit tries: a refused sale leaves its KSN free, and 2,000 forged blocks on one KSN left it free, after which the real sale still passed. The bridge lab's PIN envelope carries a CMAC that the bank checks before it looks at the KSN ledger, which closes this.",
+          "source": "PR #35 body, table row 'A forged block burns a real sale's KSN' and advisory 3 (the format check is not integrity); the 2,000-try run reproduced by reader-a15a (output in PR #41); src/NetSec.Core Bridge BankHsmCore.Decide (CMAC checked before the ledger); docs/program-design.md, section 6, PIN-pad row (PinEnvelope with a CMAC)"
         }
       ],
       "unlock": { "mode": "action", "ref": "L6-S11-T1" }
