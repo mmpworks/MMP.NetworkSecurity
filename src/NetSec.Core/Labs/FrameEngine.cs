@@ -219,6 +219,12 @@ namespace NetSec.Labs
             return result;
         }
 
+        /// <summary>False for a code that only follows from a catch on the other side.</summary>
+        public static bool NamesACause(string code)
+        {
+            return code != null && Named(NetSecError.Of(code, code)) != null;
+        }
+
         static NetSecError Named(NetSecError error)
         {
             return error != null && error.Code != ErrorCodes.PeerClosedEarly && error.Code != ErrorCodes.LinkLost && error.Code != Tls13Codes.AlertReceived && error.Code != Tls13Codes.Truncated && error.Code != NetSec.Tls11.Tls11Codes.Alert ? error : null;

@@ -15,7 +15,11 @@ import SequenceDiagram from './components/SequenceDiagram.vue'
 import TourPanel from './components/TourPanel.vue'
 import PicturePanel from './components/PicturePanel.vue'
 import MeasurePanel from './components/MeasurePanel.vue'
-import { pictureOf } from './lab'
+import ChainPanel from './components/ChainPanel.vue'
+import LadderPanel from './components/LadderPanel.vue'
+import HostKeyPanel from './components/HostKeyPanel.vue'
+import { isLadderEvent, pictureOf, protocols, raceStats } from './lab'
+import type { TraceEvent } from './types'
 
 const lightbox = ref(false)
 const hostChip = computed(() => (hostState.value === 'connected' ? 'engine connected' : hostState.value === 'connecting' ? 'engine starting' : 'engine offline'))
@@ -32,14 +36,35 @@ const position = computed(() => {
 const sessionTabs = computed(() => ui.sessions.filter(s => s.lesson === ui.lesson))
 
 // Lesson views: tabs appear only when the shown events carry that kind of data. A new selection of that kind opens its tab.
-const hasPicture = computed(() => shownEvents.value.some(e => pictureOf(e)))
-const hasMeasure = computed(() => shownEvents.value.some(e => e.type === 'measure.result'))
-watch(selectedEvent, e => {
-  if (e && e.message.startsWith('Picture') && hasPicture.value) ui.inspectorTab = 'picture'
-  else if (e?.type === 'measure.result') ui.inspectorTab = 'measures'
-  else if (e) ui.inspectorTab = 'bytes'
+type TabId = 'bytes' | 'picture' | 'chain' | 'ladder' | 'measures' | 'hostkey'
+const tabs = computed(() => {
+  const list: { id: TabId; label: string }[] = [{ id: 'bytes', label: 'Bytes' }]
+  const ev = shownEvents.value
+  if (ev.some(e => pictureOf(e))) list.push({ id: 'picture', label: 'Picture' })
+  if (ev.some(e => e.type === 'ca.certificate.issued')) list.push({ id: 'chain', label: 'Chain' })
+  if (ev.some(e => e.type === 'ssh.hostkey.seen' || e.check?.name === 'known_hosts match')) list.push({ id: 'hostkey', label: 'Host key' })
+  if (ev.some(e => isLadderEvent(e))) list.push({ id: 'ladder', label: 'Keys' })
+  if (ev.some(e => e.type === 'measure.result')) list.push({ id: 'measures', label: 'Measures' })
+  return list
 })
-watch([hasPicture, hasMeasure], () => { if ((ui.inspectorTab === 'picture' && !hasPicture.value) || (ui.inspectorTab === 'measures' && !hasMeasure.value)) ui.inspectorTab = 'bytes' })
+const hasTab = (id: TabId) => tabs.value.some(t => t.id === id)
+function tabFor(e: TraceEvent): TabId {
+  if (e.message.startsWith('Picture')) return 'picture'
+  if (e.type === 'ca.certificate.issued') return 'chain'
+  if (e.type === 'ssh.hostkey.seen') return 'hostkey'
+  if (isLadderEvent(e) || e.message === 'Reader registers') return 'ladder'
+  if (e.type === 'measure.result') return 'measures'
+  return 'bytes'
+}
+// A new selection opens the tab that shows its kind of data. A tab whose data went away closes.
+watch(selectedEvent, e => { if (e) { const t = tabFor(e); ui.inspectorTab = hasTab(t) ? t : 'bytes' } })
+watch(tabs, () => { if (!hasTab(ui.inspectorTab)) ui.inspectorTab = 'bytes' })
+
+// Lesson 7: when the session holds both TLS 1.1 and TLS 1.3 streams, the diagram splits into a race.
+const raceMode = computed(() => { const p = protocols(shownEvents.value); return p.has('tls11') && p.has('tls13') })
+const raceView = computed(() => (ui.view === 'eavesdropper' ? 'eavesdropper' : 'endpoints') as 'endpoints' | 'eavesdropper')
+const raceUpTo = computed(() => selectedEvent.value?.seq ?? Infinity)
+const race = computed(() => ({ left: raceStats(shownEvents.value, raceUpTo.value, 'tls11'), right: raceStats(shownEvents.value, raceUpTo.value, 'tls13') }))
 
 function setView(v: ViewMode) { ui.view = v }
 function toggleTransport() { ui.transport = ui.transport === 'real' ? 'glass' : 'real' }
@@ -132,6 +157,19 @@ const shortcuts: [string, string][] = [
                     <template v-if="ui.lesson == null">Pick a lesson to see its messages here.</template>
                     <template v-else>Press Start tour in the tour panel to see the first message.</template>
                   </div>
+                  <div v-else-if="raceMode" class="race" data-testid="race">
+                    <div v-for="side in ([['left', 'tls11', 'TLS 1.1 (2006)'], ['right', 'tls13', 'TLS 1.3']] as const)" :key="side[0]" class="race-col" :data-testid="`race-${side[0]}`">
+                      <div class="race-head">
+                        <span class="rname">{{ side[2] }}</span>
+                        <span class="race-counts">
+                          <span>messages <b :data-testid="`race-count-messages-${side[0]}`">{{ race[side[0]].messages }}</b></span>
+                          <span>round trips before data <b :data-testid="`race-count-roundtrips-${side[0]}`">{{ race[side[0]].roundTrips ?? '…' }}</b></span>
+                          <span>bytes <b :data-testid="`race-count-bytes-${side[0]}`">{{ race[side[0]].bytes }}</b></span>
+                        </span>
+                      </div>
+                      <SequenceDiagram :view="raceView" :protocol="side[1]" @lightbox="lightbox = true" />
+                    </div>
+                  </div>
                   <div v-else class="diagrams" :class="{ both: ui.view === 'both' }">
                     <SequenceDiagram v-if="ui.view !== 'eavesdropper'" view="endpoints" @lightbox="lightbox = true" />
                     <SequenceDiagram v-if="ui.view !== 'endpoints'" view="eavesdropper" @lightbox="lightbox = true" />
@@ -140,13 +178,14 @@ const shortcuts: [string, string][] = [
               </Pane>
               <Pane :size="40" :min-size="18">
                 <div class="panel">
-                  <div v-if="hasPicture || hasMeasure" class="tabs-inline" data-testid="inspector-tabs">
-                    <button type="button" class="stab" :class="{ on: ui.inspectorTab === 'bytes' }" data-testid="inspector-tab-bytes" @click="ui.inspectorTab = 'bytes'">Bytes</button>
-                    <button v-if="hasPicture" type="button" class="stab" :class="{ on: ui.inspectorTab === 'picture' }" data-testid="inspector-tab-picture" @click="ui.inspectorTab = 'picture'">Picture</button>
-                    <button v-if="hasMeasure" type="button" class="stab" :class="{ on: ui.inspectorTab === 'measures' }" data-testid="inspector-tab-measures" @click="ui.inspectorTab = 'measures'">Measures</button>
+                  <div v-if="tabs.length > 1" class="tabs-inline" data-testid="inspector-tabs">
+                    <button v-for="t in tabs" :key="t.id" type="button" class="stab" :class="{ on: ui.inspectorTab === t.id }" :data-testid="`inspector-tab-${t.id}`" @click="ui.inspectorTab = t.id">{{ t.label }}</button>
                   </div>
-                  <PicturePanel v-if="ui.inspectorTab === 'picture' && hasPicture" />
-                  <MeasurePanel v-else-if="ui.inspectorTab === 'measures' && hasMeasure" />
+                  <PicturePanel v-if="ui.inspectorTab === 'picture' && hasTab('picture')" />
+                  <ChainPanel v-else-if="ui.inspectorTab === 'chain' && hasTab('chain')" />
+                  <HostKeyPanel v-else-if="ui.inspectorTab === 'hostkey' && hasTab('hostkey')" />
+                  <LadderPanel v-else-if="ui.inspectorTab === 'ladder' && hasTab('ladder')" />
+                  <MeasurePanel v-else-if="ui.inspectorTab === 'measures' && hasTab('measures')" />
                   <ByteInspector v-else />
                 </div>
               </Pane>

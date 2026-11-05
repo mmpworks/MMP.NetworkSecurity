@@ -2,8 +2,11 @@ using System;
 using System.Collections.Generic;
 using System.Net;
 using MMP.AsyncProxy;
+using NetSec.Crypto;
 using NetSec.Errors;
 using NetSec.Io;
+using NetSec.Keys;
+using NetSec.Machine;
 using NetSec.Platform;
 using NetSec.Trace;
 
@@ -79,10 +82,19 @@ namespace NetSec.Bridge
     {
         public IPEndPoint PinPad, Gateway;
         public string LinkKind;
+        public SshSuite Suite;
+        public IRandomSource Random;
+        public ITrainingKeySource Keys;
+        public IStepGate Gate;
+        public ITamperHook Tamper;
+
+        /// <summary>Null means the envelope's trace id.</summary>
+        public string SessionId;
         public ITraceSink Sink;
         public IClock Clock;
     }
 
+    /// <summary>Ok repeats what the reply says. The CE holds no key that could check the reply, so a forged reply reads the same (lesson 9 teaches this).</summary>
     public sealed class CeRunResult
     {
         public bool Ok;
@@ -122,7 +134,8 @@ namespace NetSec.Bridge
             PinEnvelope envelope = PinEnvelope.Parse(envelopeRead.Result);
             result.TraceId = envelope.TraceId;
 
-            TraceStream stream = new TraceStream(envelope.TraceId + "/ce/bridge", envelope.TraceId, envelope.TraceId, null, "ce", o.Clock);
+            string session = o.SessionId ?? envelope.TraceId;
+            TraceStream stream = new TraceStream(session + "/ce/bridge", session, envelope.TraceId, null, "ce", o.Clock);
             TraceEventDraft taken = new TraceEventDraft();
             taken.Type = "ce.envelope.taken";
             taken.Message = "PinEnvelope";
@@ -136,11 +149,26 @@ namespace NetSec.Bridge
                 pad.Close();
                 yield break;
             }
-            yield return link.Open();
-            yield return link.Send(envelope.Bytes);
+
+            // A fault on the link ends the relay. The CE still closes both sides, and the result names what stopped it.
+            IFuture opened = link.Open();
+            yield return Futures.Observe(opened);
+            if (opened.IsFaulted || opened.IsCanceled)
+            {
+                result.Code = CodeOf(opened);
+                yield return Futures.Observe(link.Close());
+                pad.Close();
+                yield break;
+            }
+            IFuture sent = link.Send(envelope.Bytes);
+            yield return Futures.Observe(sent);
             IFuture<byte[]> replyRead = link.Receive();
-            yield return replyRead;
-            if (replyRead.Result == null)
+            yield return Futures.Observe(replyRead);
+            if (replyRead.IsFaulted || replyRead.IsCanceled)
+            {
+                result.Code = CodeOf(replyRead);
+            }
+            else if (replyRead.Result == null)
             {
                 result.Code = ErrorCodes.PeerClosedEarly;
             }
@@ -155,14 +183,32 @@ namespace NetSec.Bridge
                 o.Sink.Write(stream.Stamp(relayed));
                 yield return FrameIo.WriteFrame(pad, replyRead.Result);
             }
-            yield return link.Close();
+            yield return Futures.Observe(link.Close());
             pad.Close();
+        }
+
+        static string CodeOf(IFuture ended)
+        {
+            NetSecException named = FirstNamed(ended.Exception);
+            return named != null ? named.Error.Code : ErrorCodes.LinkLost;
+        }
+
+        static NetSecException FirstNamed(Exception e)
+        {
+            for (Exception at = e; at != null; at = at.InnerException)
+            {
+                NetSecException named = at as NetSecException;
+                if (named != null) return named;
+            }
+            return null;
         }
 
         static IDeviceLink LinkFor(CeRunOptions o, string traceId)
         {
             if (o.LinkKind == LinkExternalForward)
                 return new ExternalForwardLink(o.Gateway, o.Sink, traceId + "/ce/forward", traceId, o.Clock);
+            if (o.LinkKind == GlassSshLink.KindName)
+                return new GlassSshLink(o.Gateway, o.Keys, o.Suite, o.Random, o.Sink, traceId, o.SessionId, o.Gate, o.Tamper);
             return null;
         }
     }

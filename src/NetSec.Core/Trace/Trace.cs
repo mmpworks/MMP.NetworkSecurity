@@ -90,6 +90,18 @@ namespace NetSec.Trace
             AtMicros = atMicros;
         }
 
+        TraceEvent(TraceEvent e, string traceId)
+        {
+            Schema = e.Schema; EventId = e.EventId; StreamId = e.StreamId; StreamSeq = e.StreamSeq;
+            SessionId = e.SessionId; TraceId = traceId; Hop = e.Hop; Actor = e.Actor;
+            From = e.From; To = e.To; Type = e.Type; Message = e.Message; Step = e.Step; Detail = e.Detail;
+            Wire = e.Wire; Plain = e.Plain; Fields = e.Fields; Secrets = e.Secrets; Check = e.Check;
+            WaitingFor = e.WaitingFor; AtMicros = e.AtMicros;
+        }
+
+        /// <summary>The same event under a trace id its process learned after it stamped the event.</summary>
+        public TraceEvent WithTraceId(string traceId) { return new TraceEvent(this, traceId); }
+
         static byte[] Copy(byte[] bytes)
         {
             return bytes == null ? null : (byte[])bytes.Clone();

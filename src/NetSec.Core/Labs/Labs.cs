@@ -196,6 +196,16 @@ namespace NetSec.Labs
         /// Lesson 10's rows. They join All, and the lab joins LabCatalog, in the commit that lands its tour, so no learner reaches a token lab
         /// without the accuracy text. Tests run them from here.
         /// </summary>
+        /// <summary>Lesson 9's rows, which join All when its tour lands, as lesson 10's do.</summary>
+        public static AttackDefinition[] Lesson9Unreleased { get { return (AttackDefinition[])Lesson9Rows.Clone(); } }
+
+        static readonly AttackDefinition[] Lesson9Rows =
+        {
+            Flip("L9-tamper-hop1", 9, SshNames.ChannelData, SshProtectedBodyOffset, SshCodes.PacketMac, SshChecks.PacketMac),
+            Flip("L9-tamper-hop2", 9, "ApplicationData", Tls13Lab.RecordCipherOffset, Tls13Codes.AeadTag, Tls13Codes.CheckName(Tls13Codes.AeadTag)),
+            WithOption("L9-flip-pin-block", 9, Lesson09Bridge.OptionFlipPinBlock, "yes", AttackOutcome.Rejected, ErrorCodes.DukptMacMismatch, NetSec.Bridge.BankHsmCore.MacCheck),
+        };
+
         public static AttackDefinition[] Lesson10Unreleased { get { return (AttackDefinition[])Lesson10Rows.Clone(); } }
 
         static readonly AttackDefinition[] Lesson10Rows =
@@ -209,6 +219,7 @@ namespace NetSec.Labs
             WithOption("L10-replay-challenge", 10, Lesson10Auth.OptionReplayChallenge, "yes", AttackOutcome.Rejected, ErrorCodes.ChallengeReplay, NetSec.Auth.Challenge.ReplayCheck),
             WithOption("L10-remove-client-cert", 10, Lesson10Auth.OptionClientCert, Lesson10Auth.ClientCertNone, AttackOutcome.Rejected, NetSec.Tls13.Tls13Codes.CertRequired, NetSec.Tls13.Tls13Codes.CheckName(NetSec.Tls13.Tls13Codes.CertRequired)),
             WithOption("L10-corrupt-client-cert", 10, Lesson10Auth.OptionClientCert, Lesson10Auth.ClientCertCorrupt, AttackOutcome.Rejected, NetSec.Tls13.Tls13Codes.BadCertificate, NetSec.Tls13.Tls13Codes.CheckName(NetSec.Tls13.Tls13Codes.BadCertificate)),
+            WithOption("L10-wrong-client-name", 10, Lesson10Auth.OptionClientCert, Lesson10Auth.ClientCertWrongName, AttackOutcome.Rejected, Tls13Codes.ClientNameRefused, Tls13Codes.CheckName(Tls13Codes.ClientNameRefused)),
             WithOption("L10-unissued-challenge", 10, Lesson10Auth.OptionAnswerUnissued, "yes", AttackOutcome.Rejected, ErrorCodes.ChallengeNotIssued, NetSec.Auth.Challenge.IssuedCheck),
             WithOption("L10-unknown-device", 10, Lesson10Auth.OptionUnknownDevice, "yes", AttackOutcome.Rejected, ErrorCodes.DeviceNotEnrolled, NetSec.Auth.Challenge.EnrolledCheck),
             WithOption("L10-wrong-audience", 10, Lesson10Auth.OptionTokenAudience, "https://other.training/api", AttackOutcome.Rejected, ErrorCodes.TokenBadAudience, NetSec.Auth.Token.AudienceCheck),

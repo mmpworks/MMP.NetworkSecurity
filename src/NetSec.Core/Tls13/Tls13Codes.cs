@@ -23,6 +23,7 @@ namespace NetSec.Tls13
         public const string KeyChangeBoundary = "TLS13_KEY_CHANGE_BOUNDARY";
         public const string MessageTooLong = "TLS13_MESSAGE_TOO_LONG";
         public const string Truncated = "TLS13_TRUNCATED";
+        public const string ClientNameRefused = "TLS13_CLIENT_NAME_REFUSED";
         public const string CertRequired = "TLS13_CERT_REQUIRED";
         public const string BadCertificate = "TLS13_BAD_CERTIFICATE";
 
@@ -54,6 +55,7 @@ namespace NetSec.Tls13
             new Row(NoCommonSignature, "common signature scheme", 40),
             new Row(CertRequired, "certificate_required alert", 116),
             new Row(BadCertificate, "bad_certificate alert", 42),
+            new Row(ClientNameRefused, "client name", 49),
             new Row("CHAIN_NO_ANCHOR", "chain to trust anchor", 48),
             new Row("CERT_VALIDITY", "validity window", 45),
             new Row("CERT_NAME", "name match", 42),

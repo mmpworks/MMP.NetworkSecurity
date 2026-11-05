@@ -1,13 +1,15 @@
 <script setup lang="ts">
 import { computed, nextTick, ref, watch } from 'vue'
-import { HEAD_H, ROW_H, layoutDiagram } from '../layout'
+import { HEAD_H, ROW_H, layoutDiagram, protocolOf } from '../layout'
 import { isHighlighted, lessonRow, replayTick, selectEvent, selectedEvent, shownEvents, ui } from '../store'
 import type { ViewMode } from '../types'
 
-const props = defineProps<{ view: Exclude<ViewMode, 'both'>; inLightbox?: boolean }>()
+const props = defineProps<{ view: Exclude<ViewMode, 'both'>; inLightbox?: boolean; protocol?: string }>()
 const emit = defineEmits<{ (e: 'lightbox'): void }>()
 
-const layout = computed(() => layoutDiagram(shownEvents.value, lessonRow.value?.lanes ?? [], props.view))
+// `protocol` keeps only the events of one stream family (lesson 7 draws TLS 1.1 and TLS 1.3 side by side).
+const events = computed(() => (props.protocol ? shownEvents.value.filter(e => protocolOf(e) === props.protocol) : shownEvents.value))
+const layout = computed(() => layoutDiagram(events.value, lessonRow.value?.lanes ?? [], props.view))
 const zoom = ref(1)
 const box = ref<HTMLElement | null>(null)
 const reduced = typeof matchMedia === 'function' && matchMedia('(prefers-reduced-motion: reduce)').matches
@@ -90,7 +92,11 @@ const pulse = computed(() => replayTick.value)
           <line :x1="l.x" :x2="l.x" :y1="HEAD_H" :y2="layout.height" class="lane-line" />
         </g>
         <circle v-if="waitingLane" :cx="waitingLane.x" :cy="HEAD_H + 12" r="9" class="wait-ring" data-testid="engine-waiting-ring" />
-        <g v-for="r in layout.rows" :key="r.seq" class="row" :class="{ sel: selectedEvent?.seq === r.seq, hl: isHighlighted('diagram', 'message', r.label) }" :data-testid="`diagram-message-${r.seq}`" @click="selectEvent(r.seq)">
+        <g v-for="r in layout.rows.filter(x => x.kind === 'divider')" :key="r.seq" class="divider-row">
+          <line :x1="20" :x2="layout.width - 20" :y1="r.y" :y2="r.y" class="divider-line" />
+          <text :x="layout.width / 2" :y="r.y - 6" text-anchor="middle" class="divider-text" data-testid="round-divider">{{ r.label }}</text>
+        </g>
+        <g v-for="r in layout.rows.filter(x => x.kind !== 'divider')" :key="r.seq" class="row" :class="{ sel: selectedEvent?.seq === r.seq, hl: isHighlighted('diagram', 'message', r.label) }" :data-testid="`diagram-message-${r.seq}`" @click="selectEvent(r.seq)">
           <rect x="0" :y="r.y - ROW_H / 2 + 6" :width="layout.width" :height="ROW_H - 8" class="row-band" />
           <template v-if="r.kind === 'arrow'">
             <line :x1="r.fromX" :x2="arrowEnd(r)" :y1="r.y" :y2="r.y" class="arrow" :class="r.protectedBytes ? 'enc' : 'readable'" marker-end="url(#arr)" />

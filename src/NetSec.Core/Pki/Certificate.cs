@@ -216,6 +216,16 @@ namespace NetSec.Pki
             return SignedWithEd25519 && issuerPublicKey.Length == 32 && Signature.Length == 64 && Ed25519.Verify(issuerPublicKey, Tbs, Signature);
         }
 
+        /// <summary>Compares the whole subject in bytes, so a second name part or another spelling of the name does not pass.</summary>
+        public bool SubjectIs(string commonName)
+        {
+            byte[] expected = TrainingCa.Name(commonName);
+            if (Subject.Length != expected.Length) return false;
+            for (int i = 0; i < expected.Length; i++)
+                if (Subject[i] != expected[i]) return false;
+            return true;
+        }
+
         public bool Matches(string dnsName)
         {
             for (int i = 0; i < DnsNames.Length; i++)

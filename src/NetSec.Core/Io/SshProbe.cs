@@ -7,6 +7,7 @@ using NetSec.Crypto;
 using NetSec.Errors;
 using NetSec.Keys;
 using NetSec.Machine;
+using NetSec.Pki;
 using NetSec.Platform;
 using NetSec.Ssh;
 using NetSec.Trace;
@@ -45,6 +46,14 @@ namespace NetSec.Io
             return o;
         }
 
+        /// <summary>The line a device holds for its gateway, so its first connect checks the host key. The suite picks which training key that is.</summary>
+        public static string KnownHostLine(ITrainingKeySource keys, SshSuite suite, string host, int port)
+        {
+            string typeName;
+            byte[] blob = SshKeyBlob.Of(keys.Find(HostKeyIdFor(suite)), out typeName);
+            return SshKnownHosts.Line(host, port, typeName, blob);
+        }
+
         public static SshServerOptions Server(ITrainingKeySource keys, SshSuite suite, IRandomSource random, Func<string, int, bool> allowTunnel)
         {
             SshServerOptions o = new SshServerOptions();
@@ -74,7 +83,7 @@ namespace NetSec.Io
         {
             bool isClient = r.Role == EngineRole.Client;
             string actor = r.Actor ?? (isClient ? "client" : "server");
-            string peer = isClient ? "server" : "client";
+            string peer = r.PeerActor ?? (isClient ? "server" : "client");
             string session = r.SessionId ?? r.TraceId ?? "glass";
             TraceStream stream = new TraceStream(session + "/" + actor + "/ssh", session, r.TraceId, r.Hop, actor, new MonotonicClock());
             SshEngine engine = isClient

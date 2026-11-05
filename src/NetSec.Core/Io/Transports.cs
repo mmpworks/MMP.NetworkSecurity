@@ -58,6 +58,8 @@ namespace NetSec.Io
         public ITamperHook Tamper;
         public string TraceId, Hop, PeerName;
         public string SessionId, Actor;
+        /// <summary>The lane the far end draws in. Null means the role's usual name, client or server.</summary>
+        public string PeerActor;
         // SSH only. Null KnownHosts ends in SSH_HOST_KEY_UNKNOWN unless TrustFirstUse says otherwise. Then GlassSshSession.LearnedKnownHostsLine
         // holds the line to store, and the caller passes it back as KnownHosts on each later connect. A server with no AllowTunnel refuses every tunnel.
         public int PeerPort;

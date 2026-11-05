@@ -17,7 +17,8 @@ namespace NetSec.Labs
     /// <summary>
     /// Lesson 10. A device first shows a certificate to the server over mutual TLS. A device enrolled ahead of time then answers a challenge and gets a signed token bound to its key. A signature shows who calls only
     /// because the issuer already holds that key for that subject. The device then calls a server, with a fresh DPoP proof on each call, and the
-    /// token's role or capability decides what it may do. This lab has no TLS, so the token shows on the wire.
+    /// token's role or capability decides what it may do. The handshake, the login and the calls run on three separate connections. The login and
+    /// the calls run in the clear, so the token shows on the wire, and neither of them reads the client certificate.
     /// A passkey-shaped challenge is not WebAuthn. Built to show the parts. Do not copy.
     /// </summary>
     public sealed class Lesson10Auth : ILab
@@ -39,6 +40,8 @@ namespace NetSec.Labs
         const string ClientCertUnknownCa = "unknown-ca";
         const string ClientCertExpired = "expired";
         const string ClientCertWrongKey = "wrong-key";
+        public const string ClientCertWrongName = "wrong-name";
+        const string WrongClientName = "bank-hsm-admin";
 
         // A fixed lab time, so a same-seed run gives the same bytes.
         const long LabNow = 1793836800;
@@ -117,6 +120,7 @@ namespace NetSec.Labs
             server.CertificateChain = new byte[][] { TrainingPki.ServerCertificate(ca, serverKey) };
             server.SigningSeed = serverKey.CopyMaterial();
             server.RequireClientCertificate = true;
+            server.ExpectedClientName = TrainingPki.ClientName;
 
             Tls13Engine clientEngine = Tls13Engine.CreateClient(client);
             clientEngine.Command(new EngineCommand(EngineCommandKind.Send, 0, Encoding.UTF8.GetBytes("device hello" + (char)10), null));
@@ -161,6 +165,10 @@ namespace NetSec.Labs
                     leaf = ca.IssueClientCertificate(TrainingPki.ClientName, spki, new DateTime(2020, 1, 1, 0, 0, 0, DateTimeKind.Utc), new DateTime(2021, 1, 1, 0, 0, 0, DateTimeKind.Utc));
                     break;
                 case ClientCertWrongKey:
+                    seed = attacker.CopyMaterial();
+                    break;
+                case ClientCertWrongName:
+                    leaf = ca.IssueClientCertificate(WrongClientName, TrainingCa.Ed25519Spki(attacker.CopyPublic()), TrainingCa.DefaultNotBefore, TrainingCa.DefaultNotAfter);
                     seed = attacker.CopyMaterial();
                     break;
             }

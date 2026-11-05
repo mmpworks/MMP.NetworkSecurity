@@ -81,6 +81,13 @@ Each correction goes here, newest slice last. Later slices read this file first.
 6. **A key from the wire gets a shape check before any arithmetic.** `Tls11RsaKeys.TryReadPublic` refuses an even modulus, a modulus under 59 bytes, and an even exponent or one below 3, as `TLS11_SERVER_KEY_UNUSABLE`. Without it `BigUInt` throws an unnamed `ArgumentException` on an even modulus and `Pkcs1` throws `RSA_MESSAGE_TOO_LONG`.
 7. **In Git Bash, `-p:NetCFRefDir=E:\dev\tools\netcf35-ref` loses its backslashes.** The build then says the CF references are missing. Use forward slashes or leave the flag out, because `Directory.Build.props` holds that default.
 
+8. **Review of PR 49 (Jared), fixed in the follow-up.** OpenSSL's default client refuses a server with no `renegotiation_info` answer, even at `@SECLEVEL=0`, so the server role needs an outside judge beside the client role. A7 judges only the client, and `Tls11Tests` now runs `s_client` against the glass server.
+9. **A failed engine's alert write can hit a closed socket.** `EnginePump` then reported `LINK_LOST` over the engine's named failure. The pump now keeps the engine's failure. This applies to TLS 1.3 and SSH too.
+10. **Three readings of the sources.** RFC 9325 section 4.5 sets the RSA floor at 2048 bits, and the same document says TLS 1.1 must not be negotiated, so a floor cannot make this engine current. RFC 4346 section 7.2.2 sends `record_overflow` above 2^14 + 1024 decrypted bytes, and section 6.2.1 says plaintext should not exceed 2^14. This engine uses the smaller number. Section 7.2.2 leaves some alert levels to the sender, so "must send a fatal alert" is too strong for that section.
+11. **TLS has no flow window, so `GlassTlsChannel` caps its unread queue at 16 MiB and then names `CHANNEL_BUFFER_FULL`.** The cap is a call: a quarter of the CE profile's 64 MB. A real device needs a measured number.
+
+12. **Second review of the TLS 1.1 fixes (Jared).** A clear warning alert must not cancel the fatal alert a later failure owes. The queue cap now aborts with a fatal alert, through `EngineCommand.Abort`, because a `close_notify` after dropped data says a clean end. The cap still ends the session where TCP could wait: the pump could stop reading while the queue is full. That change stays open. The cap is enough unless a real flow sends 16 MiB to a stalled reader.
+
 ## S6
 
 1. **Name known skips in the PR body.** A clean PR body said "a change to any token character is refused" while a test skipped the last character. The skip was the defect showing. A skip goes in the body, with its reason.
@@ -123,6 +130,13 @@ Each correction goes here, newest slice last. Later slices read this file first.
 18. **The sequence number stops by name at 2^32.** RFC 4253 section 6.4 lets it wrap. RFC 4344 section 3.1 says not to send 2^32 packets under one key, and this engine has no rekey. The check runs in the writer and the reader, so a command path needs the same failure guard as a feed.
 19. **A test can pass for the wrong reason on a closed channel.** The first second-confirmation test ran the exec to its end, so the channel had gone and the failure came from that. A rule-breaking test must assert the state it attacks is still live.
 
+## S5, the bridge
+
+1. **The gateway opens hop 2 at the first byte.** `ssh.exe -L` opens a tunnel for any local connection, and the suite's port check is one. An eager open started a TLS handshake that the check then cut, and that named `PEER_CLOSED_EARLY` in a good run. `FirstWriteOpensLink` opens nothing for an empty tunnel.
+2. **A hop server starts before it knows the trace id.** The PIN pad makes the id and the envelope carries it, so the gateway's SSH handshake and the server's TLS handshake come first. `LateTraceSink` holds those events and writes them under the id when the first frame crosses. A session that ends first writes them with no id, so a tamper at the handshake still shows its check.
+3. **A hop reads the trace id without proof, so it only labels with it.** The bank refuses before the MAC passes under no trace id, and names the claimed id in the detail.
+4. **The pad holds a loaded key.** `PinPadCore.InjectedInitialKey` stands for a key loader's work, and a test pins it to what the bank derives. The base key is in `NetSec.Core.dll` on every process, because `TrainingKeySource` derives it from public text. So the boundary is what each role's code reads, and no binary hides anything.
+5. **Open a live `tap` log with `FileShare.ReadWrite`.** The tap still holds it open.
 ## Pump deadline test
 
 1. **The side whose deadline fires reports `LINK_DEADLINE`. The side that then reads the close reports `PEER_CLOSED_EARLY`, and that is its true outcome.** A test that names one side's code must fix the order with two deadlines. `LabPair.Named` drops the second code, so a lab reports the real failure in either order.
