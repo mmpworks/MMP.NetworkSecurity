@@ -24,6 +24,11 @@ namespace NetSec.Tls13
         public byte[] SigningSeed;
         /// <summary>A server that sets this asks for a client certificate, checks it against TrustAnchors, and refuses a client with none.</summary>
         public bool RequireClientCertificate;
+        /// <summary>
+        /// The application rule above the chain check. A chain shows only that a trusted CA vouched for this key. The server must still compare
+        /// the name with the one it allows. Null leaves the chain check alone, as TLS itself does.
+        /// </summary>
+        public string ExpectedClientName;
     }
 
     /// <summary>
