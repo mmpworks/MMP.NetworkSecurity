@@ -12,6 +12,12 @@ namespace NetSec.Tls13
                       ClientApplicationTrafficSecret0, ServerApplicationTrafficSecret0, ExporterMasterSecret;
     }
 
+    /// <summary>The two values a session ticket needs, RFC 8446 sections 7.1 and 4.6.1.</summary>
+    public sealed class Tls13Resumption
+    {
+        public byte[] ResumptionMasterSecret, ResumptionSecret;
+    }
+
     /// <summary>Pure functions over bytes. No session, no state, so A4 checks it against the RFC 8448 trace alone.</summary>
     public static class Tls13KeySchedule
     {
@@ -36,6 +42,23 @@ namespace NetSec.Tls13
             s.ServerApplicationTrafficSecret0 = DeriveSecret(h, s.MasterSecret, "s ap traffic", serverFinishedHash);
             s.ExporterMasterSecret = DeriveSecret(h, s.MasterSecret, "exp master", serverFinishedHash);
             return s;
+        }
+
+        /// <summary>
+        /// The rung that needs the client Finished, which Derive does not take. This engine reads a ticket and drops it, so only
+        /// the RFC 8448 check calls this. It stays apart so a later resumption lesson can start from it.
+        /// </summary>
+        public static Tls13Resumption Resume(Func<IHash> h, byte[] masterSecret, byte[] clientFinishedHash, byte[] ticketNonce)
+        {
+            if (h == null) throw new ArgumentNullException("h");
+            if (masterSecret == null) throw new ArgumentNullException("masterSecret");
+            if (clientFinishedHash == null) throw new ArgumentNullException("clientFinishedHash");
+            if (ticketNonce == null) throw new ArgumentNullException("ticketNonce");
+
+            Tls13Resumption r = new Tls13Resumption();
+            r.ResumptionMasterSecret = DeriveSecret(h, masterSecret, "res master", clientFinishedHash);
+            r.ResumptionSecret = ExpandLabel(h, r.ResumptionMasterSecret, "resumption", ticketNonce, h().DigestSize);
+            return r;
         }
 
         public static byte[] ExpandLabel(Func<IHash> h, byte[] secret, string label, byte[] context, int length)
@@ -63,8 +86,18 @@ namespace NetSec.Tls13
         /// <summary>RFC 8446 section 4.4.4: HMAC, under a key made from the traffic secret, of the transcript hash so far.</summary>
         public static byte[] VerifyData(Func<IHash> h, byte[] trafficSecret, byte[] transcriptHash)
         {
-            byte[] finishedKey = ExpandLabel(h, trafficSecret, "finished", new byte[0], h().DigestSize);
-            return Hmac.Compute(h, finishedKey, transcriptHash);
+            return Hmac.Compute(h, FinishedKey(h, trafficSecret), transcriptHash);
+        }
+
+        /// <summary>Checks a received verify_data in constant time. A value of another length gives false.</summary>
+        public static bool VerifyFinished(Func<IHash> h, byte[] trafficSecret, byte[] transcriptHash, byte[] received)
+        {
+            return Hmac.Verify(h, FinishedKey(h, trafficSecret), transcriptHash, received);
+        }
+
+        static byte[] FinishedKey(Func<IHash> h, byte[] trafficSecret)
+        {
+            return ExpandLabel(h, trafficSecret, "finished", new byte[0], h().DigestSize);
         }
 
         public static byte[] HashOf(Func<IHash> h, byte[] bytes)

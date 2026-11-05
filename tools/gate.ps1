@@ -33,6 +33,13 @@ $report = "docs/_runs/$date-$Slice.md"
 New-Item -ItemType Directory -Force -Path 'docs/_runs' | Out-Null
 $cf = "-p:NetCFRefDir=$NetCFRefDir"
 $hang = @('--blame-hang-timeout', $HangLimit, '--blame-hang-dump-type', 'none')
+
+# A merge left half done builds something other than either side, and every step after it reports false results.
+$unmerged = @(git diff --name-only --diff-filter=U)
+if ($unmerged.Count -gt 0) {
+    Write-Host "gate ${Slice}: GATE_TREE_UNMERGED: resolve these files first, nothing ran: $($unmerged -join ', ')"
+    exit 2
+}
 $rows = [System.Collections.Generic.List[object]]::new()
 $failed = 0
 $Clauses = @($Clauses | ForEach-Object { $_ -split ',' } | Where-Object { $_ })
