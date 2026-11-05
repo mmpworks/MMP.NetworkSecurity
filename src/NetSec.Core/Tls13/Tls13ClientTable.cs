@@ -124,8 +124,7 @@ namespace NetSec.Tls13
         static StepDecision Finished(Tls13Session session, InboundMessage message)
         {
             Tls13Suite suite = session.Suite;
-            byte[] expected = Tls13KeySchedule.VerifyData(suite.Hash, session.Secrets.ServerHandshakeTrafficSecret, session.HashWith());
-            if (message.Body.Length != expected.Length || !ConstantTime.Equal(message.Body, 0, expected, 0, expected.Length))
+            if (!Tls13KeySchedule.VerifyFinished(suite.Hash, session.Secrets.ServerHandshakeTrafficSecret, session.HashWith(), message.Body))
                 return Tls13Rules.Refuse(Tls13Codes.FinishedMismatch, "the server Finished does not match this transcript");
 
             byte[] serverFinishedHash = session.HashWith(message.Bytes);
