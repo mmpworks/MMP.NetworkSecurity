@@ -54,7 +54,7 @@ export const ui = reactive({
   engine: 'idle' as 'idle' | 'running' | 'stepping' | 'waiting' | 'finished',
   shortcuts: false,
   follow: true,
-  inspectorTab: 'bytes' as 'bytes' | 'picture' | 'measures' | 'chain' | 'ladder',
+  inspectorTab: 'bytes' as 'bytes' | 'picture' | 'measures' | 'chain' | 'ladder' | 'hostkey',
 })
 
 export const tour = reactive({
@@ -312,9 +312,14 @@ async function enterStep(i: number) {
       if (idx < 0) idx = findBound(s, events, 0)
       if (idx >= 0) { tour.bound[i] = idx; ui.viewUpTo = s.pause === 'none' ? null : idx; ui.selectedSeq = null; markSeen(s); return }
       if (ts()?.finished) { tour.unreachable = 'The session ended before the engine sent this message'; return }
-      sock?.send({ type: 'session.step', sessionId: tour.sessionId })
-      ui.engine = 'stepping'
-      if (!(await nextActivity(15000))) { fail('STEP_TIMEOUT', 'The engine sent nothing for 15 seconds.', true); tour.unreachable = 'The engine is not answering'; return }
+      // A step command can be lost while an engine starts up (lesson 8 showed it). Send it again every 3 seconds, and give up after 15.
+      let answered = false
+      for (let attempt = 0; attempt < 5 && !answered; attempt++) {
+        sock?.send({ type: 'session.step', sessionId: tour.sessionId })
+        ui.engine = 'stepping'
+        answered = await nextActivity(3000)
+      }
+      if (!answered) { fail('STEP_TIMEOUT', 'The engine sent nothing for 15 seconds.', true); tour.unreachable = 'The engine is not answering'; return }
       if (ui.error) { tour.unreachable = 'The engine reported an error'; return }
     }
   } finally { tour.driving = false }
@@ -406,3 +411,6 @@ const highlights = computed(() => (tour.active ? step.value?.highlight ?? [] : [
 export function isHighlighted(panel: string, kind: string, name: string): boolean {
   return highlights.value.some(h => h.panel === panel && h.kind === kind && h.name === name)
 }
+
+/** Panels show everything up to the selected event. With no explicit selection they show everything shown, so a check that comes after the last byte still appears. */
+export const upToSeq = computed(() => (ui.selectedSeq != null ? selectedEvent.value?.seq ?? Infinity : Infinity))

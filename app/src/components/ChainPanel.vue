@@ -1,11 +1,11 @@
 <script setup lang="ts">
 import { computed } from 'vue'
 import { chainOf, type Status } from '../lab'
-import { allEvents, selectedEvent, selectEvent } from '../store'
+import { allEvents, selectedEvent, selectEvent, upToSeq } from '../store'
 import type { TraceEvent } from '../types'
 
 // Lesson 4: three linked cards. Root, leaf, and the proof that the server holds the leaf's key. A link colors from the check events and from nothing else.
-const upTo = computed(() => selectedEvent.value?.seq ?? Infinity)
+const upTo = upToSeq
 const chain = computed(() => chainOf(allEvents.value, upTo.value))
 const mark = (s: Status | undefined) => (s === 'fail' ? '✕' : s === 'pass' ? '✓' : '…')
 const label = (s: Status | undefined) => (s === 'fail' ? 'failed' : s === 'pass' ? 'passed' : 'not checked yet')

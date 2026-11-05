@@ -11,7 +11,7 @@ export interface Lane { name: string; x: number }
 export interface Row {
   seq: number
   y: number
-  kind: 'arrow' | 'check' | 'note'
+  kind: 'arrow' | 'check' | 'note' | 'divider'
   fromX: number
   toX: number
   label: string
@@ -29,7 +29,11 @@ export const isWireSent = (e: TraceEvent): boolean => e.type === 'wire.sent'
 // plain differ from wire, so comparing the two would call a tamper "encrypted".
 export const isProtected = (e: TraceEvent): boolean => e.wire.length > 0 && e.fields.some(f => !f.visibleToWire)
 // Events that draw a marker on one lane: key installs, certificates issued, keys erased, alerts.
-export const isNoteEvent = (e: TraceEvent): boolean => e.type.startsWith('keys.') || e.type === 'ca.certificate.issued' || e.type === 'dukpt.key.erased' || e.type === 'tls.alert.sent'
+export const isNoteEvent = (e: TraceEvent): boolean =>
+  e.type.startsWith('keys.') || e.type.startsWith('ssh.weak.') || ['ca.certificate.issued', 'dukpt.key.erased', 'tls.alert.sent', 'ssh.hostkey.seen', 'ssh.exec.exit'].includes(e.type)
+
+/** The protocol of an event: the third part of its stream id (`<session>/client/tls11` and `<session>/client/tls11/wire` both give `tls11`). */
+export const protocolOf = (e: TraceEvent): string => e.streamId.split('/')[2] ?? ''
 export const byteCount = (hex: string): number => hex.length >> 1
 
 export function laneNames(events: readonly TraceEvent[], declared: readonly string[]): string[] {
@@ -46,10 +50,17 @@ export function layoutDiagram(events: readonly TraceEvent[], declared: readonly 
   const rows: Row[] = []
   let learned = 0
   let total = 0
+  let lastProto = ''
   for (const e of events) {
-    const y = HEAD_H + 30 + rows.length * ROW_H
     const prot = isProtected(e)
-    if (isWireSent(e) && e.from && e.to && e.from.toLowerCase() !== e.to.toLowerCase()) {
+    const isArrow = isWireSent(e) && !!e.from && !!e.to && e.from.toLowerCase() !== e.to.toLowerCase()
+    // A run with two rounds on two streams (lesson 8: modern, then legacy) gets a divider where the stream changes.
+    if (isArrow && lastProto && protocolOf(e) !== lastProto) {
+      rows.push({ seq: -rows.length - 1, y: HEAD_H + 30 + rows.length * ROW_H, kind: 'divider', fromX: LEFT, toX: LEFT, label: `next round: ${protocolOf(e)}`, bytes: 0, protectedBytes: false, unreadable: false, check: null, head: '' })
+    }
+    if (isArrow) lastProto = protocolOf(e)
+    const y = HEAD_H + 30 + rows.length * ROW_H
+    if (isArrow) {
       total++
       if (!prot) learned++
       const hidden = view === 'eavesdropper' && prot

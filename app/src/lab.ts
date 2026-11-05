@@ -1,4 +1,4 @@
-import { hexToBytes } from './layout'
+import { hexToBytes, protocolOf } from './layout'
 import type { TraceEvent } from './types'
 
 // Pure helpers for the lesson views (pictures, measures). A test can call every function here.
@@ -89,7 +89,7 @@ export function chainOf(events: readonly TraceEvent[], upTo: number): ChainView 
 
 export interface Rung { key: string; holder: string; name: string; state: 'held' | 'erased'; derivedFrom: string[]; seq: number }
 
-const TLS_LADDER = /^(early_secret|handshake_secret|master_secret|[cs]_hs_traffic|[cs]_ap_traffic|exp_master|x25519_shared|mlkem_shared|hybrid_shared)$/
+const TLS_LADDER = /^(tls11\.[a-z0-9_.]+|ssh\.[a-zA-Z0-9_.]+|early_secret|handshake_secret|master_secret|[cs]_hs_traffic|[cs]_ap_traffic|exp_master|x25519_shared|mlkem_shared|hybrid_shared)$/
 
 export const isLadderEvent = (e: TraceEvent): boolean =>
   e.type.startsWith('dukpt.key.') || (e.type === 'secret.derived' && e.secrets.some(s => TLS_LADDER.test(s.name)))
@@ -116,6 +116,44 @@ export function registers(events: readonly TraceEvent[], upTo: number): { held: 
   for (const e of events) {
     if (e.seq > upTo) break
     if (e.type === 'measure.result' && e.message === 'Reader registers') { const d = parseDetail(e.detail); out = { held: Number(d.held ?? 0), next: Number(d.next ?? 0) } }
+  }
+  return out
+}
+
+// ---- lesson 7: the race ----
+
+export interface RaceStats { messages: number; bytes: number; roundTrips: number | null }
+
+/** Messages and bytes are counts of wire.sent events of one protocol. A round trip is a pair of direction changes before the client first sends application data. */
+export function raceStats(events: readonly TraceEvent[], upTo: number, protocol: string): RaceStats {
+  const sent = events.filter(e => e.seq <= upTo && e.type === 'wire.sent' && protocolOf(e) === protocol)
+  let changes = 0
+  let last = ''
+  let reached = false
+  for (const e of sent) {
+    if (last && e.from !== last) changes++
+    last = e.from
+    if (e.from === 'client' && e.message === 'ApplicationData') { reached = true; break }
+  }
+  return { messages: sent.length, bytes: sent.reduce((n, e) => n + (e.wire.length >> 1), 0), roundTrips: reached ? Math.floor(changes / 2) : null }
+}
+
+export const protocols = (events: readonly TraceEvent[]): Set<string> => new Set(events.map(protocolOf).filter(Boolean))
+
+// ---- lesson 8: host keys ----
+
+export interface HostKeySeen { fingerprint: string; protocol: string; status: Status }
+
+export function hostKeys(events: readonly TraceEvent[], upTo: number): HostKeySeen[] {
+  const out: HostKeySeen[] = []
+  for (const e of events) {
+    if (e.seq > upTo) break
+    if (e.type === 'ssh.hostkey.seen') out.push({ fingerprint: e.message, protocol: protocolOf(e), status: 'pending' })
+    if (e.check?.name === 'known_hosts match') {
+      // A refused key may fail the check before any card was shown. The card then says so, with an empty fingerprint.
+      if (!out.length || out[out.length - 1].status !== 'pending') out.push({ fingerprint: '', protocol: protocolOf(e), status: e.check.result })
+      else out[out.length - 1].status = e.check.result
+    }
   }
   return out
 }

@@ -18,3 +18,17 @@
 .rung.erased .rname { text-decoration: line-through; text-decoration-color: var(--muted); }
 .rung .erased-tag { color: var(--encrypted); font-style: italic; }
 .rname { font-weight: 700; }
+.divider-line { stroke: var(--muted); stroke-dasharray: 2 4; }
+.divider-text { fill: var(--muted); font-size: 12px; font-style: italic; }
+.race { flex: 1 1 auto; min-height: 0; display: flex; }
+.race-col { flex: 1 1 50%; min-width: 0; display: flex; flex-direction: column; border-left: 1px solid var(--line); }
+.race-col:first-child { border-left: 0; }
+.race-head { padding: 6px 10px 0; font-size: 12px; }
+.race-head .rname { display: block; font-size: 13px; }
+.race-counts { display: flex; gap: 12px; margin-top: 2px; color: var(--muted); }
+.race-counts b { color: var(--text); font-size: 15px; }
+.hostkey { padding: 10px 14px; overflow: auto; height: 100%; box-sizing: border-box; font-size: 13px; }
+.hostkey code { font: 12px ui-monospace, Consolas, monospace; overflow-wrap: anywhere; }
+.hk-status { margin-top: 8px; padding: 6px 8px; border-left: 3px solid var(--line); }
+.hk-status.pass { border-left-color: var(--pass); }
+.hk-status.fail { border-left-color: var(--fail); }

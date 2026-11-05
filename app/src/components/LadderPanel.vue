@@ -1,10 +1,10 @@
 <script setup lang="ts">
 import { computed } from 'vue'
 import { ladderRungs, registers } from '../lab'
-import { allEvents, isReal, selectedEvent } from '../store'
+import { allEvents, isReal, selectedEvent, upToSeq } from '../store'
 
 // Lessons 5 and 6: the keys in the order the engine made them. A rung that the engine erased is shown erased. The register count comes from the event.
-const upTo = computed(() => selectedEvent.value?.seq ?? Infinity)
+const upTo = upToSeq
 const rungs = computed(() => ladderRungs(allEvents.value, upTo.value))
 const regs = computed(() => registers(allEvents.value, upTo.value))
 const short = (s: string) => s.replace(/^dukpt\./, '')
