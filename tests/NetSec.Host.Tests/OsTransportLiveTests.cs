@@ -18,7 +18,7 @@ namespace NetSec.Host.Tests;
 /// </summary>
 public sealed class OsTransportLiveTests
 {
-    static string OpenSsl()
+    internal static string OpenSsl()
     {
         string? set = Environment.GetEnvironmentVariable("NETSEC_OPENSSL");
         string path = !string.IsNullOrEmpty(set) ? set : @"C:\Program Files\Git\mingw64\bin\openssl.exe";
@@ -26,15 +26,21 @@ public sealed class OsTransportLiveTests
         return path;
     }
 
-    static void Run(string exe, string args, string dir)
+    internal static void Run(string exe, string args, string dir)
     {
         using Process p = Process.Start(new ProcessStartInfo(exe, args) { WorkingDirectory = dir, UseShellExecute = false, RedirectStandardOutput = true, RedirectStandardError = true })!;
         string output = p.StandardOutput.ReadToEnd() + p.StandardError.ReadToEnd();
         Assert.True(p.WaitForExit(60_000) && p.ExitCode == 0, "openssl " + args + ": " + output);
     }
 
+    static void SelfSignedRsa(string openssl, string dir)
+    {
+        Run(openssl, "genpkey -algorithm RSA -pkeyopt rsa_keygen_bits:2048 -out key.pem", dir);
+        Run(openssl, "req -new -x509 -key key.pem -subj \"/CN=localhost\" -days 2 -addext \"subjectAltName=DNS:localhost\" -out cert.pem", dir);
+    }
+
     /// <summary>An RSA server on a free port, with -rev so it answers each line reversed. Schannel refuses an Ed25519 server certificate.</summary>
-    sealed class Peer : IDisposable
+    internal sealed class Peer : IDisposable
     {
         readonly Process _server;
         public readonly string Dir = Path.Combine(Path.GetTempPath(), "netsec-os-" + Guid.NewGuid().ToString("N"));
@@ -42,13 +48,13 @@ public sealed class OsTransportLiveTests
         public string KeyLog => Path.Combine(Dir, "peer.keylog");
         public readonly int Port;
 
-        public Peer()
+        /// <summary>make writes the server's files into Dir; serverFiles are the s_server arguments that name them. With no make, one self-signed RSA cert.pem.</summary>
+        public Peer(Action<string, string>? make = null, string serverFiles = "-cert cert.pem -key key.pem")
         {
             Directory.CreateDirectory(Dir);
             string openssl = OpenSsl();
-            Run(openssl, "genpkey -algorithm RSA -pkeyopt rsa_keygen_bits:2048 -out key.pem", Dir);
-            Run(openssl, "req -new -x509 -key key.pem -subj \"/CN=localhost\" -days 2 -addext \"subjectAltName=DNS:localhost\" -out cert.pem", Dir);
-            _server = new Process { StartInfo = new ProcessStartInfo(openssl, "s_server -accept 0 -tls1_3 -rev -cert cert.pem -key key.pem -keylogfile peer.keylog")
+            (make ?? SelfSignedRsa)(openssl, Dir);
+            _server = new Process { StartInfo = new ProcessStartInfo(openssl, "s_server -accept 0 -tls1_3 -rev " + serverFiles + " -keylogfile peer.keylog")
             { WorkingDirectory = Dir, UseShellExecute = false, RedirectStandardOutput = true, RedirectStandardError = true, RedirectStandardInput = true } };
             TaskCompletionSource<int> port = new(TaskCreationOptions.RunContinuationsAsynchronously);
             _server.OutputDataReceived += (_, e) =>
@@ -82,6 +88,23 @@ public sealed class OsTransportLiveTests
     }
 
     static string TypeOf(JsonElement frame) => frame.GetProperty("type").GetString()!;
+
+    /// <summary>The app and the Host use one name for the OS transport, os. The old name, real, must be gone from the app's source.</summary>
+    [Fact]
+    public void The_app_names_the_os_transport_os_and_never_real()
+    {
+        DirectoryInfo dir = new(AppContext.BaseDirectory);
+        while (dir.Parent is not null && !Directory.Exists(Path.Combine(dir.FullName, "app", "src"))) dir = dir.Parent;
+        string src = Path.Combine(dir.FullName, "app", "src");
+        Assert.True(Directory.Exists(src), "no app/src above " + AppContext.BaseDirectory);
+        List<string> hits = Directory.GetFiles(src, "*.*", SearchOption.AllDirectories)
+            .Where(f => f.EndsWith(".ts") || f.EndsWith(".vue"))
+            .SelectMany(f => File.ReadAllLines(f).Select((line, i) => (f, i, line)))
+            .Where(x => Regex.IsMatch(x.line, @"['""]real['""]") || Regex.IsMatch(x.line, @"\bisReal\b"))
+            .Select(x => Path.GetFileName(x.f) + ":" + (x.i + 1) + " " + x.line.Trim()).ToList();
+        Assert.True(hits.Count == 0, "the old transport name is still in the app: " + string.Join(" | ", hits));
+        Assert.Contains("'os'", File.ReadAllText(Path.Combine(src, "types.ts")));
+    }
 
     [Fact]
     public async Task Lesson_5_on_the_os_transport_talks_tls_13_and_shows_no_secret()
