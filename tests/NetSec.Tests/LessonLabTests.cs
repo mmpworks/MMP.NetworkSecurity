@@ -209,7 +209,7 @@ namespace NetSec.Tests
                 "L3-swap-server-share", "L3-flip-mlkem-ciphertext",
                 "L6-replay-sale", "L6-flip-pin-block", "L6-ask-past-key",
             };
-            Assert.Equal(expected, AttackCatalog.All.Where(a => a.Lesson >= 1 && a.Lesson <= 3).Select(a => a.AttackId).ToArray());
+            Assert.Equal(expected, AttackCatalog.All.Where(a => a.Lesson >= 1 && a.Lesson != 4 && a.Lesson != 5).Select(a => a.AttackId).ToArray());
         }
     }
 }
