@@ -1,6 +1,6 @@
 <Project Sdk="Microsoft.NET.Sdk">
 
-  <!-- Starts the built Host as its own process and talks to it the way the app does. No product code is linked. -->
+  <!-- Starts the built Host as its own process and talks to it the way the app does. NetSec.Core is linked only for TrainingKeyBclTests, the net10.0-only check on the training keys. -->
 
   <PropertyGroup>
     <TargetFramework>net10.0</TargetFramework>
@@ -18,6 +18,7 @@
   <ItemGroup>
     <ProjectReference Include="..\..\src\NetSec.Host\NetSec.Host.csproj" ReferenceOutputAssembly="false" />
     <ProjectReference Include="..\..\src\NetSec.Node\NetSec.Node.csproj" ReferenceOutputAssembly="false" />
+    <ProjectReference Include="..\..\src\NetSec.Core\NetSec.Core.csproj" />
     <ProjectReference Include="..\..\src\NetSec.CeDevice\NetSec.CeDevice.csproj" ReferenceOutputAssembly="false" SetTargetFramework="TargetFramework=net35" />
   </ItemGroup>
 
