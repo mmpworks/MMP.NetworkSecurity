@@ -157,3 +157,16 @@ body { background: var(--bg); color: var(--text); overflow: hidden; }
 .hex-ascii { white-space: nowrap; }
 .hex-row { width: max-content; min-width: 100%; }
 .attack-result { margin: 4px 12px; padding: 6px 10px; border-left: 3px solid var(--fail); background: var(--surface2); font-size: 13px; }
+.picture, .measures { overflow: auto; height: 100%; padding: 8px 12px; box-sizing: border-box; }
+.pic-grid { display: flex; gap: 16px; flex-wrap: wrap; }
+.pic-grid figure { margin: 0; text-align: center; font-size: 12px; color: var(--muted); }
+.pic-canvas { width: 192px; height: 192px; image-rendering: pixelated; border: 1px solid var(--line); background: #000; }
+.measure-card { border: 1px solid var(--line); border-radius: 8px; padding: 8px; margin-bottom: 8px; font-size: 13px; }
+.avalanche { display: grid; grid-template-columns: repeat(32, 1fr); gap: 1px; margin: 6px 0; max-width: 420px; }
+.abit { aspect-ratio: 1; background: var(--surface2); border-radius: 1px; }
+.abit.on { background: var(--encrypted); }
+.bar { height: 10px; background: var(--surface2); border-radius: 5px; overflow: hidden; margin: 6px 0; max-width: 420px; }
+.bar-fill { height: 100%; background: var(--encrypted); }
+.tabs-inline { display: flex; gap: 4px; padding: 4px 10px 0; }
+.chk-name.hl { text-decoration: underline; font-size: 14px; }
+.chk-fail-t.hl, .chk-pass-t.hl { outline: 2px solid var(--focus); border-radius: 4px; padding: 0 3px; }

@@ -26,6 +26,8 @@ namespace NetSec.Io
         public string KnownHostsFile;
         public bool OfferOnlyTls11;
         public string ClientKeyId;
+        /// <summary>A listener that sets this asks for a client certificate from the training CA.</summary>
+        public bool RequireClientCert;
         public string ExecCommand;
         public string TunnelTo;
         public byte[] Send;
@@ -194,6 +196,11 @@ namespace NetSec.Io
             Tls13Options o = CommonOptions(r, "client", "server");
             o.TrustAnchors = new byte[][] { new TrainingCa(new TrainingKeySource()).RootCertificateDer };
             o.OfferOnlyTls11 = r.OfferOnlyTls11;
+            if (r.ClientKeyId == null) return o;
+            ITrainingKeySource keys = new TrainingKeySource();
+            ITrainingKey key = keys.Find(r.ClientKeyId);
+            o.CertificateChain = new byte[][] { TrainingPki.ClientCertificate(new TrainingCa(keys), key) };
+            o.SigningSeed = key.CopyMaterial();
             return o;
         }
 
@@ -204,6 +211,8 @@ namespace NetSec.Io
             ITrainingKey key = keys.Find(KeyIds.ServerTlsEd25519);
             o.CertificateChain = new byte[][] { TrainingPki.ServerCertificate(new TrainingCa(keys), key) };
             o.SigningSeed = key.CopyMaterial();
+            o.RequireClientCertificate = r.RequireClientCert;
+            o.TrustAnchors = new byte[][] { new TrainingCa(keys).RootCertificateDer };
             return o;
         }
 

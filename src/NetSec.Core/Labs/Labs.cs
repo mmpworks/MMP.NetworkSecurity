@@ -145,7 +145,7 @@ namespace NetSec.Labs
             Flip("L2-flip-hmac-tag", 2, "HmacSealed", Lesson02Seals.SealOffset, ErrorCodes.SealHmacMismatch, Lesson02Seals.HmacCheck),
             Flip("L2-flip-cmac-message", 2, "CmacSealed", Lesson02Seals.MessageOffset + 3, ErrorCodes.SealCmacMismatch, Lesson02Seals.CmacCheck),
             Flip("L2-flip-cmac-tag", 2, "CmacSealed", Lesson02Seals.SealOffset, ErrorCodes.SealCmacMismatch, Lesson02Seals.CmacCheck),
-            WithOption("L2-extend-keyed-hash", 2, Lesson02Seals.OptionExtend, "KeyedHashSealed", AttackOutcome.Accepted, null, null),
+            WithOption("L2-extend-keyed-hash", 2, Lesson02Seals.OptionExtend, "KeyedHashSealed", AttackOutcome.NoCheck, null, null),
             WithOption("L2-extend-hmac", 2, Lesson02Seals.OptionExtend, "HmacSealed", AttackOutcome.Rejected, ErrorCodes.SealHmacMismatch, Lesson02Seals.HmacCheck),
 
             Swap("L3-swap-server-share", 3, "X25519ServerShare", Lesson03Kex.SwappedServerShare(), ErrorCodes.KexConfirmMismatch, Lesson03Kex.ConfirmCheck),
@@ -190,6 +190,28 @@ namespace NetSec.Labs
         const int SshRsaSignatureOffset = 669;
 
         public static AttackDefinition[] All { get { return (AttackDefinition[])Rows.Clone(); } }
+
+        /// <summary>
+        /// Lesson 10's rows. They join All, and the lab joins LabCatalog, in the commit that lands its tour, so no learner reaches a token lab
+        /// without the accuracy text. Tests run them from here.
+        /// </summary>
+        public static AttackDefinition[] Lesson10Unreleased { get { return (AttackDefinition[])Lesson10Rows.Clone(); } }
+
+        static readonly AttackDefinition[] Lesson10Rows =
+        {
+            Flip("L10-change-token-claim", 10, "ReadTotals", Lesson10Auth.ClaimsOffset + 5, ErrorCodes.TokenBadSignature, NetSec.Auth.Token.SignatureCheck),
+            WithOption("L10-expired-token", 10, Lesson10Auth.OptionTokenExpired, "yes", AttackOutcome.Rejected, ErrorCodes.TokenExpired, NetSec.Auth.Token.ExpiryCheck),
+            WithOption("L10-replay-proof", 10, Lesson10Auth.OptionReplayProof, "yes", AttackOutcome.Rejected, ErrorCodes.DpopReplay, NetSec.Auth.DpopProof.ReplayCheck),
+            WithOption("L10-stolen-token", 10, Lesson10Auth.OptionStolenToken, "yes", AttackOutcome.Rejected, ErrorCodes.DpopJktMismatch, NetSec.Auth.DpopProof.BindingCheck),
+            WithOption("L10-ungranted-capability", 10, Lesson10Auth.OptionCallRefund, "yes", AttackOutcome.Rejected, ErrorCodes.CapabilityDenied, NetSec.Auth.AccessRules.PermissionCheck),
+            WithOption("L10-wrong-role", 10, Lesson10Auth.OptionTokenRole, "guest", AttackOutcome.Rejected, ErrorCodes.RoleDenied, NetSec.Auth.AccessRules.PermissionCheck),
+            WithOption("L10-replay-challenge", 10, Lesson10Auth.OptionReplayChallenge, "yes", AttackOutcome.Rejected, ErrorCodes.ChallengeReplay, NetSec.Auth.Challenge.ReplayCheck),
+            WithOption("L10-remove-client-cert", 10, Lesson10Auth.OptionClientCert, Lesson10Auth.ClientCertNone, AttackOutcome.Rejected, NetSec.Tls13.Tls13Codes.CertRequired, NetSec.Tls13.Tls13Codes.CheckName(NetSec.Tls13.Tls13Codes.CertRequired)),
+            WithOption("L10-corrupt-client-cert", 10, Lesson10Auth.OptionClientCert, Lesson10Auth.ClientCertCorrupt, AttackOutcome.Rejected, NetSec.Tls13.Tls13Codes.BadCertificate, NetSec.Tls13.Tls13Codes.CheckName(NetSec.Tls13.Tls13Codes.BadCertificate)),
+            WithOption("L10-unissued-challenge", 10, Lesson10Auth.OptionAnswerUnissued, "yes", AttackOutcome.Rejected, ErrorCodes.ChallengeNotIssued, NetSec.Auth.Challenge.IssuedCheck),
+            WithOption("L10-unknown-device", 10, Lesson10Auth.OptionUnknownDevice, "yes", AttackOutcome.Rejected, ErrorCodes.DeviceNotEnrolled, NetSec.Auth.Challenge.EnrolledCheck),
+            WithOption("L10-wrong-audience", 10, Lesson10Auth.OptionTokenAudience, "https://other.training/api", AttackOutcome.Rejected, ErrorCodes.TokenBadAudience, NetSec.Auth.Token.AudienceCheck),
+        };
 
         static AttackDefinition Flip(string id, int lesson, string message, int offset, string code, string check)
         {

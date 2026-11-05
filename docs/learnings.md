@@ -74,6 +74,15 @@ Each correction goes here, newest slice last. Later slices read this file first.
 5. **`Pkcs1` had no block with an empty DigestInfo prefix.** TLS 1.1 signs 36 bytes of MD5 then SHA-1 with no prefix. `SignMd5Sha1` and `VerifyMd5Sha1` share `EncodeDigestBlock` with the SHA-1 and SHA-256 forms.
 6. **A key from the wire gets a shape check before any arithmetic.** `Tls11RsaKeys.TryReadPublic` refuses an even modulus, a modulus under 59 bytes, and an even exponent or one below 3, as `TLS11_SERVER_KEY_UNUSABLE`. Without it `BigUInt` throws an unnamed `ArgumentException` on an even modulus and `Pkcs1` throws `RSA_MESSAGE_TOO_LONG`.
 7. **In Git Bash, `-p:NetCFRefDir=E:\dev\tools\netcf35-ref` loses its backslashes.** The build then says the CF references are missing. Use forward slashes or leave the flag out, because `Directory.Build.props` holds that default.
+
+## S6
+
+1. **Name known skips in the PR body.** A clean PR body said "a change to any token character is refused" while a test skipped the last character. The skip was the defect showing. A skip goes in the body, with its reason.
+2. **A signature shows who calls only when the verifier already holds the key.** The first lab checked a signature against the key the caller sent, so any key earned a token. The issuer now holds an enrolment row, and it compares the answer to the challenge it sent.
+3. **`Convert.FromBase64String` accepts set spare bits and whitespace on both builds.** To hold one spelling, encode the result and compare it to the text.
+4. **`DateTime` subtraction ignores `Kind`.** A verifier that takes a `DateTime` must convert a local value and refuse one with no zone, or a local clock moves every expiry.
+
+5. **The contract named the wrong alert for a removed client certificate.** RFC 8446 sections 4.4.2.4 and 6.2 name `certificate_required` for an empty list and `bad_certificate` for a corrupt certificate. Go sends alert 116 in a live run. Read the RFC before you wire an alert name from a design doc.
 ## S7
 
 1. **Timing cases taken one after the other measure the machine, and they do not measure the compare.** This machine has 24 logical CPUs. A whole-case sample of the constant-time compare moved its mean between about 12 and 19 ticks from run to run. Sequential constant-time |t| ran from 3.7 to 230, and a control with two identical cases reached 89. So `TimingLab.Interleaved` takes turns of 100 samples between its two cases, and the lab uses it. `TimingLab.Sample` stays sequential because the contract names it.

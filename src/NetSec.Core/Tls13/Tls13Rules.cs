@@ -17,6 +17,24 @@ namespace NetSec.Tls13
             return Effect.Check(Tls13Codes.CheckName(code), code);
         }
 
+        /// <summary>One handshake message goes out and joins the transcript.</summary>
+        public static void AddFlight(List<StepEffect> effects, string name, int type, byte[] message)
+        {
+            effects.Add(Effect.Send(name, message, Tls13Messages.FieldsOf(type, message, false)));
+            effects.Add(Effect.Absorb(message));
+        }
+
+        /// <summary>The peer's CertificateVerify, checked under the leaf it sent. The two roles differ only in the context string.</summary>
+        public static StepDecision PeerSignature(Tls13Session session, InboundMessage message, string context)
+        {
+            CertificateVerifyInfo info = Tls13Messages.ReadCertificateVerify(message.Bytes, false);
+            byte[] signed = Tls13Messages.SignedContent(context, session.HashWith());
+            bool good = info.Scheme == Tls13Messages.Ed25519Scheme && session.Leaf.KeyIsEd25519 && info.Signature.Length == 64
+                && Ed25519.Verify(session.Leaf.PublicKey, signed, info.Signature);
+            if (!good) return Refuse(Tls13Codes.CertVerifyBad, "the signature over the transcript does not verify under the leaf key");
+            return StepDecision.Advance(Effect.Absorb(message.Bytes), Pass(Tls13Codes.CertVerifyBad));
+        }
+
         public static void AddHandshakeLadder(List<StepEffect> effects, Tls13Session session, KexOutcome kex, Tls13Secrets s)
         {
             string holder = session.Holder;
