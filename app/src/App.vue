@@ -23,8 +23,14 @@ import TimingPanel from './components/TimingPanel.vue'
 import OnionPanel from './components/OnionPanel.vue'
 import { isLadderEvent, pictureOf, protocols, raceStats } from './lab'
 import type { TraceEvent } from './types'
+import NeedsBanner from './components/NeedsBanner.vue'
+import SecurityPage from './components/SecurityPage.vue'
+import ShowKeysSwitch from './components/ShowKeysSwitch.vue'
+import WizardSheet from './components/WizardSheet.vue'
+import { badgeCount, closeSecurity, keysChip, loadSecurity, openSecurity, sec } from './security'
 
 const lightbox = ref(false)
+const mineCountColor = computed(() => (keysChip.value === 'Keys: built-in' ? undefined : 'primary'))
 const hostChip = computed(() => (hostState.value === 'connected' ? 'engine connected' : hostState.value === 'connecting' ? 'engine starting' : 'engine offline'))
 const hostColor = computed(() => (hostState.value === 'connected' ? 'success' : hostState.value === 'connecting' ? 'warning' : 'error'))
 const engineText = computed(() => {
@@ -91,6 +97,7 @@ function onKey(ev: KeyboardEvent) {
   if (ev.ctrlKey || ev.metaKey || ev.altKey) return
   const k = ev.key
   const inDiagram = !!t?.closest?.('.diagram')
+  if (sec.open) { if (k === 'Escape' && !sec.run) closeSecurity(); return }
   if (k === 'Escape') { lightbox.value = false; ui.shortcuts = false }
   else if (k === 'ArrowRight' && !ev.shiftKey || k === 'n' || k === 'N') void tourNext()
   else if (k === 'ArrowLeft' && !ev.shiftKey || k === 'b' || k === 'B') tourBack()
@@ -105,6 +112,7 @@ function onKey(ev: KeyboardEvent) {
   void inDiagram
 }
 
+watch(hostState, s => { if (s === 'connected') void loadSecurity() })
 onMounted(() => { onTheme(name => { vuetify.theme.global.name.value = name }); connect(); window.addEventListener('keydown', onKey) })
 onBeforeUnmount(() => window.removeEventListener('keydown', onKey))
 const shortcuts: [string, string][] = [
@@ -129,7 +137,19 @@ const shortcuts: [string, string][] = [
             <span v-if="trainingChip === 'TRAINING ONLY'">This engine shows its keys on purpose. Never use it with real secrets. {{ GLASS_NOTE }}</span>
             <span v-else>The OS handles the keys and this course shows none of them.</span>
           </v-tooltip>
+          <v-tooltip location="bottom" max-width="340">
+            <template #activator="{ props: p }">
+              <v-chip v-bind="p" :color="mineCountColor" tabindex="0" data-testid="keys-chip" @click="openSecurity">
+                <v-icon start size="14">mdi-key-outline</v-icon>{{ keysChip }}
+              </v-chip>
+            </template>
+            <span>Whose key signs: the course's own, or yours. Click to change.</span>
+          </v-tooltip>
           <v-chip :color="hostColor" data-testid="host-chip">{{ hostChip }}</v-chip>
+          <v-btn size="small" variant="tonal" prepend-icon="mdi-shield-key-outline" data-testid="security-setup-button" @click="openSecurity">
+            Security setup
+            <v-badge v-if="badgeCount" :content="badgeCount" color="warning" inline data-testid="security-badge" />
+          </v-btn>
           <label class="target-label">Target device
             <select v-model="ui.target" class="ns-select" data-testid="target-select"><option v-for="d in TARGET_DEVICES" :key="d.id" :value="d.id" :disabled="!d.enabled">{{ d.label }}</option></select>
           </label>
@@ -140,7 +160,8 @@ const shortcuts: [string, string][] = [
           <v-btn-toggle :model-value="ui.view" mandatory density="compact" data-testid="view-switch" @update:model-value="v => v && setView(v)">
             <v-btn value="endpoints" data-testid="view-endpoints">Endpoints</v-btn><v-btn value="eavesdropper" data-testid="view-eavesdropper">Eavesdropper</v-btn><v-btn value="both" data-testid="view-both">Both</v-btn>
           </v-btn-toggle>
-          <v-btn :variant="ui.transport === 'real' ? 'flat' : 'tonal'" :color="ui.transport === 'real' ? 'info' : undefined" data-testid="transport-switch" :aria-pressed="ui.transport === 'real'" @click="toggleTransport">Real mode</v-btn>
+          <ShowKeysSwitch testid="show-keys-switch" />
+          <v-btn :variant="ui.transport === 'real' ? 'flat' : 'tonal'" :color="ui.transport === 'real' ? 'info' : undefined" data-testid="transport-switch" :aria-pressed="ui.transport === 'real'" @click="toggleTransport">OS transport</v-btn>
           <select v-model.number="ui.speed" class="ns-select" data-testid="speed-select" aria-label="Animation speed"><option :value="0.5">0.5x</option><option :value="1">1x</option><option :value="2">2x</option></select>
           <select :value="ui.theme" class="ns-select" data-testid="theme-select" aria-label="Theme" @change="e => setTheme((e.target as HTMLSelectElement).value as any)"><option value="system">System</option><option value="dark">Dark</option><option value="light">Light</option></select>
           <v-btn size="small" icon="mdi-keyboard-outline" aria-label="Keyboard shortcuts" @click="ui.shortcuts = true" />
@@ -156,7 +177,11 @@ const shortcuts: [string, string][] = [
           <template v-if="ui.error.retryable" #append><v-btn size="small" data-testid="error-retry" @click="retryConnect">Retry</v-btn></template>
         </v-alert>
 
-        <Splitpanes class="main-split">
+        <NeedsBanner />
+        <SecurityPage v-if="sec.open" />
+        <WizardSheet v-if="sec.run" />
+
+        <Splitpanes v-show="!sec.open" class="main-split">
           <Pane :size="17" :min-size="11"><LessonRail /></Pane>
           <Pane :size="50" :min-size="30">
             <Splitpanes horizontal>

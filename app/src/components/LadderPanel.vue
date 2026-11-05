@@ -12,7 +12,7 @@ const short = (s: string) => s.replace(/^dukpt\./, '')
 
 <template>
   <div class="ladder" data-testid="key-ladder">
-    <div v-if="isReal" class="empty-note">Values are held by the OS. This course shows none of them in real mode.</div>
+    <div v-if="isReal" class="empty-note">Values are held by the OS. This course shows none of them with the OS transport.</div>
     <template v-else>
       <div v-if="regs" class="regs" data-testid="reader-registers">Reader registers: <b>{{ regs.held }}</b> held, next counter {{ regs.next }}</div>
       <div v-if="!rungs.length" class="empty-note">Keys appear here as the engine derives them.</div>

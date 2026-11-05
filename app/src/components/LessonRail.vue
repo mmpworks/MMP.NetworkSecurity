@@ -1,5 +1,6 @@
 <script setup lang="ts">
 import { isHighlighted, lessonDone, lessons, selectLesson, ui } from '../store'
+import { lessonNeeds, showNeeds } from '../security'
 import { TOURS } from '../tour'
 
 function status(n: number, built: boolean): string {
@@ -7,6 +8,7 @@ function status(n: number, built: boolean): string {
   if (lessonDone(n)) return 'finished'
   return TOURS.has(n) ? 'ready' : 'ready, no tour yet'
 }
+const needTitle = (n: number) => { const c = lessonNeeds(n).length; return `${c} ${c === 1 ? 'key needs' : 'keys need'} setup` }
 </script>
 
 <template>
@@ -20,6 +22,10 @@ function status(n: number, built: boolean): string {
         <span class="rail-title">{{ l.title }}</span>
         <span class="rail-status" :data-testid="`lesson-status-${l.lesson}`">{{ status(l.lesson, l.built) }}</span>
       </span>
+      <span
+        v-if="lessonNeeds(l.lesson).length" class="rail-keys" role="button" tabindex="0" :title="needTitle(l.lesson)" :aria-label="needTitle(l.lesson)" :data-testid="`lesson-keys-badge-${l.lesson}`"
+        @click.stop="showNeeds(l.lesson)" @keydown.enter.stop.prevent="showNeeds(l.lesson)"
+      ><v-icon size="14">mdi-key-outline</v-icon></span>
     </button>
   </nav>
 </template>
