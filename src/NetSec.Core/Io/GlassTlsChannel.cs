@@ -164,7 +164,7 @@ namespace NetSec.Io
             string session = r.SessionId ?? r.TraceId ?? "glass";
             Tls13Options o = new Tls13Options();
             o.Stream = new TraceStream(session + "/" + actor + "/tls13", session, r.TraceId, r.Hop, actor, new MonotonicClock());
-            o.Peer = client ? "server" : "client";
+            o.Peer = r.PeerActor ?? (client ? "server" : "client");
             o.Random = r.Random ?? new OsRandom();
             o.Tamper = r.Tamper;
             o.Group = r.Group == KexGroup.X25519 ? Tls13Group.X25519 : Tls13Group.X25519MlKem768;
