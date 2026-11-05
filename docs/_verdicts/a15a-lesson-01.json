@@ -19,13 +19,13 @@
     {
       "id": "L1-C03",
       "verdict": "accurate",
-      "note": "Section 8 title is 'Uniqueness Requirement on IVs and Keys' and says a repeated IV may leave the implementation vulnerable to forgery attacks. Section 5.2.1 calls the IV 'essentially a nonce'. The 'exposes the data' part is in Appendix A (Counter mode confidentiality can fail for repeated counter blocks) and in the section 1 caution ('compromise the security assurance almost entirely'). Suggest adding 'and Appendix A' to the source.",
+      "note": "Re-checked against tours at feat/tours-6-11 commit 8b3ae45. Source now adds Appendix A. Appendix A: a repeated IV likely lets an adversary learn the hash subkey and construct a forgery; it also covers the Counter mode confidentiality loss. Text and source agree.",
       "checkedAgainst": "NIST SP 800-38D sections 5.2.1, 8, Appendix A, PDF fetched this session"
     },
     {
       "id": "L1-C04",
       "verdict": "accurate",
-      "note": "ux-design.md section 8 lesson 1 row: 'nonce reuse detector (the engine event, shown as a warning)'. Code: Lesson01Aes.cs defines NonceCheck 'nonce reuse detector' as a lab Effect.Check. SP 800-38D Appendix A: 'in most cases it will not be feasible for the authenticated decryption function to detect the repetition', so real GCM has no built-in alarm. Suggest adding that Appendix A line to the source.",
+      "note": "Re-checked against tours at feat/tours-6-11 commit 8b3ae45. Source now adds SP 800-38D Appendix A ('in most cases it will not be feasible for the authenticated decryption function to detect the repetition'). Text and source agree.",
       "checkedAgainst": "docs/ux-design.md section 8 (read); src/NetSec.Core/Labs/Lesson01Aes.cs (read); NIST SP 800-38D Appendix A (fetched)"
     },
     {

@@ -6,9 +6,9 @@
   "claims": [
     {
       "id": "L0-C01",
-      "verdict": "inaccurate",
-      "note": "Claim is true in code: EchoEngine.cs says it has no lock, and ServerHello sends the received body back unchanged. The cited source does not say it. program-design.md section 8 row S0 only lists 'EchoEngine through EnginePump, one live toy lesson'. Fix: cite src/NetSec.Core/Machine/EchoEngine.cs (class summary) or add the sentence to program-design.md.",
-      "checkedAgainst": "docs/program-design.md section 8 (read); src/NetSec.Core/Machine/EchoEngine.cs (read)"
+      "verdict": "accurate",
+      "note": "Re-checked against tours at feat/tours-6-11 commit 8b3ae45. Source now EchoEngine.cs. Class summary says 'It has no lock' and 'before any cryptography exists'; ServerHello returns message.Body unchanged in the reply frame; ClientReply compares with the bytes sent. Quoted source strings match the file.",
+      "checkedAgainst": "src/NetSec.Core/Machine/EchoEngine.cs (read)"
     },
     {
       "id": "L0-C02",

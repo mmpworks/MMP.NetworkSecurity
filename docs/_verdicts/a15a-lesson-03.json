@@ -7,14 +7,14 @@
     {
       "id": "L3-C01",
       "verdict": "accurate",
-      "note": "RFC 7748 section 6.1: 'Both now share K = X25519(a, X25519(b, 9)) = X25519(b, X25519(a, 9))'. The 32-byte size comes from section 5 ('the inputs and outputs are 32-byte strings (for X25519)') and the 32-byte scalars in 6.1. Suggest 'sections 5 and 6.1'.",
+      "note": "Re-checked against tours at feat/tours-6-11 commit 8b3ae45. Source now cites RFC 7748 sections 5 and 6.1. Section 5: inputs and outputs of X25519 are 32-byte strings. Section 6.1: both parties reach the same K. Text and source agree.",
       "checkedAgainst": "RFC 7748 sections 5, 6.1, fetched from rfc-editor.org this session"
     },
     {
       "id": "L3-C02",
-      "verdict": "inaccurate",
-      "note": "Sizes are correct but in the wrong table. FIPS 203 section 8 Table 3 gives ML-KEM-768: encapsulation key 1184, decapsulation key 2400, ciphertext 1088, shared secret 32. Table 2 holds parameters (k, eta, d_u, d_v, RBG strength) and no sizes. The clause 'no known quantum algorithm breaks it' is not in section 8. FIPS 203 abstract says 'ML-KEM is believed to be secure, even against adversaries who possess a quantum computer'. Fix: cite 'FIPS 203, section 8, Table 3' for sizes and 'FIPS 203, abstract' for the quantum clause.",
-      "checkedAgainst": "FIPS 203 section 8 Tables 2 and 3, abstract, section 1.2, PDF fetched from nvlpubs.nist.gov this session"
+      "verdict": "accurate",
+      "note": "Re-checked against tours at feat/tours-6-11 commit 8b3ae45. FIPS 203 section 8 Table 3, ML-KEM-768 row: encapsulation key 1184, ciphertext 1088. The abstract reads 'ML-KEM is believed to be secure, even against adversaries who possess a quantum computer'. Claim text now matches that wording.",
+      "checkedAgainst": "FIPS 203 section 8 Table 3 and abstract (fetched)"
     },
     {
       "id": "L3-C03",
