@@ -24,9 +24,9 @@
     },
     {
       "id": "L5-C04",
-      "verdict": "inaccurate",
-      "note": "Tours read at origin/feat/tours-4-5-10 (PR 23, commit 1b2fc21). RFC 8446 numbers 'Major Differences from TLS 1.2' as section 1.2. Section 1.3 is 'Updates Affecting TLS 1.2'. The sentence 'All handshake messages after the ServerHello are now encrypted.' is in 1.2. Fix: cite section 1.2.",
-      "checkedAgainst": "RFC 8446 sections 1.2, 1.3 (RFC text fetched from rfc-editor.org this session)"
+      "verdict": "accurate",
+      "note": "Re-checked against tours at origin/feat/tours-4-5-10 commit 78e0192 (PR 23). Source now cites RFC 8446 section 1.2. Correct.",
+      "checkedAgainst": "RFC 8446 section 1.2 (fetched)"
     },
     {
       "id": "L5-C05",

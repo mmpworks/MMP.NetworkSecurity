@@ -24,9 +24,9 @@
     },
     {
       "id": "L7-C04",
-      "verdict": "inaccurate",
-      "note": "Tours read at origin/feat/tours-7-8-10 (PR 25, commit 150b732). RFC 8446 numbers 'Major Differences from TLS 1.2' as section 1.2. Section 1.3 is 'Updates Affecting TLS 1.2'. The sentence 'All handshake messages after the ServerHello are now encrypted.' is in 1.2. Fix: cite section 1.2. The TLS 1.1 half is right: message-order rows 1 to 7 (through ChangeCipherSpec) are clear records, and Certificate is row 3.",
-      "checkedAgainst": "RFC 8446 sections 1.2, 1.3; docs/lesson-tls11-names.md Message order (read)"
+      "verdict": "accurate",
+      "note": "Re-checked against tours at origin/feat/tours-7-8-10 commit f648cab (PR 25). Source now cites RFC 8446 section 1.2. Correct. TLS 1.1 half unchanged and accurate.",
+      "checkedAgainst": "RFC 8446 section 1.2 (fetched); docs/lesson-tls11-names.md (read)"
     },
     {
       "id": "L7-C05",
@@ -54,9 +54,9 @@
     },
     {
       "id": "L7-C09",
-      "verdict": "inaccurate",
-      "note": "Tours read at origin/feat/tours-7-8-10 (PR 25, commit 150b732). The text copies RFC 7457 (February 2015): 'A consequence of the MAC-then-encrypt design in all current versions of TLS'. In 2026 the current TLS version is 1.3, which uses AEAD and has no MAC-then-encrypt. The sentence was true for TLS 1.0 to 1.2 when written. The Lucky Thirteen part is correct: section 2.4 calls it a timing side-channel attack and says AEAD (AES-GCM) or encrypt-then-MAC mitigates it. Fix: write 'MAC-then-encrypt in TLS 1.0 to 1.2 allows padding oracle attacks' and cite RFC 7457 section 2.4 as the 2015 source for it.",
-      "checkedAgainst": "RFC 7457 section 2.4 (RFC text fetched from rfc-editor.org this session)"
+      "verdict": "accurate",
+      "note": "Re-checked against tours at origin/feat/tours-7-8-10 commit f648cab (PR 25). Text now reads 'MAC-then-encrypt in TLS 1.0 to 1.2 ... TLS 1.3 uses AEAD only.' RFC 7457 section 2.4 is cited as a 2015 text that meant TLS 1.0 to 1.2. RFC 8446 section 5.2: 'all ciphers are modeled as AEAD'. Lucky Thirteen and mitigation wording match section 2.4.",
+      "checkedAgainst": "RFC 7457 section 2.4; RFC 8446 section 5.2 (fetched)"
     },
     {
       "id": "L7-C10",
@@ -85,7 +85,7 @@
     {
       "id": "L7-C14",
       "verdict": "accurate",
-      "note": "Tours read at origin/feat/tours-7-8-10 (PR 25, commit 150b732). PRD spike row 'CE compiler, emulator, device': 'None found ... Nothing can run on real CE in this run. The claim is CF-compiled binaries on the desktop CLR.' The PRD scopes this to 'this run'; the claim says 'this course'. True today, and it needs a re-check if a CE run happens later.",
+      "note": "Re-checked against tours at origin/feat/tours-7-8-10 commit f648cab (PR 25). Text now starts 'In this run', matching the PRD spike row scope.",
       "checkedAgainst": "docs/prd.md Spike results (read)"
     }
   ]

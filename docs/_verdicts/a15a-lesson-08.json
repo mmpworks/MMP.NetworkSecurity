@@ -60,9 +60,9 @@
     },
     {
       "id": "L8-C10",
-      "verdict": "inaccurate",
-      "note": "Tours read at origin/feat/tours-7-8-10 (PR 25, commit 150b732). The NIST news page is titled 'NIST Retires SHA-1 Cryptographic Algorithm' but its body says SHA-1 'should be phased out by Dec. 31, 2030, in favor of the more secure SHA-2 and SHA-3 groups'. 'Collision attacks have been used to undermine SHA-1 in recent years' is on the page. So 'NIST retired it' is stronger than the body. Fix: 'NIST announced SHA-1 should be phased out by 2030, recommending SHA-2 or SHA-3'.",
-      "checkedAgainst": "NIST news, 2022-12-15 (page fetched this session)"
+      "verdict": "accurate",
+      "note": "Re-checked against tours at origin/feat/tours-7-8-10 commit f648cab (PR 25). Text now reads 'In 2022 NIST announced that SHA-1 should be phased out by Dec. 31, 2030, and recommended SHA-2 or SHA-3.' It matches the page body. The collision sentence is on the page.",
+      "checkedAgainst": "NIST news 2022-12-15 (fetched)"
     },
     {
       "id": "L8-C11",
@@ -73,8 +73,8 @@
     {
       "id": "L8-C12",
       "verdict": "accurate",
-      "note": "Tours read at origin/feat/tours-7-8-10 (PR 25, commit 150b732). Tier: primary record, paper unread. The NVD description of CVE-2008-5161 (fetched from the NVD API): 'when using a block cipher algorithm in Cipher Block Chaining (CBC) mode, makes it easier for remote attackers to recover certain plaintext data from an arbitrary block of ciphertext in an SSH session via unknown vectors'. The claim drops the scope: NVD names specific products (SSH Tectia, OpenSSH 4.7p1 and possibly other versions). The Albrecht, Paterson and Watson paper (IEEE S&P 2009) was not fetched; a web search returned its abstract only: attacks on SSH in the default configuration of a 128-bit block cipher in CBC mode, 14 bits of plaintext at probability 2^-14 and 32 bits at 2^-18 against OpenSSH. That supports the claim as a general statement about SSH-with-CBC. Suggest naming the paper beside the CVE and adding 'in implementations of that time'.",
-      "checkedAgainst": "NVD CVE-2008-5161 (API response fetched this session); paper abstract via web search only (not a direct fetch; full text unread)"
+      "note": "Re-checked against tours at origin/feat/tours-7-8-10 commit f648cab (PR 25). Text now carries the NVD scope: SSH Tectia products and OpenSSH 4.7p1, and possibly other versions, with the CBC condition. Matches the NVD description. Paper unread, as the source line says.",
+      "checkedAgainst": "NVD CVE-2008-5161 (API response fetched)"
     },
     {
       "id": "L8-C13",
@@ -85,7 +85,7 @@
     {
       "id": "L8-C14",
       "verdict": "accurate",
-      "note": "Tours read at origin/feat/tours-7-8-10 (PR 25, commit 150b732). Same PRD spike row as L7-C14; the PRD scopes it to 'this run'. True today; re-check if a CE run happens later.",
+      "note": "Re-checked against tours at origin/feat/tours-7-8-10 commit f648cab (PR 25). Text now starts 'In this run', matching the PRD spike row scope.",
       "checkedAgainst": "docs/prd.md Spike results (read)"
     }
   ]
