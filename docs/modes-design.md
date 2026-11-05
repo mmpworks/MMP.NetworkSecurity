@@ -8,13 +8,13 @@ Author: Richard. Date: 2026-11-05. Status: design for review, no product code. B
 2. **Each of the 15 security types is Mock or Real on its own.** A lab reads a snapshot of the types at `session.start`. A Real type that is not ready refuses the lab by name. It never falls back to Mock.
 3. **Engines get operations, never private bytes.** `IKeyHandle` widens and enters the glass engines, so a vault key signs inside the box, as an HSM does. Keys still show on screen, through the Host (section 6). This reverses the last sentence of D5, so it needs Steve's yes (decision O1).
 4. **SQLite works as the vault.** The spike created, stored, and read keys through `Microsoft.Data.Sqlite.Core` on .NET 10, signed inside the box, and OpenSSL verified the signature. Use the `.Core` package with `SQLitePCLRaw.bundle_e_sqlite3` 3.0.3. The plain `Microsoft.Data.Sqlite` 10.0.9 package pulls a bundle with a high-severity advisory, and `TreatWarningsAsErrors` turns that warning into a build failure.
-5. **"Real mode" and "real keys" are two separate axes.** Transport asks whose code speaks the protocol. Keys ask whose key signs.
+5. **"Real" means one thing: a real key in place of a mock one.** The `SslStream` path gets its own name, "OS transport". They are two separate axes. Transport asks whose code speaks the protocol. Keys ask whose key signs.
 6. **The spike found three limits that shape the wizards.**
    - The glass chain check accepts Ed25519 signatures only (`Certificate.cs:216`), so a certificate from a public CA fails today.
    - Windows `SslStream` fails against an Ed25519 server certificate. **So `A16.real-mode.os-transport-writes-no-secret-bytes` cannot pass as written**, because `HostClauses.cs:175` makes its peer key Ed25519. The clause needs an RSA peer. Echo owns that edit.
    - The .NET BCL has no Ed25519 type, `X509Certificate2` rejects an Ed25519 PEM, and an Ed25519 PKCS#12 file fails to load. So an Ed25519 key can use only PEM, OpenSSH, or the vault, through our own readers. The OS store route is RSA only (inferred from those results; the store itself was not touched).
 7. **One app-wide "Show keys" toggle decides what shows, default ON, in Mock and Real alike.** Steve's ruling. OFF puts fingerprints in place of key bytes at the Host's trace boundary (section 6).
-8. **A separate bug waits behind real mode.** The clause wants `transportKind == "os"` (`HostClauses.cs:199`). The app tests for `'real'` (`app/src/store.ts:100`, `:206`). A working OS transport would still show the TRAINING ONLY chip.
+8. **A separate bug waits behind the OS transport.** The clause wants `transportKind == "os"` (`HostClauses.cs:199`). The app tests for `'real'` (`app/src/store.ts:100`, `:206`). A working OS transport would still show the TRAINING ONLY chip.
 
 Two things for Steve: decide O1, and confirm O3 (the keys live in a gitignored `.security/` folder inside the project).
 
@@ -293,7 +293,8 @@ Each row adds a field or overload, and existing contract signatures stay. A rule
 | Item | Effect |
 |---|---|
 | D5 last sentence, "a real key cannot enter it by type" | Replaced. New D15: a real key enters a glass engine only as operations. Showing its bytes is the Host's job, under the Show keys toggle |
-| D6 last sentence, "Real-key routes... do not exist" | Retired. The rest of D6 stays and governs the transport axis |
+| D6 | **Rewritten.** New text: "The OS transport runs `SslStream`. It shows metadata only, because Schannel holds the secrets. A Real key is a separate setting." The last sentence, "Real-key routes... do not exist", is retired |
+| A16 secret scan | **Substance stays, name changes.** It scans an OS transport session, and Schannel still gives us no secret bytes, so the ruling does not touch it. Echo renames `A16.real-mode.*` to `A16.os-transport.*`, `transport: real` to `transport: os` (`store.ts:288`, `HostClauses.cs:197`), and `NETSEC_REAL_PEER` to `NETSEC_OS_PEER` |
 | `A16.type.keyhandle-cannot-reach-glass-factory` | **Stays green.** Its 4 attack programs still fail. A probe of the two-constructor shape gave CS1503 on both handle programs and compiled the control |
 | `A16.type.core-holds-no-keyhandle-implementation-and-no-io-member-takes-one` | **Must change.** Core gains `IKeyHandle` implementations (mock and file). The Io half stays true: `CredentialSet` is the public type there |
 | Design section 11, A16 row, "its only constructor" | Text edit |
@@ -366,7 +367,7 @@ The engines take raw bytes today (section 3.3). After the seam they call operati
 | Derive | DUKPT bank | `vault.derive`: key name, version, KSN |
 | Data key | Lessons 1, 2 | `vault.datakey`. The key then shows as a session secret, since the lab misuses it on purpose |
 
-These `vault.*` events appear only in Real mode, so tour bindings on Mock stay as they are. Each event pairs with an audit row, so the learner can read both sides of one call.
+These `vault.*` events appear only for a Real key, so tour bindings on Mock stay as they are. Each event pairs with an audit row, so the learner can read both sides of one call.
 
 ### 4.4 Package and spike
 
@@ -468,7 +469,7 @@ This check stays whatever the Show keys toggle says. The ruling that keys may sh
 
 | Date | Ruling | Effect |
 |---|---|---|
-| 2026-11-05 | "I only ever use test keys... This is training." | Real mode shows keys as Mock does. The earlier fingerprint-only design for Real is gone, and so is the per-item control. The gitignore and the no-commit check stay (section 5) |
+| 2026-11-05 | "I only ever use test keys... This is training." | A Real key shows as a Mock key does. The earlier fingerprint-only design for Real is gone, and so is the per-item control. The gitignore and the no-commit check stay (section 5) |
 | 2026-11-05 | "We should make the showing of keys optional. a toggle switch." | One toggle, independent of Mock or Real, default ON because the course teaches by showing keys |
 
 The toggle is the only redaction in the product. Mode does not change what shows.
@@ -585,7 +586,7 @@ Every lesson runs with the toggle OFF. Each one loses the bytes and keeps the co
 | `A17.show-keys.mock-golden-unmoved` | Engine streams stay byte-equal to golden with the toggle ON and OFF. Only the Host's copy differs |
 | `A17.ui.show-keys-switch` | Playwright: `show-keys-switch` flips, the open session's panel changes with no new run, and the state survives a Host restart |
 
-## 7. Relationship to unbuilt real mode
+## 7. Relationship to the unbuilt OS transport
 
 **Recommendation: two axes.** They answer different questions and fail in different ways. The design's own words already separate them: D6 is about transport, and D5 is about keys.
 
@@ -598,16 +599,16 @@ The axes touch at one place: the wizard's key choice. "Ed25519" runs on glass on
 
 The new dropdown from PR #98, `ui.target` (`store.ts:41-48`), is a third axis. It stays independent, and the CE rows stay disabled. Real credentials reach a future CE through the file provider.
 
-### 7.1 What real mode needs
+### 7.1 What the OS transport needs
 
 | Item | Detail | Owner |
 |---|---|---|
 | `OsTransportFactory` | Unbuilt. Design section 2.2 places it in the Host. `Program.cs:203` answers `REAL_MODE_NOT_BUILT` | Builder |
-| Lab route | `Tls13Lab.cs:78` builds both engines directly, and no lab reads `LabContext.Transports`. So lesson 5 in real mode needs its own lab path, one client and a peer from `NETSEC_REAL_PEER` | Builder |
+| Lab route | `Tls13Lab.cs:78` builds both engines directly, and no lab reads `LabContext.Transports`. So lesson 5 on the OS transport needs its own lab path, one client and a peer from `NETSEC_REAL_PEER` | Builder |
 | Clause peer key | `HostClauses.cs:175` makes an Ed25519 key. Evidence above: `SslStream` fails on it, and RSA passes on the same probe. Change to `-algorithm rsa -pkeyopt rsa_keygen_bits:2048` | **Echo** |
 | Clause trust | `HostClauses.cs:186` sets `SSL_CERT_FILE`. From recollection, Schannel does not read it. The product reads that variable and loads a `CustomTrustStore`. This needs a line in `CONTRACT.md` | Echo, builder |
 | Chip bug | `store.ts:100` and `:206` use `'real'`. The clause wants `os`. Change both | Nancy |
-| Button text | `App.vue:143` says "Real mode". It must change to "OS transport", or the word "Real" means two things on one screen. `transport-switch` stays as the test id | Nancy |
+| Button text | `App.vue:143` says "Real mode". It must change to "OS transport", so "Real" has one meaning, as Jared also asks. `transport-switch` stays as the test id | Nancy |
 | Today's button | Per the closing report, it changes the label, and the error shows at the next lesson start | Fixed by the factory |
 
 ### 7.2 Open PRs
@@ -651,7 +652,7 @@ Every wizard's `Intro` step shows one line, copy id `wizard.common.test-keys-onl
 
 It shows whatever the toggle says, because the learner can flip the toggle later. The line also stands on the security page. Bindings and files stay out of git by section 5.2.
 
-This line is the whole control. Jared recommends a hard stop on production keys. Nothing can detect one, and imports must stay open for vendor test keys, so Steve's rule stands as a stated rule: test keys only.
+This line is the whole control. Nothing can detect a production key, and imports stay open for vendor test keys, so Steve's rule stands as a stated rule: test keys only.
 
 ### 8.3 Step payload
 
