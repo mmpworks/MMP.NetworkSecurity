@@ -149,7 +149,7 @@
       "lesson": 1,
       "title": "A nonce must never repeat",
       "text": [
-        "GCM needs a fresh nonce for every message under one key. A repeat lets an attacker compare two messages and forge new ones.",
+        "GCM needs a fresh nonce for every message under one key. A repeat can let an attacker compare two messages and forge new ones.",
         "Real GCM has no alarm for this mistake. The lab adds a detector so you can see it.",
         "Try it: send the last message with the first nonce. The detector fails the check."
       ],
@@ -166,12 +166,12 @@
         {
           "id": "L1-C03",
           "text": "GCM needs a nonce that is unique for each message under one key. A repeated nonce exposes the data and lets an attacker forge messages.",
-          "source": "NIST SP 800-38D, section 8 (uniqueness requirement on IVs)"
+          "source": "NIST SP 800-38D, section 8 (Uniqueness Requirement on IVs and Keys) and Appendix A (if IVs repeat, an adversary will likely learn the hash subkey and can construct a forgery)"
         },
         {
           "id": "L1-C04",
           "text": "The nonce reuse detector is a lab engine event. Real GCM has no built-in alarm for a repeated nonce.",
-          "source": "docs/ux-design.md, section 8, lesson 1 row"
+          "source": "NIST SP 800-38D, Appendix A (in most cases the authenticated decryption function cannot detect an IV repetition); docs/ux-design.md, section 8, lesson 1 row (the detector is an engine event)"
         }
       ],
       "unlock": { "mode": "action", "ref": "L1-S09-T1" }
