@@ -1,0 +1,3 @@
+<Project>
+  <!-- This file stops MSBuild from walking up the tree. See Directory.Build.props. -->
+</Project>
