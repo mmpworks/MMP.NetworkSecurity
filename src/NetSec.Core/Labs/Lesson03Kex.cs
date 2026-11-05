@@ -98,8 +98,8 @@ namespace NetSec.Labs
             return StepDecision.Advance(
                 Effect.SecretAs("kex.secret.computed", X25519Shared, "client", X25519Shared, shared, X25519Private, Names[XServer]),
                 Confirm(XConfirm, shared),
-                Effect.SecretAs("kex.share.computed", Names[MEncaps], "client", MlKemDk, pair.DecapsulationKey),
-                Send(MEncaps, pair.EncapsulationKey, new FieldSpan("mlkemEncapsKey", "key", -1, 0, true)));
+                Effect.SecretAs("kex.share.computed", Names[MEncaps], "client", MlKemDk, pair.Dk),
+                Send(MEncaps, pair.Ek, new FieldSpan("mlkemEncapsKey", "key", -1, 0, true)));
         }
 
         static StepDecision ClientMlKemSecret(Session s, InboundMessage m)
@@ -107,11 +107,11 @@ namespace NetSec.Labs
             byte[] shared = MlKem768.Decaps(s.Secret(MlKemDk), m.Body);
             MlKemPair pair = MlKem768.KeyGen(s.Draw(MlKemSeedSize), s.Draw(MlKemSeedSize));
             byte[] scalar = s.Draw(X25519Size);
-            byte[] share = new ByteWriter().Put(pair.EncapsulationKey).Put(X25519.MultBase(scalar)).ToArray();
+            byte[] share = new ByteWriter().Put(pair.Ek).Put(X25519.MultBase(scalar)).ToArray();
             return StepDecision.Advance(
                 Effect.SecretAs("kex.secret.computed", MlKemShared, "client", MlKemShared, shared, MlKemDk, Names[MCipher]),
                 Confirm(MConfirm, shared),
-                Effect.SecretAs("kex.share.computed", Names[HClient], "client", MlKemDk, pair.DecapsulationKey),
+                Effect.SecretAs("kex.share.computed", Names[HClient], "client", MlKemDk, pair.Dk),
                 Effect.SecretAs("kex.share.computed", Names[HClient], "client", X25519Private, scalar),
                 Send(HClient, share, new FieldSpan("mlkemEncapsKey", "key", EkSize, 0, true), new FieldSpan("x25519Share", "key", -1, 0, true)));
         }

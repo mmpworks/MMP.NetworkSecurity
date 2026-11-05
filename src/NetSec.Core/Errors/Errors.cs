@@ -49,5 +49,10 @@ namespace NetSec.Errors
         public const string TransportNotBuilt = "TRANSPORT_NOT_BUILT";
         public const string LessonNotBuilt = "LESSON_NOT_BUILT";
         public const string RealModeNotBuilt = "REAL_MODE_NOT_BUILT";
+        public const string DhPeerOutOfRange = "DH_PEER_OUT_OF_RANGE";
+        public const string RsaValueOutOfRange = "RSA_VALUE_OUT_OF_RANGE";
+        public const string RsaMessageTooLong = "RSA_MESSAGE_TOO_LONG";
+        public const string MlKemKeyInvalid = "MLKEM_KEY_INVALID";
+        public const string MlKemCiphertextInvalid = "MLKEM_CIPHERTEXT_INVALID";
     }
 }
