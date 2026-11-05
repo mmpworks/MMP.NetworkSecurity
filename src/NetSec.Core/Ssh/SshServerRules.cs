@@ -129,7 +129,7 @@ namespace NetSec.Ssh
             bool signed = r.U8("signed", "data") != 0;
             string algorithm = SshFields.Text(r.Prefixed("algorithm", "id"));
             byte[] blob = r.Prefixed("key", "key");
-            if (algorithm != OpenSshKeyFile.Ed25519Name || !IsAuthorized(s, blob)) return StepDecision.Stay(Failure(s));
+            if (algorithm != SshKeyBlob.Ed25519Name || !IsAuthorized(s, blob)) return StepDecision.Stay(Failure(s));
             if (!signed)
                 return StepDecision.Stay(s.SealedPacket(SshNames.UserauthPkOk, new ByteWriter().U8(SshMsg.UserauthPkOk).Prefixed(algorithm).Prefixed(blob).ToArray()));
 
@@ -158,7 +158,7 @@ namespace NetSec.Ssh
         {
             string offered = System.Convert.ToBase64String(blob);
             for (int i = 0; i < s.Server.AuthorizedKeys.Length; i++)
-                if (System.Convert.ToBase64String(OpenSshKeyFile.Ed25519Blob(s.Server.AuthorizedKeys[i])) == offered) return true;
+                if (System.Convert.ToBase64String(SshKeyBlob.Ed25519(s.Server.AuthorizedKeys[i])) == offered) return true;
             return false;
         }
 

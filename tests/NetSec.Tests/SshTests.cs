@@ -116,7 +116,7 @@ namespace NetSec.Tests
 
         // ---------------------------------------------------------------- host key from the wire: Jared's handoffs 2 and 3
 
-        static byte[] RsaBlob(byte[] n, byte[] e) => OpenSshKeyFile.RsaBlob(n, e);
+        static byte[] RsaBlob(byte[] n, byte[] e) => SshKeyBlob.Rsa(n, e);
 
         [Fact]
         public void An_even_rsa_modulus_gets_a_named_error_at_the_parser()

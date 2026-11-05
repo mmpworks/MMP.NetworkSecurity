@@ -73,9 +73,9 @@ namespace NetSec.Io
         static GlassSshSession NewSession(ITrainingKeySource keys, TransportRequest r)
         {
             bool isClient = r.Role == EngineRole.Client;
-            string actor = isClient ? "client" : "server";
+            string actor = r.Actor ?? (isClient ? "client" : "server");
             string peer = isClient ? "server" : "client";
-            string session = r.TraceId ?? "glass";
+            string session = r.SessionId ?? r.TraceId ?? "glass";
             TraceStream stream = new TraceStream(session + "/" + actor + "/ssh", session, r.TraceId, r.Hop, actor, new MonotonicClock());
             SshEngine engine = isClient
                 ? SshEngine.Client(Client(keys, r.Suite, r.Random, r.PeerName, r.PeerPort, r.KnownHosts, r.KnownHosts == null), stream, r.Tamper, peer)

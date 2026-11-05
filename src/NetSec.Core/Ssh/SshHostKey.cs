@@ -33,8 +33,8 @@ namespace NetSec.Ssh
             try
             {
                 string algorithm = SshFields.Text(r.Prefixed("type", "id"));
-                if (algorithm == OpenSshKeyFile.Ed25519Name) return ParseEd25519(blob, r);
-                if (algorithm == OpenSshKeyFile.RsaName) return ParseRsa(blob, r);
+                if (algorithm == SshKeyBlob.Ed25519Name) return ParseEd25519(blob, r);
+                if (algorithm == SshKeyBlob.RsaName) return ParseRsa(blob, r);
                 throw new ParseFailure(SshCodes.HostKeyBad, "the host key type '" + algorithm + "' is not one this lab reads");
             }
             catch (ParseFailure failure)
@@ -48,7 +48,7 @@ namespace NetSec.Ssh
         {
             byte[] publicKey = r.Prefixed("key", "key");
             if (publicKey.Length != Ed25519Size) throw new ParseFailure(SshCodes.HostKeyBad, "an Ed25519 host key holds " + publicKey.Length + " bytes, not 32");
-            return new SshHostKey(OpenSshKeyFile.Ed25519Name, blob, publicKey, null);
+            return new SshHostKey(SshKeyBlob.Ed25519Name, blob, publicKey, null);
         }
 
         static SshHostKey ParseRsa(byte[] blob, ByteReader r)
@@ -57,7 +57,7 @@ namespace NetSec.Ssh
             BigUInt n = BigUInt.FromBytes(r.Prefixed("n", "key"));
             if (!n.IsOdd) throw new ParseFailure(SshCodes.HostKeyBad, "the RSA modulus is even, so this is no RSA key");
             if (!e.IsOdd) throw new ParseFailure(SshCodes.HostKeyBad, "the RSA exponent is even, so this is no RSA key");
-            return new SshHostKey(OpenSshKeyFile.RsaName, blob, null, new RsaPublic(n, e));
+            return new SshHostKey(SshKeyBlob.RsaName, blob, null, new RsaPublic(n, e));
         }
 
         /// <summary>
@@ -108,14 +108,14 @@ namespace NetSec.Ssh
             if (key.Algorithm == KeyAlgorithm.Ed25519)
             {
                 _seed = key.CopyMaterial();
-                Algorithm = OpenSshKeyFile.Ed25519Name;
-                Blob = OpenSshKeyFile.Ed25519Blob(key.CopyPublic());
+                Algorithm = SshKeyBlob.Ed25519Name;
+                Blob = SshKeyBlob.Ed25519(key.CopyPublic());
                 return;
             }
             RsaPkcs8 parts = RsaPkcs8.Parse(key.CopyMaterial());
             _rsa = new RsaPrivate(BigUInt.FromBytes(parts.N), BigUInt.FromBytes(parts.D));
-            Algorithm = OpenSshKeyFile.RsaName;
-            Blob = OpenSshKeyFile.RsaBlob(parts.N, parts.E);
+            Algorithm = SshKeyBlob.RsaName;
+            Blob = SshKeyBlob.Rsa(parts.N, parts.E);
         }
 
         public byte[] Sign(byte[] message)

@@ -103,8 +103,7 @@ namespace NetSec.Labs
         static string PinnedLine(ITrainingKeySource keys, SshSuite suite)
         {
             string typeName;
-            byte[] blob;
-            OpenSshKeyFile.PublicBlobOf(keys.Find(SshSetup.HostKeyIdFor(suite)), out typeName, out blob);
+            byte[] blob = SshKeyBlob.Of(keys.Find(SshSetup.HostKeyIdFor(suite)), out typeName);
             return SshKnownHosts.Line(HostName, HostPort, typeName, blob);
         }
 

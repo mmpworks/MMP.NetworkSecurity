@@ -8,6 +8,7 @@ using NetSec.Errors;
 using NetSec.Io;
 using NetSec.Machine;
 using NetSec.Platform;
+using NetSec.Tls13;
 using NetSec.Trace;
 
 namespace NetSec.Labs
@@ -170,12 +171,20 @@ namespace NetSec.Labs
     {
         public const int DeadlineMs = 30000;
 
+        /// <summary>Lets a lab set each pump's OnApp before the pumps start.</summary>
+        public delegate void PumpSetup(EnginePump client, EnginePump server);
+
         public static IFuture<LabResult> Run(LabContext c, IProtocolEngine client, IProtocolEngine server, ITamperHook tamper)
         {
-            return AsyncProxy.Run<LabResult>(delegate(Return<LabResult> ret) { return Body(c, client, server, tamper, ret); });
+            return Run(c, client, server, tamper, null);
         }
 
-        static IEnumerable<IFuture> Body(LabContext c, IProtocolEngine client, IProtocolEngine server, ITamperHook tamper, Return<LabResult> ret)
+        public static IFuture<LabResult> Run(LabContext c, IProtocolEngine client, IProtocolEngine server, ITamperHook tamper, PumpSetup setup)
+        {
+            return AsyncProxy.Run<LabResult>(delegate(Return<LabResult> ret) { return Body(c, client, server, tamper, setup, ret); });
+        }
+
+        static IEnumerable<IFuture> Body(LabContext c, IProtocolEngine client, IProtocolEngine server, ITamperHook tamper, PumpSetup setup, Return<LabResult> ret)
         {
             LinkListener listener = new LinkListener(new IPEndPoint(IPAddress.Loopback, 0));
             IFuture<SocketLink> accepted = listener.Accept();
@@ -184,9 +193,12 @@ namespace NetSec.Labs
             yield return connected;
             listener.Close();
 
-            int deadline = c.Gate is FreeRunGate ? DeadlineMs : 0;
-            IFuture<PumpResult> serverRun = new EnginePump(server, accepted.Result, c.Sink, c.Gate, tamper, deadline, c.Clock).Run();
-            IFuture<PumpResult> clientRun = new EnginePump(client, connected.Result, c.Sink, c.Gate, tamper, deadline, c.Clock).Run();
+            int deadline = c.DeadlineMs > 0 ? c.DeadlineMs : DeadlineMs;
+            EnginePump serverPump = new EnginePump(server, accepted.Result, c.Sink, c.Gate, tamper, deadline, c.Clock);
+            EnginePump clientPump = new EnginePump(client, connected.Result, c.Sink, c.Gate, tamper, deadline, c.Clock);
+            if (setup != null) setup(clientPump, serverPump);
+            IFuture<PumpResult> serverRun = serverPump.Run();
+            IFuture<PumpResult> clientRun = clientPump.Run();
             yield return clientRun;
             yield return serverRun;
 
@@ -209,7 +221,7 @@ namespace NetSec.Labs
 
         static NetSecError Named(NetSecError error)
         {
-            return error != null && error.Code != ErrorCodes.PeerClosedEarly && error.Code != ErrorCodes.LinkLost ? error : null;
+            return error != null && error.Code != ErrorCodes.PeerClosedEarly && error.Code != ErrorCodes.LinkLost && error.Code != Tls13Codes.AlertReceived ? error : null;
         }
 
         public static TraceStream Stream(LabContext c, string actor, string protocol)

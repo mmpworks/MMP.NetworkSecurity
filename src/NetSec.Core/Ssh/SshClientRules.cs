@@ -145,7 +145,7 @@ namespace NetSec.Ssh
         /// <summary>The query asks whether the server takes this key, before the client spends a signature on it.</summary>
         static StepDecision ReadServiceAccept(SshSession s, InboundMessage m)
         {
-            byte[] blob = OpenSshKeyFile.Ed25519Blob(s.Client.UserKey.CopyPublic());
+            byte[] blob = SshKeyBlob.Ed25519(s.Client.UserKey.CopyPublic());
             byte[] payload = UserauthBody(s.Client.User, 0, blob).ToArray();
             return StepDecision.Advance(s.SealedPacket(SshNames.UserauthQuery, payload));
         }
@@ -153,17 +153,17 @@ namespace NetSec.Ssh
         static ByteWriter UserauthBody(string user, int signedFlag, byte[] blob)
         {
             return new ByteWriter().U8(SshMsg.UserauthRequest).Prefixed(user).Prefixed(ServiceConnection).Prefixed(MethodPublicKey)
-                .U8(signedFlag).Prefixed(OpenSshKeyFile.Ed25519Name).Prefixed(blob);
+                .U8(signedFlag).Prefixed(SshKeyBlob.Ed25519Name).Prefixed(blob);
         }
 
         /// <summary>RFC 4252 section 7: the signature covers the session id and this whole request, so it cannot be replayed into another session.</summary>
         static StepDecision ReadPkOk(SshSession s, InboundMessage m)
         {
-            byte[] blob = OpenSshKeyFile.Ed25519Blob(s.Client.UserKey.CopyPublic());
+            byte[] blob = SshKeyBlob.Ed25519(s.Client.UserKey.CopyPublic());
             byte[] request = UserauthBody(s.Client.User, 1, blob).ToArray();
             byte[] signed = new ByteWriter().Prefixed(s.SessionId).Put(request).ToArray();
             byte[] seed = (s.Client.SignWith ?? s.Client.UserKey).CopyMaterial();
-            byte[] signatureBlob = new ByteWriter().Prefixed(OpenSshKeyFile.Ed25519Name).Prefixed(Ed25519.Sign(seed, signed)).ToArray();
+            byte[] signatureBlob = new ByteWriter().Prefixed(SshKeyBlob.Ed25519Name).Prefixed(Ed25519.Sign(seed, signed)).ToArray();
             byte[] payload = new ByteWriter().Put(request).Prefixed(signatureBlob).ToArray();
             return StepDecision.Advance(s.SealedPacket(SshNames.UserauthSigned, payload));
         }
