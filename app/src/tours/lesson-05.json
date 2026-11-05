@@ -23,7 +23,7 @@
         "The client speaks first. The ClientHello lists the lock suites it can use, the one group it offers for key exchange (the hybrid), and a key share for that group.",
         "Open the inspector. The hybrid share holds an ML-KEM key and an X25519 share side by side, 1,216 bytes in all. The message travels in the clear, so an eavesdropper reads it.",
         "Try it: swap the client's X25519 share on the way out. The two sides will end up with different keys, and the first sealed record will not open.",
-        "This failure does not point at the key share alone. A flip in any byte of either hello gives the same AEAD tag failure, because each hello is part of the transcript the keys come from. Only the shared secret tells the cases apart: it differs between the sides after a key share flip, and it matches after a flip of the hello's random."
+        "This failure does not point at the key share alone. A flip in most bytes of either hello gives the same AEAD tag failure (245 of the 315 flips tested), because each hello is part of the transcript the keys come from. The others fail at once with a parse or parameter check. Only the shared secret tells the cases apart: it differs between the sides after a key share flip, and it matches after a flip of the hello's random."
       ],
       "glossary": [],
       "bind": { "kind": "event", "eventType": "tls.handshake.sent", "match": { "actor": "client", "message": "ClientHello" } },
@@ -47,7 +47,7 @@
         },
         {
           "id": "L5-C03",
-          "text": "After a replaced client key share, the two sides hold different keys, so the first sealed record fails the AEAD tag check before any Finished arrives. A flip of any byte of either hello gives the same failure, because each hello is in the transcript the keys come from; only x25519_shared tells the cases apart.",
+          "text": "After a replaced client key share, the two sides hold different keys, so the first sealed record fails the AEAD tag check before any Finished arrives. A flip in most bytes of either hello gives the same failure (245 of the 315 flips tested), because each hello is in the transcript the keys come from; the others fail at once with a parse or parameter check. Only x25519_shared tells the cases apart.",
           "source": "docs/lessons-4-5-names.md, section 'Three corrections to ux-design.md section 8', item 1 (branch feat/s3); docs/lessons-4-5-names.md, What the lessons must state (branch fix/s3-tls-blockers, local at b5d6641), item 1"
         },
         {
@@ -263,7 +263,7 @@
       "text": [
         "The client closes the talk with an alert. A close alert is a polite goodbye, and both sides then stop.",
         "One more attack: make a record claim to be 256 bytes longer than it is. The receiver waits for bytes that never come. After up to 30 seconds it gives up with the check named read deadline.",
-        "In step mode the clock restarts whenever the engine holds an event for you, so you can read as long as you like. Most other flipped bytes in a handshake fail at once with a named check. A flipped length is the one that can wait."
+        "In step mode the clock restarts whenever the engine holds an event for you, so you can read as long as you like. Almost every other flipped byte in a handshake fails at once with a named check. The record's version bytes are ignored by design, and a flipped length can wait."
       ],
       "glossary": [],
       "bind": { "kind": "event", "eventType": "tls.alert.sent", "match": { "actor": "client", "message": "Alert" } },
@@ -282,7 +282,7 @@
         },
         {
           "id": "L5-C17",
-          "text": "A flipped length field can wait instead of fail. Each other byte of a handshake gets a named check at once (Tls13FlipSweepTests).",
+          "text": "A flipped length field can wait instead of fail. Almost every other byte of a handshake gets a named check at once; the record's version bytes are ignored by design (RFC 8446 section 5.1). The committed sweep (Tls13FlipSweepTests) found 245 AEAD tag failures in 315 hello flips, and the others failed with a parse or parameter check or stalled.",
           "source": "docs/lessons-4-5-names.md, What the lessons must state (branch fix/s3-tls-blockers, local at b5d6641), item 4"
         }
       ],
