@@ -7,11 +7,21 @@ using NetSec.Host;
 using NetSec.Labs;
 using NetSec.Trace;
 
-// Binds 127.0.0.1 only. NETSEC_PORT overrides the port. NETSEC_TOKEN is the session token: Electron makes one and passes it here
-// and to the renderer. LOCALAPPDATA moves the session folder. docs/program-design.md section 5 is the contract.
-int port = int.TryParse(Environment.GetEnvironmentVariable("NETSEC_PORT"), out int p) ? p : 5180;
-string? givenToken = Environment.GetEnvironmentVariable("NETSEC_TOKEN");
-string token = string.IsNullOrEmpty(givenToken) ? Convert.ToHexStringLower(RandomNumberGenerator.GetBytes(24)) : givenToken;
+// Binds 127.0.0.1 only. --port or NETSEC_PORT sets the port. --token or NETSEC_TOKEN is the session token: Electron makes one and
+// passes it here and to the renderer. A flag wins over its variable. LOCALAPPDATA moves the session folder.
+// docs/program-design.md sections 5 and 11 are the contract.
+HostStartOptions options;
+try
+{
+    options = HostStartOptions.From(args, Environment.GetEnvironmentVariable);
+}
+catch (ArgumentException e)
+{
+    Console.Error.WriteLine("HOST_OPTION_REFUSED: " + e.Message);
+    return 2;
+}
+int port = options.Port;
+string token = options.Token;
 string appData = Environment.GetEnvironmentVariable("LOCALAPPDATA") ?? Path.GetTempPath();
 string sessionsDir = Path.Combine(appData, "MMP.NetworkSecurity", "sessions");
 
@@ -59,8 +69,9 @@ app.Map("/ws", async ctx =>
 
 app.Lifetime.ApplicationStopping.Register(ce.Stop);
 app.Lifetime.ApplicationStarted.Register(() => Console.WriteLine(
-    $"HOST-READY port={port}" + (string.IsNullOrEmpty(givenToken) ? $" token={token}" : "")));
+    $"HOST-READY port={port}" + (options.TokenWasGenerated ? $" token={token}" : "")));
 app.Run();
+return 0;
 
 static IResult NoSuchSession(string id) => Results.Json(
     new { code = "SESSION_NOT_FOUND", message = $"No session {id}.", retryable = false, requestId = Guid.NewGuid().ToString("N") },
