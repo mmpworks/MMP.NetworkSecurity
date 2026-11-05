@@ -38,6 +38,13 @@ Each correction goes here, newest slice last. Later slices read this file first.
 
 1. **`openssl genpkey -outform DER` on OpenSSL 3.5.7 wrote a traditional `RSAPrivateKey`, not PKCS#8.** CONTRACT rule 5 needs `PrivateKeyInfo`. Run `openssl pkcs8 -topk8 -nocrypt` after it. The net10 test `An_rsa_key_is_pkcs8_with_its_matching_spki` pins the format.
 2. **`TrainingKeySource.Find` throws `TRAINING_KEY_UNKNOWN` for an unknown id.** It never returns null. A symmetric key's `CopyPublic` gives an empty array.
+3. **`DukptPinPad.Next` uses a new counter on each call (CONTRACT.md).** The S5 `PinEnvelope` holds one KSN, a PIN block, and a MAC. So S5 needs both keys under one counter and must add a method to the pad that returns several working keys for one counter. The derivation already allows it: `DukptDerivation.Working` takes the usage per call.
+4. **Lesson 6 has no MAC on the wire, by the UX row.** A flipped PIN block must reach `PIN block format check`, and a MAC would catch it first. `DUKPT_MAC_MISMATCH` stays for S5.
+5. **`held` does not fall on every sale.** A sale erases one register and can fill lower ones with child keys: 32 after the load, then 31, 31, 30, 31. UX moment 5 says "the reader column shrinks". The lab reports the true count, and the tour must not promise a steady fall.
+6. **The one-bit limit of 16 is from recollection of X9.24-3, which is paid.** The free vectors do not state it. Both sides agree past it in `DukptTests`, because the bank walks any counter.
+7. **`DUKPT_COUNTER_EXHAUSTED` has no test.** The pad would need about 2^31 sales to reach it.
+8. **`PumpTests.A_flipped_length_byte_...` raced.** Two 300 ms deadlines, so the client could close first, and the server then reported `PEER_CLOSED_EARLY`. It failed 1 of 2 gate runs. The server's deadline now comes first. A test with two deadlines must say which one ends first.
+9. **The lab's reader session holds no base key.** Only `BankSession` holds it, and a test scans the reader's trace for it. S5 keeps this shape across processes (D13).
 
 ## S3
 

@@ -117,6 +117,7 @@ namespace NetSec.Labs
                 case 3: return new Lesson03Kex();
                 case 4: return Tls13Lab.Lesson4();
                 case 5: return Tls13Lab.Lesson5();
+                case 6: return new Lesson06Dukpt();
                 default: return null;
             }
         }
@@ -158,6 +159,10 @@ namespace NetSec.Labs
             PlainFlip("L5-replace-key-share", 5, "ClientHello", Tls13Lab.ClientX25519ShareOffset, Tls13Codes.AeadTag),
             PlainFlip("L5-flip-mlkem-ciphertext", 5, "ServerHello", Tls13Lab.ServerMlKemCiphertextOffset, Tls13Codes.AeadTag),
             FlipLength("L5-flip-record-length", 5, "Finished"),
+
+            WithOption("L6-replay-sale", 6, Lesson06Dukpt.OptionScenario, Lesson06Dukpt.ScenarioReplaySale, AttackOutcome.Rejected, ErrorCodes.DukptKsnReplay, Lesson06Dukpt.ReplayCheck),
+            Flip("L6-flip-pin-block", 6, Lesson06Dukpt.SaleName, Lesson06Dukpt.PinBlockOffset + 3, ErrorCodes.DukptPinBlockFormat, Lesson06Dukpt.FormatCheck),
+            WithOption("L6-ask-past-key", 6, Lesson06Dukpt.OptionScenario, Lesson06Dukpt.ScenarioAskPastKey, AttackOutcome.Rejected, ErrorCodes.DukptKeyNotHeld, Lesson06Dukpt.NotHeldCheck),
         };
 
         public static AttackDefinition[] All { get { return (AttackDefinition[])Rows.Clone(); } }
