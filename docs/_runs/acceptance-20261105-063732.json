@@ -1,11 +1,11 @@
 {
   "summary": {
     "schema": 1,
-    "timestamp": "2026-11-05T06:29:41.7401906-06:00",
+    "timestamp": "2026-11-05T06:39:53.7370463-06:00",
     "machine": "BEAST",
     "command": "run.ps1 -Clauses A1,A8,A9",
     "productRoot": "E:\\dev\\ns-s4ssh",
-    "productCommit": "c6f9e99",
+    "productCommit": "e8d7acb",
     "acceptanceCommit": "4fcf9ed",
     "freshClone": false,
     "productPresent": true,
@@ -33,7 +33,7 @@
       "status": "PASS",
       "reason": "",
       "detail": "4 of 4 vectors",
-      "ms": 42
+      "ms": 17
     },
     {
       "id": "A1.aes-cbc.net10",
@@ -57,7 +57,7 @@
       "status": "PASS",
       "reason": "",
       "detail": "6 of 6 vectors",
-      "ms": 40
+      "ms": 6
     },
     {
       "id": "A1.aes-ctr.net10",
@@ -81,7 +81,7 @@
       "status": "PASS",
       "reason": "",
       "detail": "12 of 12 vectors",
-      "ms": 27
+      "ms": 6
     },
     {
       "id": "A1.aes-ecb.net10",
@@ -93,7 +93,7 @@
       "status": "PASS",
       "reason": "",
       "detail": "12 of 12 vectors",
-      "ms": 9
+      "ms": 2
     },
     {
       "id": "A1.aes-gcm.cf",
@@ -105,7 +105,7 @@
       "status": "PASS",
       "reason": "",
       "detail": "1050 of 1050 vectors",
-      "ms": 55
+      "ms": 23
     },
     {
       "id": "A1.aes-gcm.net10",
@@ -117,7 +117,7 @@
       "status": "PASS",
       "reason": "",
       "detail": "1050 of 1050 vectors",
-      "ms": 36
+      "ms": 26
     },
     {
       "id": "A1.cmac.cf",
@@ -129,7 +129,7 @@
       "status": "PASS",
       "reason": "",
       "detail": "4 of 4 vectors",
-      "ms": 23
+      "ms": 7
     },
     {
       "id": "A1.cmac.net10",
@@ -141,7 +141,7 @@
       "status": "PASS",
       "reason": "",
       "detail": "4 of 4 vectors",
-      "ms": 3
+      "ms": 1
     },
     {
       "id": "A1.dh-group14.cf",
@@ -153,7 +153,7 @@
       "status": "PASS",
       "reason": "",
       "detail": "9 of 9 vectors",
-      "ms": 137
+      "ms": 99
     },
     {
       "id": "A1.dh-group14.net10",
@@ -165,7 +165,7 @@
       "status": "PASS",
       "reason": "",
       "detail": "9 of 9 vectors",
-      "ms": 225
+      "ms": 184
     },
     {
       "id": "A1.ed25519.cf",
@@ -177,7 +177,7 @@
       "status": "PASS",
       "reason": "",
       "detail": "25 of 25 vectors",
-      "ms": 214
+      "ms": 121
     },
     {
       "id": "A1.ed25519.net10",
@@ -189,7 +189,7 @@
       "status": "PASS",
       "reason": "",
       "detail": "25 of 25 vectors",
-      "ms": 241
+      "ms": 296
     },
     {
       "id": "A1.hkdf-sha1.cf",
@@ -201,7 +201,7 @@
       "status": "PASS",
       "reason": "",
       "detail": "8 of 8 vectors",
-      "ms": 29
+      "ms": 12
     },
     {
       "id": "A1.hkdf-sha1.net10",
@@ -213,7 +213,7 @@
       "status": "PASS",
       "reason": "",
       "detail": "8 of 8 vectors",
-      "ms": 5
+      "ms": 4
     },
     {
       "id": "A1.hkdf-sha256.cf",
@@ -225,7 +225,7 @@
       "status": "PASS",
       "reason": "",
       "detail": "6 of 6 vectors",
-      "ms": 15
+      "ms": 7
     },
     {
       "id": "A1.hkdf-sha256.net10",
@@ -237,7 +237,7 @@
       "status": "PASS",
       "reason": "",
       "detail": "6 of 6 vectors",
-      "ms": 2
+      "ms": 1
     },
     {
       "id": "A1.hmac-md5.cf",
@@ -249,7 +249,7 @@
       "status": "PASS",
       "reason": "",
       "detail": "7 of 7 vectors",
-      "ms": 24
+      "ms": 5
     },
     {
       "id": "A1.hmac-md5.net10",
@@ -273,7 +273,7 @@
       "status": "PASS",
       "reason": "",
       "detail": "9 of 9 vectors",
-      "ms": 27
+      "ms": 1
     },
     {
       "id": "A1.hmac-sha1.net10",
@@ -285,7 +285,7 @@
       "status": "PASS",
       "reason": "",
       "detail": "9 of 9 vectors",
-      "ms": 1
+      "ms": 0
     },
     {
       "id": "A1.hmac-sha256.cf",
@@ -297,7 +297,7 @@
       "status": "PASS",
       "reason": "",
       "detail": "7 of 7 vectors",
-      "ms": 18
+      "ms": 1
     },
     {
       "id": "A1.hmac-sha256.net10",
@@ -321,7 +321,7 @@
       "status": "PASS",
       "reason": "",
       "detail": "7 of 7 vectors",
-      "ms": 25
+      "ms": 2
     },
     {
       "id": "A1.hmac-sha384.net10",
@@ -345,7 +345,7 @@
       "status": "PASS",
       "reason": "",
       "detail": "7 of 7 vectors",
-      "ms": 13
+      "ms": 1
     },
     {
       "id": "A1.hmac-sha512.net10",
@@ -369,7 +369,7 @@
       "status": "PASS",
       "reason": "",
       "detail": "35 of 35 vectors",
-      "ms": 14
+      "ms": 4
     },
     {
       "id": "A1.md5.net10",
@@ -393,7 +393,7 @@
       "status": "PASS",
       "reason": "",
       "detail": "60 of 60 vectors",
-      "ms": 470
+      "ms": 280
     },
     {
       "id": "A1.rsa.net10",
@@ -405,7 +405,7 @@
       "status": "PASS",
       "reason": "",
       "detail": "60 of 60 vectors",
-      "ms": 514
+      "ms": 455
     },
     {
       "id": "A1.sha1.cf",
@@ -417,7 +417,7 @@
       "status": "PASS",
       "reason": "",
       "detail": "340 of 340 vectors",
-      "ms": 42
+      "ms": 3
     },
     {
       "id": "A1.sha1.net10",
@@ -429,7 +429,7 @@
       "status": "PASS",
       "reason": "",
       "detail": "340 of 340 vectors",
-      "ms": 9
+      "ms": 4
     },
     {
       "id": "A1.sha256.cf",
@@ -441,7 +441,7 @@
       "status": "PASS",
       "reason": "",
       "detail": "340 of 340 vectors",
-      "ms": 28
+      "ms": 3
     },
     {
       "id": "A1.sha256.net10",
@@ -453,7 +453,7 @@
       "status": "PASS",
       "reason": "",
       "detail": "340 of 340 vectors",
-      "ms": 43
+      "ms": 34
     },
     {
       "id": "A1.sha3-256.cf",
@@ -465,7 +465,7 @@
       "status": "PASS",
       "reason": "",
       "detail": "700 of 700 vectors",
-      "ms": 79
+      "ms": 12
     },
     {
       "id": "A1.sha3-256.net10",
@@ -477,7 +477,7 @@
       "status": "PASS",
       "reason": "",
       "detail": "700 of 700 vectors",
-      "ms": 31
+      "ms": 44
     },
     {
       "id": "A1.sha3-512.cf",
@@ -489,7 +489,7 @@
       "status": "PASS",
       "reason": "",
       "detail": "380 of 380 vectors",
-      "ms": 59
+      "ms": 7
     },
     {
       "id": "A1.sha3-512.net10",
@@ -501,7 +501,7 @@
       "status": "PASS",
       "reason": "",
       "detail": "380 of 380 vectors",
-      "ms": 12
+      "ms": 15
     },
     {
       "id": "A1.sha384.cf",
@@ -513,7 +513,7 @@
       "status": "PASS",
       "reason": "",
       "detail": "660 of 660 vectors",
-      "ms": 18
+      "ms": 4
     },
     {
       "id": "A1.sha384.net10",
@@ -525,7 +525,7 @@
       "status": "PASS",
       "reason": "",
       "detail": "660 of 660 vectors",
-      "ms": 7
+      "ms": 6
     },
     {
       "id": "A1.sha512.cf",
@@ -537,7 +537,7 @@
       "status": "PASS",
       "reason": "",
       "detail": "660 of 660 vectors",
-      "ms": 24
+      "ms": 5
     },
     {
       "id": "A1.sha512.net10",
@@ -549,7 +549,7 @@
       "status": "PASS",
       "reason": "",
       "detail": "660 of 660 vectors",
-      "ms": 3
+      "ms": 4
     },
     {
       "id": "A1.shake128.cf",
@@ -561,7 +561,7 @@
       "status": "PASS",
       "reason": "",
       "detail": "377 of 377 vectors",
-      "ms": 50
+      "ms": 10
     },
     {
       "id": "A1.shake128.net10",
@@ -573,7 +573,7 @@
       "status": "PASS",
       "reason": "",
       "detail": "377 of 377 vectors",
-      "ms": 22
+      "ms": 19
     },
     {
       "id": "A1.shake256.cf",
@@ -585,7 +585,7 @@
       "status": "PASS",
       "reason": "",
       "detail": "313 of 313 vectors",
-      "ms": 34
+      "ms": 6
     },
     {
       "id": "A1.shake256.net10",
@@ -609,7 +609,7 @@
       "status": "PASS",
       "reason": "",
       "detail": "500 of 500 vectors",
-      "ms": 52
+      "ms": 17
     },
     {
       "id": "A1.tdes.net10",
@@ -621,7 +621,7 @@
       "status": "PASS",
       "reason": "",
       "detail": "500 of 500 vectors",
-      "ms": 33
+      "ms": 30
     },
     {
       "id": "A1.x25519.cf",
@@ -633,7 +633,7 @@
       "status": "PASS",
       "reason": "",
       "detail": "8 of 8 vectors",
-      "ms": 1418
+      "ms": 1244
     },
     {
       "id": "A1.x25519.net10",
@@ -645,7 +645,7 @@
       "status": "PASS",
       "reason": "",
       "detail": "8 of 8 vectors",
-      "ms": 948
+      "ms": 937
     },
     {
       "id": "A8.ssh.exe-to-glass-server.cf",
@@ -656,8 +656,8 @@
       "referee": "Go x/crypto/ssh and ssh.exe",
       "status": "PASS",
       "reason": "",
-      "detail": "ssh.exe ran 'echo hello' on our server and printed: Warning: Permanently added '[127.0.0.1]:54483' (ED25519) to the list of known hosts.\nhello",
-      "ms": 1718
+      "detail": "ssh.exe ran 'echo hello' on our server and printed: Warning: Permanently added '[127.0.0.1]:53992' (ED25519) to the list of known hosts.\nhello",
+      "ms": 498
     },
     {
       "id": "A8.ssh.exe-to-glass-server.net10",
@@ -668,8 +668,8 @@
       "referee": "Go x/crypto/ssh and ssh.exe",
       "status": "PASS",
       "reason": "",
-      "detail": "ssh.exe ran 'echo hello' on our server and printed: Warning: Permanently added '[127.0.0.1]:62554' (ED25519) to the list of known hosts.\nhello",
-      "ms": 1006
+      "detail": "ssh.exe ran 'echo hello' on our server and printed: Warning: Permanently added '[127.0.0.1]:62412' (ED25519) to the list of known hosts.\nhello",
+      "ms": 1177
     },
     {
       "id": "A8.ssh.hostkey-changed-beside-control.cf",
@@ -681,7 +681,7 @@
       "status": "PASS",
       "reason": "",
       "detail": "control opens; changed host key gives SSH_HOST_KEY_CHANGED",
-      "ms": 2185
+      "ms": 1303
     },
     {
       "id": "A8.ssh.hostkey-changed-beside-control.net10",
@@ -693,7 +693,7 @@
       "status": "PASS",
       "reason": "",
       "detail": "control opens; changed host key gives SSH_HOST_KEY_CHANGED",
-      "ms": 6233
+      "ms": 2505
     },
     {
       "id": "A8.ssh.legacy.exec.cf",
@@ -705,7 +705,7 @@
       "status": "PASS",
       "reason": "",
       "detail": "exec returned 'hello'; referee confirms the Legacy suite",
-      "ms": 573
+      "ms": 499
     },
     {
       "id": "A8.ssh.legacy.exec.net10",
@@ -717,7 +717,7 @@
       "status": "PASS",
       "reason": "",
       "detail": "exec returned 'hello'; referee confirms the Legacy suite",
-      "ms": 788
+      "ms": 646
     },
     {
       "id": "A8.ssh.legacy.tunnel.cf",
@@ -729,7 +729,7 @@
       "status": "PASS",
       "reason": "",
       "detail": "tunnel echoed 19 bytes; referee confirms the Legacy suite",
-      "ms": 697
+      "ms": 679
     },
     {
       "id": "A8.ssh.legacy.tunnel.net10",
@@ -741,7 +741,7 @@
       "status": "PASS",
       "reason": "",
       "detail": "tunnel echoed 19 bytes; referee confirms the Legacy suite",
-      "ms": 824
+      "ms": 1078
     },
     {
       "id": "A8.ssh.modern.exec.cf",
@@ -753,7 +753,7 @@
       "status": "PASS",
       "reason": "",
       "detail": "exec returned 'hello'; referee confirms the Modern suite",
-      "ms": 602
+      "ms": 557
     },
     {
       "id": "A8.ssh.modern.exec.net10",
@@ -765,7 +765,7 @@
       "status": "PASS",
       "reason": "",
       "detail": "exec returned 'hello'; referee confirms the Modern suite",
-      "ms": 619
+      "ms": 3980
     },
     {
       "id": "A8.ssh.modern.tunnel.cf",
@@ -777,7 +777,7 @@
       "status": "PASS",
       "reason": "",
       "detail": "tunnel echoed 19 bytes; referee confirms the Modern suite",
-      "ms": 689
+      "ms": 585
     },
     {
       "id": "A8.ssh.modern.tunnel.net10",
@@ -789,7 +789,7 @@
       "status": "PASS",
       "reason": "",
       "detail": "tunnel echoed 19 bytes; referee confirms the Modern suite",
-      "ms": 617
+      "ms": 849
     },
     {
       "id": "A9.cf.binaries-reference-cf-mscorlib",
@@ -801,7 +801,7 @@
       "status": "PASS",
       "reason": "",
       "detail": "4 of 4 vectors",
-      "ms": 37
+      "ms": 26
     },
     {
       "id": "A9.cf.compiles-against-reference-assemblies-with-langversion-3",
@@ -813,7 +813,7 @@
       "status": "PASS",
       "reason": "",
       "detail": "src/NetSec.Core and src/NetSec.Core.NetCF use LangVersion 3; the CF project builds against E:\\dev\\tools\\netcf35-ref",
-      "ms": 2435
+      "ms": 2882
     },
     {
       "id": "A9.cf.same-suite-passes-on-net48-skips-pinned",
@@ -824,8 +824,8 @@
       "referee": "CF references and System.Reflection.Metadata",
       "status": "PASS",
       "reason": "",
-      "detail": "2 of 2 vectors; net10.0 477 passed, net48 477 passed, 0 skipped (all pinned)",
-      "ms": 57997
+      "detail": "2 of 2 vectors; net10.0 484 passed, net48 484 passed, 0 skipped (all pinned)",
+      "ms": 56715
     },
     {
       "id": "A9.git-ls-files.no-cf-binary",
@@ -836,8 +836,8 @@
       "referee": "CF references and System.Reflection.Metadata",
       "status": "PASS",
       "reason": "",
-      "detail": "412 tracked files checked against 42 CF reference files and the CF mscorlib token; none match",
-      "ms": 535
+      "detail": "425 tracked files checked against 42 CF reference files and the CF mscorlib token; none match",
+      "ms": 504
     }
   ]
 }
