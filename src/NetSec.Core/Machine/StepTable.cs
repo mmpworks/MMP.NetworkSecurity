@@ -6,7 +6,7 @@ using NetSec.Trace;
 namespace NetSec.Machine
 {
     public enum StepOutcome { Advance, Stay, Fail }
-    public enum EffectKind { Absorb, Send, Secret, InstallKeys, Check, Deliver, Note }
+    public enum EffectKind { Absorb, Send, Secret, InstallKeys, Check, Deliver, Note, Store }
     public enum Direction { Inbound, Outbound }
 
     public sealed class InboundMessage
@@ -18,10 +18,14 @@ namespace NetSec.Machine
         public readonly byte[] Bytes;
         public readonly byte[] Body;
         public readonly TraceField[] Fields;
+        public readonly string EventType;
 
-        public InboundMessage(int type, string name, byte[] bytes, byte[] body, TraceField[] fields)
+        public InboundMessage(int type, string name, byte[] bytes, byte[] body, TraceField[] fields) : this(type, name, bytes, body, fields, null) { }
+
+        /// <param name="eventType">The trace type of this arrival, for a protocol with more than one kind of message. Null means the session's ReceivedType.</param>
+        public InboundMessage(int type, string name, byte[] bytes, byte[] body, TraceField[] fields, string eventType)
         {
-            Type = type; Name = name; Bytes = bytes; Body = body; Fields = fields;
+            Type = type; Name = name; Bytes = bytes; Body = body; Fields = fields; EventType = eventType;
         }
 
         public static readonly InboundMessage Start = new InboundMessage(StartType, null, new byte[0], new byte[0], null);
@@ -37,10 +41,14 @@ namespace NetSec.Machine
         public readonly string[] From;
         public readonly int Channel;
         public readonly Direction Direction;
+        public readonly Action Store;
 
         internal StepEffect(EffectKind kind, string name, string text, byte[] bytes, byte[] iv, TraceField[] fields, string[] from, int channel, Direction direction)
+            : this(kind, name, text, bytes, iv, fields, from, channel, direction, null) { }
+
+        internal StepEffect(EffectKind kind, string name, string text, byte[] bytes, byte[] iv, TraceField[] fields, string[] from, int channel, Direction direction, Action store)
         {
-            Kind = kind; Name = name; Text = text; Bytes = bytes; Iv = iv; Fields = fields; From = from; Channel = channel; Direction = direction;
+            Kind = kind; Name = name; Text = text; Bytes = bytes; Iv = iv; Fields = fields; From = from; Channel = channel; Direction = direction; Store = store;
         }
     }
 
@@ -48,6 +56,10 @@ namespace NetSec.Machine
     {
         public static StepEffect Absorb(byte[] message) { return Make(EffectKind.Absorb, null, null, message); }
         public static StepEffect Send(string message, byte[] body, TraceField[] fields) { return new StepEffect(EffectKind.Send, message, null, body, null, fields, null, 0, Direction.Outbound); }
+        /// <summary>A send with its own trace type, for a protocol with more than one kind of message.</summary>
+        public static StepEffect SendAs(string eventType, string message, byte[] body, TraceField[] fields) { return new StepEffect(EffectKind.Send, message, eventType, body, null, fields, null, 0, Direction.Outbound); }
+        /// <summary>Keeps a value a rule worked out for a later rule. The rule returns this and the interpreter runs it, so a rule still changes nothing. It emits no event.</summary>
+        public static StepEffect Store(Action store) { return new StepEffect(EffectKind.Store, null, null, null, null, null, null, 0, Direction.Outbound, store); }
         public static StepEffect Secret(string holder, string name, byte[] value, params string[] from) { return new StepEffect(EffectKind.Secret, name, holder, value, null, null, from, 0, Direction.Outbound); }
         public static StepEffect InstallKeys(Direction d, string suite, byte[] key, byte[] iv) { return new StepEffect(EffectKind.InstallKeys, suite, null, key, iv, null, null, 0, d); }
         public static StepEffect Check(string name, string code) { return Make(EffectKind.Check, name, code, null); }
