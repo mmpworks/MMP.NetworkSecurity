@@ -2,7 +2,7 @@
 """Fails on a dependency edge that points up the folder table in docs/program-design.md section 1.
 
 A folder may use folders of its own row and of earlier rows. Three named exceptions come from acceptance/CONTRACT.md:
-  1. Io names NetSec.Bridge.DeviceProfile, by full name only, because the contract keeps that type in Bridge.
+  1. Io names NetSec.Bridge.DeviceProfile and NetSec.Labs.TamperPlan, by full name only, because the contract keeps those types there.
   2. Machine/IStepGate.cs uses MMP.AsyncProxy, because the contract keeps IStepGate in Machine.
   3. Bridge, Labs and Native sit above Io and may use it. Only Io, Bridge and Labs may use MMP.AsyncProxy or System.Net.Sockets.
 #if NETCF stays in Platform.
@@ -32,6 +32,7 @@ ASYNC_ALLOWED = {"Io", "Bridge", "Labs"}
 ASYNC_ALLOWED_FILES = {"Machine/IStepGate.cs"}
 USING = re.compile(r"^\s*using\s+(?P<name>[A-Za-z0-9_.]+)\s*;", re.M)
 FULL_BRIDGE = re.compile(r"NetSec\.Bridge\.(?P<member>[A-Za-z0-9_]+)")
+FULL_LABS = re.compile(r"NetSec\.Labs\.(?P<member>[A-Za-z0-9_]+)")
 IF_NETCF = re.compile(r"^\s*#\s*(?:if|elif)\b.*\bNETCF\b", re.M)
 
 
@@ -53,6 +54,9 @@ def problems_in(rel, folder, text):
         for match in FULL_BRIDGE.finditer(text):
             if match.group("member") != "DeviceProfile":
                 found.append("%s: Io names NetSec.Bridge.%s; only DeviceProfile is allowed" % (rel, match.group("member")))
+        for match in FULL_LABS.finditer(text):
+            if match.group("member") != "TamperPlan":
+                found.append("%s: Io names NetSec.Labs.%s; only TamperPlan is allowed" % (rel, match.group("member")))
     if folder != "Platform" and IF_NETCF.search(text):
         found.append("%s: #if NETCF outside Platform" % rel)
     return found

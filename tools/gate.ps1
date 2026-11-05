@@ -3,6 +3,8 @@
 .SYNOPSIS
   The base gate of docs/program-design.md section 9, plus the slice's extras. Writes docs\_runs\<date>-<Slice>.md with each command's
   exit code and last lines. The exit code is nonzero when any step fails. A step that cannot run yet says so by name, and never counts as a pass.
+.PARAMETER Clauses
+  The acceptance clauses to run, as a list or one comma-separated text. The gate always adds A9, because any change to a test or to shared code can break the CF build's proof.
 .PARAMETER SkipApp
   Skips the app steps (npm, Playwright). The report names the skip. With no app/package.json the app steps are skipped by the same rule.
 .PARAMETER Lesson
@@ -28,6 +30,8 @@ New-Item -ItemType Directory -Force -Path 'docs/_runs' | Out-Null
 $cf = "-p:NetCFRefDir=$NetCFRefDir"
 $rows = [System.Collections.Generic.List[object]]::new()
 $failed = 0
+$Clauses = @($Clauses | ForEach-Object { $_ -split ',' } | Where-Object { $_ })
+if ($Clauses -notcontains 'A9' -and $Clauses -notcontains 'All') { $Clauses += 'A9' }
 
 function Step([string]$name, [scriptblock]$body) {
     Write-Host "== $name"
@@ -67,9 +71,7 @@ Step 'dotnet build src/NetSec.Core.NetCF' { dotnet build src/NetSec.Core.NetCF -
 Step 'dotnet test net10.0' { dotnet test tests/NetSec.Tests -c Release -f net10.0 $cf --nologo --logger trx --results-directory "$trx-net10" }
 Step 'dotnet test net48 (CF binaries)' { dotnet test tests/NetSec.Tests -c Release -f net48 $cf --nologo --logger trx --results-directory "$trx-cf" }
 Step 'dotnet test Host (live process)' { dotnet test tests/NetSec.Host.Tests -c Release $cf --nologo --logger trx --results-directory "$trx-host" }
-if ($Clauses.Count -gt 0) {
-    Step "acceptance $($Clauses -join ',')" { pwsh -NoProfile -File acceptance/run.ps1 -Clauses ($Clauses -join ',') -NetCFRefDir $NetCFRefDir }
-} else { Skip 'acceptance' 'no -Clauses given' }
+Step "acceptance $($Clauses -join ',')" { pwsh -NoProfile -File acceptance/run.ps1 -Clauses ($Clauses -join ',') -NetCFRefDir $NetCFRefDir }
 Step 'tour_lint' { python tools/tour_lint.py app/src/tours --max-grade 8.9 --max-concept 0.30 }
 
 $tours = @(Get-ChildItem 'app/src/tours/lesson-*.json' -ErrorAction SilentlyContinue)

@@ -23,8 +23,8 @@ GROUPS = {
     "tls11":      {"kind": "csharp", "project": "groups/tls11/tls11.csproj", "assembly": "Acceptance.Tls11", "builds": ["net10", "cf"], "needsCore": True},
     "ssh":        {"kind": "csharp", "project": "groups/ssh/ssh.csproj", "assembly": "Acceptance.Ssh", "builds": ["net10", "cf"], "needsCore": True},
     "auth":       {"kind": "csharp", "project": "groups/auth/auth.csproj", "assembly": "Acceptance.Auth", "builds": ["net10"], "needsCore": True},
-    "nativeprod": {"kind": "csharp", "project": "groups/nativeprod/nativeprod.csproj", "assembly": "Acceptance.NativeProd", "builds": ["net10", "cf"], "needsCore": True},
     "native":     {"kind": "csharp", "project": "groups/native/native.csproj", "assembly": "Acceptance.Native", "builds": ["net10", "cf"], "needsCore": False},
+    "nativeprod": {"kind": "csharp", "project": "groups/nativeprod/nativeprod.csproj", "assembly": "Acceptance.NativeProd", "builds": ["net10", "cf"], "needsCore": True},
     "bridge":     {"kind": "csharp", "project": "groups/bridge/bridge.csproj", "assembly": "Acceptance.Bridge", "builds": ["net10"], "needsCore": False},
     "host":       {"kind": "csharp", "project": "groups/host/host.csproj", "assembly": "Acceptance.Host", "builds": ["net10"], "needsCore": False},
     "keys":       {"kind": "csharp", "project": "groups/keys/keys.csproj", "assembly": "Acceptance.Keys", "builds": ["net10"], "needsCore": False},
@@ -118,7 +118,8 @@ def scan_e2e():
 
 
 DRIVER = [("driver", "A13.fresh-clone.acceptance-unchanged", False), ("driver", "A13.fresh-clone.sibling-layout", False),
-          ("driver", "SELF.clauses-json-matches-code", False), ("driver", "SELF.vectors-python", False)]
+          ("driver", "SELF.clauses-json-matches-code", False), ("driver", "SELF.vectors-python", False),
+          ("driver", "SELF.tool-cannot-start-still-reports", False)]
 
 
 def build():

@@ -89,8 +89,8 @@
       "claims": [
         {
           "id": "L2-C02",
-          "text": "A seal built as SHA-256(key + message) allows length extension: someone who sees the seal can compute a valid seal for the message plus extra data, with no key.",
-          "source": "RFC 2104, section 1 (introduction); FIPS 180-4, section 5 (padding and chaining of SHA-256); docs/lessons-1-3-names.md, Lesson 2 attacks, L2-extend-keyed-hash"
+          "text": "SHA-256 pads a message with a 1 bit, zeros and a 64-bit length, then processes the blocks in order, each starting from the previous hash value. The final digest is therefore the starting state for any further blocks. In the lab, a forged seal for the message plus extra text passes the keyed-hash compare.",
+          "source": "FIPS 180-4, sections 5.1.1 (padding) and 6.2.2 (SHA-256 hash computation); the attack's name appears in FIPS 202, Appendix A.1; lab result: docs/lessons-1-3-names.md, Lesson 2 attacks, L2-extend-keyed-hash"
         }
       ],
       "unlock": { "mode": "action", "ref": "L2-S05-T1" }
@@ -100,7 +100,7 @@
       "lesson": 2,
       "title": "HMAC closes the gap",
       "text": [
-        "{{term:hmac}} hashes twice and mixes the key in at both ends. The inner result sits inside the outer hash, so the restart trick fails.",
+        "{{term:hmac}} hashes twice and mixes the key in at both ends. The inner hash sits inside an outer hash, and the lab shows the restart trick fail.",
         "Try it: run the same forgery against the HMAC message. The check named HMAC compare fails."
       ],
       "glossary": ["hmac"],
@@ -115,8 +115,13 @@
       "claims": [
         {
           "id": "L2-C03",
-          "text": "HMAC is H((K xor opad) || H((K xor ipad) || message)), a nested hash that blocks length extension.",
-          "source": "RFC 2104, section 2 (definition of HMAC)"
+          "text": "HMAC is H((K xor opad) || H((K xor ipad) || message)), a nested hash.",
+          "source": "RFC 2104, section 2 (Definition of HMAC)"
+        },
+        {
+          "id": "L2-C06",
+          "text": "In the lab, the same extension forgery against the HMAC message is rejected by the check named HMAC compare, with code SEAL_HMAC_MISMATCH.",
+          "source": "docs/lessons-1-3-names.md, Lesson 2 attacks, L2-extend-hmac"
         }
       ],
       "unlock": { "mode": "action", "ref": "L2-S06-T1" }
@@ -161,7 +166,7 @@
         {
           "id": "L2-C04",
           "text": "CMAC is a message authentication code built from a block cipher such as AES.",
-          "source": "NIST SP 800-38B, section 1 (purpose) and section 6.2"
+          "source": "NIST SP 800-38B, section 3 (Introduction: a MAC algorithm based on a symmetric key block cipher) and section 6.2 (MAC generation)"
         }
       ],
       "unlock": { "mode": "action", "ref": "L2-S08-T1" }

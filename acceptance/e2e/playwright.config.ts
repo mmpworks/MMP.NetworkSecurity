@@ -10,7 +10,7 @@ export default defineConfig({
   testMatch: /.*\.spec\.ts/,
   workers: 1,
   fullyParallel: false,
-  timeout: 180_000,
+  timeout: 60_000,          // a step that needs more than a minute is a failure, and 15 tests must end inside the 900 s tool limit
   retries: 0,
   reporter: [['list'], ['json', { outputFile: process.env.ACC_OUT ? process.env.ACC_OUT + '/playwright.json' : 'test-results/playwright.json' }]],
   globalSetup: './global-setup.ts',
