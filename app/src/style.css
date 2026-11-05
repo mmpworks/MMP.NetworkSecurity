@@ -220,3 +220,14 @@ body { background: var(--bg); color: var(--text); overflow: hidden; }
 .wiz-reason { font-size: 12px; min-height: 1em; }
 .wiz-cancel { position: absolute; inset: 0; display: flex; flex-direction: column; align-items: flex-start; justify-content: center; gap: 10px; padding: 32px; background: var(--surface); z-index: 5; }
 @media (max-width: 900px) { .sec-row { grid-template-columns: 1fr; } }
+
+/* Practice vault */
+.vault-keys { display: flex; flex-direction: column; gap: 6px; margin: 12px 0; }
+.vault-key { display: flex; flex-wrap: wrap; align-items: center; gap: 4px 12px; padding: 8px 10px; border: 1px solid var(--line); border-radius: 8px; }
+.vault-key code, .vault-screen code { font: 12px ui-monospace, Consolas, monospace; overflow-wrap: anywhere; }
+.vault-hidden { flex: 1 1 100%; font-size: 13px; border-left: 3px solid var(--warn); padding-left: 8px; }
+.vault-tabs { display: flex; gap: 8px; margin: 12px 0; flex-wrap: wrap; }
+.vault-screen { display: flex; flex-direction: column; gap: 8px; align-items: flex-start; }
+.vault-screen .wiz-fact { display: block; }
+.vault-audit-table { width: 100%; border-collapse: collapse; font-size: 12px; }
+.vault-audit-table th, .vault-audit-table td { text-align: left; padding: 4px 8px; border-bottom: 1px solid var(--line); overflow-wrap: anywhere; }
