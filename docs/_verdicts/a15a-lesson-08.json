@@ -88,5 +88,32 @@
       "note": "Re-checked against tours at origin/feat/tours-7-8-10 commit f648cab (PR 25). Text now starts 'In this run', matching the PRD spike row scope.",
       "checkedAgainst": "docs/prd.md Spike results (read)"
     }
-  ]
+  ],
+  "textRead": {
+    "readAt": "main c0a105b; tour text identical to main 562047e (lessons 0 to 8, 10, 11)",
+    "method": "Every sentence of every step text read against the lab. The lab ran in-process (NetSec.Core: LabCatalog, Lesson10Auth, TimingAttackLab), once as a control and once for every try-it attack row; trace events, secrets, field lists and check names were compared with the words. Code was read where the trace did not show the fact. Statements about the UI (colours, panels) and about lesson 9 (not built) were not run.",
+    "stepsRead": 13,
+    "stepsWithProblems": 2,
+    "problemsFound": 2,
+    "problems": [
+      {
+        "step": "L8-S01",
+        "severity": "medium",
+        "wrong": "There is no certificate authority.",
+        "right": "This lab uses no certificate authority. SSH can use one, but it does not need one.",
+        "evidence": "RFC 4251 section 4.1 lists two trust models, a local key database and a host key certified by a trusted CA."
+      },
+      {
+        "step": "L8-S08",
+        "severity": "high",
+        "wrong": "The check is named packet MAC. It passes on the normal run.",
+        "right": "The check is named packet MAC. On the normal run the lab shows no event for it, as with the AEAD tag in lesson 5. Only a failure shows up.",
+        "evidence": "Lab run on main c0a105b: zero check.result events named packet MAC in the control run (both rounds). The step also binds to check.result packet MAC, which never fires on a normal run."
+      }
+    ],
+    "notes": [
+      "L8-S01 and others say 'Lesson 9 builds on this one'; plan statement.",
+      "Bind defect: L8-S08 binds to check.result 'packet MAC'; no such event exists in the control run."
+    ]
+  }
 }

@@ -120,3 +120,7 @@ Each correction goes here, newest slice last. Later slices read this file first.
 ## Pump deadline test
 
 1. **The side whose deadline fires reports `LINK_DEADLINE`. The side that then reads the close reports `PEER_CLOSED_EARLY`, and that is its true outcome.** A test that names one side's code must fix the order with two deadlines. `LabPair.Named` drops the second code, so a lab reports the real failure in either order.
+
+## Gate hang limit
+
+1. **Each `dotnet test` step in the gate now ends a stuck test at 3 minutes and names it.** The slowest test takes 11.4 s at 100% CPU. `--blame-hang-dump-type none` keeps the run on net48 and writes no dump. The name sits in the last lines of the step, so the gate report keeps it. A9 runs its own `dotnet test` with a 30-minute limit per build, so after a hang the gate still waits for A9.

@@ -45,6 +45,7 @@ The token parts and proof parts have dots between them, one byte each. Their fie
 | `challenge issued` | `issuer` | The answer names the challenge this issuer sent in this login |
 | `challenge signature` | `issuer` | The enrolled key signed this challenge and origin |
 | `challenge already used` | `issuer` | This challenge has not been answered before |
+| `token format` | `server` | The token reads as one compact JWS, names EdDSA, and holds no `crit`. It shows only when it fails, and no attack row reaches it |
 | `token signature` | `server` | The issuer key signed the token |
 | `token expiry` | `server` | The token has not expired |
 | `token audience` | `server` | The token names this server in `aud` |
