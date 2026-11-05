@@ -37,7 +37,15 @@ const TOY_LESSON: LessonRow = { lesson: 0, title: 'Start here', built: true, lan
 export const lessons = ref<LessonRow[]>([TOY_LESSON, ...DEFAULT_TITLES.map((title, i) => ({ lesson: i + 1, title, built: false, lanes: [], attacks: [] }))])
 export const cePanel = ref<{ label: string; state: string } | null>(null)
 
+// The labs run on this computer only. The CE boxes stay listed and disabled until their work starts.
+export const TARGET_DEVICES = [
+  { id: 'this-computer', label: 'This computer', enabled: true },
+  { id: 'wince6', label: 'WinCE 6', enabled: false },
+  { id: 'wince7', label: 'WinCE 7', enabled: false },
+] as const
+
 export const ui = reactive({
+  target: 'this-computer' as (typeof TARGET_DEVICES)[number]['id'],
   lesson: null as number | null,
   mode: 'tour' as AppMode,
   view: 'endpoints' as ViewMode,
