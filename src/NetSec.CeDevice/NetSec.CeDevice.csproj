@@ -1,0 +1,33 @@
+<Project Sdk="Microsoft.NET.Sdk">
+
+  <!-- The CE process: a CF-compiled exe that runs on the desktop CLR. Nothing here has run on CE.
+       GenerateSupportedRuntime stays false. The SDK default writes supportedRuntime v2.0.50727, and that config makes the exe
+       print nothing and exit 0 on a machine with no CLR 2. App.config names v4.0 instead (docs/program-design.md section 6). -->
+
+  <PropertyGroup>
+    <OutputType>Exe</OutputType>
+    <TargetFramework>net35</TargetFramework>
+    <LangVersion>3</LangVersion>
+    <AssemblyName>NetSec.CeDevice</AssemblyName>
+    <RootNamespace>NetSec.CeDevice</RootNamespace>
+    <DefineConstants>$(DefineConstants);NETCF</DefineConstants>
+    <AutomaticallyUseReferenceAssemblyPackages>false</AutomaticallyUseReferenceAssemblyPackages>
+    <FrameworkPathOverride>$(NetCFRefDir)</FrameworkPathOverride>
+    <GenerateAssemblyFileVersionAttribute>false</GenerateAssemblyFileVersionAttribute>
+    <GenerateSupportedRuntime>false</GenerateSupportedRuntime>
+    <NoStdLib>true</NoStdLib>
+    <NoCompilerStandardLib>true</NoCompilerStandardLib>
+    <DisableImplicitFrameworkReferences>true</DisableImplicitFrameworkReferences>
+    <GenerateTargetFrameworkAttribute>false</GenerateTargetFrameworkAttribute>
+    <IsPackable>false</IsPackable>
+    <NoWarn>$(NoWarn);CS1591;CS1685</NoWarn>
+  </PropertyGroup>
+
+  <ItemGroup>
+    <ProjectReference Include="..\NetSec.Core.NetCF\NetSec.Core.NetCF.csproj" />
+    <Reference Include="mscorlib"><HintPath>$(NetCFRefDir)\mscorlib.dll</HintPath><Private>false</Private></Reference>
+    <Reference Include="System"><HintPath>$(NetCFRefDir)\System.dll</HintPath><Private>false</Private></Reference>
+    <Reference Include="System.Core"><HintPath>$(NetCFRefDir)\System.Core.dll</HintPath><Private>false</Private></Reference>
+  </ItemGroup>
+
+</Project>

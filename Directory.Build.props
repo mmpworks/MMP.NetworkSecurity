@@ -1,0 +1,17 @@
+<Project>
+  <PropertyGroup>
+    <Nullable>disable</Nullable>
+    <ImplicitUsings>disable</ImplicitUsings>
+    <TreatWarningsAsErrors>true</TreatWarningsAsErrors>
+    <GenerateDocumentationFile>false</GenerateDocumentationFile>
+    <SatelliteResourceLanguages>en</SatelliteResourceLanguages>
+    <!-- MMP.AsyncProxy is a sibling checkout, outside any solution here. Without this switch a build strips
+         Configuration from that reference and builds the library Debug under a Release build. -->
+    <ShouldUnsetParentConfigurationAndPlatform>false</ShouldUnsetParentConfigurationAndPlatform>
+    <AsyncProxyRoot Condition="'$(AsyncProxyRoot)' == ''">$(MSBuildThisFileDirectory)..\MMP.AsyncProxy</AsyncProxyRoot>
+    <NetCFRefDir Condition="'$(NetCFRefDir)' == ''">E:\dev\tools\netcf35-ref</NetCFRefDir>
+    <Authors>MMPWorks LLC</Authors>
+    <Company>MMPWorks LLC</Company>
+    <Version>0.1.0</Version>
+  </PropertyGroup>
+</Project>
