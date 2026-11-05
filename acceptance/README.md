@@ -2,7 +2,7 @@
 
 Author: Echo. Date: 2026-11-05. Branch: `test/acceptance-suite`. Rule: D11. Builders never write under `acceptance/`.
 
-Conclusion: the suite has **M = 259 product clauses** (`clauses.json`): the 208 of the first release and 51 for A17 (section 8). With no product built it reports **0 of 259 PASS, 0 FAIL, 259 NOT RUN**.
+Conclusion: the suite has **M = 260 product clauses** (`clauses.json`): the 208 of the first release and 52 for A17 (section 8). With no product built it reports **0 of 260 PASS, 0 FAIL, 260 NOT RUN**.
 Its 31 checks on itself all PASS. The suite is written against `docs/program-design.md` section 11, `docs/modes-design.md`, and the merged referees in `acceptance/referees`. Every group compiles against the contract stub on net10.0 and on net48 with the CF build of MMP.AsyncProxy.
 Disposition: merge this branch. Send the open items in section 7 and in `CONTRACT.md` section 5.7 to Richard and Jared.
 
@@ -166,13 +166,13 @@ These appear later by design, each named in the report: `REFEREE_MISSING`, `REFE
 
 ## 8. A17: per-type test keys, wizards and the vault (added 2026-11-05)
 
-Conclusion: A17 adds **51 clauses**, so M is **259** (208 + 51). The A16 renames add none. Source: `docs/modes-design.md` and `docs/wizards-ux.md` on `main` at c65e1bb. The Host contract the clauses read is `CONTRACT.md` section 5.
+Conclusion: A17 adds **52 clauses**, so M is **260** (208 + 52). The A16 renames add none. Source: `docs/modes-design.md` and `docs/wizards-ux.md` on `main` at c65e1bb. The Host contract the clauses read is `CONTRACT.md` section 5.
 Disposition: merge. Then the builders' slices V0 to V8 turn the clauses from NOT RUN to PASS one by one.
 
 | Group | Clauses | Judge |
 |---|---|---|
 | `a17` (Host over HTTP and WebSocket, net10) | 39: readiness 2, personal-path warning 1, login walk 1, token 1, repo 1, vault 7, Show keys 5, flow walks 4, payment known-answer 1, lesson-key MAC 1, certificates and attacks 5, lessons on own keys 9, cold reader 1 | OpenSSL, Go `tokenverify`, the vault file read with Python sqlite3 and its master key, the suite's own SHA-256 and DUKPT reference |
-| `a17probe` (links `NetSec.Core`, net10) | 5: TLS 1.3 server, TLS 1.1 server, TLS 1.3 client with an intermediate, SSH host key, SSH client key | OpenSSL, Go `crypto/tls`, `ssh.exe`, Go `x/crypto/ssh`, on `ProbeRequest.Credentials` |
+| `a17probe` (links `NetSec.Core`, net10) | 6: TLS 1.3 server, TLS 1.1 server, TLS 1.3 client with an intermediate, SSH host key, SSH client key, no training key on a Credentials run | OpenSSL, Go `crypto/tls`, `ssh.exe`, Go `x/crypto/ssh`, on `ProbeRequest.Credentials` |
 | `golden` (links `NetSec.Core`, net10 and CF) | 2: `A17.mock.golden-trace-equal` on each build | The traces recorded in `acceptance/golden/` before the key work began |
 | `docs` (Python) | 4: `A17.ui.no-word-real`, `.ui.test-keys-line`, `.ui.no-outside-judge-line`, `.copy.grade-and-tics` | Flesch-Kincaid, tic-gate, pattern checks over `app/src` |
 | `e2e` (Playwright) | 1: `A17.ui.show-keys-switch` | The browser |

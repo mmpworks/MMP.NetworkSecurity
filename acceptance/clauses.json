@@ -1694,6 +1694,17 @@
    "counts": true
   },
   {
+   "id": "A17.probe.no-training-key-on-credentials-run",
+   "base": "A17.probe.no-training-key-on-credentials-run",
+   "assertion": "A17",
+   "group": "a17probe",
+   "build": "host",
+   "slice": "V0",
+   "referee": "test over HTTP and WebSocket, OpenSSL, ssh.exe, Go referees; known-answer where no outside referee exists",
+   "roles": [],
+   "counts": true
+  },
+  {
    "id": "A17.proof.root-negative-control",
    "base": "A17.proof.root-negative-control",
    "assertion": "A17",

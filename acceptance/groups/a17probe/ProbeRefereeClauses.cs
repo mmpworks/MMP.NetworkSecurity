@@ -294,5 +294,56 @@ namespace Acceptance
                 return "refuses";
             }
         }
+
+        // ---------------------------------------------------------------- no training key on a run that has credentials
+
+        /// <summary>
+        /// A Probe that mixes keys would pass for the wrong reason: it could trust the training root beside the learner's, authorize the training user key,
+        /// or sign with a training key. The suite holds the training files and its own, and every check below fails if a training key is in play.
+        /// Each refusal has a control: the same peer, without Credentials, must be accepted, so the refusal comes from the learner's set and from nothing else.
+        /// </summary>
+        [Clause("A17.probe.no-training-key-on-credentials-run")]
+        public static string NoTrainingKeyOnCredentialsRun(Ctx c)
+        {
+            if (Training(c)) throw new NotRunException("NOT_APPLICABLE", "this clause is about a run that has Credentials");
+            TlsKeys mine = MakeTls(c, "a17-notrain-tls");
+            PkiDir training = PkiDir.Export(c, "a17-notrain-training");
+            // 1. Client: a server that holds the training certificate. Trust must be the learner's root only.
+            using (OpenSslPeer ctl = OpenSslPeer.StartServer(c, "-tls1_3 -cert \"" + training.Cert + "\" -key \"" + training.Key + "\""))
+            {
+                ProbeRequest r0 = ProbeKit.Request(WireProtocol.Tls13, ctl.Port, "localhost");
+                r0.Group = KexGroup.X25519; r0.Send = Encoding.ASCII.GetBytes("hello\n");
+                Check.True(ProbeKit.Connect(r0, "control: client on training keys").Completed, "control: the glass client without Credentials does not trust the training server");
+            }
+            using (OpenSslPeer srv = OpenSslPeer.StartServer(c, "-tls1_3 -cert \"" + training.Cert + "\" -key \"" + training.Key + "\""))
+            {
+                ProbeRequest r = ProbeKit.Request(WireProtocol.Tls13, srv.Port, "localhost");
+                r.Group = KexGroup.X25519; r.Send = Encoding.ASCII.GetBytes("hello\n");
+                Use(r, mine.Set);
+                Check.True(!ProbeKit.Connect(r, "glass TLS 1.3 client on Credentials against a training server").Completed, "the glass client with Credentials trusted the training root");
+            }
+            // 2. Server: the certificate shown must chain to the learner's root and not to the training root.
+            TlsKeys asTraining = new TlsKeys(); asTraining.Set = mine.Set; asTraining.Root = mine.Root; asTraining.WrongRoot = training.Root;
+            Serve(c, asTraining, mine.Root, true);
+            Serve(c, asTraining, training.Root, false);
+            // 3. SSH client: a Go server that authorizes only the training user key must refuse it.
+            SshKeys k = MakeSsh(c, "a17-notrain-ssh");
+            string goHost = Path.Combine(LivePki.Dir(c, "a17probe-notrain-gohost"), "gohost.key");
+            Keygen(c, Path.GetDirectoryName(goHost), "-q -t ed25519 -N \"\" -f \"" + goHost + "\"");
+            Check.Equal("control: the learner's key is accepted", "accepts", ClientVsGo(c, k, goHost, k.UserPub, true));
+            Check.Equal("a server that authorizes only the training user key", "refuses", ClientVsGo(c, k, goHost, training.UserPub, false));
+            // 4. SSH server: ssh.exe with the training user key must be refused, and the training host key must not be what it shows.
+            ProbeRequest sr = ProbeKit.Request(WireProtocol.Ssh, 0, "127.0.0.1");
+            sr.SshSuite = SshSuite.Modern;
+            Use(sr, k.Set);
+            ProbeListener l = Probe.Listen(sr);
+            string known = KnownHosts(c, k.Dir, training.HostKey, l.Port, "known_hosts_training");
+            OpenSshKey.RestrictToCurrentUser(training.UserKey);
+            using (Proc ssh = Proc.Start(Referees.SshExe(c), "-F NUL -o BatchMode=yes -o UserKnownHostsFile=\"" + known + "\" -o StrictHostKeyChecking=yes -o ConnectTimeout=20 -i \"" + training.UserKey + "\" -p " + l.Port + " training@127.0.0.1 echo hello"))
+            {
+                Check.True(ssh.WaitExit(40000) && ssh.ExitCode != 0, "ssh.exe, pinned to the training host key and signing with the training user key, got in. Output: " + ssh.AllOutput);
+            }
+            return "with Credentials set, the glass TLS client refuses a server on the training certificate, the glass TLS server shows a certificate that chains to the learner's root and not the training root, the glass SSH client is refused by a server that authorizes only the training user key, and the glass SSH server refuses the training user key and shows another host key; each refusal has a control";
+        }
     }
 }
