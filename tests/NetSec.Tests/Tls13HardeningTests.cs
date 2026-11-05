@@ -410,18 +410,29 @@ namespace NetSec.Tests
             int _wireIndex;
             readonly int _wireSend, _wireOffset;
 
-            public Duel(Tls13Group group, Flip plainFlip, int wireSend, int wireOffset)
+            public Duel(Tls13Group group, Flip plainFlip, int wireSend, int wireOffset, bool mutual = false)
             {
                 _wireSend = wireSend; _wireOffset = wireOffset;
                 Tls13Options c = TlsKit.Common("client", "server", group, 1);
                 c.TrustAnchors = new[] { new TrainingCa(TlsKit.Keys).RootCertificateDer };
                 c.Tamper = plainFlip;
+                if (mutual)
+                {
+                    ITrainingKey clientKey = TlsKit.Keys.Find(KeyIds.SshClient);
+                    c.CertificateChain = new[] { TrainingPki.ClientCertificate(new TrainingCa(TlsKit.Keys), clientKey) };
+                    c.SigningSeed = clientKey.CopyMaterial();
+                }
                 Client = Tls13Engine.CreateClient(c);
                 Tls13Options s = TlsKit.Common("server", "client", group, 2);
                 ITrainingKey key = TlsKit.Keys.Find(KeyIds.ServerTlsEd25519);
                 s.CertificateChain = new[] { TrainingPki.ServerCertificate(new TrainingCa(TlsKit.Keys), key) };
                 s.SigningSeed = key.CopyMaterial();
                 s.Tamper = plainFlip;
+                if (mutual)
+                {
+                    s.RequireClientCertificate = true;
+                    s.TrustAnchors = new[] { new TrainingCa(TlsKit.Keys).RootCertificateDer };
+                }
                 Server = Tls13Engine.CreateServer(s);
             }
 
@@ -478,18 +489,18 @@ namespace NetSec.Tests
             }
         }
 
-        static List<Sent> Baseline(Tls13Group group)
+        static List<Sent> Baseline(Tls13Group group, bool mutual = false)
         {
-            Duel duel = new Duel(group, null, -1, 0);
+            Duel duel = new Duel(group, null, -1, 0, mutual);
             duel.Run();
             Assert.Equal(Outcome.Completed, duel.Outcome);
             return duel.Sends;
         }
 
         /// <summary>Runs one flip, and writes one line for anything the sweep does not accept.</summary>
-        static void Check(List<string> faults, Dictionary<string, int> tally, Tls13Group group, string what, Flip plain, int wireSend, int wireOffset, Func<bool> mayStallOrPass)
+        static void Check(List<string> faults, Dictionary<string, int> tally, Tls13Group group, string what, Flip plain, int wireSend, int wireOffset, Func<bool> mayStallOrPass, bool mutual = false)
         {
-            Duel duel = new Duel(group, plain, wireSend, wireOffset);
+            Duel duel = new Duel(group, plain, wireSend, wireOffset, mutual);
             try { duel.Run(); }
             catch (Exception e)
             {
@@ -543,6 +554,37 @@ namespace NetSec.Tests
             Assert.True(tally.ContainsKey(Tls13Codes.AeadTag) && tally.ContainsKey(Tls13Codes.FinishedMismatch) && tally.ContainsKey(Tls13Codes.CertVerifyBad) && tally.ContainsKey(ChainCheck.BadSignature), Report(faults, tally));
         }
 
+        /// <summary>The client's flight in mutual TLS: a server reads these bytes before the client has proved anything, so a throw here is reachable by anyone who connects.</summary>
+        [Fact]
+        public void Every_byte_of_the_client_flight_in_mutual_tls_gives_a_named_result_at_the_server()
+        {
+            List<Sent> sends = Baseline(Tls13Group.X25519, true);
+            List<string> faults = new List<string>();
+            Dictionary<string, int> tally = new Dictionary<string, int>();
+            int covered = 0;
+            for (int k = 0; k < sends.Count; k++)
+            {
+                Sent sent = sends[k];
+                if (sent.Actor != "client" || sent.Message == "ClientHello") continue;
+                covered++;
+                for (int offset = 0; offset < sent.PlainLength; offset++)
+                {
+                    int at = offset;
+                    Check(faults, tally, Tls13Group.X25519, "mutual client " + sent.Message + " plain+" + at, new Flip { Send = k, Offset = at }, -1, 0, () => at >= 1 && at <= 3, true);
+                }
+                for (int offset = 0; offset < sent.WireLength; offset++)
+                {
+                    if (SkipSealedByte(sent, offset)) continue;
+                    int at = offset;
+                    Check(faults, tally, Tls13Group.X25519, "mutual client " + sent.Message + " wire+" + at, new Flip(), k, at, () => at == 3 || at == 4, true);
+                }
+            }
+            _output.WriteLine(Report(faults, tally));
+            Assert.True(faults.Count == 0, Report(faults, tally));
+            Assert.Equal(3, covered);
+            Assert.True(tally.ContainsKey(DerReader.ParseCode) && tally.ContainsKey(Tls13Codes.FinishedMismatch), Report(faults, tally));
+        }
+
         [Fact]
         public void Every_byte_outside_the_ml_kem_values_of_a_hybrid_hello_gives_a_named_result_and_each_ml_kem_value_is_sampled()
         {
@@ -567,6 +609,62 @@ namespace NetSec.Tests
             _output.WriteLine(Report(faults, tally));
             Assert.True(faults.Count == 0, Report(faults, tally));
             Assert.True(tally.ContainsKey(Tls13Codes.AeadTag), Report(faults, tally));
+        }
+    }
+
+    /// <summary>Jared's verdict on PR 20: mutual TLS gives the record rules new reach on the server, before the client proves anything.</summary>
+    public class Tls13MutualServerTests
+    {
+        static Tls13Engine ServerWaitingForClient(out byte[] clientHello)
+        {
+            Tls13Options s = TlsKit.Common("server", "client", Tls13Group.X25519, 2);
+            ITrainingKey key = TlsKit.Keys.Find(KeyIds.ServerTlsEd25519);
+            s.CertificateChain = new[] { TrainingPki.ServerCertificate(new TrainingCa(TlsKit.Keys), key) };
+            s.SigningSeed = key.CopyMaterial();
+            s.RequireClientCertificate = true;
+            s.TrustAnchors = new[] { new TrainingCa(TlsKit.Keys).RootCertificateDer };
+            Tls13Engine server = Tls13Engine.CreateServer(s);
+            server.Start();
+            clientHello = TlsKit.Client(Tls13Group.X25519).Start().Wire;
+            Assert.Equal(EngineStatus.Handshaking, server.Feed(clientHello, 0, clientHello.Length).Status);
+            return server;
+        }
+
+        public static IEnumerable<object[]> ClearRecords()
+        {
+            byte[] emptyCertificate = Tls13Messages.CertificateMessage(new byte[0][]);
+            yield return new object[] { "empty Certificate", RecordProtection.PlainRecord(ContentType.Handshake, 0x0303, emptyCertificate, 0, emptyCertificate.Length) };
+            yield return new object[] { "close_notify", RecordProtection.PlainRecord(ContentType.Alert, 0x0303, new byte[] { 1, 0 }, 0, 2) };
+            byte[] finished = Tls13Messages.Finished(new byte[32]);
+            yield return new object[] { "Finished", RecordProtection.PlainRecord(ContentType.Handshake, 0x0303, finished, 0, finished.Length) };
+        }
+
+        /// <summary>A forged empty Certificate must not read as a client with no certificate. The reason a learner sees must be the true one.</summary>
+        [Theory]
+        [MemberData(nameof(ClearRecords))]
+        public void A_clear_record_gets_the_true_reason_while_the_server_waits_for_the_client(string name, byte[] record)
+        {
+            Assert.NotNull(name);
+            byte[] hello;
+            Tls13Engine server = ServerWaitingForClient(out hello);
+            EngineOutput output = server.Feed(record, 0, record.Length);
+            Assert.Equal(EngineStatus.Failed, output.Status);
+            Assert.Equal(ErrorCodes.UnexpectedMessage, output.Error.Code);
+        }
+
+        [Fact]
+        public void A_client_certificate_with_a_bad_date_is_named_at_the_server_and_never_a_throw()
+        {
+            ITrainingKey clientKey = TlsKit.Keys.Find(KeyIds.SshClient);
+            byte[] good = TrainingPki.ClientCertificate(new TrainingCa(TlsKit.Keys), clientKey);
+            FieldMark before = Certificate.Parse(good).Marks(0, true).Single(m => m.Name == "cert.not_before");
+            byte[] bad = (byte[])good.Clone();
+            bad[before.Offset + 4] = (byte)'9';
+            Assert.Equal(DerReader.ParseCode, Assert.Throws<ParseFailure>(() => Certificate.Parse(bad)).Code);
+
+            byte[] message = Tls13Messages.CertificateMessage(new[] { bad });
+            TraceField[] fields = Tls13Messages.FieldsOf(HandshakeType.Certificate, message, false);
+            Assert.NotEmpty(fields);
         }
     }
 

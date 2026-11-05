@@ -85,10 +85,10 @@ Each row is an `AttackCatalog` row. The expected check is what the engine does, 
 
 ## What the lessons must state (from the verdict on PR 28)
 
-1. **`L5-replace-key-share` does not show that the key share alone caused the failure.** A flip in any byte of either hello gives the same `AEAD tag`, because each hello is in the transcript the keys come from. Only the shared secret tells them apart: `x25519_shared` differs between the sides after a key share flip, and it matches after a flip of the hello's random. A test pins both.
+1. **`L5-replace-key-share` does not show that the key share alone caused the failure.** A flip in most bytes of either hello gives the same `AEAD tag`, because each hello is in the transcript the keys come from. In the hybrid sweep, 245 of 315 flips gave `AEAD tag`. The other 70 gave a parse, parameter, or other named result, or a stall. Only the shared secret tells them apart: `x25519_shared` differs between the sides after a key share flip, and it matches after a flip of the hello's random. A test pins both.
 2. **The certificate check is partial.** It reads the chain, the signatures, the dates, the name, and `basicConstraints` CA. It refuses a critical extension it does not read. It does not read `pathLen`, `keyUsage`, or name constraint values, and it does not date the trust anchor. A real verifier does more (RFC 5280 section 6).
 3. **A clean end needs a sealed `close_notify`.** After keys exist, a clear alert is refused, because anyone on the path can forge one. A transport close with no `close_notify` is `TLS13_TRUNCATED`: the data may be cut short (RFC 8446 section 6.1).
-4. **A flipped length field can wait instead of fail.** Each other byte of a handshake gets a named check, at once. `Tls13FlipSweepTests` holds this.
+4. **Almost every flipped byte of a handshake gets a named check, at once.** `Tls13FlipSweepTests` holds this, with two exceptions. A flip in a length field can wait for bytes that never come (15 of 1,099 X25519 flips), and the pump's read deadline names that wait. A flip in a clear record's legacy version bytes completes (4 of 1,099), because RFC 8446 section 5.1 says a receiver ignores them.
 5. **This engine has no `KeyUpdate` and no record count limit.** A long run stops by name at a peer's `KeyUpdate`. RFC 8446 section 5.5 limits records per key, and no lab reaches that limit.
 
 ## Field names (`fields[].gloss`)
