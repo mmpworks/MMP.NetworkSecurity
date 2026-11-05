@@ -309,7 +309,7 @@
         {
           "id": "L10-C16",
           "text": "The lab accepts a proof whose iat is within 60 seconds, and it keeps the used proof ids for one run only.",
-          "source": "docs/lesson-10-names.md, Check name table, proof age row (branch feat/s6, commit beb1447); review of PR #20, Advisory 2"
+          "source": "docs/lesson-10-names.md, Check name table, proof age row (branch feat/s6, commit beb1447); review of PR #20, Advisory 2; src/NetSec.Core/Labs/Lesson10Auth.cs, Session._seen (a per-session dictionary of used challenges and proof ids, branch feat/s6)"
         }
       ],
       "unlock": { "mode": "action", "ref": "L10-S13-T1" }
@@ -347,7 +347,7 @@
       "title": "Three ways a client proves itself",
       "text": [
         "You have now seen the main ways to prove who a client is: a certificate in TLS (mutual TLS), a signed challenge, and a token with a proof.",
-        "Each one rests on a key the server linked to the client ahead of time. A signature on its own proves only that the signer holds a key. The enrolment turns that into who.",
+        "Each one rests on a key or certificate the server trusts ahead of time. A signature on its own proves only that the signer holds a key. The enrolment turns that into who.",
         "Mutual TLS works like the server side in lesson 4, with the client signing the handshake. This lab does not run mutual TLS yet.",
         "Built to show the parts. Do not copy."
       ],
