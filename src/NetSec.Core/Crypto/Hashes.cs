@@ -9,6 +9,15 @@ namespace NetSec.Crypto
         public static IHash Md5() { return new Md5Hash(); }
         public static IHash Sha1() { return new Sha1Hash(); }
         public static IHash Sha256() { return new Sha256Hash(); }
+
+        /// <summary>
+        /// Teaching entry point for the length-extension attack in lesson 2. No protocol in this course calls it.
+        /// A SHA-256 digest is the whole internal state, so this continues a hash from its digest with no knowledge of the message.
+        /// bytesAlreadyHashed counts the message and its padding, is a multiple of 64, and goes into the length that Finish writes.
+        /// HMAC is not open to this attack: its outer hash covers the inner digest under the key.
+        /// </summary>
+        public static IHash Sha256Resume(byte[] digest, long bytesAlreadyHashed) { return Sha256Hash.Resume(digest, bytesAlreadyHashed); }
+
         public static IHash Sha384() { return Sha512Hash.New384(); }
         public static IHash Sha512() { return Sha512Hash.New512(); }
         public static IHash Sha3_256() { return new Sha3Hash(32); }
