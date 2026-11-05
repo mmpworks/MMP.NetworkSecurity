@@ -1,0 +1,171 @@
+{
+  "summary": {
+    "schema": 1,
+    "timestamp": "2026-11-05T07:18:32.0947280-06:00",
+    "machine": "BEAST",
+    "command": "run.ps1 -Clauses A7,A9",
+    "productRoot": "E:\\dev\\ns-s4tls11",
+    "productCommit": "da24728",
+    "acceptanceCommit": "b041dd0",
+    "freshClone": false,
+    "productPresent": true,
+    "M": 204,
+    "selected": 12,
+    "pass": 12,
+    "fail": 0,
+    "notRun": 0,
+    "reasons": [],
+    "selfChecks": {
+      "selected": 0,
+      "pass": 0,
+      "fail": 0,
+      "notRun": 0
+    }
+  },
+  "results": [
+    {
+      "id": "A7.alert70.modern-server-beside-legacy-control.cf",
+      "assertion": "A7",
+      "slice": "S4",
+      "group": "tls11",
+      "build": "cf",
+      "referee": "OpenSSL 3.5.7",
+      "status": "PASS",
+      "reason": "",
+      "detail": "control opens against TLS 1.1; the TLS 1.3-only server answers with alert 70 (protocol_version)",
+      "ms": 6944
+    },
+    {
+      "id": "A7.alert70.modern-server-beside-legacy-control.net10",
+      "assertion": "A7",
+      "slice": "S4",
+      "group": "tls11",
+      "build": "net10",
+      "referee": "OpenSSL 3.5.7",
+      "status": "PASS",
+      "reason": "",
+      "detail": "control opens against TLS 1.1; the TLS 1.3-only server answers with alert 70 (protocol_version)",
+      "ms": 5376
+    },
+    {
+      "id": "A7.downgrade-sentinel.tls13-client-beside-control.cf",
+      "assertion": "A7",
+      "slice": "S4",
+      "group": "tls11",
+      "build": "cf",
+      "referee": "OpenSSL 3.5.7",
+      "status": "PASS",
+      "reason": "",
+      "detail": "control opens as TLS 1.3; a hello that offers only TLS 1.1 gives TLS13_DOWNGRADE_SENTINEL and the server random ends in DOWNGRD",
+      "ms": 10758
+    },
+    {
+      "id": "A7.downgrade-sentinel.tls13-client-beside-control.net10",
+      "assertion": "A7",
+      "slice": "S4",
+      "group": "tls11",
+      "build": "net10",
+      "referee": "OpenSSL 3.5.7",
+      "status": "PASS",
+      "reason": "",
+      "detail": "control opens as TLS 1.3; a hello that offers only TLS 1.1 gives TLS13_DOWNGRADE_SENTINEL and the server random ends in DOWNGRD",
+      "ms": 8231
+    },
+    {
+      "id": "A7.tls11.openssl.ecdhe-cbc.cf",
+      "assertion": "A7",
+      "slice": "S4",
+      "group": "tls11",
+      "build": "cf",
+      "referee": "OpenSSL 3.5.7",
+      "status": "PASS",
+      "reason": "",
+      "detail": "TLS 1.1 handshake and echo, OpenSSL reports TLSv1.1 and ECDHE-RSA-AES128-SHA",
+      "ms": 4690
+    },
+    {
+      "id": "A7.tls11.openssl.ecdhe-cbc.net10",
+      "assertion": "A7",
+      "slice": "S4",
+      "group": "tls11",
+      "build": "net10",
+      "referee": "OpenSSL 3.5.7",
+      "status": "PASS",
+      "reason": "",
+      "detail": "TLS 1.1 handshake and echo, OpenSSL reports TLSv1.1 and ECDHE-RSA-AES128-SHA",
+      "ms": 779
+    },
+    {
+      "id": "A7.tls11.openssl.rsa-transport.cf",
+      "assertion": "A7",
+      "slice": "S4",
+      "group": "tls11",
+      "build": "cf",
+      "referee": "OpenSSL 3.5.7",
+      "status": "PASS",
+      "reason": "",
+      "detail": "TLS 1.1 handshake and echo, OpenSSL reports TLSv1.1 and AES128-SHA",
+      "ms": 4674
+    },
+    {
+      "id": "A7.tls11.openssl.rsa-transport.net10",
+      "assertion": "A7",
+      "slice": "S4",
+      "group": "tls11",
+      "build": "net10",
+      "referee": "OpenSSL 3.5.7",
+      "status": "PASS",
+      "reason": "",
+      "detail": "TLS 1.1 handshake and echo, OpenSSL reports TLSv1.1 and AES128-SHA",
+      "ms": 4204
+    },
+    {
+      "id": "A9.cf.binaries-reference-cf-mscorlib",
+      "assertion": "A9",
+      "slice": "All",
+      "group": "binproof",
+      "build": "host",
+      "referee": "CF references and System.Reflection.Metadata",
+      "status": "PASS",
+      "reason": "",
+      "detail": "4 of 4 vectors",
+      "ms": 76
+    },
+    {
+      "id": "A9.cf.compiles-against-reference-assemblies-with-langversion-3",
+      "assertion": "A9",
+      "slice": "All",
+      "group": "binproof",
+      "build": "host",
+      "referee": "CF references and System.Reflection.Metadata",
+      "status": "PASS",
+      "reason": "",
+      "detail": "src/NetSec.Core and src/NetSec.Core.NetCF use LangVersion 3; the CF project builds against E:\\dev\\tools\\netcf35-ref",
+      "ms": 9028
+    },
+    {
+      "id": "A9.cf.same-suite-passes-on-net48-skips-pinned",
+      "assertion": "A9",
+      "slice": "All",
+      "group": "binproof",
+      "build": "host",
+      "referee": "CF references and System.Reflection.Metadata",
+      "status": "PASS",
+      "reason": "",
+      "detail": "2 of 2 vectors; net10.0 533 passed, net48 533 passed, 0 skipped (all pinned)",
+      "ms": 57547
+    },
+    {
+      "id": "A9.git-ls-files.no-cf-binary",
+      "assertion": "A9",
+      "slice": "All",
+      "group": "binproof",
+      "build": "host",
+      "referee": "CF references and System.Reflection.Metadata",
+      "status": "PASS",
+      "reason": "",
+      "detail": "463 tracked files checked against 42 CF reference files and the CF mscorlib token; none match",
+      "ms": 736
+    }
+  ]
+}
