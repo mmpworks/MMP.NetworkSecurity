@@ -26,6 +26,10 @@ Each correction goes here, newest slice last. Later slices read this file first.
 5. **`RsaPrivate` holds n and d only, so it runs the full-size exponent.** Parsing a PKCS#8 key can drop the CRT values. On a real device this makes a private operation slower than a CRT one by a factor of about 4 (standard estimate, not measured here).
 6. **A2 tests valid ML-KEM exchanges only.** Implicit rejection and the key checks are reached by 36 NIST ACVP records in `tests/NetSec.Tests/vectors/mlkem768-acvp.txt`.
 
+## S2
+
+1. **`openssl genpkey -outform DER` on OpenSSL 3.5.7 wrote a traditional `RSAPrivateKey`, not PKCS#8.** CONTRACT rule 5 needs `PrivateKeyInfo`. Run `openssl pkcs8 -topk8 -nocrypt` after it. The net10 test `An_rsa_key_is_pkcs8_with_its_matching_spki` pins the format.
+2. **`TrainingKeySource.Find` throws `TRAINING_KEY_UNKNOWN` for an unknown id.** It never returns null. A symmetric key's `CopyPublic` gives an empty array.
 ## S7
 
 1. **Timing cases taken one after the other measure the machine, and they do not measure the compare.** This machine has 24 logical CPUs. A whole-case sample of the constant-time compare moved its mean between about 12 and 19 ticks from run to run. Sequential constant-time |t| ran from 3.7 to 230, and a control with two identical cases reached 89. So `TimingLab.Interleaved` takes turns of 100 samples between its two cases, and the lab uses it. `TimingLab.Sample` stays sequential because the contract names it.

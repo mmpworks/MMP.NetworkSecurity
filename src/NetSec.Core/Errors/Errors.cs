@@ -50,5 +50,6 @@ namespace NetSec.Errors
         public const string RsaMessageTooLong = "RSA_MESSAGE_TOO_LONG";
         public const string MlKemKeyInvalid = "MLKEM_KEY_INVALID";
         public const string MlKemCiphertextInvalid = "MLKEM_CIPHERTEXT_INVALID";
+        public const string TrainingKeyUnknown = "TRAINING_KEY_UNKNOWN";
     }
 }
