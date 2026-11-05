@@ -22,6 +22,15 @@ namespace Acceptance
 
         static readonly Regex ForbiddenPath = new Regex(@"(^|/)\.security/|\.(pfx|p12|db|key|ndjson)$|(^|/)(master\.key|id_rsa|id_ed25519|known_hosts)$", RegexOptions.IgnoreCase);
 
+        /// <summary>
+        /// The golden traces (acceptance/golden/**/*.ndjson) are tracked on purpose. They hold only the built-in training keys, which are public by design.
+        /// Only the .ndjson rule is lifted for them: any other forbidden name under that folder, and the PEM scan, still apply.
+        /// </summary>
+        static bool IsGoldenTrace(string path)
+        {
+            return path.StartsWith("acceptance/golden/", StringComparison.Ordinal) && path.EndsWith(".ndjson", StringComparison.OrdinalIgnoreCase);
+        }
+
         static string Marker { get { return "PRIV" + "ATE KEY"; } }
 
         // A PEM block of key material: the header line, a body of base64, and the footer. A sentence that names the header (a document, a test message)
@@ -52,7 +61,7 @@ namespace Acceptance
             List<string> files = Tracked(root);
             foreach (string f in files)
             {
-                if (ForbiddenPath.IsMatch(f)) { problems.Add(f + ": a path that holds keys or session data is tracked"); continue; }
+                if (ForbiddenPath.IsMatch(f) && !IsGoldenTrace(f)) { problems.Add(f + ": a path that holds keys or session data is tracked"); continue; }
                 if (Array.IndexOf(PemAllowList, f) >= 0) continue;
                 string full = Path.Combine(root, f.Replace('/', Path.DirectorySeparatorChar));
                 FileInfo fi = new FileInfo(full);
