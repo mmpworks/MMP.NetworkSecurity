@@ -138,6 +138,16 @@ namespace Acceptance
             return run;
         }
 
+        /// <summary>
+        /// A slice that is not built yet answers session.start with error code LESSON_NOT_BUILT. That is NOT RUN LESSON_NOT_BUILT, never a FAIL.
+        /// Any other error stays a FAIL. A secret leak is found by the scan, not here.
+        /// </summary>
+        static void RequireBuilt(SessionRun run, int lesson)
+        {
+            if (run.Error != null && MiniJson.Str(run.Error, "code") == "LESSON_NOT_BUILT")
+                throw new NotRunException("LESSON_NOT_BUILT", "the Host reports lesson " + lesson + " as not built yet");
+        }
+
         static int SecretCount(SessionRun run)
         {
             int n = 0;
@@ -171,6 +181,7 @@ namespace Acceptance
                 {
                     // Control first: a glass-box session shows its secrets, so a scan of the session can see them.
                     SessionRun glass = RunSession(h, 5, "glass", null);
+                    RequireBuilt(glass, 5);
                     Check.True(glass.Error == null, "glass session reported an error: " + (glass.Error == null ? "" : glass.Error.ToString()));
                     Check.True(glass.TrainingOnly && glass.TransportKind == "glass", "glass session did not say trainingOnly with transportKind glass");
                     Check.True(SecretCount(glass) > 0, "the glass-box control session shows no secrets, so the scan cannot prove absence in real mode");
@@ -178,6 +189,7 @@ namespace Acceptance
                     Check.True(glassKeylog.IsSuccessStatusCode, "the key log of a glass session got HTTP " + (int)glassKeylog.StatusCode);
 
                     SessionRun real = RunSession(h, 5, "real", null);
+                    RequireBuilt(real, 5);
                     Check.True(real.Error == null, "real session reported an error: " + (real.Error == null ? "" : real.Error.ToString()));
                     Check.True(!real.TrainingOnly && real.TransportKind == "os", "real session reported trainingOnly=" + real.TrainingOnly + " transportKind=" + real.TransportKind + "; expected false and os");
                     Check.True(real.Events.Count > 0, "real session sent no trace events");
@@ -223,12 +235,14 @@ namespace Acceptance
             using (HostProc h = HostProc.Start(c, "a14-bindings", null))
             {
                 Tally t = new Tally();
+                int notBuilt = 0;
                 foreach (string file in files)
                 {
                     int lesson = int.Parse(Regex.Match(Path.GetFileName(file), @"lesson-(\d+)\.json").Groups[1].Value);
                     object parsed = MiniJson.Parse(File.ReadAllText(file));
                     List<object> steps = parsed as List<object> ?? MiniJson.Arr(MiniJson.AsObject(parsed), "steps");
                     SessionRun run = RunSession(h, lesson, "glass", null);
+                    if (run.Error != null && MiniJson.Str(run.Error, "code") == "LESSON_NOT_BUILT") { notBuilt++; continue; }
                     if (run.Error != null) { t.Miss("lesson " + lesson, "the Host answered session.start with an error: " + run.Error.ToString()); continue; }
                     if (run.Events.Count == 0) { t.Miss("lesson " + lesson, "the live session produced no trace events, so no binding can be shown"); continue; }
                     foreach (object so in steps)
@@ -251,7 +265,8 @@ namespace Acceptance
                         t.Expect(MiniJson.Str(s, "id") ?? ("lesson " + lesson), found, "no live event of type '" + wantType + "' fits the step's bind (match " + (match == null ? "none" : "given") + "): the binding dangles");
                     }
                 }
-                return t.Done();
+                if (notBuilt == files.Length) throw new NotRunException("LESSON_NOT_BUILT", "the Host reports every lesson with a tour file as not built yet");
+                return t.Done() + (notBuilt > 0 ? "; " + notBuilt + " lessons not built yet were skipped" : "");
             }
         }
 
