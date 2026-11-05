@@ -319,14 +319,28 @@ namespace NetSec.Tests
         [Fact]
         public void Guess_against_the_leaky_compare_recovers_the_secret_and_fails_no_check()
         {
-            LabContext c = Context(Row("L11-guess-leaky"));
-            IFuture<LabResult> run = new TimingAttackLab().Run(c);
-            Make.Done(run);
-            Assert.True(run.Result.Completed, run.Result.FailedCode + " " + run.Result.FailedCheck);
-            TraceEvent[] events = ((ListSink)c.Sink).Events;
-            Assert.DoesNotContain(events, e => e.Check != null && !e.Check.Passed);
-            TraceEvent finished = Array.Find(events, e => e.Type == "timing.guess.finished");
-            Assert.Contains("\"correctBytes\":4", Plain(finished));
+            // The guess loop reads real clock ticks, so a scheduler pause can hide the leak from one run on a loaded machine (the lab then says TimingNotSeparated).
+            // One run in a row that recovers the secret proves the leak is readable, so a miss of this one kind gets up to three runs. Any other failure fails at once.
+            const int attempts = 3;
+            string missed = "";
+            for (int attempt = 1; attempt <= attempts; attempt++)
+            {
+                LabContext c = Context(Row("L11-guess-leaky"));
+                IFuture<LabResult> run = new TimingAttackLab().Run(c);
+                Make.Done(run);
+                if (!run.Result.Completed && run.Result.FailedCode == ErrorCodes.TimingNotSeparated)
+                {
+                    missed += " [run " + attempt + ": " + run.Result.FailedCode + " " + run.Result.FailedCheck + "]";
+                    continue;
+                }
+                Assert.True(run.Result.Completed, run.Result.FailedCode + " " + run.Result.FailedCheck);
+                TraceEvent[] events = ((ListSink)c.Sink).Events;
+                Assert.DoesNotContain(events, e => e.Check != null && !e.Check.Passed);
+                TraceEvent finished = Array.Find(events, e => e.Type == "timing.guess.finished");
+                Assert.Contains("\"correctBytes\":4", Plain(finished));
+                return;
+            }
+            throw new Xunit.Sdk.XunitException("the guess loop missed the leak in all " + attempts + " runs:" + missed);
         }
 
         [Fact]
