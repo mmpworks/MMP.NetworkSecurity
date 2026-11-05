@@ -58,7 +58,7 @@
         {
           "id": "L10-C23",
           "text": "A certificate chain shows that a trusted CA vouched for the key and the name. Name matching is the application's job, and the server must still compare the name with the one it allows.",
-          "source": "Jared's re-check of PR #20, Blocker 2 (comment 6658016121); richard-s1b, lab owner, message of 2026-11-05 on the client name check (docs/lesson-10-names.md, row L10-wrong-client-name, in the lab owner's PR)"
+          "source": "Jared's re-check of PR #20, Blocker 2 (comment 6658016121); richard-s1b, lab owner, message of 2026-11-05 on the client name check (docs/lesson-10-names.md, row L10-wrong-client-name, main commit 21533cc)"
         }
       ],
       "unlock": { "mode": "event" }
@@ -147,7 +147,7 @@
       "text": [
         "A trusted CA can vouch for many keys. A chain that leads to the root shows that the CA vouched for this key under some name. It does not show that the name is the one this server allows.",
         "So the server compares the certificate's name with the name it allows. The check is named client name.",
-        "Try it: connect with an attacker key whose certificate, issued under the same training root, names bank-hsm-admin. The chain is fine and the signature verifies, but the name is wrong. The server refuses with alert 49, access_denied.",
+        "Try it: connect with an attacker key whose certificate, issued under the same training root, names bank-hsm-admin. The chain is fine, but the name is wrong, so the server refuses before it reads the signature. It sends alert 49, access_denied.",
         "The check compares a name only. If the CA issues that name to the wrong key, the check passes. That is why the choice of CA matters."
       ],
       "glossary": [],
@@ -163,7 +163,7 @@
         {
           "id": "L10-C24",
           "text": "In the lab the server compares the client certificate's name with the one it allows, and refuses a certificate for bank-hsm-admin that was issued under the training root, with code TLS13_CLIENT_NAME_REFUSED and alert 49.",
-          "source": "richard-s1b, lab owner, message of 2026-11-05: row L10-wrong-client-name, check client name (actor server), code TLS13_CLIENT_NAME_REFUSED, alert 49; docs/lesson-10-names.md in the lab owner's PR"
+          "source": "richard-s1b, lab owner, message of 2026-11-05: row L10-wrong-client-name, check client name (actor server), code TLS13_CLIENT_NAME_REFUSED, alert 49; docs/lesson-10-names.md, main commit 21533cc"
         },
         {
           "id": "L10-C25",
