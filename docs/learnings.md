@@ -75,6 +75,10 @@ Each correction goes here, newest slice last. Later slices read this file first.
 6. **A key from the wire gets a shape check before any arithmetic.** `Tls11RsaKeys.TryReadPublic` refuses an even modulus, a modulus under 59 bytes, and an even exponent or one below 3, as `TLS11_SERVER_KEY_UNUSABLE`. Without it `BigUInt` throws an unnamed `ArgumentException` on an even modulus and `Pkcs1` throws `RSA_MESSAGE_TOO_LONG`.
 7. **In Git Bash, `-p:NetCFRefDir=E:\dev\tools\netcf35-ref` loses its backslashes.** The build then says the CF references are missing. Use forward slashes or leave the flag out, because `Directory.Build.props` holds that default.
 
+8. **Review of PR 49 (Jared), fixed in the follow-up.** OpenSSL's default client refuses a server with no `renegotiation_info` answer, even at `@SECLEVEL=0`, so the server role needs an outside judge beside the client role. A7 judges only the client, and `Tls11Tests` now runs `s_client` against the glass server.
+9. **A failed engine's alert write can hit a closed socket.** `EnginePump` then reported `LINK_LOST` over the engine's named failure. The pump now keeps the engine's failure. This applies to TLS 1.3 and SSH too.
+10. **TLS has no flow window, so `GlassTlsChannel` caps its unread queue at 16 MiB and then names `CHANNEL_BUFFER_FULL`.** The cap is a call: a quarter of the CE profile's 64 MB. A real device needs a measured number.
+
 ## S6
 
 1. **Name known skips in the PR body.** A clean PR body said "a change to any token character is refused" while a test skipped the last character. The skip was the defect showing. A skip goes in the body, with its reason.

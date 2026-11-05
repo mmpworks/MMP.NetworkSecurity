@@ -39,6 +39,8 @@ The `tls13` half uses the names of lesson 5 (`docs/lessons-4-5-names.md`). Only 
 | 12 | `ApplicationData` | server | Protected, as below |
 | 13 | `Alert` | client | Protected. A `close_notify` |
 
+A side that fails a check then sends one fatal `Alert`, in clear before its keys change and protected after. A peer that sent an alert or closed gets none.
+
 A protected record has the fields `type`, `version`, `length`, `iv`, `cipher`. `iv` has `visibleToWire` true. `cipher` has `visibleToWire` false. In `plain` you see the handshake message or the application bytes. The MAC and the padding sit inside `cipher` and are not in `plain`.
 
 Round trips before the client can send data: 2 in TLS 1.1. The UI counts them from the trace.
@@ -60,14 +62,16 @@ Round trips before the client can send data: 2 in TLS 1.1. The UI counts them fr
 | `message` (check name) | `actor` | Failure code | When it runs |
 |---|---|---|---|
 | `certificate chain` | `client` | `CHAIN_NO_ANCHOR`, `CERT_SIGNATURE`, `CERT_VALIDITY`, `CERT_NAME` | On `Certificate` |
-| `server key shape` | `client` | `TLS11_SERVER_KEY_UNUSABLE` | On `Certificate`. The key from the wire is too short, even, or not RSA |
+| `server key shape` | `client` | `TLS11_SERVER_KEY_UNUSABLE` | On `Certificate`. The key from the wire is below 2048 bits, even, or not RSA |
 | `ServerKeyExchange signature` | `client` | `TLS11_SKE_SIGNATURE` | On `ServerKeyExchange` |
 | `Finished compare` | `client`, `server` | `TLS11_FINISHED_MISMATCH` | On `Finished` |
-| `record HMAC` | receiver | `TLS11_RECORD_MAC` | On each protected record. Bad padding gives the same code |
+| `record HMAC` | receiver | `TLS11_RECORD_MAC` | On each protected record. Bad padding gives the same code. A bad RSA premaster ends here too, on the client's sealed `Finished`, and not at `Finished compare` |
 | `protocol_version alert` | `client` | `TLS11_ALERT_PROTOCOL_VERSION` | A fail only. Alert 70 arrived |
 | `peer alert` | receiver | `TLS11_ALERT` | A fail only. Another fatal alert arrived |
 | `version offered` | `client`, `server` | `TLS11_VERSION_REFUSED` | A fail only |
 | `suite offered` | `client`, `server` | `TLS11_SUITE_REFUSED` | A fail only |
+| `compression offered` | `client`, `server` | `TLS11_COMPRESSION_REFUSED` | A fail only |
+| `message shape` | receiver | `TLS11_CCS_BODY`, `TLS11_RENEGOTIATION_INFO`, `TLS11_RECORD_OVERFLOW`, and parse codes | A fail only |
 | `downgrade sentinel` | `client` on `tls13` | `TLS13_DOWNGRADE_SENTINEL` | A fail only. Read on the TLS 1.3 client |
 
 ## Attacks
@@ -97,4 +101,4 @@ The sentinel helps only a client that speaks TLS 1.3. A TLS 1.1 client has nothi
 | RFC 8996 retires TLS 1.1 | RFC 8996 |
 | CBC with MAC-then-encrypt leaves padding oracles, such as Lucky13. The explicit IV stops BEAST | `docs/prd.md` accuracy rule 3 |
 | RSA key transport lets an attacker record now and decrypt after a key theft | `docs/prd.md` accuracy rule 3 |
-| This engine computes the MAC on bad padding too, and managed code gives no timing guarantee. Do not state that it resists Lucky13 | `src/NetSec.Core/Tls11/Tls11Records.cs` |
+| This engine computes the MAC on bad padding too, and managed code gives no timing guarantee. The result does not tell an attacker which fault it was, and the time can: one run on one machine showed 49.7 against 40.2 microseconds per record. Do not state that it resists Lucky13 | `src/NetSec.Core/Tls11/Tls11Records.cs` |

@@ -336,7 +336,8 @@ namespace NetSec.Io
 
         void Conclude()
         {
-            End(_linkError);
+            // A failed engine's last write is its alert, and the peer may already be gone. The engine's named failure is the news, so a lost write does not replace it.
+            End(_engine.Status == EngineStatus.Failed ? null : _linkError);
         }
 
         /// <summary>Ends the run once. A link error wins over the engine's status, because the engine never saw the failure.</summary>

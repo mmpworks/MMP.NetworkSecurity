@@ -1,3 +1,6 @@
+using NetSec.Errors;
+using NetSec.Pki;
+
 namespace NetSec.Tls11
 {
     /// <summary>The stable failure codes and check names of the TLS 1.1 engine. docs/lesson-tls11-names.md lists them for the tours.</summary>
@@ -15,6 +18,37 @@ namespace NetSec.Tls11
         public const string RecordOverflow = "TLS11_RECORD_OVERFLOW";
         public const string RecordHeader = "TLS11_RECORD_HEADER";
         public const string EngineFault = "TLS11_ENGINE_FAULT";
+        public const string CompressionRefused = "TLS11_COMPRESSION_REFUSED";
+        public const string CcsBody = "TLS11_CCS_BODY";
+        public const string RenegotiationInfo = "TLS11_RENEGOTIATION_INFO";
+
+        /// <summary>The alert a failure owes the peer (RFC 4346 section 7.2.2). Internal_error (80) covers a code with no row.</summary>
+        public static int AlertFor(string code)
+        {
+            switch (code)
+            {
+                case RecordMac: return 20;
+                case RecordOverflow: return 22;
+                case ErrorCodes.UnexpectedMessage: return 10;
+                case VersionRefused: return 70;
+                case SuiteRefused: return 40;
+                case ChainCheck.NoAnchor: return 48;
+                case ChainCheck.Validity: return 45;
+                case ChainCheck.Name:
+                case ChainCheck.BadSignature: return 42;
+                case ServerKeyUnusable: return 43;
+                case FinishedMismatch:
+                case SkeSignature: return 51;
+                case CompressionRefused:
+                case CcsBody:
+                case EcdheZeroShared:
+                case RenegotiationInfo: return 47;
+                case ErrorCodes.ParseTruncated:
+                case RecordHeader:
+                case DerReader.ParseCode: return 50;
+                default: return 80;
+            }
+        }
     }
 
     public static class Tls11Checks
@@ -29,6 +63,7 @@ namespace NetSec.Tls11
         public const string PeerAlert = "peer alert";
         public const string VersionOffered = "version offered";
         public const string SuiteOffered = "suite offered";
+        public const string CompressionOffered = "compression offered";
         public const string MessageShape = "message shape";
     }
 }

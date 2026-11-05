@@ -22,6 +22,7 @@ namespace NetSec.Tls11
         readonly Tls11RecordReader _records = new Tls11RecordReader();
         readonly Tls11HandshakeReader _handshake = new Tls11HandshakeReader();
         readonly Queue<byte[]> _waitingToSend = new Queue<byte[]>();
+        bool _noAlertOwed;
 
         Tls11Engine(StepTable<Tls11Session> table, Tls11Options options, string peer)
         {
@@ -88,17 +89,33 @@ namespace NetSec.Tls11
             catch (ArgumentException refused) { _machine.Fail(Tls11Codes.EngineFault, Tls11Checks.MessageShape, refused.Message, null); }
             catch (ArithmeticException refused) { _machine.Fail(Tls11Codes.EngineFault, Tls11Checks.MessageShape, refused.Message, null); }
             catch (IndexOutOfRangeException refused) { _machine.Fail(Tls11Codes.EngineFault, Tls11Checks.MessageShape, refused.Message, null); }
-            return _machine.TakeOutput();
+            return Take();
         }
 
         public EngineOutput Command(EngineCommand c)
         {
             if (c.Kind == EngineCommandKind.PeerClosed && !_machine.IsEnded)
+            {
+                _noAlertOwed = true;
                 _machine.Fail(ErrorCodes.PeerClosedEarly, "peer stayed until the end", "the peer closed in state " + _machine.State + " with no close_notify", null);
+            }
             else if (c.Kind == EngineCommandKind.Close)
                 Close();
             else if (c.Kind == EngineCommandKind.Send)
                 Send(c.Bytes);
+            return Take();
+        }
+
+        /// <summary>After each call: a failure owes the peer one fatal alert (RFC 4346 section 7.2.2), unless the peer ended the session first.</summary>
+        EngineOutput Take()
+        {
+            if (_machine.Status == EngineStatus.Failed && !_noAlertOwed)
+            {
+                _noAlertOwed = true;
+                byte[] alert = Tls11Messages.BuildAlert(Tls11Messages.FatalLevel, Tls11Codes.AlertFor(_machine.Error.Code));
+                TraceField[] fields = _session.OutboundProtected ? Tls11Messages.ProtectedFields(alert.Length) : Tls11Messages.ClearFields(Tls11Messages.AlertKey, alert, _session.Options.Suite);
+                _machine.Perform(AppStep, Effect.Send(Tls11Messages.AlertName, alert, fields));
+            }
             return _machine.TakeOutput();
         }
 
@@ -111,10 +128,15 @@ namespace NetSec.Tls11
                 _machine.Fail(Tls11Codes.RecordMac, Tls11Checks.RecordHmac, "a record failed its MAC or padding check", null);
                 return;
             }
+            if (content.Length > Tls11RecordCipher.MaxContent)
+            {
+                _machine.Fail(Tls11Codes.RecordOverflow, Tls11Checks.MessageShape, "a record holds " + content.Length + " bytes of content, and the limit is " + Tls11RecordCipher.MaxContent, null);
+                return;
+            }
             switch (record.Type)
             {
                 case Tls11Content.Handshake: HandleHandshake(content, wasProtected); break;
-                case Tls11Content.ChangeCipherSpec: DispatchWhole(Tls11Messages.ChangeCipherSpecKey, content, wasProtected); break;
+                case Tls11Content.ChangeCipherSpec: HandleChangeCipherSpec(content, wasProtected); break;
                 case Tls11Content.Alert: HandleAlert(content, wasProtected); break;
                 case Tls11Content.ApplicationData: HandleData(content, wasProtected); break;
                 default: _machine.Fail(ErrorCodes.UnexpectedMessage, "message allowed in this state", "a record has content type " + record.Type, null); break;
@@ -140,10 +162,22 @@ namespace NetSec.Tls11
             _machine.Dispatch(Inbound(key, content, content, wasProtected));
         }
 
+        /// <summary>Half a message from before the keys changed would join the protected bytes after them, and the wait for the rest would have no end. So it fails here.</summary>
+        void HandleChangeCipherSpec(byte[] content, bool wasProtected)
+        {
+            if (!_handshake.IsEmpty)
+            {
+                _machine.Fail(ErrorCodes.UnexpectedMessage, "message allowed in this state", "a ChangeCipherSpec arrived in the middle of a handshake message", null);
+                return;
+            }
+            DispatchWhole(Tls11Messages.ChangeCipherSpecKey, content, wasProtected);
+        }
+
         void HandleAlert(byte[] content, bool wasProtected)
         {
             if (content.Length != 2) throw new ParseFailure(ErrorCodes.ParseTruncated, "an alert has " + content.Length + " bytes, and it needs 2");
             AlertReceived = content[1];
+            _noAlertOwed = true;
             DispatchWhole(Tls11Messages.AlertKey, content, wasProtected);
         }
 
