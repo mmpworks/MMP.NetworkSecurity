@@ -18,7 +18,10 @@ namespace NetSec.Ssh
 
         const string ServiceUserauth = "ssh-userauth", ServiceConnection = "ssh-connection", MethodPublicKey = "publickey";
         const int X25519Size = 32;
-        const int OpenAdministrativelyProhibited = 1, OpenUnknownType = 3;
+        const int OpenAdministrativelyProhibited = 1, OpenUnknownType = 3, OpenResourceShortage = 4;
+
+        /// <summary>Counts each request: a normal login takes 3 (none, query, signed). A query also answers "is this key allowed", so queries count too.</summary>
+        const int MaxAuthRequests = 10;
 
         public static readonly StepTable<SshSession> Table = Build();
 
@@ -61,6 +64,7 @@ namespace NetSec.Ssh
             s.PeerKexInit = m.Body;
             List<StepEffect> effects = new List<StepEffect>();
             effects.Add(Effect.Check(SshChecks.Algorithm, SshCodes.NoCommonAlg));
+            effects.Add(SshKex.StrictNote(s));
             effects.AddRange(SshKex.WeakNotes(s));
             return StepDecision.Advance(effects.ToArray());
         }
@@ -120,6 +124,8 @@ namespace NetSec.Ssh
         /// </summary>
         static StepDecision ReadUserauth(SshSession s, InboundMessage m)
         {
+            if (++s.AuthRequests > MaxAuthRequests)
+                return StepDecision.Fail(SshCodes.AuthTries, SshChecks.AuthTries, "the client sent " + s.AuthRequests + " userauth requests, and this server takes " + MaxAuthRequests);
             ByteReader r = new ByteReader(m.Body, 1, m.Body.Length - 1, true);
             string user = SshFields.Text(r.Prefixed("user", "id"));
             string service = SshFields.Text(r.Prefixed("service", "id"));
@@ -171,8 +177,16 @@ namespace NetSec.Ssh
             long sender = r.U32("sender", "id");
             long window = r.U32("window", "length");
             long maxPacket = r.U32("maxPacket", "length");
+            if (s.Channels.Count >= SshRows.MaxChannels)
+                return StepDecision.Stay(
+                    Effect.CheckFailed(SshChecks.ChannelLimit, SshCodes.ChannelLimit, "this side holds " + s.Channels.Count + " open channels, the limit"),
+                    OpenFailure(s, sender, OpenResourceShortage, "too many open channels"));
             if (kind == "session")
-                return StepDecision.Stay(s.SealedPacket(SshNames.ChannelOpenConfirmation, SshRows.Confirmation(SshRows.AddRemote(s, sender, window, maxPacket))));
+            {
+                SshChannel session = SshRows.AddRemote(s, sender, window, maxPacket);
+                session.IsSession = true;
+                return StepDecision.Stay(s.SealedPacket(SshNames.ChannelOpenConfirmation, SshRows.Confirmation(session)));
+            }
             if (kind != "direct-tcpip")
                 return StepDecision.Stay(OpenFailure(s, sender, OpenUnknownType, "this server opens session and direct-tcpip channels"));
 
@@ -204,13 +218,14 @@ namespace NetSec.Ssh
             if (channel == null) return refused;
             string request = SshFields.Text(r.Prefixed("request", "id"));
             bool wantReply = r.U8("wantReply", "data") != 0;
-            if (request == "exec") return StepDecision.Stay(RunExec(s, channel, SshFields.Text(r.Prefixed("command", "data")), wantReply));
+            if (request == "exec" && channel.IsSession && !channel.ExecDone) return StepDecision.Stay(RunExec(s, channel, SshFields.Text(r.Prefixed("command", "data")), wantReply));
             if (!wantReply) return StepDecision.Stay();
             return StepDecision.Stay(s.SealedPacket(SshNames.ChannelFailure, new ByteWriter().U8(SshMsg.ChannelFailure).U32(channel.Remote).ToArray()));
         }
 
         static StepEffect[] RunExec(SshSession s, SshChannel channel, string command, bool wantReply)
         {
+            channel.ExecDone = true;
             int exitCode;
             byte[] output = SshRows.RunExec(command, s.User, out exitCode);
             List<StepEffect> effects = new List<StepEffect>();

@@ -345,7 +345,7 @@ namespace NetSec.Tests
             MemoryLink[] links = MemoryLink.Pair();
             GlassTransportFactory factory = new GlassTransportFactory(new TrainingKeySource());
             IFuture<ISecureChannel> server = factory.Open(new TransportRequest { Protocol = WireProtocol.Ssh, Role = EngineRole.Server, Suite = suite, Link = links[1], Random = new SeededRandom(1) });
-            IFuture<ISecureChannel> client = factory.Open(new TransportRequest { Protocol = WireProtocol.Ssh, Role = EngineRole.Client, Suite = suite, Link = links[0], Random = new SeededRandom(2), PeerName = "h", PeerPort = 22 });
+            IFuture<ISecureChannel> client = factory.Open(new TransportRequest { Protocol = WireProtocol.Ssh, Role = EngineRole.Client, Suite = suite, Link = links[0], Random = new SeededRandom(2), PeerName = "h", PeerPort = 22, TrustFirstUse = true });
             Assert.True(client.Wait(60000), "the client did not open");
             ISshChannel channel = Assert.IsAssignableFrom<ISshChannel>(client.Result);
             Assert.Equal(suite == SshSuite.Legacy ? "diffie-hellman-group14-sha1" : "curve25519-sha256", channel.Info.Group);
@@ -429,7 +429,7 @@ namespace NetSec.Tests
         {
             string[] lines = Go(null, 7).Events.Where(e => !e.StreamId.EndsWith("/wire")).OrderBy(e => e.EventId, StringComparer.Ordinal).Select(TraceJson.ToLine).ToArray();
             using (SHA1 sha = SHA1.Create())
-                Assert.Equal("9e63738720149855050bad893caf628548fa5b94", Hex.Encode(sha.ComputeHash(Encoding.UTF8.GetBytes(string.Join("\n", lines)))));
+                Assert.Equal("8505330800f5f38e7319adb5fa8c9d339b7a5013", Hex.Encode(sha.ComputeHash(Encoding.UTF8.GetBytes(string.Join("\n", lines)))));
         }
     }
 }

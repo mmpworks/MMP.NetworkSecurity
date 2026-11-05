@@ -86,6 +86,17 @@ namespace NetSec.Ssh
         public const int HeaderSize = 5;
         public const int MaximumPacket = 35000;
 
+        /// <summary>
+        /// RFC 4253 section 6.4 lets the sequence number wrap at 2^32. RFC 4344 section 3.1 says not to send 2^32 packets under one key, because a
+        /// repeated number makes a MAC collision useful. This engine has no rekey, so it stops by name at the last number.
+        /// </summary>
+        public const long LastSequence = uint.MaxValue;
+
+        public static void CheckSequence(long sequence)
+        {
+            if (sequence > LastSequence) throw new ParseFailure(SshCodes.SequenceExhausted, "this session used all 2^32 sequence numbers, and this lab has no rekey");
+        }
+
         public static int PaddingFor(int payloadLength, int block)
         {
             int padding = block - ((HeaderSize + payloadLength) % block);
@@ -117,21 +128,29 @@ namespace NetSec.Ssh
         ISshCipher _cipher;
         byte[] _macKey;
         Func<IHash> _macHash;
-        uint _sequence;
+        long _sequence;
+
+        public SshPacketWriter() { }
+
+        public SshPacketWriter(uint firstSequence) { _sequence = firstSequence; }
 
         public void Arm(ISshCipher cipher, byte[] macKey, Func<IHash> macHash)
         {
             _cipher = cipher; _macKey = macKey; _macHash = macHash;
         }
 
+        /// <summary>Strict KEX only: the number restarts right after NewKeys, so a packet dropped before NewKeys cannot shift it.</summary>
+        public void ResetSequence() { _sequence = 0; }
+
         public byte[] Seal(byte[] payload, IRandomSource random)
         {
+            SshPacketForm.CheckSequence(_sequence);
             int block = _cipher == null ? SshPacketForm.ClearBlock : SshPacketForm.CipherBlock;
             int padding = SshPacketForm.PaddingFor(payload.Length, block);
             byte[] noise = new byte[padding];
             random.Fill(noise, 0, padding);
             byte[] packet = new ByteWriter().U32(1 + payload.Length + padding).U8(padding).Put(payload).Put(noise).ToArray();
-            uint sequence = _sequence++;
+            uint sequence = (uint)_sequence++;
             if (_cipher == null) return packet;
 
             byte[] mac = Hmac.Compute(_macHash, _macKey, SshPacketForm.MacInput(sequence, packet, packet.Length));
@@ -162,7 +181,11 @@ namespace NetSec.Ssh
         byte[] _macKey;
         Func<IHash> _macHash;
         int _macSize;
-        uint _sequence;
+        long _sequence;
+
+        public SshPacketReader() { }
+
+        public SshPacketReader(uint firstSequence) { _sequence = firstSequence; }
 
         public void Append(byte[] b, int off, int n)
         {
@@ -171,6 +194,11 @@ namespace NetSec.Ssh
             Buffer.BlockCopy(b, off, joined, _pending.Length, n);
             _pending = joined;
         }
+
+        /// <summary>How many packets this reader has taken since the last reset. Strict KEX reads this to prove KexInit came first.</summary>
+        public long Sequence { get { return _sequence; } }
+
+        public void ResetSequence() { _sequence = 0; }
 
         public void Arm(ISshCipher cipher, byte[] macKey, Func<IHash> macHash, int macSize)
         {
@@ -197,6 +225,7 @@ namespace NetSec.Ssh
         /// <summary>The next whole packet, or null until enough bytes have come. Each bad packet throws ParseFailure with a named code.</summary>
         public SshPacket TryNext()
         {
+            SshPacketForm.CheckSequence(_sequence);
             int block = _cipher == null ? SshPacketForm.ClearBlock : SshPacketForm.CipherBlock;
             if (_firstBlock == null)
             {
@@ -251,7 +280,7 @@ namespace NetSec.Ssh
         {
             byte[] tag = new byte[_macSize];
             Buffer.BlockCopy(_pending, plainSize, tag, 0, _macSize);
-            if (!Hmac.Verify(_macHash, _macKey, SshPacketForm.MacInput(_sequence, plain, plainSize), tag)) throw new ParseFailure(SshCodes.PacketMac, "packet " + _sequence + " fails its MAC, so it changed on the way or the keys differ");
+            if (!Hmac.Verify(_macHash, _macKey, SshPacketForm.MacInput((uint)_sequence, plain, plainSize), tag)) throw new ParseFailure(SshCodes.PacketMac, "packet " + _sequence + " fails its MAC, so it changed on the way or the keys differ");
         }
 
         void Drop(int count)
