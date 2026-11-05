@@ -17,7 +17,7 @@
         {
           "id": "L10-C09",
           "text": "A signature shows who calls only because the key was enrolled ahead of time. The lab runs mutual TLS, then a login, then calls. The login and calls run in the clear so the token shows on the wire; a real system sends them inside TLS.",
-          "source": "docs/lesson-10-names.md, opening paragraph and Roles and capabilities (branch feat/s6, commit f72acef)"
+          "source": "docs/lesson-10-names.md, opening paragraph, check table (device enrolled) and Roles and capabilities, last paragraph (main, commit 279e9a1)"
         }
       ],
       "unlock": { "mode": "ack" }
@@ -96,13 +96,13 @@
       "claims": [
         {
           "id": "L10-C18",
-          "text": "Alert certificate_required (116) is sent by servers when a client certificate is required but none was provided. If the client sends an empty Certificate message, the server may continue without client authentication or abort with certificate_required.",
+          "text": "Alert certificate_required (116) is sent by servers when a client certificate is desired but none was provided by the client. If the client sends an empty Certificate message, the server may continue without client authentication or abort with certificate_required.",
           "source": "RFC 8446, section 4.4.2.4 (Receiving a Certificate Message) and section 6.2 (Error Alerts)"
         },
         {
           "id": "L10-C19",
-          "text": "In the lab the removed-certificate row ends with code TLS13_CERT_REQUIRED and alert 116; ux-design.md section 7 names bad_certificate for this try-it, and the names file leaves that ruling to the lead.",
-          "source": "docs/lesson-10-names.md, Mutual TLS section, attack table and last paragraph (branch feat/s6, commit f72acef)"
+          "text": "In the lab the removed-certificate row ends with code TLS13_CERT_REQUIRED and alert 116 (certificate_required), and the lesson 10 row of the UX design lists certificate_required alert for this try-it.",
+          "source": "docs/lesson-10-names.md, Mutual TLS section and attack table (main, commit 279e9a1); docs/ux-design.md, section 8, lesson 10 row"
         }
       ],
       "unlock": { "mode": "action", "ref": "L10-S05-T1" }
@@ -187,7 +187,7 @@
         {
           "id": "L10-C11",
           "text": "In the lab the issuer refuses a login with a key it does not hold for the subject, with code DEVICE_NOT_ENROLLED.",
-          "source": "docs/lesson-10-names.md, check table and Attacks, L10-unknown-device (branch feat/s6, commit f72acef)"
+          "source": "docs/lesson-10-names.md, check table and Attacks, L10-unknown-device (main, commit 279e9a1)"
         }
       ],
       "unlock": { "mode": "action", "ref": "L10-S09-T1" }
@@ -232,7 +232,7 @@
         {
           "id": "L10-C02",
           "text": "In the lab the issuer rejects a second ChallengeResponse for the same challenge with code CHALLENGE_REPLAY.",
-          "source": "docs/lesson-10-names.md, Attacks, L10-replay-challenge (branch feat/s6, commit f72acef)"
+          "source": "docs/lesson-10-names.md, Attacks, L10-replay-challenge (main, commit 279e9a1)"
         }
       ],
       "unlock": { "mode": "action", "ref": "L10-S11-T1" }
@@ -259,7 +259,7 @@
         {
           "id": "L10-C12",
           "text": "The issuer compares the answered challenge with the one this login issued and refuses an unissued one with code CHALLENGE_NOT_ISSUED.",
-          "source": "docs/lesson-10-names.md, check table and Attacks, L10-unissued-challenge (branch feat/s6, commit f72acef); review of PR #20, Blocker 1"
+          "source": "docs/lesson-10-names.md, check table and Attacks, L10-unissued-challenge (main, commit 279e9a1); review of PR #20, Blocker 1"
         }
       ],
       "unlock": { "mode": "action", "ref": "L10-S12-T1" }
@@ -356,7 +356,7 @@
         {
           "id": "L10-C15",
           "text": "In the lab the server refuses a token written for another server with code TOKEN_BAD_AUDIENCE.",
-          "source": "docs/lesson-10-names.md, Attacks, L10-wrong-audience (branch feat/s6, commit f72acef)"
+          "source": "docs/lesson-10-names.md, Attacks, L10-wrong-audience (main, commit 279e9a1)"
         }
       ],
       "unlock": { "mode": "action", "ref": "L10-S16-T1" }
@@ -388,7 +388,7 @@
         {
           "id": "L10-C05",
           "text": "DPoP is a mechanism for sender-constraining OAuth 2.0 tokens via a proof-of-possession mechanism on the application level. The lab applies the same idea to its own token, not to OAuth.",
-          "source": "RFC 9449, Abstract; docs/lesson-10-names.md, check table, proof binding row (branch feat/s6, commit f72acef)"
+          "source": "RFC 9449, Abstract; docs/lesson-10-names.md, check table, proof binding row (main, commit 279e9a1)"
         }
       ],
       "unlock": { "mode": "action", "ref": "L10-S17-T1" }
@@ -421,7 +421,7 @@
         {
           "id": "L10-C16",
           "text": "The lab accepts a proof whose iat is within 60 seconds, and it keeps the used proof ids for one run only. It issues no DPoP nonce.",
-          "source": "docs/lesson-10-names.md, check table (proof age; no nonce check is listed) (branch feat/s6, commit f72acef); src/NetSec.Core/Labs/Lesson10Auth.cs, Session._seen (a per-session dictionary of used challenges and proof ids)"
+          "source": "docs/lesson-10-names.md, check table (proof age; no nonce check is listed) (main, commit 279e9a1); src/NetSec.Core/Labs/Lesson10Auth.cs, Session._seen (a per-session dictionary of used challenges and proof ids)"
         },
         {
           "id": "L10-C21",
@@ -453,7 +453,7 @@
         {
           "id": "L10-C07",
           "text": "In the lab, read-totals needs the role cashier or manager; void-sale and refund each need a capability of that name. The normal token holds roles [cashier] and cap [void-sale].",
-          "source": "docs/lesson-10-names.md, Roles and capabilities (branch feat/s6, commit f72acef)"
+          "source": "docs/lesson-10-names.md, Roles and capabilities (main, commit 279e9a1)"
         }
       ],
       "unlock": { "mode": "action", "ref": "L10-S19-T1" }
