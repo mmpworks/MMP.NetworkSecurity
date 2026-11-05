@@ -29,10 +29,10 @@ namespace NetSec.Tests
         }
 
         [Fact]
-        public void Lesson_9_stays_unbuilt_until_its_tour_lands()
+        public void Lesson_9_is_released_with_its_three_rows()
         {
-            Assert.Null(LabCatalog.Find(9));
-            Assert.DoesNotContain(AttackCatalog.All, a => a.Lesson == 9);
+            Assert.IsType<Lesson09Bridge>(LabCatalog.Find(9));
+            Assert.Equal(3, AttackCatalog.All.Count(a => a.Lesson == 9));
         }
 
         [Fact]
@@ -74,7 +74,7 @@ namespace NetSec.Tests
         [InlineData("L9-flip-pin-block", "DUKPT_MAC_MISMATCH", "PIN block MAC at bank")]
         public void Each_row_changes_one_thing_and_stops_at_its_named_check(string id, string code, string check)
         {
-            AttackDefinition row = AttackCatalog.Lesson9Unreleased.Single(a => a.AttackId == id);
+            AttackDefinition row = AttackCatalog.All.Single(a => a.AttackId == id);
             Assert.Equal(1, (row.Plan != null ? 1 : 0) + (row.Options == null ? 0 : row.Options.Length));
             Assert.Equal(code, row.ExpectCode);
             Assert.Equal(check, row.ExpectCheck);
@@ -87,7 +87,7 @@ namespace NetSec.Tests
         [Fact]
         public void A_flipped_pin_block_passes_both_hops_and_only_the_bank_sees_it()
         {
-            Run run = Go(AttackCatalog.Lesson9Unreleased.Single(a => a.AttackId == "L9-flip-pin-block"));
+            Run run = Go(AttackCatalog.All.Single(a => a.AttackId == "L9-flip-pin-block"));
             TraceEvent[] failed = run.Events.Where(e => e.Check != null && !e.Check.Passed).ToArray();
             Assert.Equal(new[] { "bank" }, failed.Select(e => e.Actor).Distinct().ToArray());
             Assert.Contains(run.Events, e => e.Actor == "server" && e.Hop == "hop2" && e.Type == "wire.sent" && e.Message == "ApplicationData");
@@ -96,7 +96,7 @@ namespace NetSec.Tests
         [Fact]
         public void A_tampered_hop_1_never_reaches_the_bank()
         {
-            Run run = Go(AttackCatalog.Lesson9Unreleased.Single(a => a.AttackId == "L9-tamper-hop1"));
+            Run run = Go(AttackCatalog.All.Single(a => a.AttackId == "L9-tamper-hop1"));
             Assert.DoesNotContain(run.Events, e => e.Actor == "bank");
         }
     }

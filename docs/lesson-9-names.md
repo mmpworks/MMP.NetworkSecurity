@@ -1,6 +1,6 @@
 # Lesson 9: names the bridge lab emits
 
-Conclusion: the lab and its 3 attack rows exist, and lesson 9 stays `built: false` until its tour and UI land. `LabCatalog.Find(9)` returns null, and the rows wait in `AttackCatalog.Lesson9Unreleased`. Tours and UI bind to these names. A change goes through Richard. Date: 2026-11-05.
+Conclusion: the lab and its 3 attack rows are released. `LabCatalog.Find(9)` returns the lab, and the rows are in `AttackCatalog.All`. Tours and UI bind to these names. A change goes through Richard. Date: 2026-11-05.
 
 `docs/lessons-1-3-names.md` holds the rules for arrows, binds, fields, and the end of a run. `docs/lesson-ssh-names.md` and the TLS 1.3 lessons hold each engine's own messages. This file lists what is new.
 

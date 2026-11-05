@@ -121,6 +121,7 @@ namespace NetSec.Labs
                 case 6: return new Lesson06Dukpt();
                 case 7: return new Lesson07Tls11();
                 case 8: return new Lesson08Ssh();
+                case 9: return new Lesson09Bridge();
                 default: return null;
             }
         }
@@ -178,6 +179,10 @@ namespace NetSec.Labs
             WithOption("L8-wrong-user-key", 8, Lesson08Ssh.OptionWrongUserKey, "attacker", AttackOutcome.Rejected, SshCodes.AuthRefused, SshChecks.AuthSignature),
             WithOption("L8-refused-tunnel", 8, Lesson08Ssh.OptionRefusedTunnel, "yes", AttackOutcome.Rejected, SshCodes.TunnelRefused, SshChecks.TunnelAllowList),
             Flip("L8-legacy-flip-signature", 8, SshNames.KexdhReply, SshRsaSignatureOffset, SshCodes.ExchangeSignature, SshChecks.ExchangeSignature),
+
+            Flip("L9-tamper-hop1", 9, SshNames.ChannelData, SshProtectedBodyOffset, SshCodes.PacketMac, SshChecks.PacketMac),
+            Flip("L9-tamper-hop2", 9, "ApplicationData", Tls13Lab.RecordCipherOffset, Tls13Codes.AeadTag, Tls13Codes.CheckName(Tls13Codes.AeadTag)),
+            WithOption("L9-flip-pin-block", 9, Lesson09Bridge.OptionFlipPinBlock, "yes", AttackOutcome.Rejected, ErrorCodes.DukptMacMismatch, NetSec.Bridge.BankHsmCore.MacCheck),
         };
 
         // Packet header 5, type 1, host key 4 + 51, share 4 + 32, signature length 4, name 4 + 11, value length 4, then 10 bytes into the signature value.
@@ -195,16 +200,6 @@ namespace NetSec.Labs
         /// Lesson 10's rows. They join All, and the lab joins LabCatalog, in the commit that lands its tour, so no learner reaches a token lab
         /// without the accuracy text. Tests run them from here.
         /// </summary>
-        /// <summary>Lesson 9's rows, which join All when its tour lands, as lesson 10's do.</summary>
-        public static AttackDefinition[] Lesson9Unreleased { get { return (AttackDefinition[])Lesson9Rows.Clone(); } }
-
-        static readonly AttackDefinition[] Lesson9Rows =
-        {
-            Flip("L9-tamper-hop1", 9, SshNames.ChannelData, SshProtectedBodyOffset, SshCodes.PacketMac, SshChecks.PacketMac),
-            Flip("L9-tamper-hop2", 9, "ApplicationData", Tls13Lab.RecordCipherOffset, Tls13Codes.AeadTag, Tls13Codes.CheckName(Tls13Codes.AeadTag)),
-            WithOption("L9-flip-pin-block", 9, Lesson09Bridge.OptionFlipPinBlock, "yes", AttackOutcome.Rejected, ErrorCodes.DukptMacMismatch, NetSec.Bridge.BankHsmCore.MacCheck),
-        };
-
         public static AttackDefinition[] Lesson10Unreleased { get { return (AttackDefinition[])Lesson10Rows.Clone(); } }
 
         static readonly AttackDefinition[] Lesson10Rows =
