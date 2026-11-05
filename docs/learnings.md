@@ -16,3 +16,7 @@ Each correction goes here, newest slice last. Later slices read this file first.
 10. **`NetSec.Node` is not in S0.** `acceptance/run.ps1` reports the bridge group NOT RUN PRODUCT_MISSING until S5.
 11. **A flipped length byte leaves a receiver waiting forever, so every real engine lesson (S3 on) needs a read timeout that ends in a named error.** The length promises bytes that never come, and no check runs. In free run the pump's deadline ends the wait with `LINK_DEADLINE` (`EchoLab` uses 30 s, and a test pins the code). In step mode the pump has no deadline, because a learner can read for an hour, so that wait still has no end. S3 must decide who ends it. A deadline in the engine's waiting state, counted only while the gate is open, is the first candidate.
 12. **The toy is lesson 0 and sits outside `GET /api/lessons`, which holds lessons 1 to 11 (lead's ruling).** `session.start` accepts 0. `GET /api/lessons/0` gives its row.
+
+## S1
+
+1. **The `prim` group compiles as one program, so A1 and A2 stay NOT RUN until every Crypto type exists.** `Subject.Product.cs` names all of section 2.3. A partial Crypto folder fails the compile, and all 64 clauses report PRODUCT_MISSING, including the primitives that work. To read a partial result, add the rest of `acceptance/contract/Crypto.cs` as an uncommitted file (its bodies throw `NotImplementedException`, which maps to NOT RUN), run the clauses, and delete the file. The full gate reports the acceptance step as FAIL until both S1 lanes merge.
