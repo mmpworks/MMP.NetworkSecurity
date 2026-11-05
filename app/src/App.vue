@@ -1,5 +1,5 @@
 <script setup lang="ts">
-import { computed, onBeforeUnmount, onMounted, ref } from 'vue'
+import { computed, onBeforeUnmount, onMounted, ref, watch } from 'vue'
 import { Pane, Splitpanes } from 'splitpanes'
 import { vuetify } from './theme'
 import {
@@ -13,6 +13,9 @@ import LessonRail from './components/LessonRail.vue'
 import SecretsPanel from './components/SecretsPanel.vue'
 import SequenceDiagram from './components/SequenceDiagram.vue'
 import TourPanel from './components/TourPanel.vue'
+import PicturePanel from './components/PicturePanel.vue'
+import MeasurePanel from './components/MeasurePanel.vue'
+import { pictureOf } from './lab'
 
 const lightbox = ref(false)
 const hostChip = computed(() => (hostState.value === 'connected' ? 'engine connected' : hostState.value === 'connecting' ? 'engine starting' : 'engine offline'))
@@ -27,6 +30,16 @@ const position = computed(() => {
   return `event ${i} of ${allEvents.value.length}`
 })
 const sessionTabs = computed(() => ui.sessions.filter(s => s.lesson === ui.lesson))
+
+// Lesson views: tabs appear only when the shown events carry that kind of data. A new selection of that kind opens its tab.
+const hasPicture = computed(() => shownEvents.value.some(e => pictureOf(e)))
+const hasMeasure = computed(() => shownEvents.value.some(e => e.type === 'measure.result'))
+watch(selectedEvent, e => {
+  if (e && e.message.startsWith('Picture') && hasPicture.value) ui.inspectorTab = 'picture'
+  else if (e?.type === 'measure.result') ui.inspectorTab = 'measures'
+  else if (e) ui.inspectorTab = 'bytes'
+})
+watch([hasPicture, hasMeasure], () => { if ((ui.inspectorTab === 'picture' && !hasPicture.value) || (ui.inspectorTab === 'measures' && !hasMeasure.value)) ui.inspectorTab = 'bytes' })
 
 function setView(v: ViewMode) { ui.view = v }
 function toggleTransport() { ui.transport = ui.transport === 'real' ? 'glass' : 'real' }
@@ -125,7 +138,18 @@ const shortcuts: [string, string][] = [
                   </div>
                 </div>
               </Pane>
-              <Pane :size="40" :min-size="18"><div class="panel"><ByteInspector /></div></Pane>
+              <Pane :size="40" :min-size="18">
+                <div class="panel">
+                  <div v-if="hasPicture || hasMeasure" class="tabs-inline" data-testid="inspector-tabs">
+                    <button type="button" class="stab" :class="{ on: ui.inspectorTab === 'bytes' }" data-testid="inspector-tab-bytes" @click="ui.inspectorTab = 'bytes'">Bytes</button>
+                    <button v-if="hasPicture" type="button" class="stab" :class="{ on: ui.inspectorTab === 'picture' }" data-testid="inspector-tab-picture" @click="ui.inspectorTab = 'picture'">Picture</button>
+                    <button v-if="hasMeasure" type="button" class="stab" :class="{ on: ui.inspectorTab === 'measures' }" data-testid="inspector-tab-measures" @click="ui.inspectorTab = 'measures'">Measures</button>
+                  </div>
+                  <PicturePanel v-if="ui.inspectorTab === 'picture' && hasPicture" />
+                  <MeasurePanel v-else-if="ui.inspectorTab === 'measures' && hasMeasure" />
+                  <ByteInspector v-else />
+                </div>
+              </Pane>
             </Splitpanes>
           </Pane>
           <Pane :size="33" :min-size="22">
