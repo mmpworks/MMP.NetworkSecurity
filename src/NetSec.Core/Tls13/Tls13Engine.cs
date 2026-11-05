@@ -11,7 +11,7 @@ namespace NetSec.Tls13
     /// TLS 1.3, bytes in and bytes out. Feed joins bytes into records, opens them, joins the contents into messages, and hands each message to
     /// the table. It holds no socket and no clock. Data sent before the handshake ends waits here until the state is Open.
     /// </summary>
-    public sealed class Tls13Engine : IProtocolEngine
+    public sealed class Tls13Engine : ITlsEngine
     {
         const int CloseNotify = 0;
 
@@ -51,6 +51,7 @@ namespace NetSec.Tls13
         /// <summary>The alert number the peer sent, or -1.</summary>
         public int AlertReceived { get; private set; }
         public bool ReachedOpen { get; private set; }
+        public string VersionName { get { return "TLSv1.3"; } }
         public string[] KeyLogLines { get { return _session.KeyLogLines.ToArray(); } }
         public string SuiteName { get { return _session.Suite == null ? null : _session.Suite.Name; } }
         public string GroupName { get { return ReachedOpen ? Tls13GroupInfo.Name(_session.Options.Group) : null; } }

@@ -119,6 +119,7 @@ namespace NetSec.Labs
                 case 4: return Tls13Lab.Lesson4();
                 case 5: return Tls13Lab.Lesson5();
                 case 6: return new Lesson06Dukpt();
+                case 7: return new Lesson07Tls11();
                 case 8: return new Lesson08Ssh();
                 case 10: return new Lesson10Auth();
                 default: return null;
@@ -166,6 +167,10 @@ namespace NetSec.Labs
             WithOption("L6-replay-sale", 6, Lesson06Dukpt.OptionScenario, Lesson06Dukpt.ScenarioReplaySale, AttackOutcome.Rejected, ErrorCodes.DukptKsnReplay, Lesson06Dukpt.ReplayCheck),
             Flip("L6-flip-pin-block", 6, Lesson06Dukpt.SaleName, Lesson06Dukpt.PinBlockOffset + 3, ErrorCodes.DukptPinBlockFormat, Lesson06Dukpt.FormatCheck),
             WithOption("L6-ask-past-key", 6, Lesson06Dukpt.OptionScenario, Lesson06Dukpt.ScenarioAskPastKey, AttackOutcome.Rejected, ErrorCodes.DukptKeyNotHeld, Lesson06Dukpt.NotHeldCheck),
+
+            WithOption("L7-downgrade", 7, Lesson07Tls11.OptionScenario, Lesson07Tls11.ScenarioDowngrade, AttackOutcome.Rejected, Tls13Codes.DowngradeSentinel, Tls13Codes.CheckName(Tls13Codes.DowngradeSentinel)),
+            WithOption("L7-modern-server", 7, Lesson07Tls11.OptionScenario, Lesson07Tls11.ScenarioModernServer, AttackOutcome.Rejected, NetSec.Tls11.Tls11Codes.AlertProtocolVersion, NetSec.Tls11.Tls11Checks.ProtocolVersionAlert),
+            Flip("L7-flip-record", 7, Lesson07Tls11.ApplicationData, Lesson07Tls11.CipherOffset, NetSec.Tls11.Tls11Codes.RecordMac, NetSec.Tls11.Tls11Checks.RecordHmac),
 
             WithOption("L8-change-host-key", 8, Lesson08Ssh.OptionHostKey, "attacker", AttackOutcome.Rejected, SshCodes.HostKeyChanged, SshChecks.KnownHosts),
             Flip("L8-flip-exchange-signature", 8, SshNames.KexEcdhReply, SshEd25519SignatureOffset, SshCodes.ExchangeSignature, SshChecks.ExchangeSignature),

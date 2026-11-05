@@ -84,6 +84,19 @@ namespace NetSec.Machine
         EngineOutput Command(EngineCommand c);
     }
 
+    /// <summary>What Probe reads from a TLS engine after a run. One session loop then serves each TLS version.</summary>
+    public interface ITlsEngine : IProtocolEngine
+    {
+        bool ReachedOpen { get; }
+        string VersionName { get; }
+        string SuiteName { get; }
+        string GroupName { get; }
+
+        /// <summary>The alert number the peer sent, or -1.</summary>
+        int AlertReceived { get; }
+        string[] KeyLogLines { get; }
+    }
+
     public enum TamperPoint { Plain, Wire }
 
     public sealed class TamperResult
