@@ -253,7 +253,7 @@ public sealed class LabContext { /* existing fields */ public CredentialSet Cred
 | Provider | Project, build | Handles | Refuses by name |
 |---|---|---|---|
 | `builtin` | Core, both builds. Wraps `TrainingKeySource` | All 15 types | Nothing |
-| `file`: PEM, PKCS#8, OpenSSH | Core, `Pki/KeyFileReader`, C# 3, beside `OpenSshFile`. Reuses `Der` and `RsaPkcs8` | Ed25519, RSA 2048 | `KEY_FILE_ENCRYPTED`, `KEY_FILE_FORMAT`, `KEY_SIZE_NOT_2048` |
+| `file`: PEM, PKCS#8, OpenSSH, hex text | Core, `Pki/KeyFileReader`, C# 3, beside `OpenSshFile`. Reuses `Der` and `RsaPkcs8` | Ed25519, RSA 2048, a 16-byte test BDK | `KEY_FILE_ENCRYPTED`, `KEY_FILE_FORMAT`, `KEY_SIZE_NOT_2048` |
 | `vault` | New `src/NetSec.Vault`, net10 only, Host references it | All key types | Section 4 |
 
 Which code is net10 only: the vault, the flows, RSA key generation (BCL `RSA.Create(2048).ExportPkcs8PrivateKey()`), and the Host routes. Ed25519 generation uses `OsRandom` and Core's `Ed25519`.
@@ -635,8 +635,7 @@ Every flow runs these states. The default path is five screens, and "Use my own 
 
 Placing writes a new version of each type and keeps the old one, so a failed check loses nothing. A flow has one decision on its default path. It offers no choice of name, key kind, or dates: sections 2.5 and 3.4 say why, and `Review` says "A real system uses about 90 days. This lab's clock is fixed, so these dates stay."
 
-**Resume.** A run's state stays in `.security/runs/<runId>.json`, with no secret in it, so a learner who quits comes back to the same step. A typed test BDK is never stored, and that step asks again.
-
+**Resume.** A run's state stays in `.security/runs/<runId>.json`, with no secret in it, so a learner who quits comes back to the same step.
 **The test-keys line,** copy id `wizard.common.test-keys-only`, on every `Intro` and on the security page:
 
 > Use test keys only. This course shows your keys on screen and in saved files.
@@ -662,7 +661,7 @@ All routes sit behind `HostGuard`, per D14. Errors carry `code`, `message`, `ret
 | `GET /api/lessons` | Existing. `attacks[]` gains `available` and `whyNot` |
 | WebSocket `session.started` | Existing. Gains `security[]` and `showKeys` |
 
-A key file moves by **path**, chosen in Electron's file dialog, and the Host reads it (gem `paths-plain-at-the-boundary`). The one secret typed into a field is a pasted test BDK, and `fields[].mask` is true there.
+A key file moves by **path**, chosen in Electron's file dialog, and the Host reads it (gem `paths-plain-at-the-boundary`). No flow has a field for typing a secret. The `my-payment` branch is a file row like every other flow's: a text file holding one test BDK as 32 hex characters. Beside it is one optional field for the vendor's check value, which is not a secret. If the learner fills it and it differs, the step gives `DUKPT_KCV_MISMATCH`.
 
 ### 8.4 Step payload and the machine
 
@@ -693,7 +692,7 @@ public static class WizardMachine { public static WizardDecision Decide(WizardTa
 | `CHAIN_INCOMPLETE` | A leaf under an issuing CA must come with its intermediate, for a client too. Jared ran it: Go refused a leaf-only mutual TLS client, and passed with `-cert_chain` |
 | `CERT_SIGNATURE_ALG_UNSUPPORTED` | **Engine and flow code.** An RSA or P-256 root. Today it reads `CERT_SIGNATURE`, which says tampering. Names the OS transport as the route |
 | `KNOWN_HOSTS_LINE_BAD` | The line does not parse. Wildcards refused, as `SshKnownHosts` does |
-| `DUKPT_KEY_SIZE`, `DUKPT_KCV_MISMATCH` | A test BDK must be 16 bytes this round, since lessons use AES-128. A typing error |
+| `DUKPT_KEY_SIZE`, `DUKPT_KCV_MISMATCH` | A test BDK must be 16 bytes this round, since lessons use AES-128. The file's key does not match the check value the learner gave |
 | `VAULT_KEY_UNKNOWN`, `VAULT_OP_REFUSED`, `VAULT_EXPORT_REFUSED`, `VAULT_UNWRAP_FAILED` | Section 4. Jared's doc calls the refusal `KEY_NOT_EXPORTABLE`. The spike printed `VAULT_EXPORT_REFUSED`, and that name stands |
 | `KEYS_HIDDEN` | The key log was asked for with Show keys OFF |
 | `REFEREE_MISSING`, `CHECK_FAILED` | Tool absent, or it said no, with its output attached |
