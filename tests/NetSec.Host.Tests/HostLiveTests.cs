@@ -210,6 +210,25 @@ namespace NetSec.Host.Tests
             Assert.Equal("echo compare", finished.GetProperty("check").GetString());
         }
 
+        /// <summary>The contract's order is started, forked, then the fork's own frames. Lesson 0 can finish in the time the Host takes to send a frame, so one try proves little.</summary>
+        [Fact]
+        public async Task A_fork_says_forked_before_it_finishes_every_time()
+        {
+            using Socket s = await Socket.Open(host);
+            await s.Send("{\"type\":\"session.start\",\"requestId\":\"r1\",\"lesson\":0,\"seed\":11,\"mode\":\"run\"}");
+            string parent = (await s.Until("session.started")).GetProperty("sessionId").GetString();
+            await s.UntilFinished(parent);
+
+            for (int i = 0; i < 40; i++)
+            {
+                await s.Send("{\"type\":\"session.attack\",\"requestId\":\"a" + i + "\",\"sessionId\":\"" + parent + "\",\"attackId\":\"L0-flip-wire-byte\"}");
+                string fork = (await s.Until("session.started")).GetProperty("sessionId").GetString();
+                List<JsonElement> frames = await s.UntilFinished(fork);
+                Assert.Contains(frames, f => f.GetProperty("type").GetString() == "session.forked");
+                parent = fork;      // The Host keeps the last 20 sessions, so the next attack forks this one.
+            }
+        }
+
         [Fact]
         public async Task A_flip_addressed_by_at_seq_hits_the_same_message_in_the_fork()
         {
