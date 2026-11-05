@@ -39,7 +39,7 @@ function Step([string]$name, [scriptblock]$body) {
 }
 
 function Skip([string]$name, [string]$why) {
-    Write-Host "== $name: SKIPPED ($why)"
+    Write-Host "== ${name}: SKIPPED ($why)"
     $rows.Add([pscustomobject]@{ Name = $name; Status = 'SKIPPED'; Exit = ''; Tail = $why })
 }
 
