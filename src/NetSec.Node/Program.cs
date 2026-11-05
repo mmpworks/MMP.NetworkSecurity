@@ -151,20 +151,7 @@ void TraceBank(ITraceSink sink, BankDecision d)
 {
     string traceId = d.TraceId ?? "unread";
     TraceStream stream = new(traceId + "/bank/bridge", traceId, traceId, null, "bank", new MonotonicClock());
-    if (d.Ok)
-    {
-        sink.Write(stream.Stamp(new TraceEventDraft
-        {
-            Type = "secret.derived",
-            Secrets = [new TraceSecret { Holder = "bank", Name = "dukpt.pin-key", Bytes = d.PinKey, DerivedFrom = ["dukpt.bdk"] }],
-        }));
-    }
-    sink.Write(stream.Stamp(new TraceEventDraft
-    {
-        Type = "check.result",
-        Message = d.Check ?? BankHsmCore.MacCheck,
-        Check = new TraceCheck { Id = d.Code ?? ErrorCodes.DukptMacMismatch, Name = d.Check ?? BankHsmCore.MacCheck, Passed = d.Ok, Code = d.Code, Detail = d.Detail },
-    }));
+    foreach (TraceEvent e in BankTrace.Events(stream, d)) sink.Write(e);
 }
 
 // Waits on a future and rethrows its fault, for this process's plain top-level flow.
