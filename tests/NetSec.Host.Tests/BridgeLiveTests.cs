@@ -123,10 +123,12 @@ namespace NetSec.Host.Tests
         {
             public Child Bank, Pad, Ce;
             public Relay Relay, PadTap;
+            public readonly List<Child> Others = new List<Child>();
             public string BankTrace, CeTrace;
             public void Dispose()
             {
                 Ce?.Dispose(); Pad?.Dispose(); Bank?.Dispose(); Relay?.Dispose(); PadTap?.Dispose();
+                foreach (Child other in Others) other.Dispose();
             }
         }
 
@@ -222,6 +224,92 @@ namespace NetSec.Host.Tests
             Assert.Equal("", bank.GetProperty("pinBlockHex").GetString());
             Assert.Equal("PIN block MAC at bank", bank.GetProperty("check").GetString());
             Assert.False(Json(await lab.Ce.Line("CE-RESULT")).GetProperty("ok").GetBoolean());
+        }
+
+        /// <summary>Five real processes with no tap. A dead port stands for a bank that is down.</summary>
+        async Task<(Child ce, string ceTrace, string gatewayTrace, Child bank, Child pad)> RunWhole(string suite, bool bankDown)
+        {
+            string name = Guid.NewGuid().ToString("N");
+            string node = Under("src", "NetSec.Node", "bin", "Release", "net10.0", "NetSec.Node.dll");
+            string F(string who) => Path.Combine(_dir, name + "-" + who + ".ndjson");
+            Lab lab = new Lab();
+            _labs.Add(lab);
+            int bankPort;
+            Child bank = null;
+            if (bankDown)
+            {
+                TcpListener closed = new TcpListener(IPAddress.Loopback, 0);
+                closed.Start();
+                bankPort = ((IPEndPoint)closed.LocalEndpoint).Port;
+                closed.Stop();
+            }
+            else
+            {
+                bank = new Child("dotnet", $"\"{node}\" --role bankhsm --listen 0 --trace-file \"{F("bank")}\"");
+                lab.Bank = bank;
+                bankPort = Port(await bank.Line("READY"));
+            }
+            Child server = new Child("dotnet", $"\"{node}\" --role server --listen 0 --bank {bankPort} --trace-file \"{F("server")}\"");
+            lab.Others.Add(server);
+            int serverPort = Port(await server.Line("READY"));
+            Child gateway = new Child("dotnet", $"\"{node}\" --role gateway --listen 0 --server {serverPort} --link ssh --suite {suite} --trace-file \"{F("gateway")}\"");
+            lab.Others.Add(gateway);
+            int gatewayPort = Port(await gateway.Line("READY"));
+            Child pad = new Child("dotnet", $"\"{node}\" --role pinpad --listen 0 --pin 1234 --pan 4111111111111111 --trace-file \"{F("pad")}\"");
+            lab.Pad = pad;
+            int padPort = Port(await pad.Line("READY"));
+            string ceExe = Under("src", "NetSec.CeDevice", "bin", "Release", "net35", "NetSec.CeDevice.exe");
+            Child ce = new Child(ceExe, $"--pinpad {padPort} --gateway {gatewayPort} --trace-file \"{F("ce")}\" --link glass-ssh --suite {suite} --pool 25");
+            lab.Ce = ce;
+            await ce.Line("CE-READY", 10000);
+            return (ce, F("ce"), F("gateway"), bank, pad);
+        }
+
+        [Fact]
+        public async Task The_ce_on_the_legacy_suite_reaches_the_bank_through_real_processes()
+        {
+            var run = await RunWhole("legacy", bankDown: false);
+            JsonElement ce = Json(await run.ce.Line("CE-RESULT", 60000));
+            Assert.True(ce.GetProperty("ok").GetBoolean(), ce.ToString());
+            JsonElement bank = Json(await run.bank.Line("RESULT"));
+            JsonElement pad = Json(await run.pad.Line("RESULT"));
+            Assert.Equal("OK", bank.GetProperty("code").GetString());
+            Assert.Equal(pad.GetProperty("pinBlockHex").GetString(), bank.GetProperty("pinBlockHex").GetString());
+            string ceTrace = ReadShared(run.ceTrace), gatewayTrace = ReadShared(run.gatewayTrace);
+            Assert.Contains("\"message\":\"KexdhInit\"", ceTrace);
+            Assert.DoesNotContain("KexEcdhInit", ceTrace);
+            Assert.Contains("\"message\":\"KexdhReply\"", gatewayTrace);
+        }
+
+        [Fact]
+        public async Task With_the_bank_down_the_ce_stops_soon_and_says_why()
+        {
+            var run = await RunWhole("modern", bankDown: true);
+            DateTime start = DateTime.UtcNow;
+            JsonElement ce = Json(await run.ce.Line("CE-RESULT", 25000));
+            Assert.True(DateTime.UtcNow - start < TimeSpan.FromSeconds(20), "the CE waited for a deadline");
+            Assert.False(ce.GetProperty("ok").GetBoolean());
+            Assert.NotEqual("LINK_LOST", ce.GetProperty("code").GetString());
+        }
+
+        [Fact]
+        public async Task A_gateway_on_the_wrong_suite_stops_the_ce_by_name()
+        {
+            string name = Guid.NewGuid().ToString("N");
+            string node = Under("src", "NetSec.Node", "bin", "Release", "net10.0", "NetSec.Node.dll");
+            Lab lab = new Lab();
+            _labs.Add(lab);
+            Child gateway = new Child("dotnet", $"\"{node}\" --role gateway --listen 0 --server 9 --link ssh --suite modern");
+            lab.Others.Add(gateway);
+            int gatewayPort = Port(await gateway.Line("READY"));
+            Child pad = new Child("dotnet", $"\"{node}\" --role pinpad --listen 0 --pin 1234 --pan 4111111111111111");
+            lab.Pad = pad;
+            int padPort = Port(await pad.Line("READY"));
+            Child ce = new Child(Under("src", "NetSec.CeDevice", "bin", "Release", "net35", "NetSec.CeDevice.exe"), $"--pinpad {padPort} --gateway {gatewayPort} --trace-file \"{Path.Combine(_dir, name + "-ce.ndjson")}\" --link glass-ssh --suite legacy --pool 25");
+            lab.Ce = ce;
+            JsonElement result = Json(await ce.Line("CE-RESULT", 25000));
+            Assert.False(result.GetProperty("ok").GetBoolean());
+            Assert.StartsWith("SSH_", result.GetProperty("code").GetString());
         }
 
         [Theory]
