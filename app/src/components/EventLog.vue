@@ -15,7 +15,7 @@ const rows = computed(() => allEvents.value.filter(e => (!actor.value || e.actor
   <div class="tour" data-testid="event-log">
     <div class="inspector-tools"><span class="side-title">FREE PLAY</span><span class="muted">{{ allEvents.length }} events</span></div>
     <div class="btn-row">
-      <v-btn v-if="!active" :disabled="ui.lesson == null" data-testid="free-start" @click="startSession('free')">Start free play</v-btn>
+      <v-btn v-if="!active" :disabled="ui.lesson == null || !lessonRow?.built" data-testid="free-start" @click="startSession('free')">Start free play</v-btn>
       <v-btn data-testid="free-run" :disabled="!active" @click="runEngine">Run</v-btn>
       <v-btn data-testid="free-pause" :disabled="!active" @click="pauseEngine">Pause</v-btn>
       <v-btn data-testid="free-step" :disabled="!active" @click="stepEngine">Step</v-btn>

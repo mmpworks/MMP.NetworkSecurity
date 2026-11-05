@@ -1,4 +1,5 @@
 using System;
+using System.Collections.Generic;
 using System.Text;
 using NetSec.Bytes;
 using NetSec.Crypto;
@@ -125,39 +126,75 @@ namespace NetSec.Ssh
         }
     }
 
-    public enum HostKeyMatch { Match, Changed, Unknown }
+    public enum HostKeyMatch { Match, Changed, Unknown, Revoked }
 
     /// <summary>
-    /// Reads known_hosts text (the sshd(8) form: host, type, base64 key). It reads plain host names only. A hashed line is a line for no host.
-    /// The rule: a line for this host with this key matches. A line for this host with any other key means the key changed.
+    /// Reads known_hosts text (the sshd(8) form: host, type, base64 key), with spaces or tabs, plain or hashed host names, and the @revoked marker.
+    /// The rule: a revoked line for this host and key wins over all else. Then a line for this host with this key matches, and a line for this host
+    /// with any other key means the key changed. No wildcard, no negation, and no @cert-authority: such a line is a line for no host, which fails closed.
     /// </summary>
     public static class SshKnownHosts
     {
         const int DefaultPort = 22;
+        const string RevokedMarker = "@revoked", HashPrefix = "|1|";
+        static readonly char[] Blanks = { ' ', (char)9 };
 
         public static HostKeyMatch Check(string text, string host, int port, byte[] blob)
         {
             if (string.IsNullOrEmpty(text)) return HostKeyMatch.Unknown;
             string want = port == DefaultPort ? host : "[" + host + "]:" + port;
             string expected = Convert.ToBase64String(blob);
-            bool sawHost = false;
+            bool sawHost = false, matched = false;
             string[] lines = text.Split('\n');
             for (int i = 0; i < lines.Length; i++)
             {
-                string[] parts = lines[i].Trim().Split(' ');
-                if (parts.Length < 3 || parts[0].StartsWith("#") || !NamesHost(parts[0], want)) continue;
+                string[] parts = Words(lines[i]);
+                if (parts.Length < 3 || parts[0].StartsWith("#")) continue;
+                bool revoked = parts[0] == RevokedMarker;
+                if (parts[0].StartsWith("@") && !revoked) continue;
+                int first = revoked ? 1 : 0;
+                if (parts.Length < first + 3 || !NamesHost(parts[first], want)) continue;
+                if (revoked)
+                {
+                    if (parts[first + 2] == expected) return HostKeyMatch.Revoked;
+                    continue;
+                }
                 sawHost = true;
-                if (parts[2] == expected) return HostKeyMatch.Match;
+                if (parts[first + 2] == expected) matched = true;
             }
+            if (matched) return HostKeyMatch.Match;
             return sawHost ? HostKeyMatch.Changed : HostKeyMatch.Unknown;
+        }
+
+        /// <summary>The words of a line, split on runs of spaces and tabs. CF has no StringSplitOptions.</summary>
+        static string[] Words(string line)
+        {
+            List<string> words = new List<string>();
+            string[] pieces = line.Trim().Split(Blanks);
+            for (int i = 0; i < pieces.Length; i++)
+                if (pieces[i].Length > 0) words.Add(pieces[i]);
+            return words.ToArray();
         }
 
         static bool NamesHost(string patterns, string want)
         {
             string[] names = patterns.Split(',');
             for (int i = 0; i < names.Length; i++)
-                if (names[i] == want) return true;
+                if (names[i] == want || IsHashOf(names[i], want)) return true;
             return false;
+        }
+
+        /// <summary>The hashed form is |1|salt|hash in base64, and the hash is HMAC-SHA1 of the name under the salt. Bad base64 names no host.</summary>
+        static bool IsHashOf(string name, string want)
+        {
+            if (!name.StartsWith(HashPrefix)) return false;
+            string[] parts = name.Split('|');
+            if (parts.Length != 4) return false;
+            try
+            {
+                return Hmac.Verify(Hashes.Sha1, Convert.FromBase64String(parts[2]), Encoding.UTF8.GetBytes(want), Convert.FromBase64String(parts[3]));
+            }
+            catch (FormatException) { return false; }
         }
 
         public static string Line(string host, int port, string typeName, byte[] blob)

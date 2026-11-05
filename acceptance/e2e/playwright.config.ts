@@ -15,5 +15,5 @@ export default defineConfig({
   reporter: [['list'], ['json', { outputFile: process.env.ACC_OUT ? process.env.ACC_OUT + '/playwright.json' : 'test-results/playwright.json' }]],
   globalSetup: './global-setup.ts',
   globalTeardown: './global-teardown.ts',
-  use: { baseURL: 'http://localhost:4180', screenshot: 'off', trace: 'off', viewport: { width: 1440, height: 900 } },
+  use: { baseURL: `http://localhost:${process.env.ACC_PREVIEW_PORT ?? 4180}`, screenshot: 'off', trace: 'off', viewport: { width: 1440, height: 900 } },
 });

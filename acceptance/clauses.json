@@ -2286,6 +2286,50 @@
    "counts": true
   },
   {
+   "id": "A7.tls11.server.openssl.ecdhe-cbc.cf",
+   "base": "A7.tls11.server.openssl.ecdhe-cbc",
+   "assertion": "A7",
+   "group": "tls11",
+   "build": "cf",
+   "slice": "S4",
+   "referee": "OpenSSL 3.5.7",
+   "roles": [],
+   "counts": true
+  },
+  {
+   "id": "A7.tls11.server.openssl.ecdhe-cbc.net10",
+   "base": "A7.tls11.server.openssl.ecdhe-cbc",
+   "assertion": "A7",
+   "group": "tls11",
+   "build": "net10",
+   "slice": "S4",
+   "referee": "OpenSSL 3.5.7",
+   "roles": [],
+   "counts": true
+  },
+  {
+   "id": "A7.tls11.server.openssl.rsa-transport.cf",
+   "base": "A7.tls11.server.openssl.rsa-transport",
+   "assertion": "A7",
+   "group": "tls11",
+   "build": "cf",
+   "slice": "S4",
+   "referee": "OpenSSL 3.5.7",
+   "roles": [],
+   "counts": true
+  },
+  {
+   "id": "A7.tls11.server.openssl.rsa-transport.net10",
+   "base": "A7.tls11.server.openssl.rsa-transport",
+   "assertion": "A7",
+   "group": "tls11",
+   "build": "net10",
+   "slice": "S4",
+   "referee": "OpenSSL 3.5.7",
+   "roles": [],
+   "counts": true
+  },
+  {
    "id": "A8.ssh.exe-to-glass-server.cf",
    "base": "A8.ssh.exe-to-glass-server",
    "assertion": "A8",
@@ -2532,6 +2576,17 @@
    "counts": false
   },
   {
+   "id": "SELF.hop-labels-check-bites",
+   "base": "SELF.hop-labels-check-bites",
+   "assertion": "SELF",
+   "group": "selftest",
+   "build": "host",
+   "slice": "S0",
+   "referee": "stand-ins built on the BCL, python cryptography and real OpenSSL runs",
+   "roles": [],
+   "counts": false
+  },
+  {
    "id": "SELF.kschedule-rfc8448-pass",
    "base": "SELF.kschedule-rfc8448-pass",
    "assertion": "SELF",
@@ -2591,6 +2646,17 @@
    "base": "SELF.reference-passes",
    "assertion": "SELF",
    "group": "selftest",
+   "build": "host",
+   "slice": "S0",
+   "referee": "stand-ins built on the BCL, python cryptography and real OpenSSL runs",
+   "roles": [],
+   "counts": false
+  },
+  {
+   "id": "SELF.summary-m-stays-a-count",
+   "base": "SELF.summary-m-stays-a-count",
+   "assertion": "SELF",
+   "group": "driver",
    "build": "host",
    "slice": "S0",
    "referee": "stand-ins built on the BCL, python cryptography and real OpenSSL runs",

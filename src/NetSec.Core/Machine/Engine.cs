@@ -5,7 +5,7 @@ using NetSec.Trace;
 namespace NetSec.Machine
 {
     public enum EngineStatus { Handshaking, Open, Closed, Failed }
-    public enum EngineCommandKind { Send, Close, PeerClosed, OpenChannel, Exec }
+    public enum EngineCommandKind { Send, Close, PeerClosed, OpenChannel, Exec, Consumed, Abort }
 
     public sealed class EngineCommand
     {
@@ -21,6 +21,12 @@ namespace NetSec.Machine
 
         public static readonly EngineCommand PeerClosed = new EngineCommand(EngineCommandKind.PeerClosed, 0, null, null);
         public static readonly EngineCommand Close = new EngineCommand(EngineCommandKind.Close, 0, null, null);
+
+        /// <summary>Ends the session as a failure with this code. The engine sends a fatal alert, because data was lost and a clean close would say otherwise. Text holds "code|detail".</summary>
+        public static EngineCommand Abort(string code, string detail) { return new EngineCommand(EngineCommandKind.Abort, 0, null, code + "|" + detail); }
+
+        public string AbortCode { get { return Text.Substring(0, Text.IndexOf('|')); } }
+        public string AbortDetail { get { return Text.Substring(Text.IndexOf('|') + 1); } }
     }
 
     /// <summary>One event, and the bytes to put on the wire right after it, when the event is a send.</summary>

@@ -262,7 +262,7 @@ namespace NetSec.Host.Tests
             Assert.Equal("completed", (await s.UntilFinished(id)).Last().GetProperty("outcome").GetString());
             JsonElement row = await GetJson("/api/lessons/10");
             Assert.True(row.GetProperty("built").GetBoolean());
-            Assert.Equal(12, row.GetProperty("attacks").GetArrayLength());
+            Assert.Equal(13, row.GetProperty("attacks").GetArrayLength());
         }
 
         [Fact]

@@ -106,14 +106,29 @@ $M = @($all | Where-Object { $_.counts }).Count
 
 # ------------------------------------------------------------------ contract (compile-check) mode
 function Get-AsyncProxyDlls {
+    # The sibling MMP.AsyncProxy is shared by every lane. Builds that write into it can collide (CS2012). When the product holds its own
+    # AsyncProxy.Local projects (src/AsyncProxy.Local and src/AsyncProxy.Local.NetCF, which compile the sibling's sources into the product's own bin
+    # folders), the suite builds those. Without them it builds the sibling, as before. The assembly versions are the same either way.
     $r = [ordered]@{ ns2 = $null; cf = $null; error = $null }
     if (-not (Test-Path (Join-Path $AsyncProxyRoot 'src\MMP.AsyncProxy'))) { $r.error = "MMP.AsyncProxy not found at $AsyncProxyRoot (set AsyncProxyRoot)"; return $r }
-    $b = Invoke-Tool 'dotnet' @('build', (Join-Path $AsyncProxyRoot 'src\MMP.AsyncProxy'), '-c', 'Release', '-f', 'netstandard2.0', '--nologo', '-v', 'q') -TimeoutSec 600
-    $ns2 = Join-Path $AsyncProxyRoot 'src\MMP.AsyncProxy\bin\Release\netstandard2.0\MMP.AsyncProxy.dll'
+    $localNs = Join-Path $ProductRoot 'src\AsyncProxy.Local'
+    $localCf = Join-Path $ProductRoot 'src\AsyncProxy.Local.NetCF'
+    if (@(Get-ChildItem $localNs -Filter *.csproj -ErrorAction SilentlyContinue).Count -gt 0) {
+        $b = Invoke-Tool 'dotnet' @('build', $localNs, '-c', 'Release', "-p:AsyncProxyRoot=$AsyncProxyRoot", '--nologo', '-v', 'q') -TimeoutSec 600
+        $ns2 = Join-Path $localNs 'bin\Release\netstandard2.0\MMP.AsyncProxy.dll'
+    } else {
+        $b = Invoke-Tool 'dotnet' @('build', (Join-Path $AsyncProxyRoot 'src\MMP.AsyncProxy'), '-c', 'Release', '-f', 'netstandard2.0', '--nologo', '-v', 'q') -TimeoutSec 600
+        $ns2 = Join-Path $AsyncProxyRoot 'src\MMP.AsyncProxy\bin\Release\netstandard2.0\MMP.AsyncProxy.dll'
+    }
     if ($b.ExitCode -eq 0 -and (Test-Path $ns2)) { $r.ns2 = $ns2 } else { $r.error = "MMP.AsyncProxy netstandard2.0 build failed: " + (Tail $b.Output) }
     if (Test-Path (Join-Path $NetCFRefDir 'mscorlib.dll')) {
-        $c = Invoke-Tool 'dotnet' @('build', (Join-Path $AsyncProxyRoot 'src\MMP.AsyncProxy.NetCF'), '-c', 'Release', "-p:NetCFRefDir=$NetCFRefDir", '--nologo', '-v', 'q') -TimeoutSec 600
-        $cf = Join-Path $AsyncProxyRoot 'src\MMP.AsyncProxy.NetCF\bin\Release\net35\MMP.AsyncProxy.dll'
+        if (@(Get-ChildItem $localCf -Filter *.csproj -ErrorAction SilentlyContinue).Count -gt 0) {
+            $c = Invoke-Tool 'dotnet' @('build', $localCf, '-c', 'Release', "-p:AsyncProxyRoot=$AsyncProxyRoot", "-p:NetCFRefDir=$NetCFRefDir", '--nologo', '-v', 'q') -TimeoutSec 600
+            $cf = Join-Path $localCf 'bin\Release\net35\MMP.AsyncProxy.dll'
+        } else {
+            $c = Invoke-Tool 'dotnet' @('build', (Join-Path $AsyncProxyRoot 'src\MMP.AsyncProxy.NetCF'), '-c', 'Release', "-p:NetCFRefDir=$NetCFRefDir", '--nologo', '-v', 'q') -TimeoutSec 600
+            $cf = Join-Path $AsyncProxyRoot 'src\MMP.AsyncProxy.NetCF\bin\Release\net35\MMP.AsyncProxy.dll'
+        }
         if ($c.ExitCode -eq 0 -and (Test-Path $cf)) { $r.cf = $cf } else { $r.error = "MMP.AsyncProxy CF build failed: " + (Tail $c.Output) }
     } else { $r.error = "CF references not found at $NetCFRefDir" }
     return $r
@@ -374,9 +389,19 @@ if ($e2eMine.Count -gt 0) {
         $missing = @($toolRuns | Where-Object { $_.ExitCode -eq -998 })
         if ($missing.Count -gt 0) { Set-All $e2eMine 'NOT RUN' 'TOOL_MISSING' (Tail $missing[0].Output 300) } else {
         $env:ACC_ROOT = $ProductRoot; $env:ACC_HOST = $prep.host; $env:ACC_OUT = $out
-        $r = Invoke-Tool 'npx' @('playwright', 'test') $e2e -TimeoutSec 900
+        # Other sessions on this machine run Hosts and vite previews too. A fixed port that is already taken would connect the tests to
+        # somebody else's server, so the run picks free ports: any free port for the Host, and a free one of the two origins the Host allows
+        # (design section 5: localhost:4180 and localhost:5173) for the preview.
+        $listening = @([System.Net.NetworkInformation.IPGlobalProperties]::GetIPGlobalProperties().GetActiveTcpListeners() | ForEach-Object { $_.Port })
+        $previewPort = @(4180, 5173) | Where-Object { $listening -notcontains $_ } | Select-Object -First 1
+        $hostPort = 5180; while ($listening -contains $hostPort) { $hostPort++ }
+        $env:ACC_HOST_PORT = [string]$hostPort
+        if ($previewPort) { $env:ACC_PREVIEW_PORT = [string]$previewPort }
+        else { Set-All $e2eMine 'NOT RUN' 'PORT_BUSY' 'ports 4180 and 5173 are both in use by another process. The Host allows only these two origins, so the UI cannot be served here without testing against a stranger.' }
+        $r = if ($previewPort) { Invoke-Tool 'npx' @('playwright', 'test') $e2e -TimeoutSec 1800 } else { [pscustomobject]@{ ExitCode = -997; Output = '' } }
         $json = Join-Path $out 'playwright.json'
-        if ($r.ExitCode -eq -998) { Set-All $e2eMine 'NOT RUN' 'TOOL_MISSING' (Tail $r.Output 300) }
+        if ($r.ExitCode -eq -997) { }      # PORT_BUSY was recorded above
+        elseif ($r.ExitCode -eq -998) { Set-All $e2eMine 'NOT RUN' 'TOOL_MISSING' (Tail $r.Output 300) }
         elseif (-not (Test-Path $json)) { Set-All $e2eMine 'FAIL' 'NO_RESULT' ("Playwright wrote no JSON report. " + (Tail $r.Output 400)) }
         else {
             $rep = Get-Content $json -Raw | ConvertFrom-Json
@@ -384,9 +409,9 @@ if ($e2eMine.Count -gt 0) {
             function Walk-Suite($s) { if ($s.PSObject.Properties["specs"]) { foreach ($sp in @($s.specs)) { $tests.Add($sp) } }; if ($s.PSObject.Properties["suites"]) { foreach ($c in @($s.suites)) { Walk-Suite $c } } }
             foreach ($s in @($rep.suites)) { Walk-Suite $s }
             foreach ($sp in $tests) {
-                $m = [regex]::Match($sp.title, '^\[(?<id>[^\]]+)\]')
-                if (-not $m.Success) { continue }
-                $id = $m.Groups['id'].Value
+                $titleMatch = [regex]::Match($sp.title, '^\[(?<id>[^\]]+)\]')      # not $m: PowerShell names are case-insensitive and $M is the clause count
+                if (-not $titleMatch.Success) { continue }
+                $id = $titleMatch.Groups['id'].Value
                 $t = @($sp.tests)[0]; $res = @($t.results)[0]
                 $err = if ($res.PSObject.Properties.Name -contains 'error' -and $res.error) { [string]$res.error.message } else { '' }
                 if ($t.status -eq 'skipped') {
@@ -440,6 +465,13 @@ foreach ($c in @($pending | Where-Object { $_.group -eq 'driver' -and -not $resu
             $np = Get-Command npm.cmd -ErrorAction SilentlyContinue
             if ($r.ExitCode -eq -998 -and $r.Output -match '^TOOL_MISSING' -and $np) { Set-Result $c.id 'PASS' '' "a tool that cannot start gives TOOL_MISSING and the run goes on; npm.cmd resolves to $($np.Source)" }
             else { Set-Result $c.id 'FAIL' 'ASSERTION' ("exit $($r.ExitCode), output '$((Tail $r.Output 120))', npm.cmd found: $([bool]$np)") }
+        }
+        'SELF.summary-m-stays-a-count' {
+            # PowerShell variable names are case-insensitive, so a loop variable $m silently replaces $M. The summary line then prints a clause id for M.
+            $self = Get-Content (Join-Path $acc 'run.ps1') -Raw
+            $assign = [regex]::Matches($self, '(?im)^\s*(?:foreach\s*\(\s*)?\$m\s*(?:=|\bin\b)')
+            if ($assign.Count -eq 1 -and $M -is [int] -and $M -gt 0) { Set-Result $c.id 'PASS' '' "M is assigned once and is the integer $M" }
+            else { Set-Result $c.id 'FAIL' 'ASSERTION' "run.ps1 assigns `$m $($assign.Count) times (must be 1), M is of type $($M.GetType().Name)" }
         }
         'SELF.vectors-python' {
             $r = Invoke-Tool 'python' @('-I', (Join-Path $acc 'vectors\tools\selfcheck_vectors.py'), (Join-Path $acc 'vectors')) -TimeoutSec 300

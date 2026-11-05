@@ -2,8 +2,10 @@ using System;
 using System.Collections.Generic;
 using System.Net;
 using MMP.AsyncProxy;
+using NetSec.Crypto;
 using NetSec.Errors;
 using NetSec.Io;
+using NetSec.Keys;
 using NetSec.Platform;
 using NetSec.Trace;
 
@@ -79,10 +81,14 @@ namespace NetSec.Bridge
     {
         public IPEndPoint PinPad, Gateway;
         public string LinkKind;
+        public SshSuite Suite;
+        public IRandomSource Random;
+        public ITrainingKeySource Keys;
         public ITraceSink Sink;
         public IClock Clock;
     }
 
+    /// <summary>Ok repeats what the reply says. The CE holds no key that could check the reply, so a forged reply reads the same (lesson 9 teaches this).</summary>
     public sealed class CeRunResult
     {
         public bool Ok;
@@ -163,6 +169,8 @@ namespace NetSec.Bridge
         {
             if (o.LinkKind == LinkExternalForward)
                 return new ExternalForwardLink(o.Gateway, o.Sink, traceId + "/ce/forward", traceId, o.Clock);
+            if (o.LinkKind == GlassSshLink.KindName)
+                return new GlassSshLink(o.Gateway, o.Keys, o.Suite, o.Random, o.Sink, traceId);
             return null;
         }
     }

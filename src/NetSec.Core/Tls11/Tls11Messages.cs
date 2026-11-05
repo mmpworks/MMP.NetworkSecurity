@@ -34,6 +34,10 @@ namespace NetSec.Tls11
         public int Version;
         public byte[] Random;
         public int[] Suites;
+        public byte[] Compression;
+
+        /// <summary>The client sent the signalling suite or an empty renegotiation_info. The server then owes an empty one back (RFC 5746 section 3.6).</summary>
+        public bool SignalsSecureRenegotiation;
     }
 
     public sealed class Tls11ServerKeyExchange
@@ -64,7 +68,8 @@ namespace NetSec.Tls11
 
         const int NamedCurveType = 3;
         public const int X25519Curve = 29;
-        const int SupportedGroupsExtension = 10, EcPointFormatsExtension = 11;
+        const int SupportedGroupsExtension = 10, EcPointFormatsExtension = 11, RenegotiationInfoExtension = 0xFF01;
+        const int RenegotiationSignallingSuite = 0x00FF;
         public const int FatalLevel = 2, WarningLevel = 1;
         public const int CloseNotify = 0, ProtocolVersionAlert = 70;
 
@@ -101,10 +106,13 @@ namespace NetSec.Tls11
 
         // ---------------------------------------------------------------- builders
 
-        /// <summary>One suite only: the lab forces its choice, because a default run picks the best case. The X25519 extensions go only with an ECDHE suite.</summary>
+        /// <summary>
+        /// One suite only: the lab forces its choice, because a default run picks the best case. The X25519 extensions go only with an ECDHE suite.
+        /// The signalling value beside it is no suite. It tells the server this client knows RFC 5746. This engine has no row for a second handshake, so it refuses a non-empty answer and needs nothing more.
+        /// </summary>
         public static byte[] BuildClientHello(byte[] random, Tls11CipherSuite suite)
         {
-            ByteWriter body = new ByteWriter().U16(Version).Put(random).U8(0).U16(2).U16(suite.Code).U8(1).U8(0);
+            ByteWriter body = new ByteWriter().U16(Version).Put(random).U8(0).U16(4).U16(suite.Code).U16(RenegotiationSignallingSuite).U8(1).U8(0);
             if (suite.KeyExchange == Tls11KeyExchange.Ecdhe)
             {
                 body.U16(14);
@@ -114,9 +122,12 @@ namespace NetSec.Tls11
             return Handshake(ClientHello, body.ToArray());
         }
 
-        public static byte[] BuildServerHello(byte[] random, Tls11CipherSuite suite)
+        /// <param name="answerRenegotiationInfo">Adds the empty extension, ff 01 00 01 00 (RFC 5746 section 3.2). OpenSSL's default client refuses a server with no such answer.</param>
+        public static byte[] BuildServerHello(byte[] random, Tls11CipherSuite suite, bool answerRenegotiationInfo)
         {
-            return Handshake(ServerHello, new ByteWriter().U16(Version).Put(random).U8(0).U16(suite.Code).U8(0).ToArray());
+            ByteWriter body = new ByteWriter().U16(Version).Put(random).U8(0).U16(suite.Code).U8(0);
+            if (answerRenegotiationInfo) body.U16(5).U16(RenegotiationInfoExtension).U16(1).U8(0);
+            return Handshake(ServerHello, body.ToArray());
         }
 
         public static byte[] BuildCertificate(byte[][] chain)
@@ -184,9 +195,27 @@ namespace NetSec.Tls11
             byte[] suites = r.Take("suites", "data", suitesLength);
             hello.Suites = new int[suites.Length / 2];
             for (int i = 0; i < hello.Suites.Length; i++) hello.Suites[i] = (suites[2 * i] << 8) | suites[2 * i + 1];
-            r.Take("compression", "data", r.U8("compressionLength", "length"));
-            r.Take("extensions", "data", r.Remaining);
+            hello.Compression = r.Take("compression", "data", r.U8("compressionLength", "length"));
+            hello.SignalsSecureRenegotiation = Array.IndexOf(hello.Suites, RenegotiationSignallingSuite) >= 0 | ExtensionsHoldRenegotiationInfo(r.Take("extensions", "data", r.Remaining));
             return hello;
+        }
+
+        /// <summary>A hello may stop before the extension block. A first handshake must carry an empty renegotiation_info, so any other body fails (RFC 5746 section 3.6).</summary>
+        static bool ExtensionsHoldRenegotiationInfo(byte[] block)
+        {
+            if (block.Length == 0) return false;
+            ByteReader r = new ByteReader(block, 0, block.Length, true);
+            r.U16("extensionsLength", "length");
+            bool found = false;
+            while (r.Remaining > 0)
+            {
+                int type = r.U16("extensionType", "data");
+                byte[] data = r.Take("extensionData", "data", r.U16("extensionLength", "length"));
+                if (type != RenegotiationInfoExtension) continue;
+                if (data.Length != 1 || data[0] != 0) throw new ParseFailure(Tls11Codes.RenegotiationInfo, "a first handshake carries a renegotiation_info that is not empty");
+                found = true;
+            }
+            return found;
         }
 
         public static Tls11Hello ReadServerHello(ByteReader r)
@@ -197,8 +226,8 @@ namespace NetSec.Tls11
             hello.Random = r.Take("random", "nonce", RandomSize);
             r.Take("sessionId", "id", r.U8("sessionIdLength", "length"));
             hello.Suites = new int[] { r.U16("suite", "data") };
-            r.U8("compression", "data");
-            r.Take("extensions", "data", r.Remaining);
+            hello.Compression = new byte[] { (byte)r.U8("compression", "data") };
+            ExtensionsHoldRenegotiationInfo(r.Take("extensions", "data", r.Remaining));
             return hello;
         }
 

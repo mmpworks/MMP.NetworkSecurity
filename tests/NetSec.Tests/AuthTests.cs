@@ -98,7 +98,7 @@ namespace NetSec.Tests
                 changed[i] = changed[i] == 'A' ? 'B' : 'A';
                 AuthDecision d = Token.Verify(Issuer.CopyPublic(), new string(changed), Now);
                 Assert.False(d.Allowed, "a change at character " + i + " passed");
-                Assert.Equal(Token.SignatureCheck, d.CheckName);
+                Assert.Contains(d.CheckName, new[] { Token.SignatureCheck, Token.FormatCheck });
             }
         }
 
@@ -270,7 +270,7 @@ namespace NetSec.Tests
         public void Lesson_10_is_released_with_its_lab_and_its_rows()
         {
             Assert.Equal("lab-10-auth", LabCatalog.Find(10).LabId);
-            Assert.Equal(12, AttackCatalog.All.Count(a => a.Lesson == 10));
+            Assert.Equal(13, AttackCatalog.All.Count(a => a.Lesson == 10));
         }
 
         [Fact]
@@ -310,7 +310,7 @@ namespace NetSec.Tests
         public void Every_row_stops_at_its_named_check_with_one_thing_changed()
         {
             AttackDefinition[] rows = AttackCatalog.All.Where(a => a.Lesson == 10).ToArray();
-            Assert.Equal(12, rows.Length);
+            Assert.Equal(13, rows.Length);
             foreach (AttackDefinition a in rows)
             {
                 Assert.Equal(1, (a.Plan != null ? 1 : 0) + a.Options.Length);

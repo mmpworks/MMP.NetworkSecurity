@@ -119,7 +119,8 @@ def scan_e2e():
 
 DRIVER = [("driver", "A13.fresh-clone.acceptance-unchanged", False), ("driver", "A13.fresh-clone.sibling-layout", False),
           ("driver", "SELF.clauses-json-matches-code", False), ("driver", "SELF.vectors-python", False),
-          ("driver", "SELF.tool-cannot-start-still-reports", False)]
+          ("driver", "SELF.tool-cannot-start-still-reports", False),
+          ("driver", "SELF.summary-m-stays-a-count", False)]
 
 
 def build():

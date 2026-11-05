@@ -13,6 +13,8 @@ namespace NetSec.Ssh
     /// </summary>
     public sealed class SshEngine : IProtocolEngine
     {
+        const string PacketStep = "ssh.packet";
+
         readonly Interpreter<SshSession> _machine;
         readonly SshSession _session;
         readonly TraceStream _stream;
@@ -54,9 +56,22 @@ namespace NetSec.Ssh
         public EngineOutput Feed(byte[] b, int off, int n)
         {
             _session.Reader.Append(b, off, n);
+            Guarded(delegate { while (!_machine.IsEnded && DispatchNext()) { } });
+            return _machine.TakeOutput();
+        }
+
+        public EngineOutput Command(EngineCommand c)
+        {
+            if (!_machine.IsEnded) Guarded(delegate { Run(c); });
+            return _machine.TakeOutput();
+        }
+
+        /// <summary>Every named failure of a parse or a seal ends here, from a feed or from a command.</summary>
+        void Guarded(Action work)
+        {
             try
             {
-                while (!_machine.IsEnded && DispatchNext()) { }
+                work();
             }
             catch (ParseFailure failure)
             {
@@ -70,13 +85,6 @@ namespace NetSec.Ssh
             {
                 _machine.Fail(ErrorCodes.MessageRefused, "message shape", refused.Message, null);
             }
-            return _machine.TakeOutput();
-        }
-
-        public EngineOutput Command(EngineCommand c)
-        {
-            if (!_machine.IsEnded) Run(c);
-            return _machine.TakeOutput();
         }
 
         void Run(EngineCommand c)
@@ -102,6 +110,8 @@ namespace NetSec.Ssh
             if (!_session.PeerVersionSeen) return DispatchVersion();
             SshPacket packet = _session.Reader.TryNext();
             if (packet == null) return false;
+            // The reader throws on a bad MAC, so a packet that reaches this line passed. The tour shows that pass.
+            if (_session.ReaderArmed) _machine.Perform(PacketStep, Effect.Check(SshChecks.PacketMac, SshCodes.PacketMac));
             TraceField[] fields = _session.ReaderArmed
                 ? SshFields.OfCipher(packet.Wire.Length - _session.Algorithms.MacSize, _session.Algorithms.MacSize)
                 : SshFields.Clear(packet.Payload, packet.PaddingLength, _session.Algorithms.IsLegacy);
@@ -129,6 +139,7 @@ namespace NetSec.Ssh
                 case SshCodes.PacketLength: return SshChecks.PacketLength;
                 case SshCodes.Version: return SshChecks.Version;
                 case SshCodes.HostKeyBad: return SshChecks.HostKeyShape;
+                case SshCodes.SequenceExhausted: return SshChecks.Sequence;
                 default: return "message shape";
             }
         }

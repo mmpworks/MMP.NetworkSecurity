@@ -44,6 +44,7 @@ namespace NetSec.Tls11
 
         public readonly Tls11Options Options;
         public Tls11RecordCipher Inbound { get; private set; }
+        public bool OutboundProtected { get { return _outbound != null; } }
 
         public Tls11Session(Tls11Options options) { Options = options; }
 

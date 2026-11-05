@@ -151,6 +151,8 @@ namespace NetSec.Tls11
         const int MaxMessage = 1 << 17;
         byte[] _pending = new byte[0];
 
+        public bool IsEmpty { get { return _pending.Length == 0; } }
+
         public void Append(byte[] content)
         {
             byte[] joined = new byte[_pending.Length + content.Length];

@@ -7,6 +7,7 @@ using NetSec.Keys;
 using NetSec.Labs;
 using NetSec.Pki;
 using NetSec.Platform;
+using NetSec.Tls13;
 using NetSec.Trace;
 using Xunit;
 
@@ -59,6 +60,49 @@ namespace NetSec.Tests
             Assert.Equal(code, r.FailedCode);
             Assert.Equal(check, r.FailedCheck);
             Assert.DoesNotContain(events, e => e.Type == "wire.sent" && e.Message == "LoginRequest");
+        }
+
+        /// <summary>The chain is good, because the training root issued it. Only the application's compare of the name refuses it.</summary>
+        [Fact]
+        public void A_certificate_for_another_name_passes_its_chain_and_is_refused_by_name()
+        {
+            LabResult control = Lab(out TraceEvent[] controlEvents);
+            Assert.True(control.Completed);
+            Assert.Contains(controlEvents, e => e.Type == "check.result" && e.Actor == "server" && e.Message == "client name" && e.Check.Passed);
+
+            LabResult r = Lab(out TraceEvent[] events, Lesson10Auth.ClientCertWrongName);
+            Assert.Equal("TLS13_CLIENT_NAME_REFUSED", r.FailedCode);
+            Assert.Equal("client name", r.FailedCheck);
+            // The name check runs only after the chain check passes, so a refusal here means the chain was good.
+            TraceEvent refused = events.Single(e => e.Type == "check.result" && e.Actor == "server" && !e.Check.Passed);
+            Assert.Equal("client name", refused.Message);
+            Assert.Contains("the chain is good", refused.Check.Detail);
+            TraceEvent alert = events.Single(e => e.Type == "wire.sent" && e.Actor == "server" && e.Message == "Alert");
+            Assert.Equal(49, alert.Plain[alert.Plain.Length - 1]);
+            Assert.DoesNotContain(events, e => e.Type == "wire.sent" && e.Message == "LoginRequest");
+        }
+
+        /// <summary>A server with no name to compare still acts as TLS does, so Go and OpenSSL referees see the same behaviour.</summary>
+        [Fact]
+        public void A_server_with_no_expected_name_checks_the_chain_only()
+        {
+            ProbeResult[] r = Probes(true, KeyIds.ClientTlsEd25519);
+            Assert.True(r[1].Completed, r[1].Code + " " + r[1].CheckName);
+            Assert.DoesNotContain(r[1].Events, e => e.Type == "check.result" && e.Message == "client name");
+        }
+
+        [Fact]
+        public void A_client_with_a_chain_and_no_signing_key_is_refused_before_the_handshake()
+        {
+            Tls13Options o = new Tls13Options
+            {
+                Stream = new TraceStream("s1/client/tls13", "s1", "t1", null, "client", new FixedClock(1)),
+                Random = new SeededRandom(1),
+                CertificateChain = new[] { new byte[] { 1 } },
+            };
+            Assert.Throws<ArgumentException>(() => Tls13Engine.CreateClient(o));
+            o.SigningSeed = new byte[32];
+            Assert.NotNull(Tls13Engine.CreateClient(o));
         }
 
         [Fact]

@@ -19,7 +19,10 @@ namespace NetSec.Ssh
         /// <summary>known_hosts text. The engine holds no file, so the caller reads it.</summary>
         public string KnownHosts;
 
-        /// <summary>Accept a host with no known_hosts line, and emit ssh.hostkey.first-use. The first connect then has no proof at all.</summary>
+        /// <summary>
+        /// Off by default, so a missing pin ends in SSH_HOST_KEY_UNKNOWN. On, a host with no known_hosts line is accepted and ssh.hostkey.first-use
+        /// shows it. That connect has no proof at all. The caller must store the line the session returns, or every connect is a first use.
+        /// </summary>
         public bool TrustFirstUse;
 
         public string User;
@@ -49,7 +52,8 @@ namespace NetSec.Ssh
         public int Local, Remote;
         public long PeerWindow, PeerMaxPacket, OurWindow;
         public string ExecCommand;
-        public bool Confirmed, SentEof, SentClose, CloseWhenDrained;
+        public long ReadSinceGrant;
+        public bool Confirmed, SentEof, SentClose, CloseWhenDrained, WaitingForWindow, IsSession, ExecDone;
         public readonly List<byte[]> Queue = new List<byte[]>();
     }
 
@@ -57,7 +61,7 @@ namespace NetSec.Ssh
     public static class SshControl
     {
         public const int Channel = -1;
-        public const int Authenticated = 1, ChannelReady = 2, TunnelRequested = 3, PeerEof = 4;
+        public const int Authenticated = 1, ChannelReady = 2, TunnelRequested = 3, PeerEof = 4, HostKeyLearned = 5, WindowFull = 6, WindowOpen = 7;
 
         public static byte[] Encode(int kind, int channel, string text)
         {
@@ -102,8 +106,8 @@ namespace NetSec.Ssh
         public SshKeyBlock Keys;
         public EngineCommand Pending;
         public string User;
-        public int NextLocalChannel;
-        public bool PeerVersionSeen, ReaderArmed, IsOpen;
+        public int NextLocalChannel, AuthRequests;
+        public bool PeerVersionSeen, ReaderArmed, IsOpen, StrictKex;
 
         public SshSession(SshClientOptions client, string holder)
         {
@@ -133,8 +137,14 @@ namespace NetSec.Ssh
             Buffer.BlockCopy(key, EncKeySize, macKey, 0, macKey.Length);
             bool encrypt = direction == Direction.Outbound;
             ISshCipher cipher = SshPacketForm.CipherFor(Algorithms.Cipher, encKey, iv, encrypt);
-            if (encrypt) { _writer.Arm(cipher, macKey, Algorithms.MacHash); return; }
+            if (encrypt)
+            {
+                _writer.Arm(cipher, macKey, Algorithms.MacHash);
+                if (StrictKex) _writer.ResetSequence();
+                return;
+            }
             Reader.Arm(cipher, macKey, Algorithms.MacHash, Algorithms.MacSize);
+            if (StrictKex) Reader.ResetSequence();
             ReaderArmed = true;
         }
 

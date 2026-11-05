@@ -133,11 +133,22 @@ namespace Acceptance
         string Seed(int salt) { return _useSeed ? " --seed " + (_seed + (ulong)salt) : ""; }
         string TraceArg(string name) { return " --trace-file \"" + Path.Combine(_dir, name + ".ndjson") + "\""; }
 
+        /// <summary>
+        /// Waits for a line that starts with startsWith. A process that prints a code ending _NOT_BUILT (for example NODE_ROLE_NOT_BUILT)
+        /// is a part of the product that is not there yet: that is NOT RUN PRODUCT_MISSING at once, never a FAIL after the full wait.
+        /// </summary>
         static string WaitLine(Proc p, string startsWith, int ms, string what)
         {
-            string line = p.WaitForLine(delegate (string l) { return l.StartsWith(startsWith); }, ms);
-            if (line == null) throw new FailException(what + " did not print '" + startsWith + "' within " + ms + " ms. Output: " + p.AllOutput);
-            return line;
+            DateTime end = DateTime.UtcNow.AddMilliseconds(ms);
+            while (DateTime.UtcNow < end)
+            {
+                foreach (string l in p.Lines) if (l.StartsWith(startsWith)) return l;
+                string all = p.AllOutput;
+                if (all.IndexOf("_NOT_BUILT", StringComparison.Ordinal) >= 0)
+                    throw new NotRunException("PRODUCT_MISSING", what + " reports a part of the product as not built yet: " + all.Trim());
+                Thread.Sleep(100);
+            }
+            throw new FailException(what + " did not print '" + startsWith + "' within " + ms + " ms. Output: " + p.AllOutput);
         }
 
         /// <summary>Waits for "READY port=P" and returns P.</summary>

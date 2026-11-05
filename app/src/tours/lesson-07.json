@@ -157,7 +157,8 @@
       "text": [
         "The receiver opens each record and checks the seal inside. The check is named record HMAC. It passes on the normal run.",
         "Try it: flip one bit in the client's data record. The seal no longer fits and the check fails.",
-        "Bad padding gives the same failure code as a bad seal. That keeps the receiver from telling an attacker which of the two was wrong. This lab does not claim to resist Lucky Thirteen: managed code gives no timing guarantee."
+        "Bad padding gives the same failure code as a bad seal, so the message does not tell an attacker which of the two was wrong. The time can still differ, and that is the Lucky Thirteen class of attack, a timing side channel against MAC-then-encrypt.",
+        "This lab does not claim to resist Lucky Thirteen: managed code gives no timing guarantee."
       ],
       "glossary": [],
       "bind": { "kind": "event", "eventType": "check.result", "match": { "message": "record HMAC" } },
@@ -173,6 +174,11 @@
           "id": "L7-C10",
           "text": "The lab engine computes the MAC on bad padding too, and managed code gives no timing guarantee, so the lab does not claim to resist Lucky Thirteen.",
           "source": "docs/lesson-tls11-names.md, What the tour may say, last row (branch feat/s4-tls11); src/NetSec.Core/Tls11/Tls11Records.cs; RFC 4346, section 1.1 (padding errors use the bad_record_mac alert)"
+        },
+        {
+          "id": "L7-C15",
+          "text": "One failure code for bad padding and a bad seal hides the fault in the message, but the time can still differ. That timing difference is the Lucky Thirteen class of attack. The tour gives no timing number from this lab.",
+          "source": "RFC 7457, section 2.4 (Padding Oracle Attacks: Lucky Thirteen is a timing side channel against MAC-then-encrypt). reader-a15a reproduced the direction on one machine (Release build, padding 0 slower by about 6 percent, no gap in a Debug build; PR #72). Jared's single-machine timing pair (PR #49 comment 6658261494) did not repeat and was withdrawn (PR #62 comment 6658985567), so no number from this lab is used"
         }
       ],
       "unlock": { "mode": "action", "ref": "L7-S07-T1" }

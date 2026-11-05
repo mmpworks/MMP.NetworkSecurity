@@ -250,6 +250,38 @@ namespace NetSec.Tests
         }
     }
 
+    public class Tls13KeyScheduleTests
+    {
+        /// <summary>RFC 8448 section 3: the resumption master secret and the secret for ticket nonce 00 00.</summary>
+        [Fact]
+        public void Resume_matches_rfc_8448_and_a_changed_input_moves_it()
+        {
+            byte[] master = Hex.Decode("18df06843d13a08bf2a449844c5f8a478001bc4d4c627984d5a41da8d0402919");
+            byte[] clientFinishedHash = Hex.Decode("209145a96ee8e2a122ff810047cc952684658d6049e86429426db87c54ad143d");
+            byte[] nonce = { 0, 0 };
+
+            Tls13Resumption r = Tls13KeySchedule.Resume(Hashes.Sha256, master, clientFinishedHash, nonce);
+            Assert.Equal("7df235f2031d2a051287d02b0241b0bfdaf86cc856231f2d5aba46c434ec196c", Hex.Encode(r.ResumptionMasterSecret));
+            Assert.Equal("4ecd0eb6ec3b4d87f5d6028f922ca4c5851a277fd41311c9e62d2c9492e1c4f3", Hex.Encode(r.ResumptionSecret));
+
+            Assert.NotEqual(r.ResumptionSecret, Tls13KeySchedule.Resume(Hashes.Sha256, master, clientFinishedHash, new byte[] { 0, 1 }).ResumptionSecret);
+            Assert.Equal(r.ResumptionMasterSecret, Tls13KeySchedule.Resume(Hashes.Sha256, master, clientFinishedHash, new byte[] { 0, 1 }).ResumptionMasterSecret);
+        }
+
+        [Fact]
+        public void VerifyFinished_takes_the_right_value_and_refuses_a_flip_and_a_short_value()
+        {
+            byte[] secret = TlsKit.Bytes32(1), hash = TlsKit.Bytes32(2);
+            byte[] good = Tls13KeySchedule.VerifyData(Hashes.Sha256, secret, hash);
+            Assert.True(Tls13KeySchedule.VerifyFinished(Hashes.Sha256, secret, hash, good));
+
+            byte[] flipped = (byte[])good.Clone();
+            flipped[31] ^= 1;
+            Assert.False(Tls13KeySchedule.VerifyFinished(Hashes.Sha256, secret, hash, flipped));
+            Assert.False(Tls13KeySchedule.VerifyFinished(Hashes.Sha256, secret, hash, good.Take(31).ToArray()));
+        }
+    }
+
     public class TrainingPkiTests
     {
         static readonly TrainingCa Ca = new TrainingCa(TlsKit.Keys);
@@ -604,9 +636,10 @@ namespace NetSec.Tests
                 Hop hop = Open(connected.Result, accepted.Result, null, null);
                 ExchangeAndClose(hop);
 
+                // A pump writes its wire.sent event after the socket write, and the tap logs before it forwards. Either side can lead for a moment, so wait for equal lengths.
                 Stopwatch clock = Stopwatch.StartNew();
                 byte[] up = WireSent(hop, "gateway"), down = WireSent(hop, "server");
-                while (clock.ElapsedMilliseconds < 5000 && (tap.Bytes("c2s").Length < up.Length || tap.Bytes("s2c").Length < down.Length))
+                while (clock.ElapsedMilliseconds < 5000 && (tap.Bytes("c2s").Length != up.Length || tap.Bytes("s2c").Length != down.Length))
                 {
                     System.Threading.Thread.Sleep(20);
                     up = WireSent(hop, "gateway");
