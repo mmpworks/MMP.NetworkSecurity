@@ -208,7 +208,7 @@ namespace NetSec.Bridge
             if (o.LinkKind == LinkExternalForward)
                 return new ExternalForwardLink(o.Gateway, o.Sink, traceId + "/ce/forward", traceId, o.Clock);
             if (o.LinkKind == GlassSshLink.KindName)
-                return new GlassSshLink(o.Gateway, o.Keys, o.Suite, o.Random, o.Sink, traceId, o.SessionId, o.Gate, o.Tamper);
+                return new GlassSshLink(o.Gateway, o.Keys, o.Suite, o.Random, o.Sink, traceId, o.SessionId, o.Gate, o.Tamper, o.Clock);
             return null;
         }
     }

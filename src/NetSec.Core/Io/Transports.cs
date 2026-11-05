@@ -4,6 +4,7 @@ using NetSec.Crypto;
 using NetSec.Errors;
 using NetSec.Keys;
 using NetSec.Machine;
+using NetSec.Platform;
 using NetSec.Trace;
 
 namespace NetSec.Io
@@ -56,6 +57,8 @@ namespace NetSec.Io
         public ITraceSink Sink;
         public IStepGate Gate;
         public ITamperHook Tamper;
+        /// <summary>Stamps the channel's events. A lab passes its own, so a same-seed rerun gives the same bytes. Null means the real clock.</summary>
+        public IClock Clock;
         public string TraceId, Hop, PeerName;
         public string SessionId, Actor;
         /// <summary>The lane the far end draws in. Null means the role's usual name, client or server.</summary>

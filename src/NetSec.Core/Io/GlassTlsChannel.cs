@@ -35,7 +35,7 @@ namespace NetSec.Io
         public GlassTlsChannel(TransportRequest request, ITlsEngine engine)
         {
             _engine = engine;
-            _pump = new EnginePump(engine, request.Link, request.Sink, request.Gate, request.Tamper, DeadlineMs);
+            _pump = new EnginePump(engine, request.Link, request.Sink, request.Gate, request.Tamper, DeadlineMs, request.Clock ?? new MonotonicClock());
             _pump.OnApp = Arrive;
             IFuture<PumpResult> run = _pump.Run();
             run.GetAwaiter().OnCompleted(delegate { End(run); });
@@ -143,7 +143,7 @@ namespace NetSec.Io
             string session = r.SessionId ?? r.TraceId ?? "glass";
             Tls11Options o = new Tls11Options();
             o.Suite = r.Tls11Suite == Tls11Suite.EcdheRsaAes128CbcSha ? Tls11CipherSuite.EcdheRsaAes128CbcSha : Tls11CipherSuite.RsaAes128CbcSha;
-            o.Stream = new TraceStream(session + "/" + actor + "/tls11", session, r.TraceId, r.Hop, actor, new MonotonicClock());
+            o.Stream = new TraceStream(session + "/" + actor + "/tls11", session, r.TraceId, r.Hop, actor, r.Clock ?? new MonotonicClock());
             o.Random = r.Random ?? new OsRandom();
             o.Tamper = r.Tamper;
             o.PeerName = r.PeerName;
@@ -163,7 +163,7 @@ namespace NetSec.Io
             string actor = r.Actor ?? (client ? "client" : "server");
             string session = r.SessionId ?? r.TraceId ?? "glass";
             Tls13Options o = new Tls13Options();
-            o.Stream = new TraceStream(session + "/" + actor + "/tls13", session, r.TraceId, r.Hop, actor, new MonotonicClock());
+            o.Stream = new TraceStream(session + "/" + actor + "/tls13", session, r.TraceId, r.Hop, actor, r.Clock ?? new MonotonicClock());
             o.Peer = r.PeerActor ?? (client ? "server" : "client");
             o.Random = r.Random ?? new OsRandom();
             o.Tamper = r.Tamper;
