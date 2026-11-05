@@ -45,6 +45,7 @@ The token parts and proof parts have dots between them, one byte each. Their fie
 | `challenge issued` | `issuer` | The answer names the challenge this issuer sent in this login |
 | `challenge signature` | `issuer` | The enrolled key signed this challenge and origin |
 | `challenge already used` | `issuer` | This challenge has not been answered before |
+| `token format` | `server` | The token reads as one compact JWS, names EdDSA, and holds no `crit`. It shows only when it fails, and no attack row reaches it |
 | `token signature` | `server` | The issuer key signed the token |
 | `token expiry` | `server` | The token has not expired |
 | `token audience` | `server` | The token names this server in `aud` |
@@ -108,6 +109,8 @@ A test pins the handshake rows: `The_mutual_tls_phase_emits_the_event_types_the_
 The server checks on a good handshake, in order: `certificate_required alert`, `chain to trust anchor`, `validity window`, `bad_certificate alert`, `CertificateVerify signature`, `Finished verify_data`.
 
 RFC 8446 sections 4.4.2.4 and 6.2 name `certificate_required` for an empty list and `bad_certificate` for a corrupt certificate. `ux-design.md` section 7 and the A11 clauses follow these names.
+
+**What mutual TLS proves here.** The server checks the chain, the dates, and the client authentication usage. It checks no name on the certificate, as Go's `RequireAndVerifyClientCert` does. So this phase proves "a device this CA issued a certificate to". It does not prove which device. The enrolment row in the login names the device. A server that must know which device reads the certificate subject itself.
 
 ## Release
 
