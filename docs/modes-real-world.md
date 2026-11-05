@@ -6,13 +6,13 @@ Owner: Jared, for accuracy. Date: 2026-11-05. Base: `main` at `dfe9510`.
 
 The course can teach how real setups work, on one PC, with no paid account. It has no public CA and no real HSM. So "Real" means **real form**: a test key a learner makes for this course, in the file format and with the tool a real deployment uses.
 
-**Steve's ruling, 2026-11-05:** "I only ever use test keys... This is training." The course shows all keys in Real mode too. There is no hard stop on production keys. Each wizard carries one line instead (section 7).
+**Steve's ruling, 2026-11-05:** "I only ever use test keys... This is training." The course shows keys in Real mode too, except a key made non-exportable. There is no hard stop on production keys. Each wizard carries one line instead (section 7).
 
 Recommendations:
 
 1. **Name two modes and state what each is.** Mock is a public training key. Real is a test key made by a wizard on this PC, in real form. "Real" never means production.
-2. **Say on the screen that this course shows every key.** A real system does not. See section 7.
-3. **The vault still behaves like a vault, and the course then shows what a real one would hide.** The API refuses export of a non-export key. The course view shows the bytes, labelled as a thing a real vault never does. See section 4.
+2. **Say on the screen that this course shows its keys.** A real system does not. See section 7.
+3. **A non-export key stays unread, and it runs only in the separate vault exercise.** It shows its fingerprint and refuses export with `VAULT_EXPORT_REFUSED`, even with Show keys on. See section 4.
 4. **Each wizard ends at an outside referee, where one exists.** OpenSSL, Go and `ssh.exe` judge TLS, mutual TLS, SSH, tokens and DPoP (run, section 5). DUKPT, passkey and enrolment have no outside live referee, and the wizard must say so.
 5. **Keep the passkey shape on Mock, since no real form exists here.** A test BDK can run in glass by the ruling, and the wizard must still say what a real BDK does. See sections 3.7 and 3.12.
 
@@ -20,7 +20,7 @@ Recommendations:
 
 | # | Inaccuracy | The true statement |
 |---|---|---|
-| 1 | Letting the view of a key imply that real systems show keys | Real systems hide them. This course shows them to teach, and it expects test keys. A real vault gives no such view of a non-export key |
+| 1 | Letting the view of a key imply that real systems show keys, or showing bytes for a key called non-export | Real systems hide them. This course shows exportable keys to teach, and it expects test keys. A non-export key shows only its fingerprint |
 | 2 | A green check that means "trusted", when the wizard told the client what to trust | A local CA is trusted only by clients that were told to trust it. A self-signed certificate passes against itself (run). A public CA will not sign `localhost` |
 | 3 | A "BDK ceremony" or "TR-31 file" that looks like the real thing | A real BDK stays inside an HSM. X9.24 and TR-31 are paid, and this repo holds only the free vectors. Our form is a shape, with no claim of conformance |
 | 4 | Proof from our own code, or a failure that names the wrong cause | Our engine agreeing with our engine proves little. Today an RSA chain in glass fails with `CERT_SIGNATURE`, which reads as tampering (run) |
@@ -31,14 +31,14 @@ Recommendations:
 | Mode | Who makes the key | Bytes visible | Goes in glass | Outside referee | Label to show |
 |---|---|---|---|---|---|
 | Mock | The course. `TrainingKeySource`, public by design (D5) | Yes | Yes | Yes, as today | "Training key. Public on purpose." |
-| Real | A wizard, on this PC, with `openssl` or `ssh-keygen`, or the vault. A test key | Yes, by Steve's ruling | Yes | Yes, where section 5 says | "Your test key, in the real format. This course shows every key, so use test keys only." |
+| Real | A wizard, on this PC, with `openssl` or `ssh-keygen`, or the vault. A test key | Yes when exportable, through the Host, by Steve's ruling. A non-export key shows its fingerprint | Exportable keys, as Steve's option C and `docs/modes-design.md` set out. A non-export key runs only in the separate vault exercise | Yes, where section 5 says | "Your test key, in the real format. This course shows its keys, so use test keys only." |
 
 This ruling changes written decisions, and they must change together:
 
 | Text today | Change needed |
 |---|---|
-| PRD D6: "Real mode uses the OS transport (`SslStream`), shows metadata only, and writes no secret bytes" | Real mode here shows keys. If `SslStream` stays as a separate transport, name that one differently, so "Real" has one meaning |
-| PRD A16: "a scan of its trace and session file finds no secret bytes", and a real `IKeyHandle` fails in glass by type | Rewrite for the new meaning. `richard-modes` owns the design |
+| PRD D6: "Real mode uses the OS transport (`SslStream`), shows metadata only, and writes no secret bytes" | Adopted by `richard-modes`: "Real" means keys only, and `SslStream` is the "OS transport" |
+| PRD A16: "a scan of its trace and session file finds no secret bytes", and a real `IKeyHandle` fails in glass by type | The scan stays for the OS transport, because Schannel gives no secret bytes. How a real key enters glass follows Steve's choice of option C. `richard-modes` owns this (`docs/modes-design.md`) |
 | UX chip: "Never use it with real secrets" | Still true. It agrees with the ruling |
 
 ## 2. What I ran
@@ -228,7 +228,7 @@ Section 4 is the behaviour list. The rule for wizards: **an HSM is a machine tha
 
 | Behaviour | Real source | The facade must | Refusal or result to show |
 |---|---|---|---|
-| Keys are used, never read | PKCS#11: `CKA_VALUE` "Cannot be revealed" when sensitive or not extractable. KMS: keys are available "only on the HSMs and only in memory" | Offer `Sign`, `Verify`, `Mac`, `Derive`, `Unwrap` by key id. Offer no get-value call for a non-export key | `KEY_NOT_EXPORTABLE`, the shape of `CKR_KEY_UNEXTRACTABLE` |
+| Keys are used, never read | PKCS#11: `CKA_VALUE` "Cannot be revealed" when sensitive or not extractable. KMS: keys are available "only on the HSMs and only in memory" | Offer `Sign`, `Verify`, `Mac`, `Derive`, `Unwrap` by key id. Offer no get-value call for a non-export key | `VAULT_EXPORT_REFUSED`, the shape of `CKR_KEY_UNEXTRACTABLE` |
 | Export is decided at creation, and one way | Vault: `exportable` "cannot be disabled" once set, same for `allow_plaintext_backup`. PKCS#11: `CKA_EXTRACTABLE` may go from true to false, "but not the other way around". AWS Payment Cryptography: "You can't change these properties" | Store `exportable` at creation. Allow true to false only. Keep `never_extractable`, as PKCS#11 does | An attempt to turn it on fails by name, and shows in the audit |
 | Purpose is fixed | SP 800-57 one purpose. AWS `KeyModesOfUse`. PKCS#11 `CKA_SIGN`, `CKA_WRAP` | Store usage at creation. A signing key refuses `Derive` | `KEY_USAGE_DENIED` |
 | Versions | Vault: rotate adds a version, `min_decryption_version` archives old ones. KMS "retains all key material" for a key across rotation | Rotate adds a version. Sign uses the newest. Verify names the version it used. Old versions verify until retired | Ciphertext or signature shows its version |
@@ -246,18 +246,18 @@ Section 4 is the behaviour list. The rule for wizards: **an HSM is a machine tha
 3. Non-export here is a rule in our code. In an HSM it is a property of a device. Anyone can open the SQLite file and read the wrapped key.
 4. Sealing here protects the file at rest. It does not stop a program already running as the user.
 
-### Two views of one key
+### What shows on screen
 
-Steve's ruling keeps both of these on screen, and the wizard must keep them apart:
+This follows the lead's ruling. An earlier draft of this section showed the bytes of a non-export key in a "course view". That was wrong: a non-export key that shows its bytes teaches that the word means nothing.
 
-| View | What it shows | What a real vault does |
-|---|---|---|
-| The vault API, as a program calls it | `Sign` works, and a read of a non-export key fails with `KEY_NOT_EXPORTABLE` | The same |
-| The course view | The key bytes, always, labelled "A real vault never shows you this. This course does, so you can see the parts" | No such view exists |
+| Key | With Show keys on | Where it runs | What a real vault does |
+|---|---|---|---|
+| Exportable | The Host fetches the bytes through `Export`, which writes an audit row, and shows them | The labs | Export is possible only if set at creation, and it is audited |
+| Non-export | Its fingerprint only, with this line: "The course refuses to show it. A real HSM would refuse too. These files could still open it here." `Export` fails with `VAULT_EXPORT_REFUSED` | Only the separate vault exercise | The same refusal, and no file a user could open |
 
-Glass reads the key through the course view, and that read appears in the audit list as a course read, not as an export. Otherwise the audit list would teach that a non-export key was exported.
+The last sentence of that line matters for accuracy. The refusal is a rule in our code, and the SQLite file on this PC could still open the key. In an HSM, the refusal is a property of a device.
 
-The wizard's outside proofs in section 5 use files. For a non-export key, the accurate proof is the real one: sign a test value through the API, and verify it with `openssl pkeyutl -verify` against the **public** key. I did not run this row, though the same verify shape ran for tokens.
+The wizard's outside proofs in section 5 use files, so they fit an exportable key. For a non-export key, the accurate proof is the real one: sign a test value through the API, and verify it with `openssl pkeyutl -verify` against the **public** key. I did not run this row, though the same verify shape ran for tokens.
 
 ## 5. Which final step can prove a key, and against what
 
@@ -309,7 +309,7 @@ Mechanical breaks that no tour text shows, each read from code:
 
 **The line each wizard carries, on its first screen:**
 
-> This course shows every key, so it expects test keys. A real system keeps these hidden.
+> This course shows its keys, so it expects test keys. A real system keeps these hidden.
 
 Why the line is accurate, for a reader who asks:
 
