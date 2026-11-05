@@ -111,6 +111,7 @@ namespace NetSec.Labs
                 case 1: return new Lesson01Aes();
                 case 2: return new Lesson02Seals();
                 case 3: return new Lesson03Kex();
+                case 10: return new Lesson10Auth();
                 default: return null;
             }
         }
@@ -135,11 +136,19 @@ namespace NetSec.Labs
             Flip("L2-flip-hmac-tag", 2, "HmacSealed", Lesson02Seals.SealOffset, ErrorCodes.SealHmacMismatch, Lesson02Seals.HmacCheck),
             Flip("L2-flip-cmac-message", 2, "CmacSealed", Lesson02Seals.MessageOffset + 3, ErrorCodes.SealCmacMismatch, Lesson02Seals.CmacCheck),
             Flip("L2-flip-cmac-tag", 2, "CmacSealed", Lesson02Seals.SealOffset, ErrorCodes.SealCmacMismatch, Lesson02Seals.CmacCheck),
-            WithOption("L2-extend-keyed-hash", 2, Lesson02Seals.OptionExtend, "KeyedHashSealed", AttackOutcome.Accepted, null, null),
+            WithOption("L2-extend-keyed-hash", 2, Lesson02Seals.OptionExtend, "KeyedHashSealed", AttackOutcome.NoCheck, null, null),
             WithOption("L2-extend-hmac", 2, Lesson02Seals.OptionExtend, "HmacSealed", AttackOutcome.Rejected, ErrorCodes.SealHmacMismatch, Lesson02Seals.HmacCheck),
 
             Swap("L3-swap-server-share", 3, "X25519ServerShare", Lesson03Kex.SwappedServerShare(), ErrorCodes.KexConfirmMismatch, Lesson03Kex.ConfirmCheck),
             Flip("L3-flip-mlkem-ciphertext", 3, "MlKemCiphertext", Frame.HeaderSize + 10, ErrorCodes.KexConfirmMismatch, Lesson03Kex.ConfirmCheck),
+
+            Flip("L10-change-token-claim", 10, "ReadTotals", Lesson10Auth.ClaimsOffset + 5, ErrorCodes.TokenBadSignature, NetSec.Auth.Token.SignatureCheck),
+            WithOption("L10-expired-token", 10, Lesson10Auth.OptionTokenExpired, "yes", AttackOutcome.Rejected, ErrorCodes.TokenExpired, NetSec.Auth.Token.ExpiryCheck),
+            WithOption("L10-replay-proof", 10, Lesson10Auth.OptionReplayProof, "yes", AttackOutcome.Rejected, ErrorCodes.DpopReplay, NetSec.Auth.DpopProof.ReplayCheck),
+            WithOption("L10-stolen-token", 10, Lesson10Auth.OptionStolenToken, "yes", AttackOutcome.Rejected, ErrorCodes.DpopJktMismatch, NetSec.Auth.DpopProof.BindingCheck),
+            WithOption("L10-ungranted-capability", 10, Lesson10Auth.OptionCallRefund, "yes", AttackOutcome.Rejected, ErrorCodes.CapabilityDenied, NetSec.Auth.AccessRules.PermissionCheck),
+            WithOption("L10-wrong-role", 10, Lesson10Auth.OptionTokenRole, "guest", AttackOutcome.Rejected, ErrorCodes.RoleDenied, NetSec.Auth.AccessRules.PermissionCheck),
+            WithOption("L10-replay-challenge", 10, Lesson10Auth.OptionReplayChallenge, "yes", AttackOutcome.Rejected, ErrorCodes.ChallengeReplay, NetSec.Auth.Challenge.ReplayCheck),
         };
 
         public static AttackDefinition[] All { get { return (AttackDefinition[])Rows.Clone(); } }

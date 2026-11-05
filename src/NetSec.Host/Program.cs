@@ -102,7 +102,7 @@ namespace NetSec.Host
             lesson = n,
             title = Titles[n],
             labId = LabCatalog.Find(n)?.LabId,
-            lanes = n == 9 ? new[] { "ce", "gateway", "server" } : n == 6 ? new[] { "reader", "bank" } : new[] { "client", "server" },
+            lanes = n == 9 ? new[] { "ce", "gateway", "server" } : n == 6 ? new[] { "reader", "bank" } : n == 10 ? new[] { "client", "issuer", "server" } : new[] { "client", "server" },
             attacks = AttackCatalog.All.Where(a => a.Lesson == n).Select(a => new { attackId = a.AttackId, kind = a.Kind, expectCode = a.ExpectCode, expectCheck = a.ExpectCheck }),
             built = LabCatalog.Find(n) is not null,
             lastRun = _lastRuns.TryGetValue(n, out JsonElement run) ? run : (JsonElement?)null,

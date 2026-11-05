@@ -208,7 +208,7 @@ namespace NetSec.Tests
                 "L2-flip-hash-message", "L2-flip-hmac-message", "L2-flip-hmac-tag", "L2-flip-cmac-message", "L2-flip-cmac-tag", "L2-extend-keyed-hash", "L2-extend-hmac",
                 "L3-swap-server-share", "L3-flip-mlkem-ciphertext",
             };
-            Assert.Equal(expected, AttackCatalog.All.Where(a => a.Lesson >= 1).Select(a => a.AttackId).ToArray());
+            Assert.Equal(expected, AttackCatalog.All.Where(a => a.Lesson >= 1 && a.Lesson <= 3).Select(a => a.AttackId).ToArray());
         }
     }
 }
