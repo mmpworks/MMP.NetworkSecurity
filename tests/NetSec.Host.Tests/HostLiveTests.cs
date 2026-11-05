@@ -224,7 +224,7 @@ namespace NetSec.Host.Tests
                 await s.Send("{\"type\":\"session.attack\",\"requestId\":\"a" + i + "\",\"sessionId\":\"" + parent + "\",\"attackId\":\"L0-flip-wire-byte\"}");
                 string fork = (await s.Until("session.started")).GetProperty("sessionId").GetString();
                 List<JsonElement> frames = await s.UntilFinished(fork);
-                Assert.Contains(frames, f => f.GetProperty("type").GetString() == "session.forked");
+                Assert.Equal("session.forked", frames[0].GetProperty("type").GetString());
                 parent = fork;      // The Host keeps the last 20 sessions, so the next attack forks this one.
             }
         }
