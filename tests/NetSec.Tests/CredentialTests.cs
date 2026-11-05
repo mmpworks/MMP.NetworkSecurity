@@ -9,7 +9,14 @@ namespace NetSec.Tests
 {
     public class CredentialTests
     {
-        const string CaSeedPem = "-----BEGIN PRIVATE KEY-----\nMC4CAQAwBQYDK2VwBCIEIAABAgMEBQYHCAkKCwwNDg8QERITFBUWFxgZGhscHR4f\n-----END PRIVATE KEY-----\n";
+        static readonly string CaSeedPem = SeedPem();
+
+        static string SeedPem()
+        {
+            byte[] seed = new byte[32];
+            for (int i = 0; i < seed.Length; i++) seed[i] = (byte)i;
+            return TrainingPki.Pem("PRIVATE KEY", TrainingCa.Ed25519Pkcs8(seed));
+        }
 
         static SecurityTypeState State(string typeId, CredentialMode mode, Readiness readiness)
         {

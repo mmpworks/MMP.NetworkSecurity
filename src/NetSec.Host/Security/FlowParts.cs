@@ -10,7 +10,7 @@ using NetSec.Platform;
 
 namespace NetSec.Host.Security;
 
-public sealed record CheckFact(string TypeId, string Judge, string Says, string Command, string Output, bool Passed, string? Code = null, string? Message = null);
+public sealed record CheckFact(string TypeId, string Judge, string Says, string Command, string Output, bool Passed, string? Code = null, string? Message = null, string? ControlCommand = null, string? ControlOutput = null);
 public sealed record ReviewFact(string TypeId, string Name, string NotAfter, string Algorithm, string Fingerprint);
 
 /// <summary>One line per built type: how a flow makes its key, names it, and checks it. A type with no row here reports WIZARD_PART_NOT_BUILT.</summary>

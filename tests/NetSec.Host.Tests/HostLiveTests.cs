@@ -31,6 +31,7 @@ namespace NetSec.Host.Tests
             info.Environment["NETSEC_PORT"] = Port.ToString();
             info.Environment["NETSEC_TOKEN"] = Token;
             info.Environment["LOCALAPPDATA"] = AppData;
+            info.Environment["NETSEC_SECURITY_DIR"] = Path.Combine(AppData, "security");      // Never the learner's own .security/ folder
             TaskCompletionSource<string> ready = new TaskCompletionSource<string>(TaskCreationOptions.RunContinuationsAsynchronously);
             _process = new Process { StartInfo = info };
             _process.OutputDataReceived += (_, e) => { if (e.Data != null && e.Data.StartsWith("HOST-READY")) ready.TrySetResult(e.Data); };

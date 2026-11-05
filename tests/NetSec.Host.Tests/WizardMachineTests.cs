@@ -163,6 +163,175 @@ public class WizardMachineTests
         Assert.Equal("no-outside-judge", rig.Store.Entry(SecurityTypes.DeviceEnrolment).Says);
     }
 
+    [Theory]
+    [InlineData(SecurityTypes.TokenIssuer)]
+    [InlineData(SecurityTypes.DeviceEnrolment)]
+    public void An_rsa_key_for_an_ed25519_type_is_refused_by_name_and_places_nothing(string typeId)
+    {
+        using Rig rig = new();
+        FlowRun run = rig.Runs.Start("my-login")!.Run;
+        run = Move(rig.Runs, run, "next", NoData).Run;
+        run = Move(rig.Runs, run, "use-files", NoData).Run;
+        Directory.CreateDirectory(rig.Root);
+        string pem = Path.Combine(rig.Root, "rsa.pem");
+        using (System.Security.Cryptography.RSA rsa = System.Security.Cryptography.RSA.Create(2048))
+            File.WriteAllText(pem, NetSec.Pki.TrainingPki.Pem("PRIVATE KEY", rsa.ExportPkcs8PrivateKey()));
+        RunReply reply = Move(rig.Runs, run, "files", PathsData(typeId, pem));
+        Assert.Contains(reply.Errors, e => e.Code == "KEY_ALGORITHM_NOT_IN_ENGINE" && e.TypeId == typeId);
+        Assert.Equal("PickFiles", reply.Run.State);
+        Assert.Null(rig.Store.Entry(typeId).Binding);
+    }
+
+    [Fact]
+    public void Review_reads_the_algorithm_from_the_key()
+    {
+        using Rig rig = new();
+        FlowParts parts = new(rig.Store, Environment.GetEnvironmentVariable);
+        rig.Store.PlaceKey(SecurityTypes.TokenIssuer, NetSec.Pki.TrainingPki.Pem("PRIVATE KEY", NetSec.Pki.TrainingCa.Ed25519Pkcs8(new byte[32])));
+        using (System.Security.Cryptography.RSA rsa = System.Security.Cryptography.RSA.Create(2048))
+            rig.Store.PlaceKey(SecurityTypes.Tls11Server, NetSec.Pki.TrainingPki.Pem("PRIVATE KEY", rsa.ExportPkcs8PrivateKey()));
+        Assert.Equal("Ed25519", parts.Review(SecurityTypes.TokenIssuer).Algorithm);
+        Assert.Equal("RSA-2048", parts.Review(SecurityTypes.Tls11Server).Algorithm);
+    }
+
+    [Fact]
+    public void A_check_judges_the_placed_keys_when_the_types_sit_on_built_in()
+    {
+        using Rig rig = new();
+        FlowRun run = rig.Runs.Start("my-certificates")!.Run;
+        run = Move(rig.Runs, run, "next", NoData).Run;
+        run = Move(rig.Runs, run, "make", NoData).Run;
+        foreach (string typeId in rig.Runs.Table.Flow("my-certificates")!.Types) rig.Store.SetMode(typeId, SecurityStore.ModeBuiltIn);
+        string dir = Path.Combine(rig.Root, "proof");
+        FlowParts parts = new(rig.Store, Environment.GetEnvironmentVariable);
+        foreach (string typeId in rig.Runs.Table.Flow("my-certificates")!.Types)
+        {
+            CheckFact fact = parts.Check(typeId, dir);
+            Assert.True(fact.Passed, typeId + ": " + fact.Message + " " + fact.Output);
+            byte[] root = Convert.FromBase64String(string.Concat(File.ReadAllLines(Path.Combine(dir, "root.pem")).Where(l => !l.StartsWith("-----"))));
+            byte[] own = rig.Store.PlacedKey(SecurityTypes.RootCa)!.CopyPublic();
+            Assert.True(Convert.ToHexString(root).Contains(Convert.ToHexString(own)), typeId + ": the root OpenSSL saw is not the learner's root");
+        }
+    }
+
+    /// <summary>A stand-in for OpenSSL that accepts every command. A check with no way to fail must not pass.</summary>
+    static string FakeTool(Rig rig, string name, string body)
+    {
+        Directory.CreateDirectory(rig.Root);
+        string path = Path.Combine(rig.Root, name + ".cmd");
+        File.WriteAllText(path, "@echo off\r\n" + body + "\r\n");
+        return path;
+    }
+
+    [Theory]
+    [InlineData(SecurityTypes.RootCa)]
+    [InlineData(SecurityTypes.TlsTrust)]
+    [InlineData(SecurityTypes.Tls13Server)]
+    [InlineData(SecurityTypes.Tls13Client)]
+    [InlineData(SecurityTypes.Tls11Server)]
+    public void A_tool_that_accepts_everything_fails_the_check(string typeId)
+    {
+        using Rig probe = new();
+        string tool = FakeTool(probe, "always-yes", "echo ok\r\nexit /b 0");
+        using Rig rig = new(name => name == "NETSEC_OPENSSL" ? tool : null);
+        FlowRun run = rig.Runs.Start("my-certificates")!.Run;
+        run = Move(rig.Runs, run, "next", NoData).Run;
+        Move(rig.Runs, run, "make", NoData);
+        CheckFact fact = new FlowParts(rig.Store, name => name == "NETSEC_OPENSSL" ? tool : null).Check(typeId, Path.Combine(rig.Root, "proof"));
+        Assert.False(fact.Passed);
+        Assert.Equal("CHECK_FAILED", fact.Code);
+    }
+
+    [Fact]
+    public void A_control_that_fails_for_the_wrong_reason_fails_the_check()
+    {
+        using Rig probe = new();
+        // Accepts the real command, and refuses the control with words that are no refusal of a signature.
+        string tool = FakeTool(probe, "wrong-reason", "echo %* | findstr /c:\"other-root\" >nul\r\nif %errorlevel%==0 (echo out of memory\r\nexit /b 3)\r\necho ok\r\nexit /b 0");
+        using Rig rig = new(name => name == "NETSEC_OPENSSL" ? tool : null);
+        FlowRun run = rig.Runs.Start("my-certificates")!.Run;
+        run = Move(rig.Runs, run, "next", NoData).Run;
+        Move(rig.Runs, run, "make", NoData);
+        CheckFact fact = new FlowParts(rig.Store, name => name == "NETSEC_OPENSSL" ? tool : null).Check(SecurityTypes.RootCa, Path.Combine(rig.Root, "proof"));
+        Assert.False(fact.Passed);
+        Assert.Equal("CHECK_FAILED", fact.Code);
+    }
+
+    [Fact]
+    public void A_passing_check_shows_the_control_and_its_refusal()
+    {
+        using Rig rig = new();
+        rig.Store.PlaceKey(SecurityTypes.TokenIssuer, NetSec.Pki.TrainingPki.Pem("PRIVATE KEY", NetSec.Pki.TrainingCa.Ed25519Pkcs8(new byte[32])));
+        CheckFact fact = new FlowParts(rig.Store, Environment.GetEnvironmentVariable).Check(SecurityTypes.TokenIssuer, Path.Combine(rig.Root, "proof"));
+        Assert.True(fact.Passed, fact.Message);
+        Assert.Contains("changed-input", fact.ControlCommand);
+        Assert.Contains("Signature Verification Failure", fact.ControlOutput);
+    }
+
+    [Fact]
+    public void A_tool_that_cannot_start_reports_the_referee_missing()
+    {
+        using Rig rig = new();
+        Directory.CreateDirectory(rig.Root);
+        string notProgram = Path.Combine(rig.Root, "not-a-program.exe");
+        File.WriteAllText(notProgram, "this file is no program");
+        rig.Store.PlaceKey(SecurityTypes.TokenIssuer, NetSec.Pki.TrainingPki.Pem("PRIVATE KEY", NetSec.Pki.TrainingCa.Ed25519Pkcs8(new byte[32])));
+        CheckFact fact = new FlowParts(rig.Store, name => name == "NETSEC_OPENSSL" ? notProgram : null).Check(SecurityTypes.TokenIssuer, Path.Combine(rig.Root, "proof"));
+        Assert.Equal("REFEREE_MISSING", fact.Code);
+    }
+
+    [Fact]
+    public void A_file_for_a_type_outside_the_flow_is_refused_and_no_paths_at_all_is_refused()
+    {
+        using Rig rig = new();
+        FlowRun run = rig.Runs.Start("my-login")!.Run;
+        run = Move(rig.Runs, run, "next", NoData).Run;
+        run = Move(rig.Runs, run, "use-files", NoData).Run;
+        RunReply none = Move(rig.Runs, run, "files", JsonDocument.Parse("{\"paths\":{}}").RootElement);
+        Assert.Contains(none.Errors, e => e.Code == "KEY_FILE_UNREADABLE");
+        Assert.Null(rig.Store.Entry(SecurityTypes.TokenIssuer).Binding);
+        Directory.CreateDirectory(rig.Root);
+        string pem = Path.Combine(rig.Root, "k.pem");
+        File.WriteAllText(pem, NetSec.Pki.TrainingPki.Pem("PRIVATE KEY", NetSec.Pki.TrainingCa.Ed25519Pkcs8(new byte[32])));
+        RunReply wrong = Move(rig.Runs, none.Run, "files", PathsData(SecurityTypes.SshClient, pem));
+        Assert.Contains(wrong.Errors, e => e.Code == "WIZARD_TYPE_NOT_IN_FLOW" && e.TypeId == SecurityTypes.SshClient);
+        Assert.Null(rig.Store.Entry(SecurityTypes.TokenIssuer).Binding);
+    }
+
+    [Fact]
+    public void A_long_form_path_in_the_ssh_folder_still_warns()
+    {
+        using Rig rig = new();
+        FlowRun run = rig.Runs.Start("my-login")!.Run;
+        run = Move(rig.Runs, run, "next", NoData).Run;
+        run = Move(rig.Runs, run, "use-files", NoData).Run;
+        string longForm = @"\\?\" + Path.Combine(rig.Profile, ".ssh", "absent.pem");
+        RunReply reply = Move(rig.Runs, run, "files", PathsData(SecurityTypes.TokenIssuer, longForm));
+        Assert.Contains(reply.Warnings, w => w.Code == FlowRuns.PathPersonal);
+    }
+
+    [Fact]
+    public void A_corrupt_modes_file_is_named_at_start()
+    {
+        using Rig rig = new();
+        string root = Path.Combine(rig.Root, "corrupt");
+        Directory.CreateDirectory(root);
+        File.WriteAllText(Path.Combine(root, "modes.json"), "{ not json");
+        InvalidDataException e = Assert.Throws<InvalidDataException>(() => new SecurityStore(root, WizardTable.Load(FlowsFile)));
+        Assert.Contains("modes.json", e.Message);
+    }
+
+    [Fact]
+    public void A_key_file_that_is_too_large_is_refused_by_name()
+    {
+        using Rig rig = new();
+        Directory.CreateDirectory(rig.Root);
+        string big = Path.Combine(rig.Root, "big.pem");
+        using (FileStream f = File.Create(big)) f.SetLength(3L * 1024 * 1024 * 1024);
+        NetSec.Errors.NetSecException e = Assert.Throws<NetSec.Errors.NetSecException>(() => NetSec.Pki.KeyFileReader.ReadPrivateKey(big, "k"));
+        Assert.Equal("KEY_FILE_FORMAT", e.Error.Code);
+    }
+
     [Fact]
     public void Show_keys_survives_a_new_store_on_the_same_folder()
     {
