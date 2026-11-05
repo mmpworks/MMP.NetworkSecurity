@@ -1,17 +1,17 @@
 {
   "summary": {
     "schema": 1,
-    "timestamp": "2026-11-05T07:38:08.7720631-06:00",
+    "timestamp": "2026-11-05T07:45:24.3391100-06:00",
     "machine": "BEAST",
-    "command": "run.ps1 -Clauses A8,A14,A9",
+    "command": "run.ps1 -Clauses A8,A10,A14,A9",
     "productRoot": "E:\\dev\\ns-s4ssh",
-    "productCommit": "55cd2cd",
+    "productCommit": "ce83081",
     "acceptanceCommit": "af216aa",
     "freshClone": false,
     "productPresent": true,
     "M": 208,
-    "selected": 18,
-    "pass": 18,
+    "selected": 25,
+    "pass": 25,
     "fail": 0,
     "notRun": 0,
     "reasons": [],
@@ -24,6 +24,90 @@
   },
   "results": [
     {
+      "id": "A10.privacy.no-dukpt-secrets-in-ce-and-gateway-traces",
+      "assertion": "A10",
+      "slice": "S5",
+      "group": "bridge",
+      "build": "host",
+      "referee": "live run, Go referees and taps",
+      "status": "PASS",
+      "reason": "",
+      "detail": "CE and gateway traces hold none of 7 DUKPT secrets; the scan sees the bank's key and the CE's hop keys",
+      "ms": 16135
+    },
+    {
+      "id": "A10.run.glass-hops",
+      "assertion": "A10",
+      "slice": "S5",
+      "group": "bridge",
+      "build": "host",
+      "referee": "live run, Go referees and taps",
+      "status": "PASS",
+      "reason": "",
+      "detail": "our Gateway and Server: PIN block recovered by the bank, 225 trace lines",
+      "ms": 1
+    },
+    {
+      "id": "A10.run.go-referee-hops",
+      "assertion": "A10",
+      "slice": "S5",
+      "group": "bridge",
+      "build": "host",
+      "referee": "live run, Go referees and taps",
+      "status": "PASS",
+      "reason": "",
+      "detail": "Go x/crypto/ssh gateway and Go crypto/tls server: PIN block recovered by the bank, 72 trace lines",
+      "ms": 15883
+    },
+    {
+      "id": "A10.run.ssh-exe-forward",
+      "assertion": "A10",
+      "slice": "S5",
+      "group": "bridge",
+      "build": "host",
+      "referee": "live run, Go referees and taps",
+      "status": "PASS",
+      "reason": "",
+      "detail": "ssh.exe -L carried hop 1; the CE spoke plain bytes only",
+      "ms": 17281
+    },
+    {
+      "id": "A10.tamper.envelope-dukpt-mac-mismatch",
+      "assertion": "A10",
+      "slice": "S5",
+      "group": "bridge",
+      "build": "host",
+      "referee": "live run, Go referees and taps",
+      "status": "PASS",
+      "reason": "",
+      "detail": "control passes; a flipped envelope byte at the gateway gives DUKPT_MAC_MISMATCH at the bank",
+      "ms": 13948
+    },
+    {
+      "id": "A10.tamper.hop1-ssh-packet-mac",
+      "assertion": "A10",
+      "slice": "S5",
+      "group": "bridge",
+      "build": "host",
+      "referee": "live run, Go referees and taps",
+      "status": "PASS",
+      "reason": "",
+      "detail": "control passes; one flipped bit at hop 1 offset 284 gives SSH_PACKET_MAC",
+      "ms": 35630
+    },
+    {
+      "id": "A10.tamper.hop2-tls13-aead-tag",
+      "assertion": "A10",
+      "slice": "S5",
+      "group": "bridge",
+      "build": "host",
+      "referee": "live run, Go referees and taps",
+      "status": "PASS",
+      "reason": "",
+      "detail": "control passes; one flipped bit at hop 2 offset 1328 gives TLS13_AEAD_TAG",
+      "ms": 35585
+    },
+    {
       "id": "A14.tours.no-dangling-binding",
       "assertion": "A14",
       "slice": "Each",
@@ -33,7 +117,7 @@
       "status": "PASS",
       "reason": "",
       "detail": "74 of 74 vectors; 2 lessons not built yet were skipped",
-      "ms": 3740
+      "ms": 5399
     },
     {
       "id": "A14.tours.static-schema-and-concept-cap",
@@ -56,8 +140,8 @@
       "referee": "Go x/crypto/ssh and ssh.exe",
       "status": "PASS",
       "reason": "",
-      "detail": "ssh.exe ran 'echo hello' on our server and printed: Warning: Permanently added '[127.0.0.1]:49897' (ED25519) to the list of known hosts.\nhello",
-      "ms": 538
+      "detail": "ssh.exe ran 'echo hello' on our server and printed: Warning: Permanently added '[127.0.0.1]:63914' (ED25519) to the list of known hosts.\nhello",
+      "ms": 635
     },
     {
       "id": "A8.ssh.exe-to-glass-server.net10",
@@ -68,8 +152,8 @@
       "referee": "Go x/crypto/ssh and ssh.exe",
       "status": "PASS",
       "reason": "",
-      "detail": "ssh.exe ran 'echo hello' on our server and printed: Warning: Permanently added '[127.0.0.1]:57763' (ED25519) to the list of known hosts.\nhello",
-      "ms": 754
+      "detail": "ssh.exe ran 'echo hello' on our server and printed: Warning: Permanently added '[127.0.0.1]:61326' (ED25519) to the list of known hosts.\nhello",
+      "ms": 758
     },
     {
       "id": "A8.ssh.hostkey-changed-beside-control.cf",
@@ -81,7 +165,7 @@
       "status": "PASS",
       "reason": "",
       "detail": "control opens; changed host key gives SSH_HOST_KEY_CHANGED",
-      "ms": 3774
+      "ms": 1373
     },
     {
       "id": "A8.ssh.hostkey-changed-beside-control.net10",
@@ -93,7 +177,7 @@
       "status": "PASS",
       "reason": "",
       "detail": "control opens; changed host key gives SSH_HOST_KEY_CHANGED",
-      "ms": 1530
+      "ms": 4046
     },
     {
       "id": "A8.ssh.legacy.exec.cf",
@@ -105,7 +189,7 @@
       "status": "PASS",
       "reason": "",
       "detail": "exec returned 'hello'; referee confirms the Legacy suite",
-      "ms": 526
+      "ms": 490
     },
     {
       "id": "A8.ssh.legacy.exec.net10",
@@ -117,7 +201,7 @@
       "status": "PASS",
       "reason": "",
       "detail": "exec returned 'hello'; referee confirms the Legacy suite",
-      "ms": 540
+      "ms": 568
     },
     {
       "id": "A8.ssh.legacy.tunnel.cf",
@@ -129,7 +213,7 @@
       "status": "PASS",
       "reason": "",
       "detail": "tunnel echoed 19 bytes; referee confirms the Legacy suite",
-      "ms": 523
+      "ms": 478
     },
     {
       "id": "A8.ssh.legacy.tunnel.net10",
@@ -141,7 +225,7 @@
       "status": "PASS",
       "reason": "",
       "detail": "tunnel echoed 19 bytes; referee confirms the Legacy suite",
-      "ms": 514
+      "ms": 519
     },
     {
       "id": "A8.ssh.modern.exec.cf",
@@ -153,7 +237,7 @@
       "status": "PASS",
       "reason": "",
       "detail": "exec returned 'hello'; referee confirms the Modern suite",
-      "ms": 455
+      "ms": 502
     },
     {
       "id": "A8.ssh.modern.exec.net10",
@@ -165,7 +249,7 @@
       "status": "PASS",
       "reason": "",
       "detail": "exec returned 'hello'; referee confirms the Modern suite",
-      "ms": 549
+      "ms": 429
     },
     {
       "id": "A8.ssh.modern.tunnel.cf",
@@ -177,7 +261,7 @@
       "status": "PASS",
       "reason": "",
       "detail": "tunnel echoed 19 bytes; referee confirms the Modern suite",
-      "ms": 446
+      "ms": 478
     },
     {
       "id": "A8.ssh.modern.tunnel.net10",
@@ -189,7 +273,7 @@
       "status": "PASS",
       "reason": "",
       "detail": "tunnel echoed 19 bytes; referee confirms the Modern suite",
-      "ms": 459
+      "ms": 415
     },
     {
       "id": "A9.cf.binaries-reference-cf-mscorlib",
@@ -201,7 +285,7 @@
       "status": "PASS",
       "reason": "",
       "detail": "4 of 4 vectors",
-      "ms": 13
+      "ms": 14
     },
     {
       "id": "A9.cf.compiles-against-reference-assemblies-with-langversion-3",
@@ -213,7 +297,7 @@
       "status": "PASS",
       "reason": "",
       "detail": "src/NetSec.Core and src/NetSec.Core.NetCF use LangVersion 3; the CF project builds against E:\\dev\\tools\\netcf35-ref",
-      "ms": 1984
+      "ms": 2229
     },
     {
       "id": "A9.cf.same-suite-passes-on-net48-skips-pinned",
@@ -224,8 +308,8 @@
       "referee": "CF references and System.Reflection.Metadata",
       "status": "PASS",
       "reason": "",
-      "detail": "2 of 2 vectors; net10.0 551 passed, net48 551 passed, 0 skipped (all pinned)",
-      "ms": 67052
+      "detail": "2 of 2 vectors; net10.0 560 passed, net48 560 passed, 0 skipped (all pinned)",
+      "ms": 67667
     },
     {
       "id": "A9.git-ls-files.no-cf-binary",
@@ -236,8 +320,8 @@
       "referee": "CF references and System.Reflection.Metadata",
       "status": "PASS",
       "reason": "",
-      "detail": "472 tracked files checked against 42 CF reference files and the CF mscorlib token; none match",
-      "ms": 611
+      "detail": "493 tracked files checked against 42 CF reference files and the CF mscorlib token; none match",
+      "ms": 507
     }
   ]
 }
