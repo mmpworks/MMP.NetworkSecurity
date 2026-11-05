@@ -75,7 +75,7 @@
       "text": [
         "The two sides now say whether they run strict key exchange. In this lab both rounds show it on.",
         "Strict KEX answers an attack called Terrapin (CVE-2023-48795). An attacker removes a packet from the start of the protected stream, and the two sides can end up with some security features turned down without noticing.",
-        "A peer that does not offer strict KEX leaves it off, and the event then says off. These two suites still stop the prefix attack in that case, because the seal covers the plain text and a deleted packet moves the cipher stream. An injected Ignore packet can still kill such a session."
+        "A peer that does not offer strict KEX leaves it off, and the event then says off. These two suites still stop the prefix attack in that case, because the seal covers the plain text, and a deleted packet moves the cipher stream, which garbles the encrypted length field. An injected Ignore packet can still kill such a session."
       ],
       "glossary": [],
       "bind": { "kind": "event", "eventType": "ssh.kex.strict", "match": { "actor": "client" } },
@@ -83,13 +83,13 @@
       "claims": [
         {
           "id": "L8-C15",
-          "text": "Terrapin (CVE-2023-48795) lets an attacker bypass integrity checks so that some packets from the start of the handshake are omitted, which can downgrade or disable security features.",
+          "text": "Terrapin (CVE-2023-48795) lets an attacker bypass integrity checks so that some packets from the start of the protected stream are omitted (NVD names the extension negotiation message), which can downgrade or disable security features.",
           "source": "NVD, CVE-2023-48795, description (read 2026-11-05)"
         },
         {
           "id": "L8-C16",
           "text": "Both lab rounds run strict KEX because the glass client and server both offer it. A peer that does not offer it leaves it off. The lab's two suites still stop the prefix attack then (0 of 4,000 accepted on each suite in Jared's sweep), because the MAC covers the plain text. An injected Ignore can still kill such a session.",
-          "source": "docs/lesson-ssh-names.md, What the tour must state, item 7, and Events, ssh.kex.strict row (branch fix/ssh-verdict, PR #51)"
+          "source": "docs/lesson-ssh-names.md, What the tour must state, item 7, and Events, ssh.kex.strict row (branch fix/ssh-verdict, PR #51); reader-a15a reproduced the sweep with strict KEX off: Modern 0 of 4,000 accepted, Legacy 0 of 1,000 accepted (stopped for time), and an injected Ignore alone refused 30 of 30 and 10 of 10, by the packet length check (PR #72)"
         }
       ],
       "unlock": { "mode": "event" }
