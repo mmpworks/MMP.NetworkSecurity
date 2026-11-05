@@ -103,7 +103,8 @@ Offsets index `wire`, as in the other lessons.
 | `userauth accepted` | `client` | `SSH_AUTH_REFUSED` |
 | `userauth signature verify` | `server` | `SSH_AUTH_REFUSED` |
 | `exec accepted` | `client` | `SSH_EXEC_REFUSED` |
-| `tunnel allow list` | `client` | `SSH_TUNNEL_REFUSED` |
+| `tunnel allow list` | `server`, which decides (RFC 4254 section 7.2) | `SSH_TUNNEL_REFUSED` |
+| `tunnel accepted` | `client`, which only reports the server's answer | `SSH_TUNNEL_REFUSED` |
 | `channel number known` | both | `SSH_CHANNEL_UNKNOWN` |
 | `channel window` | both | `SSH_CHANNEL_WINDOW` |
 | `no rekey in this lab` | both | `SSH_REKEY_UNSUPPORTED` |
