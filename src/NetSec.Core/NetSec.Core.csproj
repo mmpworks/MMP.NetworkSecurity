@@ -12,7 +12,7 @@
   </PropertyGroup>
 
   <ItemGroup>
-    <ProjectReference Include="$(AsyncProxyRoot)\src\MMP.AsyncProxy\MMP.AsyncProxy.csproj" />
+    <ProjectReference Include="..\AsyncProxy.Local\MMP.AsyncProxy.csproj" />
   </ItemGroup>
 
 </Project>
