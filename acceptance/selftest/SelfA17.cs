@@ -115,6 +115,46 @@ namespace Acceptance
             return passes + " clauses PASS on the faithful fake; " + bites + " named defects each FAIL their clause" + (notRun.Count > 0 ? "; NOT RUN: " + string.Join("; ", notRun.ToArray()) : "");
         }
 
+        /// <summary>
+        /// HostSession.Run and Fork read one connection. When another session of the same Host ends on that connection first, the run must keep reading until its own session ends,
+        /// and must say how many foreign frames it passed. The fake sends a foreign trace event and a foreign session.finished (code FOREIGN_SESSION) ahead of the run's own frames.
+        /// </summary>
+        [Clause("SELF.a17-drive-takes-own-session")]
+        public static string DriveTakesOwnSession(Ctx c)
+        {
+            int[] baseEvents = new int[2];
+            string summary = "";
+            foreach (string mutation in new string[] { "", "foreign-finish-first" })
+            {
+                bool foreign = mutation.Length > 0;
+                string tag = "drive-" + (foreign ? "foreign" : "good");
+                using (FakeHost fake = new FakeHost(Path.Combine(c.WorkDir, "fake-" + tag), mutation, Referees.OpenSsl(c), Path.Combine(c.AcceptanceDir, "selftest", "FakeHost", "fakevault.py")))
+                using (HostProc h = A17.Host(WithFake(c, fake, tag), tag))
+                {
+                    SessionRun lesson = HostSession.Run(h, 4, "glass", null);
+                    SessionRun fork = HostSession.Fork(h, lesson.SessionId, "L4-flip-cert-byte");
+                    SessionRun[] runs = new SessionRun[] { lesson, fork };
+                    string[] names = new string[] { "the run", "the fork" };
+                    for (int i = 0; i < runs.Length; i++)
+                    {
+                        SessionRun r = runs[i];
+                        string what = names[i] + (foreign ? " with a foreign session ahead of it" : "");
+                        Check.True(r.Finished != null, what + " did not finish");
+                        Check.Equal(what + ": the session that finished", r.SessionId, MiniJson.Str(r.Finished, "sessionId"));
+                        Check.True(MiniJson.Str(r.Finished, "code") != "FOREIGN_SESSION", what + " took the foreign session's finish as its own");
+                        foreach (Dictionary<string, object> ev in r.Events)
+                            Check.True(!(MiniJson.Str(ev, "streamId") ?? "").StartsWith("s-other/", StringComparison.Ordinal), what + " kept an event of the foreign session");
+                        Check.Equal(what + ": frames of another session passed", foreign ? 2 : 0, r.ForeignFrames);
+                        if (!foreign) baseEvents[i] = r.Events.Count;
+                        else Check.Equal(what + ": events kept, against the run without a foreign session", baseEvents[i], r.Events.Count);
+                    }
+                    Check.Equal("the fork's ending code", "CERT_SIGNATURE", MiniJson.Str(fork.Finished, "code"));
+                    summary += (foreign ? "; with a foreign session ahead: " : "without: ") + lesson.Events.Count + " + " + fork.Events.Count + " events, own finish, " + (lesson.ForeignFrames + fork.ForeignFrames) + " foreign frames passed";
+                }
+            }
+            return "Run and Fork read only their own session: " + summary;
+        }
+
         [Clause("SELF.a17-absent-host-is-not-run")]
         public static string AbsentHostIsNotRun(Ctx c)
         {
