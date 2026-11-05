@@ -576,7 +576,7 @@ The screens are the ids in 9.1 and 9.1a. A test walks the default path of every 
 |    Public key    7c1e 9a02 ...   [Show all] [Copy]         |
 |    Issuer        https://pump.training/issuer              |
 |    Audience      https://pump.training/api                 |
-|  DEVICE KEY (no outside check)                           |
+|  DEVICE KEY (no outside check)                            |
 |    Device        pump-reader-4                             |
 |    Fingerprint   SHA256:Zp1...c0A=                         |
 |  These are test keys. This course shows them on screen.    |
