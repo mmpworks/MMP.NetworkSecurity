@@ -178,7 +178,7 @@
         {
           "id": "L7-C15",
           "text": "One failure code for bad padding and a bad seal hides the fault in the message, but the time can still differ. That timing difference is the Lucky Thirteen class of attack. The tour gives no timing number from this lab.",
-          "source": "RFC 7457, section 2.4 (Padding Oracle Attacks: Lucky Thirteen is a timing side channel against MAC-then-encrypt). Jared's single-machine timing pair (PR #49 comment 6658261494) did not repeat and was withdrawn (PR #62 comment 6658985567), so no number from this lab is used"
+          "source": "RFC 7457, section 2.4 (Padding Oracle Attacks: Lucky Thirteen is a timing side channel against MAC-then-encrypt). reader-a15a reproduced the direction on one machine (Release build, padding 0 slower by about 6 percent, no gap in a Debug build; PR #72). Jared's single-machine timing pair (PR #49 comment 6658261494) did not repeat and was withdrawn (PR #62 comment 6658985567), so no number from this lab is used"
         }
       ],
       "unlock": { "mode": "action", "ref": "L7-S07-T1" }
