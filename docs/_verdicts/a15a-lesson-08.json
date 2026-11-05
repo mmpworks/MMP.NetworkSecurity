@@ -1,0 +1,92 @@
+{
+  "reader": "reader-a15a",
+  "authors": [
+    "heather-s0-tour"
+  ],
+  "claims": [
+    {
+      "id": "L8-C01",
+      "verdict": "accurate",
+      "note": "Tours read at origin/feat/tours-7-8-10 (PR 25, commit 150b732). RFC 4253 section 4.2: 'both sides MUST send an identification string', before the binary packet protocol.",
+      "checkedAgainst": "RFC 4253 section 4.2 (RFC text fetched from rfc-editor.org this session)"
+    },
+    {
+      "id": "L8-C02",
+      "verdict": "accurate",
+      "note": "Tours read at origin/feat/tours-7-8-10 (PR 25, commit 150b732). RFC 4253 section 7.1: each side sends SSH_MSG_KEXINIT with name-lists; the algorithm is chosen by the client-ordered iteration rule ('Choose the first algorithm that satisfies the following conditions').",
+      "checkedAgainst": "RFC 4253 section 7.1 (RFC text fetched from rfc-editor.org this session)"
+    },
+    {
+      "id": "L8-C03",
+      "verdict": "accurate",
+      "note": "Tours read at origin/feat/tours-7-8-10 (PR 25, commit 150b732). RFC 8731 section 3: 'The protocol flow, the SSH_MSG_KEX_ECDH_INIT and SSH_MSG_KEX_ECDH_REPLY messages, and the structure of the exchange hash are identical to Section 4 of [RFC5656]'; the methods use Curve25519 per RFC 7748.",
+      "checkedAgainst": "RFC 8731 section 3 (RFC text fetched from rfc-editor.org this session)"
+    },
+    {
+      "id": "L8-C04",
+      "verdict": "accurate",
+      "note": "Tours read at origin/feat/tours-7-8-10 (PR 25, commit 150b732). RFC 7748 section 6.1: both parties MAY check for the all-zero value and abort. RFC 8731 section 3: implementations 'MUST check whether the computed Diffie-Hellman shared secret is the all-zero value and abort if so'.",
+      "checkedAgainst": "RFC 7748 section 6.1; RFC 8731 section 3 (RFC text fetched from rfc-editor.org this session)"
+    },
+    {
+      "id": "L8-C05",
+      "verdict": "accurate",
+      "note": "Tours read at origin/feat/tours-7-8-10 (PR 25, commit 150b732). RFC 4251 section 9.3.4: 'This protocol makes no assumptions or provisions for an infrastructure or means for distributing the public keys of hosts' and such use 'is vulnerable to man-in-the-middle attacks'. Section 4.1 gives the strategy of accepting the key the first time, saving it, and comparing on later connections.",
+      "checkedAgainst": "RFC 4251 sections 4.1, 9.3.4 (RFC text fetched from rfc-editor.org this session)"
+    },
+    {
+      "id": "L8-C06",
+      "verdict": "accurate",
+      "note": "Tours read at origin/feat/tours-7-8-10 (PR 25, commit 150b732). RFC 4252 section 7: 'the possession of a private key serves as authentication'; the server MUST check the key is valid for the user and the signature is valid. The signed data starts with 'string session identifier'.",
+      "checkedAgainst": "RFC 4252 section 7 (RFC text fetched from rfc-editor.org this session)"
+    },
+    {
+      "id": "L8-C07",
+      "verdict": "accurate",
+      "note": "Tours read at origin/feat/tours-7-8-10 (PR 25, commit 150b732). RFC 4254 section 6.5: 'a program is started at the remote end. The program can be a shell, an application program, or a subsystem'.",
+      "checkedAgainst": "RFC 4254 section 6.5 (RFC text fetched from rfc-editor.org this session)"
+    },
+    {
+      "id": "L8-C08",
+      "verdict": "accurate",
+      "note": "Tours read at origin/feat/tours-7-8-10 (PR 25, commit 150b732). lesson-ssh-names.md 'What the tour must state' item 5 and docs/program-design.md section 2.6: 'Our SSH server starts no process. Exec dispatches to a fixed table (echo, whoami).'",
+      "checkedAgainst": "docs/lesson-ssh-names.md on local branch feat/s4-ssh (read); docs/program-design.md section 2.6 (read)"
+    },
+    {
+      "id": "L8-C09",
+      "verdict": "accurate",
+      "note": "Tours read at origin/feat/tours-7-8-10 (PR 25, commit 150b732). RFC 4254 section 7.2: SSH_MSG_CHANNEL_OPEN with type 'direct-tcpip' carries 'host to connect' and 'port to connect' where the recipient should connect the channel. Remote forwarding uses 'forwarded-tcpip' in the same section, so 'uses direct-tcpip' is true for the local-forward case the lab shows. Observation for the author, not a claim fault: section 7.2 has the receiving side decide whether to allow the forward, while the lab check 'tunnel allow list' has actor client.",
+      "checkedAgainst": "RFC 4254 section 7.2 (RFC text fetched from rfc-editor.org this session)"
+    },
+    {
+      "id": "L8-C10",
+      "verdict": "inaccurate",
+      "note": "Tours read at origin/feat/tours-7-8-10 (PR 25, commit 150b732). The NIST news page is titled 'NIST Retires SHA-1 Cryptographic Algorithm' but its body says SHA-1 'should be phased out by Dec. 31, 2030, in favor of the more secure SHA-2 and SHA-3 groups'. 'Collision attacks have been used to undermine SHA-1 in recent years' is on the page. So 'NIST retired it' is stronger than the body. Fix: 'NIST announced SHA-1 should be phased out by 2030, recommending SHA-2 or SHA-3'.",
+      "checkedAgainst": "NIST news, 2022-12-15 (page fetched this session)"
+    },
+    {
+      "id": "L8-C11",
+      "verdict": "accurate",
+      "note": "Tours read at origin/feat/tours-7-8-10 (PR 25, commit 150b732). RFC 4253 section 6.6: for ssh-rsa, 'Signing and verifying using this key format is performed according to the RSASSA-PKCS1-v1_5 scheme in [RFC3447] using the SHA-1 hash.'",
+      "checkedAgainst": "RFC 4253 section 6.6 (RFC text fetched from rfc-editor.org this session)"
+    },
+    {
+      "id": "L8-C12",
+      "verdict": "accurate",
+      "note": "Tours read at origin/feat/tours-7-8-10 (PR 25, commit 150b732). Tier: primary record, paper unread. The NVD description of CVE-2008-5161 (fetched from the NVD API): 'when using a block cipher algorithm in Cipher Block Chaining (CBC) mode, makes it easier for remote attackers to recover certain plaintext data from an arbitrary block of ciphertext in an SSH session via unknown vectors'. The claim drops the scope: NVD names specific products (SSH Tectia, OpenSSH 4.7p1 and possibly other versions). The Albrecht, Paterson and Watson paper (IEEE S&P 2009) was not fetched; a web search returned its abstract only: attacks on SSH in the default configuration of a 128-bit block cipher in CBC mode, 14 bits of plaintext at probability 2^-14 and 32 bits at 2^-18 against OpenSSH. That supports the claim as a general statement about SSH-with-CBC. Suggest naming the paper beside the CVE and adding 'in implementations of that time'.",
+      "checkedAgainst": "NVD CVE-2008-5161 (API response fetched this session); paper abstract via web search only (not a direct fetch; full text unread)"
+    },
+    {
+      "id": "L8-C13",
+      "verdict": "accurate",
+      "note": "Tours read at origin/feat/tours-7-8-10 (PR 25, commit 150b732). RFC 6194 section 3.3: 'As of today, there is no indication that attacks on SHA-1 can be extended to HMAC-SHA-1.' The claim carries the date (2011).",
+      "checkedAgainst": "RFC 6194 section 3.3 (RFC text fetched from rfc-editor.org this session)"
+    },
+    {
+      "id": "L8-C14",
+      "verdict": "accurate",
+      "note": "Tours read at origin/feat/tours-7-8-10 (PR 25, commit 150b732). Same PRD spike row as L7-C14; the PRD scopes it to 'this run'. True today; re-check if a CE run happens later.",
+      "checkedAgainst": "docs/prd.md Spike results (read)"
+    }
+  ]
+}
