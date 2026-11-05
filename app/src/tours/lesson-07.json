@@ -157,7 +157,8 @@
       "text": [
         "The receiver opens each record and checks the seal inside. The check is named record HMAC. It passes on the normal run.",
         "Try it: flip one bit in the client's data record. The seal no longer fits and the check fails.",
-        "Bad padding gives the same failure code as a bad seal. That keeps the receiver from telling an attacker which of the two was wrong. This lab does not claim to resist Lucky Thirteen: managed code gives no timing guarantee."
+        "Bad padding gives the same failure code as a bad seal, so the message does not tell an attacker which of the two was wrong. The time can still differ, and that is the Lucky Thirteen class of attack.",
+        "A measurement on one machine found the two faults took 49.7 and 40.2 microseconds per record. Those numbers belong to that machine only. This lab does not claim to resist Lucky Thirteen: managed code gives no timing guarantee."
       ],
       "glossary": [],
       "bind": { "kind": "event", "eventType": "check.result", "match": { "message": "record HMAC" } },
@@ -173,6 +174,11 @@
           "id": "L7-C10",
           "text": "The lab engine computes the MAC on bad padding too, and managed code gives no timing guarantee, so the lab does not claim to resist Lucky Thirteen.",
           "source": "docs/lesson-tls11-names.md, What the tour may say, last row (branch feat/s4-tls11); src/NetSec.Core/Tls11/Tls11Records.cs; RFC 4346, section 1.1 (padding errors use the bad_record_mac alert)"
+        },
+        {
+          "id": "L7-C15",
+          "text": "One failure code for bad padding and a bad seal hides the fault in the message, but the time can still differ. Jared measured 49.7 against 40.2 microseconds per record on one machine; the numbers belong to that machine only.",
+          "source": "Jared's timing measurement of the lab's TLS 1.1 record check, relayed by team-lead on 2026-11-05 (not reproduced by the tour author); RFC 7457, section 2.4 (Lucky Thirteen is a timing side channel)"
         }
       ],
       "unlock": { "mode": "action", "ref": "L7-S07-T1" }
