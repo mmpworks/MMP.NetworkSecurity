@@ -92,7 +92,8 @@ namespace NetSec.Ssh
             return padding < MinimumPadding ? padding + block : padding;
         }
 
-        public static byte[] Mac(Func<IHash> hash, byte[] key, uint sequence, byte[] plainPacket, int length)
+        /// <summary>RFC 4253 section 6.4: the MAC covers the sequence number and the whole plain packet. This suite computes it over the plain text.</summary>
+        public static byte[] MacInput(uint sequence, byte[] plainPacket, int length)
         {
             byte[] input = new byte[4 + length];
             input[0] = (byte)(sequence >> 24);
@@ -100,7 +101,7 @@ namespace NetSec.Ssh
             input[2] = (byte)(sequence >> 8);
             input[3] = (byte)sequence;
             Buffer.BlockCopy(plainPacket, 0, input, 4, length);
-            return Hmac.Compute(hash, key, input);
+            return input;
         }
 
         public static ISshCipher CipherFor(string name, byte[] key, byte[] iv, bool encrypt)
@@ -133,7 +134,7 @@ namespace NetSec.Ssh
             uint sequence = _sequence++;
             if (_cipher == null) return packet;
 
-            byte[] mac = SshPacketForm.Mac(_macHash, _macKey, sequence, packet, packet.Length);
+            byte[] mac = Hmac.Compute(_macHash, _macKey, SshPacketForm.MacInput(sequence, packet, packet.Length));
             _cipher.Transform(packet, 0, packet.Length);
             return new ByteWriter().Put(packet).Put(mac).ToArray();
         }
@@ -248,10 +249,9 @@ namespace NetSec.Ssh
 
         void CheckMac(byte[] plain, int plainSize)
         {
-            byte[] expected = SshPacketForm.Mac(_macHash, _macKey, _sequence, plain, plainSize);
-            int difference = 0;
-            for (int i = 0; i < _macSize; i++) difference |= expected[i] ^ _pending[plainSize + i];
-            if (difference != 0) throw new ParseFailure(SshCodes.PacketMac, "packet " + _sequence + " fails its MAC, so it changed on the way or the keys differ");
+            byte[] tag = new byte[_macSize];
+            Buffer.BlockCopy(_pending, plainSize, tag, 0, _macSize);
+            if (!Hmac.Verify(_macHash, _macKey, SshPacketForm.MacInput(_sequence, plain, plainSize), tag)) throw new ParseFailure(SshCodes.PacketMac, "packet " + _sequence + " fails its MAC, so it changed on the way or the keys differ");
         }
 
         void Drop(int count)

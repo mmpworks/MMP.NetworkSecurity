@@ -135,7 +135,16 @@ namespace NetSec.Io
                 case SshControl.Authenticated: _opened.TrySetResult(); break;
                 case SshControl.ChannelReady: ChannelReady(channel); break;
                 case SshControl.TunnelRequested: StartRelay(channel, SshControl.Text(note)); break;
+                case SshControl.PeerEof: PeerFinished(channel); break;
             }
+        }
+
+        /// <summary>The peer sent all it will send. IByteLink has no half close, so the target closes whole, and its read then ends the channel from this side.</summary>
+        void PeerFinished(int channel)
+        {
+            Relay relay;
+            lock (_lock) _relays.TryGetValue(channel, out relay);
+            if (relay != null) ToRelay(channel, relay, new byte[0]);
         }
 
         void ChannelReady(int channel)

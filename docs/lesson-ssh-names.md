@@ -40,7 +40,7 @@ Bind a step to round 2 by its own message (`KexdhInit`, `KexdhReply`), or by the
 | 19 | `ChannelOpenTunnel` (round 1 only) | c to s | |
 | 20 | `ChannelOpenConfirmation` | s to c | |
 | 21 | `ChannelData` | c to s, then s to c | |
-| 22 | `ChannelEof`, `ChannelClose` | c to s, then s to c | |
+| 22 | `ChannelEof` c to s, then `ChannelEof`, `ChannelClose` s to c, then `ChannelClose` c to s | | |
 | 23 | `Disconnect` | c to s | |
 
 Other names can appear with a referee: `UserauthFailure`, `UserauthBanner`, `ChannelOpenFailure`, `ChannelFailure`, `ChannelWindowAdjust`, `ChannelExtendedData`, `GlobalRequest`, `RequestFailure`, `Ignore`, `Debug`, `Unimplemented`.
@@ -73,6 +73,8 @@ Offsets index `wire`, as in the other lessons.
 | `ssh.message.sent`, `wire.sent` | sender | as above | |
 | `ssh.message.received` | receiver | as above | `plain` after the unlock |
 | `ssh.hostkey.seen` | `client` | `SHA256:<base64>`, the OpenSSH fingerprint form | The host key card |
+| `ssh.hostkey.first-use` | `client` | The same fingerprint | Only when a client trusts on first use. The lab pins its key, so the lab does not emit it |
+| `ssh.exec.exit` | `client` | The exit status, as text | `0` for `echo hello` |
 | `ssh.weak.exchange-hash`, `ssh.weak.host-signature`, `ssh.weak.cipher-mode` | `client`, `server` | One short sentence that says what is weak | Round 2 only |
 | `secret.derived` | `client`, `server` | none | `secrets[]`, one per event, with the names below |
 | `keys.installed` | `client`, `server` | `<cipher>,<mac>,c2s` or `<cipher>,<mac>,s2c` | |
@@ -106,6 +108,7 @@ Offsets index `wire`, as in the other lessons.
 | `channel window` | both | `SSH_CHANNEL_WINDOW` |
 | `no rekey in this lab` | both | `SSH_REKEY_UNSUPPORTED` |
 | `version line` | both | `SSH_VERSION` |
+| `peer stayed until the end` | both | `SSH_PEER_DISCONNECT`, `PEER_CLOSED_EARLY` |
 
 ## Attacks
 
@@ -116,7 +119,7 @@ Offsets index `wire`, as in the other lessons.
 | `L8-zero-share` | The server sends an all-zero X25519 share, so both sides would get a secret anyone can compute | `Rejected` | `SSH_KEX_ZERO_SECRET` | `x25519 result not zero` |
 | `L8-flip-packet` | Flips one byte of protected `UserauthSigned` | `Rejected` | `SSH_PACKET_MAC` | `packet MAC` |
 | `L8-wrong-user-key` | The client names the allowed public key and signs with another private key | `Rejected` | `SSH_AUTH_REFUSED` | `userauth signature verify` |
-| `L8-refused-tunnel` | The client asks for a tunnel to a target off the allow list | `Rejected` | `SSH_TUNNEL_REFUSED` | `tunnel allow list` |
+| `L8-refused-tunnel` | The client asks for `bank.lab:1433`. The allow list holds only `echo.lab:7` | `Rejected` | `SSH_TUNNEL_REFUSED` | `tunnel allow list` |
 | `L8-legacy-flip-signature` | Flips one byte of the RSA signature in `KexdhReply`. Round 1 passes first | `Rejected` | `SSH_EXCHANGE_SIGNATURE` | `exchange signature` |
 
 Try-it actions are the same as `docs/lessons-1-3-names.md`. Use `run-attack` with an id above. `expect` is `{ "type": "check", "name": "<check name>", "result": "fail" }`.

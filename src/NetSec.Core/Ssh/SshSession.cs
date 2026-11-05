@@ -49,7 +49,7 @@ namespace NetSec.Ssh
         public int Local, Remote;
         public long PeerWindow, PeerMaxPacket, OurWindow;
         public string ExecCommand;
-        public bool Confirmed, SentClose, CloseWhenDrained;
+        public bool Confirmed, SentEof, SentClose, CloseWhenDrained;
         public readonly List<byte[]> Queue = new List<byte[]>();
     }
 
@@ -57,7 +57,7 @@ namespace NetSec.Ssh
     public static class SshControl
     {
         public const int Channel = -1;
-        public const int Authenticated = 1, ChannelReady = 2, TunnelRequested = 3;
+        public const int Authenticated = 1, ChannelReady = 2, TunnelRequested = 3, PeerEof = 4;
 
         public static byte[] Encode(int kind, int channel, string text)
         {

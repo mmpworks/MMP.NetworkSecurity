@@ -374,7 +374,7 @@ namespace NetSec.Tests
         {
             string[] lines = Go(null, 7).Events.Where(e => !e.StreamId.EndsWith("/wire")).OrderBy(e => e.EventId, StringComparer.Ordinal).Select(TraceJson.ToLine).ToArray();
             using (SHA1 sha = SHA1.Create())
-                Assert.Equal("e5087f13a9cc18bc992efde25b47d68e1286e35c", Hex.Encode(sha.ComputeHash(Encoding.UTF8.GetBytes(string.Join("\n", lines)))));
+                Assert.Equal("6a65211dcee27087b5d82421c95b91246fc8d022", Hex.Encode(sha.ComputeHash(Encoding.UTF8.GetBytes(string.Join("\n", lines)))));
         }
     }
 }

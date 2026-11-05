@@ -141,6 +141,7 @@ namespace NetSec.Ssh
             {
                 byte[] head = channel.Queue[0];
                 int size = (int)System.Math.Min(System.Math.Min(head.Length, channel.PeerWindow), System.Math.Min(channel.PeerMaxPacket, OurMaxPacket));
+                if (size == 0) break;   // A peer may name a largest packet of 0. This loop must not spin on it.
                 byte[] chunk = new byte[size];
                 System.Buffer.BlockCopy(head, 0, chunk, 0, size);
                 effects.Add(s.SealedPacket(SshNames.ChannelData, new ByteWriter().U8(SshMsg.ChannelData).U32(channel.Remote).Prefixed(chunk).ToArray()));
@@ -156,13 +157,20 @@ namespace NetSec.Ssh
             if (channel.CloseWhenDrained && channel.Queue.Count == 0) End(s, channel, effects);
         }
 
-        /// <summary>This side has no more to send: EOF, then close. The peer's close removes the channel.</summary>
+        /// <summary>
+        /// This side has no more to send. A client sends EOF and stays, because a reply may still be on its way, as ssh.exe does. The server
+        /// sends EOF and close. The peer's close then removes the channel. So one tunnel always ends in one order: a rerun gives the same bytes.
+        /// </summary>
         public static void End(SshSession s, SshChannel channel, List<StepEffect> effects)
         {
-            if (channel.SentClose) return;
             if (channel.Queue.Count > 0) { channel.CloseWhenDrained = true; return; }
+            if (!channel.SentEof)
+            {
+                channel.SentEof = true;
+                effects.Add(s.SealedPacket(SshNames.ChannelEof, new ByteWriter().U8(SshMsg.ChannelEof).U32(channel.Remote).ToArray()));
+            }
+            if (s.IsClient || channel.SentClose) return;
             channel.SentClose = true;
-            effects.Add(s.SealedPacket(SshNames.ChannelEof, new ByteWriter().U8(SshMsg.ChannelEof).U32(channel.Remote).ToArray()));
             effects.Add(s.SealedPacket(SshNames.ChannelClose, new ByteWriter().U8(SshMsg.ChannelClose).U32(channel.Remote).ToArray()));
         }
 
@@ -229,7 +237,8 @@ namespace NetSec.Ssh
         {
             StepDecision refused;
             SshChannel channel = Find(s, new ByteReader(m.Body, 1, m.Body.Length - 1, true).U32("recipient", "id"), out refused);
-            return channel == null ? refused : StepDecision.Stay();
+            if (channel == null) return refused;
+            return StepDecision.Stay(Effect.Deliver(SshControl.Channel, SshControl.Encode(SshControl.PeerEof, channel.Local, "")));
         }
 
         /// <summary>An empty chunk tells the code above that the channel ended. A close not yet answered gets one close back, with no EOF, since the peer is gone.</summary>

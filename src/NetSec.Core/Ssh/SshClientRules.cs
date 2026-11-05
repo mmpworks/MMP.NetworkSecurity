@@ -204,7 +204,7 @@ namespace NetSec.Ssh
             return StepDecision.Stay(effects.ToArray());
         }
 
-        /// <summary>The lab ends the session on a refused tunnel, so the refusal has one plain name for the learner.</summary>
+        /// <summary>The lab ends the session on a refused tunnel, so the refusal has one name for the learner.</summary>
         static StepDecision ReadOpenFailure(SshSession s, InboundMessage m)
         {
             ByteReader r = new ByteReader(m.Body, 1, m.Body.Length - 1, true);
@@ -228,7 +228,7 @@ namespace NetSec.Ssh
             return StepDecision.Fail(SshCodes.ExecRefused, SshChecks.ExecAccepted, "the server refused the command");
         }
 
-        /// <summary>The server's exit status has no answer. Any other request that wants an answer gets a plain no.</summary>
+        /// <summary>The server's exit status has no answer. Any other request that wants an answer gets a no.</summary>
         static StepDecision ReadChannelRequest(SshSession s, InboundMessage m)
         {
             ByteReader r = new ByteReader(m.Body, 1, m.Body.Length - 1, true);
