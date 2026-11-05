@@ -55,6 +55,8 @@ namespace Acceptance
             public KeyPair Key;               // token.issuer only
             public byte[] Seed;               // the key bytes the lab holds for this type
             public int Version;
+            public bool CanIssue = true, HasDates;
+            public DateTime NotBefore, NotAfter;
             public string State
             {
                 get
@@ -196,13 +198,7 @@ namespace Acceptance
                 Write(ctx, 200, h);
                 return;
             }
-            if (path == "/api/lessons")
-            {
-                List<object> rows = new List<object>();
-                for (int n = 1; n <= 11; n++) rows.Add(D("lesson", (double)n, "title", "Lesson " + n, "built", true, "attacks", new List<object>()));
-                Write(ctx, 200, rows);
-                return;
-            }
+            if (path == "/api/lessons") { Write(ctx, 200, LessonsJson()); return; }
             if (path == "/api/security" && method == "GET") { Write(ctx, 200, SecurityJson()); return; }
             if (path == "/api/security/readiness") { Write(ctx, 200, ReadinessJson(int.Parse(ctx.Request.QueryString["lesson"] ?? "0"))); return; }
             if (path == "/api/security/show-keys")

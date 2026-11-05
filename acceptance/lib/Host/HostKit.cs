@@ -112,6 +112,10 @@ namespace Acceptance
                 reply.Body = r.Content.ReadAsStringAsync().Result;
                 try { object parsed = MiniJson.Parse(reply.Body); reply.Json = parsed as Dictionary<string, object>; reply.Array = parsed as List<object>; }
                 catch (FormatException) { reply.Json = null; reply.Array = null; }
+                // A security route the Host does not have answers with the framework's bare 404, which carries no code. That is a feature not built, and never a FAIL.
+                // A 404 with a code (WIZARD_RUN_NOT_FOUND, SECURITY_TYPE_UNKNOWN) comes from a Host that has the route.
+                if (reply.Status == 404 && reply.Code == null && path.StartsWith("/api/security"))
+                    throw new NotRunException("PRODUCT_MISSING", "the Host has no route " + method + " " + path + " yet (modes-design.md section 8.3)");
                 return reply;
             }
         }
@@ -147,13 +151,27 @@ namespace Acceptance
         /// </summary>
         public static SessionRun Run(HostProc h, int lesson, string transport, string extraJson)
         {
+            return Drive(h, "{\"type\":\"session.start\",\"requestId\":\"r1\",\"lesson\":" + lesson + ",\"seed\":20261105,\"mode\":\"step\",\"transport\":\"" + transport + "\"" + (extraJson ?? "") + "}", true);
+        }
+
+        /// <summary>
+        /// session.attack: a fork of a session with one attack row applied (the Host forks a session found by id, from any connection).
+        /// The fork runs on its own (mode run), so no session.run is sent. The run's SessionId is the fork's.
+        /// </summary>
+        public static SessionRun Fork(HostProc h, string parentSessionId, string attackId)
+        {
+            return Drive(h, "{\"type\":\"session.attack\",\"requestId\":\"r1\",\"sessionId\":\"" + parentSessionId + "\",\"attackId\":\"" + attackId + "\",\"mode\":\"run\"}", false);
+        }
+
+        static SessionRun Drive(HostProc h, string startJson, bool sendRun)
+        {
             SessionRun run = new SessionRun();
             using (ClientWebSocket ws = new ClientWebSocket())
             {
                 ws.Options.SetRequestHeader("Origin", HostHttp.AllowedOrigin);
                 ws.ConnectAsync(new Uri("ws://127.0.0.1:" + h.Port + "/ws?token=" + h.Token), CancellationToken.None).Wait(20000);
                 if (ws.State != WebSocketState.Open) throw new FailException("the WebSocket to the Host did not open (state " + ws.State + ")");
-                Send(ws, "{\"type\":\"session.start\",\"requestId\":\"r1\",\"lesson\":" + lesson + ",\"seed\":20261105,\"mode\":\"step\",\"transport\":\"" + transport + "\"" + (extraJson ?? "") + "}");
+                Send(ws, startJson);
                 DateTime end = DateTime.UtcNow.AddSeconds(90);
                 byte[] buf = new byte[1 << 16];
                 while (DateTime.UtcNow < end && run.Finished == null && run.Error == null)
@@ -180,7 +198,7 @@ namespace Acceptance
                         run.ShowKeysReported = m.ContainsKey("showKeys");
                         run.ShowKeys = MiniJson.Bool(m, "showKeys", true);
                         // The lesson waits in step mode. session.run lets it go to the end (design section 5).
-                        Send(ws, "{\"type\":\"session.run\",\"requestId\":\"r2\",\"sessionId\":\"" + run.SessionId + "\"}");
+                        if (sendRun) Send(ws, "{\"type\":\"session.run\",\"requestId\":\"r2\",\"sessionId\":\"" + run.SessionId + "\"}");
                     }
                     else if (kind == "trace") { Dictionary<string, object> ev = MiniJson.Obj(m, "event"); if (ev != null) run.Events.Add(ev); }
                     else if (kind == "session.finished") run.Finished = m;

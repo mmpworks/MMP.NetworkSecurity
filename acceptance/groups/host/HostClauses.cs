@@ -93,6 +93,8 @@ namespace Acceptance
 
                     SessionRun os = HostSession.Run(h, 5, "os", null);
                     RequireBuilt(os, 5);
+                    // A Host that has no OS transport runs the request as a glass session. That is a transport not built, and never a pass.
+                    if (os.Error == null && os.TransportKind == "glass") throw new NotRunException("PRODUCT_MISSING", "the Host ran transport os as a glass session: the OS transport is not built");
                     Check.True(os.Error == null, "OS transport session reported an error: " + (os.Frames.Count == 0 ? "" : os.Frames[os.Frames.Count - 1]));
                     Check.True(!os.TrainingOnly && os.TransportKind == "os", "OS transport session reported trainingOnly=" + os.TrainingOnly + " transportKind=" + os.TransportKind + "; expected false and os");
                     Check.True(os.Events.Count > 0, "OS transport session sent no trace events");

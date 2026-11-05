@@ -72,3 +72,75 @@ All five processes use one `traceId`: the PIN pad makes it and the envelope carr
 | `GET /api/ce` | `label` equals `CF-compiled, run on the desktop CLR, never run on CE` |
 | `app/src` | The same wording appears in the UI source. Lesson 6 states that a managed heap can keep copies. Lesson 11 states that managed code has no constant-time guarantee. Every lesson has a step with `Built to show the parts. Do not copy.` |
 | UI | The renderer reads the Host address and token from `window.netsec.host = { port, token }` or from `?port=&token=` in the URL. A `transport-switch` test id selects real mode (ASSUMED; `ux-design.md` section 6 names none). The chip `training-only-label` reads `TRAINING ONLY` on glass and `OS TRANSPORT` in real mode |
+
+## 5. A17: security modes (what the Host must show)
+
+Source: `docs/modes-design.md` on branch `docs/security-modes` at 73f250c, sections 2, 4, 5, 6, 8, 9. Every row marked ASSUMED is a place where the design names no field or value.
+The suite wrote the name it needs. A live Host that differs fails the clause at that field, and the message names it. The fake Host in `selftest/FakeHost/` is built from this section and from nothing else.
+
+### 5.1 Process and routes
+
+| Item | The suite uses | Notes |
+|---|---|---|
+| Start | `NetSec.Host.exe --port P --token T`, and `NETSEC_PORT`, `NETSEC_TOKEN`, `LOCALAPPDATA`, `NETSEC_SECURITY_DIR` (a temp folder), `NETSEC_OPENSSL`, `NETSEC_SSH` | A fresh `NETSEC_SECURITY_DIR` holds no `modes.json`, so Show keys is ON |
+| `GET /api/health` | `showKeys` (bool) | A run stops early with `SUITE_NEEDS_SHOW_KEYS_ON` when it reads false. A clause that tests the default needs the field to be there |
+| `GET /api/security` | `types[]` with `typeId`, `mode` (`BuiltIn` or `Mine`), `state`, `version`; `showKeys` | `state` of a `BuiltIn` type is ASSUMED `BuiltIn`. Design 2.2 gives states `Unconfigured`, `Configured`, `Verified`, `Broken` for `Mine` |
+| `PUT /api/security/types/{typeId}/mode` `{ mode }` | | Going to `BuiltIn` always works, and the binding stays |
+| `GET /api/security/readiness?lesson=N` | `mayRun`, `problems[]` with `typeId`, `code`, `detail` | `detail` names the type and its flow. Codes: `SECURITY_TYPE_NOT_READY`, `SECURITY_TYPE_NOT_PROVEN`, `SECURITY_TYPES_DISAGREE`. The `problems[]` field names are ASSUMED (design 2.2 gives `TypeProblem { TypeId, Code, Detail }`) |
+| `GET /api/security/types/{typeId}/key` | `hex` (when the key can show and Show keys is ON), `fingerprint`, `version`, `provider`, `hidden` (`non-exportable` or `toggle`), `publicHex` (for `token.issuer`) | Field names ASSUMED. A vault read writes an audit row. A changed row gives `VAULT_UNWRAP_FAILED`. An audit that cannot be written gives `VAULT_AUDIT_FAILED` (ASSUMED name) |
+| `GET`, `PUT /api/security/show-keys` `{ on }` | `on` | |
+| `POST /api/security/flows/{flowId}/runs` | `runId`, `step` | Flows: `my-certificates`, `my-ssh`, `my-payment`, `my-login`, `my-lesson-keys` |
+| `POST /api/security/runs/{id}/events` `{ event, stepSeq, data }` | `step` | `WIZARD_EVENT_NOT_ALLOWED` names the state and the event. `WIZARD_STEP_STALE` for an old `stepSeq`. `WIZARD_RUN_NOT_FOUND` for an unknown run |
+| `GET /api/security/vault/keys` | `keys[]` with `name` (ASSUMED: the type id), `exportable`, `versions`, `publicHex` | |
+| `GET /api/security/vault/audit?after=N` | `rows[]` with `seq`, `caller`, `op`, `name`, `result`, `detail`, `prev_hash` | Rows as the table in design 4.1. The suite also reads `vault/vault.db` with Python sqlite3 (`checks/vaultdb.py`) |
+| `GET /api/sessions/{id}/events` | One JSON array of events (as the Host answers today) | |
+| `GET /api/sessions/{id}/keylog` | | `KEYS_HIDDEN` when Show keys is OFF |
+| `GET /api/lessons` | `attacks[]` with `attackId`, `kind`, `expectCode`, `available`, `whyNot`, and `field` for a `flip-byte` row | `available` and `whyNot` are in design 8.3. `field` is ASSUMED (design 3.4 says `TamperPlan.Field`) |
+
+### 5.2 WebSocket
+
+| Message | The suite reads | Notes |
+|---|---|---|
+| `session.start` `{ lesson, seed, mode, transport }` | `session.started` with `sessionId`, `transportKind`, `trainingOnly`, `sessionFile`, `showKeys`, `security[]` | The suite starts in `mode: step`, then sends `session.run`. Lesson 20 is the vault exercise. A refusal is an `error` frame with `code` and `message`, and no trace event follows |
+| `session.attack` `{ sessionId, attackId, mode: run }` | `session.started` (the fork), `session.forked`, `trace`, `session.finished` with `code` | The suite sends it on a new connection. The Host finds the parent by id |
+| `trace` frame | `event` with `type`, `streamId`, `streamSeq`, `actor`, `message`, `wire`, `plain`, `fields[]`, `check`, `secrets[]` | `secrets[]` entry: `name`, `holder`, and `hex` while Show keys is ON. While OFF: `fingerprint` (`fp:` and 8 bytes of SHA-256 as hex), `length`, `hidden`. A key made non-exportable shows `hidden: non-exportable` and a fingerprint |
+| `key.in-use` event | `typeId`, `version`, `provider`, one `secrets[]` entry, on stream `<sessionId>/keys` | Design 6.3 gives the stream and the content. The three field names are ASSUMED |
+| Vault exercise events | `vault.sign` (`name`, `version`, `inputHash`, `inputHex`, `signatureHex`), `vault.derive`, `vault.refused` (`code`), `vault.audit` (`rows`) | `inputHex` is ASSUMED: an outside tool needs the signed message |
+
+### 5.3 The wizard step
+
+| Field | Value |
+|---|---|
+| `state` | `Intro`, `ChooseSource`, `PickFiles`, `Options`, `ReadBack`, `Place`, `Check`, `Done` (design 8.2). `Options` exists for `my-ssh`, `my-payment`, `my-login` only |
+| `kind` | `explain`, `choose`, `file`, `choose`, `review`, `generate`, `prove`, `done`, in the order of the states above |
+| `allowed` | The events the table allows. `back` is allowed up to `Place` and not at `Check` |
+| `errors[]` | `code`, `severity` (`warning` for `KEY_PATH_PERSONAL`, else `error`), `message`. `severity` is ASSUMED |
+| `facts[]` at `ReadBack` | One per type: `typeId`, `name`, `notAfter`, `algorithm`, `fingerprint` (design 8.4). The suite checks that all types of the flow are there (15 of 15 across the five flows) and the fixed names |
+| `facts[]` at `Check` | One per type: `typeId`, `judge` (`openssl`, `ssh.exe`, `none`), `says`. ASSUMED names. `says` holds "Checked against the root you gave it", "Checked with OpenSSL", "Checked with ssh.exe", or "No outside tool can judge this". It never says trusted |
+| `copy` | Copy ids shown. The `Intro` of every flow carries `wizard.common.test-keys-only` |
+| Events | `next`, `back`, `cancel`, `choose` `{ source: make or files }`, `option` `{ typeId, keepHidden }`, `files` `{ paths }`, `check` |
+
+### 5.4 "Use my files" (ASSUMED layout)
+
+`paths` maps a key to an absolute path. For a type with a private key only (`token.issuer`, `device.enrolment`) the key is the type id and the file is an Ed25519 private key in PEM.
+For the certificate flow the file at `<typeId>` is the certificate in PEM, and `<typeId>.key` is its private key. The root's `.key` is left out for a trust-only root.
+`tls.trust` defaults to the root, and the suite also sends it. A leaf the root did not sign is refused at the check with a named code. An RSA or P-256 root is refused with `CERT_SIGNATURE_ALG_UNSUPPORTED`, and the message names the OS transport.
+
+### 5.5 Files in the product repository
+
+| File | Shape |
+|---|---|
+| `app/src/wizard-copy.json` | An object from copy id to text (a string, a list of strings, or `{ text }`). `wizard.common.test-keys-only` reads: Use test keys only. This course shows your keys on screen and in saved files. |
+| `tools/secret_guard.py` | Run from a repository root with no argument. Exit 0 when clean. Exit 1 and one line per problem, each naming the path, when a tracked or staged path is under `.security/`, ends in `.pfx .p12 .db .key .ndjson`, is named `master.key id_rsa id_ed25519 known_hosts`, or holds a PEM private key header outside the allow-list of 3 files |
+| `app/src/tours/lesson-NN.json` | A step may carry `textMine`. A claim carries `id`, `text`, `source` |
+| `docs/_verdicts/a15a-lesson-NN.json` | As before. Now each claim verdict carries `textHash`, and `textRead` carries `textHash`, `stepsRead` and `problemsOpen`. `python -I acceptance/checks/docs_checks.py --root . --hashes` prints the hashes. A verdict with no hash reads NOT RUN `ACCURACY_VERDICT_UNBOUND`. A verdict for text that changed reads NOT RUN `ACCURACY_VERDICT_STALE` |
+| `docs/_verdicts/cold-reader-lesson-10.json` | `{ reader: { name, kind: human or agent, freshContext }, clone: { fresh, commit }, keys: { issuerPublicHex }, run: { lesson: 10, token }, understoodWithoutHelp }`. A builder cannot be the reader. Until the file exists, A17.cold.lesson-10-fresh-clone reads NOT RUN `COLD_READER_PENDING` |
+| `app/src` UI | Test ids `show-keys-switch` (aria-checked or checked) and `secret-row-*`. The words `Built-in key` and `My test key`, and no `Real` as a mode, transport or label. The chip `training-only-label` reads `OS TRANSPORT` on the OS transport. The A16 clauses use `transport: os` and `NETSEC_OS_PEER=127.0.0.1:<port>`, and trust the peer certificate through `SSL_CERT_FILE` |
+
+### 5.6 Open questions (each blocks or weakens a named clause)
+
+1. **Probe on a learner's key.** `Probe` and `SshProbe` stay on training keys (design 3.3), so the suite cannot start a glass TLS or SSH server on the learner's key for OpenSSL, Go or `ssh.exe`. These five clauses read NOT RUN `PROBE_HAS_NO_CREDENTIALS`: `A17.referee.tls13-server-openssl`, `.tls13-client-go-with-intermediate`, `.tls11-server-openssl`, `.ssh-host-ssh-exe`, `.ssh-client-go`. Recommended: `ProbeRequest.Credentials` (a `CredentialSet`; null keeps training keys), and the suite builds one from its own files.
+2. **File layout of an import** (5.4). The design says one row per type, and a `chain.pem` beside the copies.
+3. **Names in 5.1 to 5.3 marked ASSUMED.** Each is one line to change in `groups/a17/` and in the fake.
+4. **Exportable is one way.** The clause reads it as: a vault key made non-exportable stays non-exportable after a second flow run asks for an exportable one, and the run adds a version.
+5. **Golden traces** wait for PRs #90 and #91 on `main`.

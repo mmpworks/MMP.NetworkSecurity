@@ -16,7 +16,7 @@ namespace Acceptance
 
         sealed class SessionEv { public Dictionary<string, object> Base; public List<RawSecret> Secrets = new List<RawSecret>(); }
 
-        sealed class Session { public string Id; public int Lesson; public List<SessionEv> Events = new List<SessionEv>(); public string File; }
+        sealed class Session { public string Id; public int Lesson, Seed; public string FinishCode; public List<SessionEv> Events = new List<SessionEv>(); public string File; }
 
         Dictionary<string, object> RenderSecret(RawSecret s, bool showKeys)
         {
@@ -90,8 +90,8 @@ namespace Acceptance
                             SendText(ws, D("type", "error", "requestId", MiniJson.Str(m, "requestId"), "code", ve.Code, "message", ve.Message));
                             break;
                         }
-                        session = new Session { Id = "s" + (++_next), Lesson = lesson };
-                        if (lesson == 20) BuildExercise(session); else BuildEvents(session, (int)MiniJson.Num(m, "seed", 20261105));
+                        session = new Session { Id = "s" + (++_next), Lesson = lesson, Seed = (int)MiniJson.Num(m, "seed", 20261105) };
+                        if (lesson == 20) BuildExercise(session); else { BuildEvents(session, session.Seed); session.FinishCode = ClockCode(lesson); }
                         _sessions[session.Id] = session;
                         session.File = Path.Combine(Dir, "session-" + session.Id + ".ndjson");
                         bool fileShows = M("off-keeps-hex-in-file") ? true : _showKeys;
@@ -110,7 +110,12 @@ namespace Acceptance
                     bool frameShows;
                     lock (_gate) { frameShows = M("off-hex-in-frames") ? true : _showKeys; }
                     foreach (SessionEv e in session.Events) SendText(ws, D("type", "trace", "event", Render(e, frameShows)));
-                    SendText(ws, D("type", "session.finished", "sessionId", session.Id, "events", (double)session.Events.Count));
+                    SendText(ws, D("type", "session.finished", "sessionId", session.Id, "events", (double)session.Events.Count, "outcome", session.FinishCode == null ? "completed" : "failed", "code", session.FinishCode));
+                    break;
+                }
+                else if (type == "session.attack")
+                {
+                    HandleAttack(ws, m);
                     break;
                 }
             }
@@ -221,6 +226,7 @@ namespace Acceptance
                     break;
                 case 4: case 5: case 7: case 9:
                     for (int i = 1; i <= 4; i++) Add(s, "client", "tls.secret", Raw("tls.secret" + i, "client", Seeded(seed, lesson, i, 32)));
+                    if (lesson == 4 || lesson == 5) AddCertificateEvent(s, seed);
                     break;
                 case 6:
                     byte[] bdk = M("dukpt-pad-constant") ? Hex.Slice(Seeded(seed, 6, 9, 16), 0, 16) : KeyBytes(_types["dukpt.bdk"]);

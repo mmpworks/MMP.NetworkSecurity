@@ -364,6 +364,63 @@ namespace Acceptance
             return new TestKey { Pem = pem, SeedHex = Hex.Encode(Hex.Slice(p8, 16, 32)), PublicHex = Hex.Encode(Hex.Slice(spki, 12, 32)) };
         }
 
+        // ------------------------------------------------------------ "Use my files", driven to the first refusal
+
+        /// <summary>What an import run reached. Codes and messages are every error the steps reported, in order.</summary>
+        public sealed class ImportResult
+        {
+            public readonly List<string> Codes = new List<string>(), Messages = new List<string>();
+            public bool Done;
+            public Flow Flow;
+            public bool Has(string code) { return Codes.Contains(code); }
+            public override string ToString() { return (Done ? "reached Done" : "stopped at " + (Flow == null ? "?" : Flow.State)) + (Codes.Count == 0 ? "" : " with " + string.Join(",", Codes.ToArray())); }
+        }
+
+        static bool Collect(ImportResult r, Reply reply)
+        {
+            if (!reply.Ok) { r.Codes.Add(reply.Code ?? ("HTTP_" + reply.Status)); r.Messages.Add(reply.ToString()); return false; }
+            bool blocking = false;
+            foreach (Dictionary<string, object> e in r.Flow.Errors)
+            {
+                r.Codes.Add(MiniJson.Str(e, "code")); r.Messages.Add(MiniJson.Str(e, "message") ?? "");
+                if (MiniJson.Str(e, "severity") != "warning") blocking = true;
+            }
+            return !blocking;
+        }
+
+        /// <summary>
+        /// Walks a flow with "Use my files" and does not throw on a refusal: it records the codes and stops at the first step with an error that is not a warning.
+        /// A refusal can come at the files event, at the next step, or at the check, and the callers look for a code at any of them.
+        /// </summary>
+        public static ImportResult TryImport(HostProc h, string flowId, Dictionary<string, string> paths, Dictionary<string, bool> keepHidden)
+        {
+            ImportResult r = new ImportResult();
+            r.Flow = Flow.Start(h, flowId);
+            Flow f = r.Flow;
+            if (!Collect(r, f.Send("next", null))) return r;
+            if (!Collect(r, f.Send("choose", Obj("source", "files")))) return r;
+            Dictionary<string, object> pd = new Dictionary<string, object>();
+            foreach (KeyValuePair<string, string> kv in paths) pd[kv.Key] = kv.Value;
+            if (!Collect(r, f.Send("files", Obj("paths", pd)))) return r;
+            if (f.State == "PickFiles" && f.Allowed.Contains("next") && !Collect(r, f.Send("next", null))) return r;
+            if (f.State == "Options")
+            {
+                if (keepHidden != null)
+                    foreach (KeyValuePair<string, bool> kv in keepHidden)
+                        if (!Collect(r, f.Send("option", Obj("typeId", kv.Key, "keepHidden", kv.Value)))) return r;
+                if (!Collect(r, f.Send("next", null))) return r;
+            }
+            while (f.State == "ReadBack" || f.State == "Place")
+                if (!Collect(r, f.Send("next", null))) return r;
+            if (f.State == "Check")
+            {
+                if (!Collect(r, f.Send("check", null))) return r;
+                if (!Collect(r, f.Send("next", null))) return r;
+            }
+            r.Done = f.State == "Done";
+            return r;
+        }
+
         // ------------------------------------------------------------ the practice vault, read from its file
 
         public static string VaultDbPath(HostProc h)

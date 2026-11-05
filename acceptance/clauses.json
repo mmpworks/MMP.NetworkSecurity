@@ -1411,6 +1411,50 @@
    "counts": true
   },
   {
+   "id": "A17.attacks.hit-named-field",
+   "base": "A17.attacks.hit-named-field",
+   "assertion": "A17",
+   "group": "a17",
+   "build": "host",
+   "slice": "V0",
+   "referee": "test over HTTP and WebSocket, OpenSSL, ssh.exe, Go referees; known-answer where no outside referee exists",
+   "roles": [],
+   "counts": true
+  },
+  {
+   "id": "A17.attacks.unavailable-names-code",
+   "base": "A17.attacks.unavailable-names-code",
+   "assertion": "A17",
+   "group": "a17",
+   "build": "host",
+   "slice": "V0",
+   "referee": "test over HTTP and WebSocket, OpenSSL, ssh.exe, Go referees; known-answer where no outside referee exists",
+   "roles": [],
+   "counts": true
+  },
+  {
+   "id": "A17.chain.alg-unsupported-named",
+   "base": "A17.chain.alg-unsupported-named",
+   "assertion": "A17",
+   "group": "a17",
+   "build": "host",
+   "slice": "V0",
+   "referee": "test over HTTP and WebSocket, OpenSSL, ssh.exe, Go referees; known-answer where no outside referee exists",
+   "roles": [],
+   "counts": true
+  },
+  {
+   "id": "A17.clock.new-certificate-not-expired",
+   "base": "A17.clock.new-certificate-not-expired",
+   "assertion": "A17",
+   "group": "a17",
+   "build": "host",
+   "slice": "V0",
+   "referee": "test over HTTP and WebSocket, OpenSSL, ssh.exe, Go referees; known-answer where no outside referee exists",
+   "roles": [],
+   "counts": true
+  },
+  {
    "id": "A17.cold.lesson-10-fresh-clone",
    "base": "A17.cold.lesson-10-fresh-clone",
    "assertion": "A17",
@@ -1609,6 +1653,17 @@
    "counts": true
   },
   {
+   "id": "A17.proof.root-negative-control",
+   "base": "A17.proof.root-negative-control",
+   "assertion": "A17",
+   "group": "a17",
+   "build": "host",
+   "slice": "V0",
+   "referee": "test over HTTP and WebSocket, OpenSSL, ssh.exe, Go referees; known-answer where no outside referee exists",
+   "roles": [],
+   "counts": true
+  },
+  {
    "id": "A17.readiness.refuses-by-name",
    "base": "A17.readiness.refuses-by-name",
    "assertion": "A17",
@@ -1633,6 +1688,61 @@
   {
    "id": "A17.referee.lesson-keys-openssl-mac",
    "base": "A17.referee.lesson-keys-openssl-mac",
+   "assertion": "A17",
+   "group": "a17",
+   "build": "host",
+   "slice": "V0",
+   "referee": "test over HTTP and WebSocket, OpenSSL, ssh.exe, Go referees; known-answer where no outside referee exists",
+   "roles": [],
+   "counts": true
+  },
+  {
+   "id": "A17.referee.ssh-client-go",
+   "base": "A17.referee.ssh-client-go",
+   "assertion": "A17",
+   "group": "a17",
+   "build": "host",
+   "slice": "V0",
+   "referee": "test over HTTP and WebSocket, OpenSSL, ssh.exe, Go referees; known-answer where no outside referee exists",
+   "roles": [],
+   "counts": true
+  },
+  {
+   "id": "A17.referee.ssh-host-ssh-exe",
+   "base": "A17.referee.ssh-host-ssh-exe",
+   "assertion": "A17",
+   "group": "a17",
+   "build": "host",
+   "slice": "V0",
+   "referee": "test over HTTP and WebSocket, OpenSSL, ssh.exe, Go referees; known-answer where no outside referee exists",
+   "roles": [],
+   "counts": true
+  },
+  {
+   "id": "A17.referee.tls11-server-openssl",
+   "base": "A17.referee.tls11-server-openssl",
+   "assertion": "A17",
+   "group": "a17",
+   "build": "host",
+   "slice": "V0",
+   "referee": "test over HTTP and WebSocket, OpenSSL, ssh.exe, Go referees; known-answer where no outside referee exists",
+   "roles": [],
+   "counts": true
+  },
+  {
+   "id": "A17.referee.tls13-client-go-with-intermediate",
+   "base": "A17.referee.tls13-client-go-with-intermediate",
+   "assertion": "A17",
+   "group": "a17",
+   "build": "host",
+   "slice": "V0",
+   "referee": "test over HTTP and WebSocket, OpenSSL, ssh.exe, Go referees; known-answer where no outside referee exists",
+   "roles": [],
+   "counts": true
+  },
+  {
+   "id": "A17.referee.tls13-server-openssl",
+   "base": "A17.referee.tls13-server-openssl",
    "assertion": "A17",
    "group": "a17",
    "build": "host",

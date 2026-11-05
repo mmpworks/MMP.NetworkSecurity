@@ -70,6 +70,7 @@ namespace Acceptance
         {
             using (HostProc h = HostProc.Start(c, "a17-sk-default", null))
             {
+                A17.Security(h);                                                       // a Host with no security routes reads NOT RUN, before any field is judged
                 Reply health = HostHttp.Get(h, "/api/health");
                 Check.True(health.Ok && health.Json != null, "GET /api/health got " + health);
                 Check.True(health.Json.ContainsKey("showKeys"), "/api/health reports no showKeys. The suite fails a run early on it, so the field must be there");

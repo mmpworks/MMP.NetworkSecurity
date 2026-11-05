@@ -199,6 +199,7 @@ namespace Acceptance
                     r.Errors.Add(D("code", "KEY_FILE_FORMAT", "severity", "error", "typeId", kv.Key, "message", "The file is not an Ed25519 private key."));
                     r.FileBlocked = true;
                 }
+                else CertChecks(r, kv.Key, p);
             }
         }
 
@@ -216,6 +217,7 @@ namespace Acceptance
                 t.KeepHidden = (t.KeepHidden && !M("exportable-flips")) || hidden;
                 bool imported = r.Source == "files" && r.Paths.ContainsKey(id);
                 t.Provider = imported ? "file" : "vault";
+                ApplyCert(r, t, id, imported);
                 if (id == "token.issuer")
                 {
                     t.Key = imported ? ReadKey(r.Paths[id]) : NewKey("issuer");
@@ -230,14 +232,22 @@ namespace Acceptance
         void RunCheck(FlowRun r)
         {
             r.Facts.Clear();
+            bool failed = false;
             foreach (string id in FlowTypesOf(r.FlowId))
             {
+                // A leaf the learner brought is checked against the root the learner gave. A leaf the root did not sign is refused.
+                if (r.Source == "files" && Array.IndexOf(LeafCerts, id) >= 0 && r.Paths.ContainsKey(id) && r.Paths.ContainsKey("pki.root-ca") && !VerifyChain(r.Paths["pki.root-ca"], r.Paths[id]))
+                {
+                    r.Errors.Add(D("code", "CHECK_FAILED", "severity", "error", "typeId", id, "message", "OpenSSL does not verify this certificate against the root you gave."));
+                    failed = true;
+                    continue;
+                }
                 _types[id].Verified = true;
                 string judge = JudgeOf(id);
                 if (M("device-judge-claimed") && id == "device.enrolment") judge = "openssl";
                 if (!M("no-judge-facts")) r.Facts.Add(D("typeId", id, "judge", judge, "says", SaysOf(id)));
             }
-            r.Checked = true;
+            r.Checked = !failed;
         }
     }
 }
