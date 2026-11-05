@@ -25,3 +25,8 @@ Each correction goes here, newest slice last. Later slices read this file first.
 4. **`Ed25519.Verify` accepts a small-order public key.** A public key at y = 1 with R = B and S = 1 verifies for any message. RFC 8032 allows this. A protocol that needs a stronger rule adds its own check. `Verify` does refuse S at or above L and a public key with y at or above p.
 5. **`RsaPrivate` holds n and d only, so it runs the full-size exponent.** Parsing a PKCS#8 key can drop the CRT values. On a real device this makes a private operation slower than a CRT one by a factor of about 4 (standard estimate, not measured here).
 6. **A2 tests valid ML-KEM exchanges only.** Implicit rejection and the key checks are reached by 36 NIST ACVP records in `tests/NetSec.Tests/vectors/mlkem768-acvp.txt`.
+
+## S2
+
+1. **`openssl genpkey -outform DER` on OpenSSL 3.5.7 wrote a traditional `RSAPrivateKey`, not PKCS#8.** CONTRACT rule 5 needs `PrivateKeyInfo`. Run `openssl pkcs8 -topk8 -nocrypt` after it. The net10 test `An_rsa_key_is_pkcs8_with_its_matching_spki` pins the format.
+2. **`TrainingKeySource.Find` throws `TRAINING_KEY_UNKNOWN` for an unknown id.** It never returns null. A symmetric key's `CopyPublic` gives an empty array.
