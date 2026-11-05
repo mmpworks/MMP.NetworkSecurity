@@ -121,6 +121,7 @@ namespace NetSec.Labs
                 case 6: return new Lesson06Dukpt();
                 case 7: return new Lesson07Tls11();
                 case 8: return new Lesson08Ssh();
+                case 11: return new TimingAttackLab();
                 default: return null;
             }
         }
@@ -178,6 +179,9 @@ namespace NetSec.Labs
             WithOption("L8-wrong-user-key", 8, Lesson08Ssh.OptionWrongUserKey, "attacker", AttackOutcome.Rejected, SshCodes.AuthRefused, SshChecks.AuthSignature),
             WithOption("L8-refused-tunnel", 8, Lesson08Ssh.OptionRefusedTunnel, "yes", AttackOutcome.Rejected, SshCodes.TunnelRefused, SshChecks.TunnelAllowList),
             Flip("L8-legacy-flip-signature", 8, SshNames.KexdhReply, SshRsaSignatureOffset, SshCodes.ExchangeSignature, SshChecks.ExchangeSignature),
+
+            TimingAttackLab.AttackRows[0],
+            TimingAttackLab.AttackRows[1],
         };
 
         // Packet header 5, type 1, host key 4 + 51, share 4 + 32, signature length 4, name 4 + 11, value length 4, then 10 bytes into the signature value.

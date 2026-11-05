@@ -175,12 +175,19 @@ namespace NetSec.Host.Tests
         }
 
         [Fact]
-        public async Task Lesson_11_is_refused_until_its_tour_lands_and_the_host_already_carries_its_library()
+        public async Task Lesson_11_loads_the_native_library_in_the_host_and_finishes_with_measured_numbers()
         {
             using Socket s = await Socket.Open(host);
-            await s.Send("{\"type\":\"session.start\",\"requestId\":\"r1\",\"lesson\":11,\"mode\":\"run\"}");
-            Assert.Equal("LESSON_NOT_BUILT", (await s.Until("error")).GetProperty("code").GetString());
-            Assert.True(File.Exists(Path.Combine(Path.GetDirectoryName(HostFixture.HostDll()), "netsec_ct.dll")));
+            await s.Send("{\"type\":\"session.start\",\"requestId\":\"r1\",\"lesson\":11,\"seed\":7,\"mode\":\"run\",\"transport\":\"glass\"}");
+            JsonElement started = await s.Next();
+            Assert.Equal("session.started", started.GetProperty("type").GetString());
+            List<JsonElement> frames = await s.UntilFinished(started.GetProperty("sessionId").GetString());
+            Assert.Equal("completed", frames.Last().GetProperty("outcome").GetString());
+            string[] types = frames.Where(f => f.GetProperty("type").GetString() == "trace").Select(f => f.GetProperty("event").GetProperty("type").GetString()).ToArray();
+            Assert.Equal(4, types.Count(t => t == "timing.samples"));
+            Assert.Contains("timing.verdict", types);
+            Assert.Contains("timing.managed", types);
+            Assert.Equal(2, types.Count(t => t == "timing.guess.finished"));
         }
 
         [Fact]
@@ -254,7 +261,7 @@ namespace NetSec.Host.Tests
             JsonElement rows = await GetJson("/api/lessons");
             Assert.Equal(Enumerable.Range(1, 11), rows.EnumerateArray().Select(r => r.GetProperty("lesson").GetInt32()));
             int[] built = rows.EnumerateArray().Where(r => r.GetProperty("built").GetBoolean()).Select(r => r.GetProperty("lesson").GetInt32()).ToArray();
-            foreach (int lesson in new[] { 1, 2, 3, 4, 5 }) Assert.Contains(lesson, built);
+            foreach (int lesson in new[] { 1, 2, 3, 4, 5, 11 }) Assert.Contains(lesson, built);
             JsonElement toy = await GetJson("/api/lessons/0");
             Assert.True(toy.GetProperty("built").GetBoolean());
             Assert.Equal("L0-flip-wire-byte", toy.GetProperty("attacks")[0].GetProperty("attackId").GetString());
