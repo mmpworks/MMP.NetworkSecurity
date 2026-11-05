@@ -5,6 +5,9 @@
   exit code and last lines. The exit code is nonzero when any step fails. A step that cannot run yet says so by name, and never counts as a pass.
 .PARAMETER Clauses
   The acceptance clauses to run, as a list or one comma-separated text. The gate always adds A9, because any change to a test or to shared code can break the CF build's proof.
+.PARAMETER HangLimit
+  The longest one test may run in a dotnet test step. Past it, the test host ends, the step fails, and the output names the test. The default is
+  3 minutes: the slowest test takes 11.4 s at 100% CPU, and a test that fails on its own 20 s waits takes about 1 minute.
 .PARAMETER SkipApp
   Skips the app steps (npm, Playwright). The report names the skip. With no app/package.json the app steps are skipped by the same rule.
 .PARAMETER Lesson
@@ -17,6 +20,7 @@ param(
     [Parameter(Mandatory)][string]$Slice,
     [string[]]$Clauses = @(),
     [string]$NetCFRefDir = 'E:\dev\tools\netcf35-ref',
+    [string]$HangLimit = '3m',
     [string]$Lesson,
     [switch]$SkipApp
 )
@@ -28,6 +32,7 @@ $trx = "docs/_runs/trx/$Slice"
 $report = "docs/_runs/$date-$Slice.md"
 New-Item -ItemType Directory -Force -Path 'docs/_runs' | Out-Null
 $cf = "-p:NetCFRefDir=$NetCFRefDir"
+$hang = @('--blame-hang-timeout', $HangLimit, '--blame-hang-dump-type', 'none')
 $rows = [System.Collections.Generic.List[object]]::new()
 $failed = 0
 $Clauses = @($Clauses | ForEach-Object { $_ -split ',' } | Where-Object { $_ })
@@ -68,9 +73,9 @@ switch ($Slice) {
 Step 'layer_check' { python tools/layer_check.py src/NetSec.Core }
 Step 'dotnet build src/NetSec.Core' { dotnet build src/NetSec.Core -c Release --nologo -v q }
 Step 'dotnet build src/NetSec.Core.NetCF' { dotnet build src/NetSec.Core.NetCF -c Release --nologo -v q $cf }
-Step 'dotnet test net10.0' { dotnet test tests/NetSec.Tests -c Release -f net10.0 $cf --nologo --logger trx --results-directory "$trx-net10" }
-Step 'dotnet test net48 (CF binaries)' { dotnet test tests/NetSec.Tests -c Release -f net48 $cf --nologo --logger trx --results-directory "$trx-cf" }
-Step 'dotnet test Host (live process)' { dotnet test tests/NetSec.Host.Tests -c Release $cf --nologo --logger trx --results-directory "$trx-host" }
+Step 'dotnet test net10.0' { dotnet test tests/NetSec.Tests -c Release -f net10.0 $cf --nologo --logger trx --results-directory "$trx-net10" @hang }
+Step 'dotnet test net48 (CF binaries)' { dotnet test tests/NetSec.Tests -c Release -f net48 $cf --nologo --logger trx --results-directory "$trx-cf" @hang }
+Step 'dotnet test Host (live process)' { dotnet test tests/NetSec.Host.Tests -c Release $cf --nologo --logger trx --results-directory "$trx-host" @hang }
 Step "acceptance $($Clauses -join ',')" { pwsh -NoProfile -File acceptance/run.ps1 -Clauses ($Clauses -join ',') -NetCFRefDir $NetCFRefDir }
 Step 'tour_lint' { python tools/tour_lint.py app/src/tours --max-grade 8.9 --max-concept 0.30 }
 
