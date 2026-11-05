@@ -110,8 +110,6 @@ The server checks on a good handshake, in order: `certificate_required alert`, `
 
 RFC 8446 sections 4.4.2.4 and 6.2 name `certificate_required` for an empty list and `bad_certificate` for a corrupt certificate. `ux-design.md` section 7 and the A11 clauses follow these names.
 
-**What mutual TLS proves here.** The server checks the chain, the dates, and the client authentication usage. It checks no name on the certificate, as Go's `RequireAndVerifyClientCert` does. So this phase proves "a device this CA issued a certificate to". It does not prove which device. The enrolment row in the login names the device. A server that must know which device reads the certificate subject itself.
-
 ## Release
 
 Lesson 10 stays unbuilt until its tour lands: `LabCatalog.Find(10)` is null, and `AttackCatalog.All` holds no lesson 10 row. The commit that lands `app/src/tours/lesson-10.json` adds `case 10` to `LabCatalog.Find` and joins `Lesson10Rows` to `All`. Until then `session.start` for lesson 10 answers `LESSON_NOT_BUILT`, and the A11 row clauses cannot find their rows.
