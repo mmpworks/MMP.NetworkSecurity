@@ -360,10 +360,18 @@ namespace NetSec.Tests
         }
     }
 
+    /// <summary>The sweep runs thousands of handshakes. It runs alone, after the parallel tests, so it takes no CPU from a test that measures time.</summary>
+    [CollectionDefinition(Name, DisableParallelization = true)]
+    public sealed class SweepCollection
+    {
+        public const string Name = "CPU-heavy sweep";
+    }
+
     /// <summary>
     /// ux-design.md moment 4: flip any byte, and the first check that fails has a name. This flips each byte of each message a handshake sends,
     /// before the seal and on the wire. No flip may throw. A flip that stalls must sit in a length field, and the pump's deadline names that one.
     /// </summary>
+    [Collection(SweepCollection.Name)]
     public class Tls13FlipSweepTests
     {
         readonly ITestOutputHelper _output;
