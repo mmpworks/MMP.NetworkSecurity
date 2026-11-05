@@ -1,4 +1,5 @@
 using System;
+using System.Collections.Generic;
 using NetSec.Bytes;
 using NetSec.Errors;
 using NetSec.Machine;
@@ -10,7 +11,7 @@ namespace NetSec.Tls11
     /// The sans-IO shell of the TLS 1.1 engine: bytes in, records out of the reader, each message through the table. It holds no socket and no thread.
     /// A wire length that never arrives leaves this engine waiting, and the pump's read deadline ends that wait with LINK_DEADLINE.
     /// </summary>
-    public sealed class Tls11Engine : IProtocolEngine
+    public sealed class Tls11Engine : ITlsEngine
     {
         const string AppStep = "tls11.app";
 
@@ -20,7 +21,7 @@ namespace NetSec.Tls11
         readonly string _peer;
         readonly Tls11RecordReader _records = new Tls11RecordReader();
         readonly Tls11HandshakeReader _handshake = new Tls11HandshakeReader();
-        bool _opened;
+        readonly Queue<byte[]> _waitingToSend = new Queue<byte[]>();
 
         Tls11Engine(StepTable<Tls11Session> table, Tls11Options options, string peer)
         {
@@ -30,6 +31,7 @@ namespace NetSec.Tls11
             _stream = options.Stream;
             _peer = peer;
             _machine = new Interpreter<Tls11Session>(table, _session, Tls11Rules.StartState, options.Stream, peer, options.Tamper);
+            AlertReceived = -1;
         }
 
         public static Tls11Engine CreateClient(Tls11Options options)
@@ -47,14 +49,14 @@ namespace NetSec.Tls11
         public EngineStatus Status { get { return _machine.Status; } }
         public TraceStream Stream { get { return _stream; } }
         public string Peer { get { return _peer; } }
-        public bool Opened { get { return _opened; } }
-        public string Suite { get { return _session.Options.Suite.Name; } }
-
-        /// <summary>The description byte of the last alert from the peer, or 0.</summary>
+        public bool ReachedOpen { get; private set; }
+        public string VersionName { get { return "TLSv1.1"; } }
+        public string SuiteName { get { return _session.Options.Suite.Name; } }
+        public string GroupName { get { return ReachedOpen && _session.Options.Suite.KeyExchange == Tls11KeyExchange.Ecdhe ? "X25519" : null; } }
         public int AlertReceived { get; private set; }
 
         /// <summary>One NSS key log line, so Wireshark can open the capture. Empty until the master secret exists.</summary>
-        public string[] KeyLog
+        public string[] KeyLogLines
         {
             get
             {
@@ -96,7 +98,7 @@ namespace NetSec.Tls11
             else if (c.Kind == EngineCommandKind.Close)
                 Close();
             else if (c.Kind == EngineCommandKind.Send)
-                SendApp(c.Bytes);
+                Send(c.Bytes);
             return _machine.TakeOutput();
         }
 
@@ -129,7 +131,7 @@ namespace NetSec.Tls11
                 byte[] body = new byte[message.Length - 4];
                 Buffer.BlockCopy(message, 4, body, 0, body.Length);
                 _machine.Dispatch(Inbound(message[0], message, body, wasProtected));
-                AfterDispatch();
+                SendWhatWaited();
             }
         }
 
@@ -153,10 +155,6 @@ namespace NetSec.Tls11
                 return;
             }
             DispatchWhole(Tls11Messages.ApplicationDataKey, content, wasProtected);
-            if (_machine.IsEnded || content.Length == 0) return;
-            Tls11Options options = _session.Options;
-            if (options.EchoReceived) SendApp(content);
-            if (options.CloseAfterReply) Close();
         }
 
         InboundMessage Inbound(int key, byte[] bytes, byte[] body, bool wasProtected)
@@ -165,23 +163,23 @@ namespace NetSec.Tls11
             return new InboundMessage(key, Tls11Messages.NameOf(key), bytes, body, fields);
         }
 
-        /// <summary>The first time the table reaches Open, the shell runs what the options ask for.</summary>
-        void AfterDispatch()
+        /// <summary>Data asked for before the handshake ends waits here. The first time the table reaches Open, it goes out.</summary>
+        void SendWhatWaited()
         {
-            if (_opened || _machine.Status != EngineStatus.Open) return;
-            _opened = true;
-            Tls11Options options = _session.Options;
-            if (options.SendOnOpen != null) SendApp(options.SendOnOpen);
-            else if (options.CloseAfterReply) Close();
+            if (_machine.Status != EngineStatus.Open) return;
+            ReachedOpen = true;
+            while (_waitingToSend.Count > 0) SendNow(_waitingToSend.Dequeue());
         }
 
-        void SendApp(byte[] bytes)
+        void Send(byte[] bytes)
         {
-            if (_machine.Status != EngineStatus.Open)
-            {
-                _machine.Fail(ErrorCodes.MessageRefused, "records open before data", "application data was asked for before the handshake ended", AppStep);
-                return;
-            }
+            if (_machine.IsEnded) return;
+            if (_machine.Status == EngineStatus.Open) SendNow(bytes);
+            else _waitingToSend.Enqueue(bytes);
+        }
+
+        void SendNow(byte[] bytes)
+        {
             for (int off = 0; off < bytes.Length; off += Tls11RecordCipher.MaxContent)
             {
                 byte[] chunk = new byte[Math.Min(Tls11RecordCipher.MaxContent, bytes.Length - off)];

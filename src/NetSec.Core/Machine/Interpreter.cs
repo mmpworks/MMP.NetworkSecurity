@@ -158,6 +158,7 @@ namespace NetSec.Machine
                 case EffectKind.Deliver: _app.Add(new DeliveredChunk(effect.Channel, effect.Bytes)); break;
                 case EffectKind.Note: ApplyNote(effect, step); break;
                 case EffectKind.Measure: ApplyMeasure(effect, step); break;
+                case EffectKind.Store: effect.Store(); break;
                 default: throw new InvalidOperationException("no case for effect kind " + effect.Kind);
             }
         }
@@ -171,7 +172,7 @@ namespace NetSec.Machine
                 if (result != null && result.Bytes != null) body = result.Bytes;
             }
             TraceEventDraft draft = new TraceEventDraft();
-            draft.Type = _session.SentType;
+            draft.Type = effect.Text ?? _session.SentType;
             draft.Message = effect.Name;
             draft.Step = step;
             draft.Plain = body;
@@ -243,7 +244,7 @@ namespace NetSec.Machine
         void EmitReceived(InboundMessage message, StepRow<TSession> row)
         {
             TraceEventDraft draft = new TraceEventDraft();
-            draft.Type = _session.ReceivedType;
+            draft.Type = message.EventType ?? _session.ReceivedType;
             draft.Message = message.Name;
             draft.Step = row == null ? null : row.Step;
             draft.Plain = _session.PlainOf(message);

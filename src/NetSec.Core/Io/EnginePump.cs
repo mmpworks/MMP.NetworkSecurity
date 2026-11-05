@@ -26,7 +26,7 @@ namespace NetSec.Io
     }
 
     /// <summary>Holds each event until Step releases one. Run opens the gate for good, and Pause closes it again.</summary>
-    public sealed class StepGate : IStepGate
+    public sealed class StepGate : IStepGate, IGateState
     {
         readonly object _lock = new object();
         readonly Queue<Promise> _waiting = new Queue<Promise>();
@@ -42,6 +42,8 @@ namespace NetSec.Io
                 return waiter.Future;
             }
         }
+
+        public bool IsHolding { get { lock (_lock) return _waiting.Count > 0; } }
 
         public void Step()
         {
@@ -78,6 +80,8 @@ namespace NetSec.Io
     /// </summary>
     public sealed class EnginePump
     {
+        const int DeadlineSliceMs = 250;
+
         readonly IProtocolEngine _engine;
         readonly IByteLink _link;
         readonly ITraceSink _sink;
@@ -155,7 +159,9 @@ namespace NetSec.Io
                 foreach (IFuture wait in AwaitRead(read)) yield return wait;
                 if (!read.IsCompleted)
                 {
-                    End(NetSecError.Of(ErrorCodes.LinkDeadline, "no bytes for " + _deadlineMs + " ms"));
+                    NetSecError deadline = NetSecError.Of(ErrorCodes.LinkDeadline, "no bytes for " + _deadlineMs + " ms");
+                    deadline.CheckName = "read deadline";
+                    End(deadline);
                     yield break;
                 }
                 if (read.IsFaulted || read.IsCanceled)
@@ -169,8 +175,19 @@ namespace NetSec.Io
 
         IEnumerable<IFuture> AwaitRead(IFuture<int> read)
         {
-            if (_deadlineMs > 0) yield return Futures.WhenAny(read, Futures.Delay(_deadlineMs));
-            else yield return Futures.Observe(read);
+            if (_deadlineMs <= 0) { yield return Futures.Observe(read); yield break; }
+            IGateState gate = _gate as IGateState;
+            if (gate == null) { yield return Futures.WhenAny(read, Futures.Delay(_deadlineMs)); yield break; }
+
+            // A learner can read one event for an hour, so the clock restarts while the gate holds an event.
+            // A read that stays open with nothing at the gate has no one left to wake it: a flipped length byte does that.
+            int waited = 0;
+            while (!read.IsCompleted && waited < _deadlineMs)
+            {
+                int slice = Math.Min(DeadlineSliceMs, _deadlineMs - waited);
+                yield return Futures.WhenAny(read, Futures.Delay(slice));
+                waited = gate.IsHolding ? 0 : waited + slice;
+            }
         }
 
         void Take(byte[] buffer, int count)

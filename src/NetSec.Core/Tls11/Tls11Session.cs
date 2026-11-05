@@ -25,11 +25,6 @@ namespace NetSec.Tls11
         public byte[][] Chain;
         public RsaPrivate ServerKey;
         public bool WriteDowngradeTail;
-
-        // What the shell does once the record layer is open. Null or false means nothing.
-        public byte[] SendOnOpen;
-        public bool EchoReceived;
-        public bool CloseAfterReply;
     }
 
     /// <summary>

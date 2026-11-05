@@ -34,12 +34,10 @@ namespace NetSec.Tests
             Stream = Stream(actor),
         };
 
-        static Tls11Engine Client(Tls11CipherSuite suite, byte[] send = null, ITamperHook tamper = null, DateTime? now = null)
+        static Tls11Engine Client(Tls11CipherSuite suite, ITamperHook tamper = null, DateTime? now = null)
         {
             Tls11Options o = Options("client", suite, 11);
             Tls11Training.TrustTrainingRoot(o, Keys, now ?? Now);
-            o.SendOnOpen = send;
-            o.CloseAfterReply = true;
             o.Tamper = tamper;
             return Tls11Engine.CreateClient(o);
         }
@@ -49,9 +47,27 @@ namespace NetSec.Tests
             Tls11Options o = Options("server", suite, 22);
             Tls11Training.UseTrainingServerKey(o, Keys);
             o.WriteDowngradeTail = sentinel;
-            o.EchoReceived = true;
             o.Tamper = tamper;
             return Tls11Engine.CreateServer(o);
+        }
+
+        /// <summary>The client sends one line, the server sends it back, and the client closes. No socket: bytes pass in a plain loop.</summary>
+        static void EchoRun(Tls11Engine client, Tls11Engine server)
+        {
+            server.Start();
+            client.Command(new EngineCommand(EngineCommandKind.Send, 0, Encoding.UTF8.GetBytes("ping"), null));
+            byte[] toServer = client.Start().Wire;
+            while (toServer.Length > 0)
+            {
+                EngineOutput fromServer = server.Feed(toServer, 0, toServer.Length);
+                byte[] toClient = fromServer.Wire;
+                foreach (DeliveredChunk chunk in fromServer.App)
+                    toClient = toClient.Concat(server.Command(new EngineCommand(EngineCommandKind.Send, 0, chunk.Bytes, null)).Wire).ToArray();
+                if (toClient.Length == 0) return;
+                EngineOutput fromClient = client.Feed(toClient, 0, toClient.Length);
+                toServer = fromClient.Wire;
+                if (fromClient.App.Length > 0) toServer = toServer.Concat(client.Command(EngineCommand.Close).Wire).ToArray();
+            }
         }
 
         // Known answers from OpenSSL 3.5.7: openssl kdf -keylen N -kdfopt digest:MD5-SHA1 -kdfopt hexsecret:S -kdfopt hexseed:(label + seed) TLS1-PRF
@@ -151,9 +167,9 @@ namespace NetSec.Tests
 
         static (Tls11Engine client, Tls11Engine server) Duel(Tls11CipherSuite suite, bool sentinel = false, ITamperHook tamper = null)
         {
-            Tls11Engine client = Client(suite, Encoding.UTF8.GetBytes("ping"), tamper);
+            Tls11Engine client = Client(suite, tamper);
             Tls11Engine server = Server(suite, sentinel, tamper);
-            EngineDuel.Run(client, server);
+            EchoRun(client, server);
             return (client, server);
         }
 
@@ -164,18 +180,18 @@ namespace NetSec.Tests
         public void Client_and_server_finish_and_close_cleanly(string name)
         {
             (Tls11Engine client, Tls11Engine server) = Duel(Tls11CipherSuite.Find(name));
-            Assert.True(client.Opened);
-            Assert.True(server.Opened);
+            Assert.True(client.ReachedOpen);
+            Assert.True(server.ReachedOpen);
             Assert.Equal(EngineStatus.Closed, client.Status);
             Assert.Equal(EngineStatus.Closed, server.Status);
-            Assert.Equal(server.KeyLog, client.KeyLog);
+            Assert.Equal(server.KeyLogLines, client.KeyLogLines);
         }
 
         [Fact]
         public void A_tls11_client_has_nothing_to_check_in_the_downgrade_sentinel()
         {
             (Tls11Engine client, _) = Duel(Tls11CipherSuite.RsaAes128CbcSha, sentinel: true);
-            Assert.True(client.Opened);
+            Assert.True(client.ReachedOpen);
             Assert.Equal(EngineStatus.Closed, client.Status);
         }
 
@@ -191,7 +207,7 @@ namespace NetSec.Tests
         public void A_flipped_finished_at_the_plain_point_fails_the_finished_compare()
         {
             TamperPlan plan = new TamperPlan { Point = TamperPoint.Plain, Message = Tls11Messages.FinishedName, Offset = 6 };
-            Tls11Engine client = Client(Tls11CipherSuite.RsaAes128CbcSha, null, plan);
+            Tls11Engine client = Client(Tls11CipherSuite.RsaAes128CbcSha, plan);
             Tls11Engine server = Server(Tls11CipherSuite.RsaAes128CbcSha);
             server.Start();
             byte[] toServer = client.Start().Wire;
@@ -305,7 +321,7 @@ namespace NetSec.Tests
         static (LabResult result, TraceEvent[] events) RunLab(AttackDefinition attack = null)
         {
             ListSink sink = new ListSink();
-            LabContext c = new LabContext { SessionId = "s7", TraceId = "s7", Seed = 7, Gate = new FreeRunGate(), Sink = sink, Clock = new FixedClock(0), Random = new SeededRandom(7), Attack = attack };
+            LabContext c = new LabContext { SessionId = "s7", TraceId = "s7", Seed = 7, Gate = new FreeRunGate(), Sink = sink, Clock = new FixedClock(0), Random = new SeededRandom(7), Attack = attack, DeadlineMs = 20000 };
             IFuture<LabResult> future = LabCatalog.Find(7).Run(c);
             Assert.True(future.Wait(60000), "the lab did not finish in 60 s");
             return (future.Result, sink.Events);
@@ -316,12 +332,32 @@ namespace NetSec.Tests
         {
             (LabResult result, TraceEvent[] events) = RunLab();
             Assert.True(result.Completed, result.FailedCode + " " + result.FailedCheck);
-            string[] Sent(string actor) => events.Where(e => e.Type == "wire.sent" && e.Actor == actor).Select(e => e.Message).ToArray();
+            string[] Sent(string actor) => events.Where(e => e.Type == "wire.sent" && e.Actor == actor && e.StreamId.Contains("/tls11")).Select(e => e.Message).ToArray();
             Assert.Equal(new[] { "ClientHello", "ClientKeyExchange", "ChangeCipherSpec", "Finished", "ApplicationData", "Alert" }, Sent("client"));
             Assert.Equal(new[] { "ServerHello", "Certificate", "ServerHelloDone", "ChangeCipherSpec", "Finished", "ApplicationData" }, Sent("server"));
             Assert.Contains(events, e => e.Type == "check.result" && e.Message == "record HMAC" && e.Check.Passed);
             Assert.Contains(events, e => e.Type == "check.result" && e.Message == "certificate chain" && e.Check.Passed);
             Assert.Contains(events, e => e.Type == "keys.installed" && e.Message == "TLS_RSA_WITH_AES_128_CBC_SHA");
+            Assert.Contains(events, e => e.Type == "wire.sent" && e.StreamId.Contains("/tls13") && e.Message == "ClientHello");
+        }
+
+        [Fact]
+        public void The_downgrade_attack_leaves_downgrd_on_the_wire_and_the_tls13_client_names_it()
+        {
+            (LabResult result, TraceEvent[] events) = RunLab(AttackCatalog.All.Single(a => a.AttackId == "L7-downgrade"));
+            Assert.Equal("TLS13_DOWNGRADE_SENTINEL", result.FailedCode);
+            Assert.Equal("downgrade sentinel", result.FailedCheck);
+            TraceEvent hello = events.Single(e => e.Type == "wire.sent" && e.Actor == "server" && e.Message == "ServerHello");
+            Assert.Equal("444f574e47524400", Hex.Encode(hello.Wire.Skip(5 + 4 + 2 + 24).Take(8).ToArray()));
+            Assert.Contains(events, e => e.Type == "check.result" && e.Actor == "client" && e.StreamId.Contains("/tls13") && !e.Check.Passed && e.Message == "downgrade sentinel");
+        }
+
+        [Fact]
+        public void The_modern_server_gives_the_old_client_alert_70()
+        {
+            (LabResult result, TraceEvent[] events) = RunLab(AttackCatalog.All.Single(a => a.AttackId == "L7-modern-server"));
+            Assert.Equal(Tls11Codes.AlertProtocolVersion, result.FailedCode);
+            Assert.Contains(events, e => e.Type == "check.result" && e.Actor == "client" && !e.Check.Passed && e.Message == "protocol_version alert");
         }
 
         [Fact]
