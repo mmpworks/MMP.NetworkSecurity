@@ -118,11 +118,14 @@ export function chipFor(t: TypeRow): Chip {
     case 'Configured': return { id: 'not-checked', text: words('wizard.chip.not-checked'), tone: 'warning', icon: 'mdi-help-circle-outline' }
     case 'Broken': return { id: 'broken', text: t.cause ? `${words('wizard.chip.broken')}: ${t.cause}` : words('wizard.chip.broken'), tone: 'error', icon: 'mdi-close-octagon-outline' }
     case 'Verified':
-      if (t.judge === 'none' || t.says === 'no-outside-judge') return { id: 'no-outside-check', text: words('wizard.chip.no-outside-check'), tone: 'warning', icon: 'mdi-shield-alert-outline' }
+      if (noJudge(t)) return { id: 'no-outside-check', text: words('wizard.chip.no-outside-check'), tone: 'warning', icon: 'mdi-shield-alert-outline' }
       return { id: 'checked', text: words(`wizard.says.${t.says}`, `${words('wizard.chip.checked')} by ${t.judge || 'an outside tool'}`), tone: 'success', icon: 'mdi-check-circle-outline' }
     default: return { id: 'needs-setup', text: words('wizard.chip.needs-setup'), tone: 'warning', icon: 'mdi-alert-outline' }
   }
 }
+
+// The Host sends no judge on a type row yet. Device and card keys have none, so the type id stands in until it does.
+const noJudge = (t: TypeRow) => t.judge === 'none' || t.says === 'no-outside-judge' || (!t.judge && (t.typeId.startsWith('device.') || t.typeId.startsWith('dukpt.')))
 
 export function actionFor(t: TypeRow): string {
   const c = chipFor(t).id

@@ -79,10 +79,10 @@
   "wizard.flow.my-payment.title": "Make my card PIN keys",
   "wizard.flow.my-login.title": "Make my sign-in set",
   "wizard.flow.my-lesson-keys.title": "Make my data keys",
-  "wizard.says.checked-with-openssl": "Checked with OpenSSL. This checks the signature only.",
+  "wizard.says.checked-with-openssl": "Checked with OpenSSL.",
   "wizard.says.checked-against-root": "Checked against the root you gave it. OpenSSL did the check.",
   "wizard.says.checked-with-ssh-exe": "Checked by ssh.exe.",
-  "wizard.says.checked-signature-only": "This checks the signature only, not the dates, the audience, or the algorithm name.",
+  "wizard.says.checked-signature-only": "Checked with OpenSSL. This checks the signature only.",
   "wizard.says.no-outside-judge": "No outside tool can judge this. Your key is saved.",
   "wizard.chip.builtin": "Built-in key",
   "wizard.chip.needs-setup": "Needs setup",
@@ -99,5 +99,8 @@
   "wizard.refusal.confirm": "This switches only the keys this lesson needs back to built-in keys. Your own keys stay saved.",
   "wizard.says.no-outside-judge.device.enrolment": "No outside tool can judge this. The sign-in challenge here is modeled on a passkey's, and it is not the WebAuthn standard. Our own check passed. Your key is saved.",
   "wizard.says.no-outside-judge.dukpt.bdk": "No outside tool can judge this. Our code matches the published vectors. Your key is saved.",
-  "wizard.says.no-outside-judge.dukpt.pad": "No outside tool can judge this. Our code matches the published vectors. Your key is saved."
+  "wizard.says.no-outside-judge.dukpt.pad": "No outside tool can judge this. Our code matches the published vectors. Your key is saved.",
+  "wizard.error.WIZARD_PART_NOT_BUILT": "This set is not built yet. Use built-in keys for these lessons for now.",
+  "wizard.error.WIZARD_CHECK_NOT_DONE": "Run the check first, then continue.",
+  "wizard.keys.hiding-later": "Hiding keys arrives in a later release. For now the course shows every key."
 }
