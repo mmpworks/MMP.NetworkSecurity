@@ -249,11 +249,11 @@ namespace NetSec.Tests
             public string Delivered;
         }
 
-        static Pair Run(IByteLink clientLink, IByteLink serverLink, IStepGate gate, ITamperHook tamper, int deadlineMs)
+        static Pair Run(IByteLink clientLink, IByteLink serverLink, IStepGate gate, ITamperHook tamper, int deadlineMs, int clientDeadlineMs = -1)
         {
             Pair p = new Pair();
             EnginePump server = new EnginePump(EchoEngine.Server(Make.Stream("server"), null), serverLink, p.Sink, gate, null, deadlineMs);
-            EnginePump client = new EnginePump(EchoEngine.Client(Make.Hello, Make.Stream("client"), null), clientLink, p.Sink, gate, tamper, deadlineMs);
+            EnginePump client = new EnginePump(EchoEngine.Client(Make.Hello, Make.Stream("client"), null), clientLink, p.Sink, gate, tamper, clientDeadlineMs < 0 ? deadlineMs : clientDeadlineMs);
             client.OnApp = c => p.Delivered = Encoding.UTF8.GetString(c.Bytes, 0, c.Bytes.Length);
             p.Server = server.Run();
             p.Client = client.Run();
@@ -356,7 +356,8 @@ namespace NetSec.Tests
         {
             MemoryLink[] links = MemoryLink.Pair();
             TamperPlan plan = new TamperPlan { Point = TamperPoint.Wire, Message = EchoEngine.HelloName, Offset = 1, Xor = 1 };
-            Pair p = Run(links[0], links[1], null, plan, 300);
+            // The server's deadline comes first. With equal deadlines the client can close first, and the server then reports PEER_CLOSED_EARLY.
+            Pair p = Run(links[0], links[1], null, plan, 300, 5000);
             Make.Done(p.Client);
             Make.Done(p.Server);
             Assert.Equal(ErrorCodes.LinkDeadline, p.Server.Result.Error.Code);
@@ -434,11 +435,14 @@ namespace NetSec.Tests
         }
     }
 
+    [Collection(TimingCollection.Name)]
     public class LabTests
     {
+        public LabTests() { NativeLib.Ensure(); }
+
         static LabContext Context(AttackDefinition attack) => new LabContext
         {
-            SessionId = "s9", TraceId = "s9", Seed = 7, Gate = new FreeRunGate(), Sink = new ListSink(), Clock = new FixedClock(1), Random = new SeededRandom(7), Attack = attack,
+            SessionId = "s9", TraceId = "s9", Seed = 7, Gate = new FreeRunGate(), Sink = new ListSink(), Clock = new FixedClock(1), Random = new SeededRandom(7), Attack = attack, DeadlineMs = 2000,
         };
 
         [Fact]
@@ -461,7 +465,8 @@ namespace NetSec.Tests
                 IFuture<LabResult> control = LabCatalog.Find(attack.Lesson).Run(Context(null));
                 Make.Done(control);
                 Assert.True(control.Result.Completed);
-                IFuture<LabResult> run = LabCatalog.Find(attack.Lesson).Run(Context(attack));
+                LabContext attacked = Context(attack);
+                IFuture<LabResult> run = LabCatalog.Find(attack.Lesson).Run(attacked);
                 Make.Done(run);
                 Assert.Equal(attack.Expect == AttackOutcome.Rejected, !run.Result.Completed);
                 Assert.Equal(attack.ExpectCode, run.Result.FailedCode);
@@ -472,7 +477,7 @@ namespace NetSec.Tests
         [Fact]
         public void An_unbuilt_lesson_has_no_lab()
         {
-            Assert.Null(LabCatalog.Find(5));
+            Assert.Null(LabCatalog.Find(99));
         }
     }
 }

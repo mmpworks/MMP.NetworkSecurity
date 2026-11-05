@@ -11,6 +11,17 @@ namespace NetSec.Crypto
     {
         const int BlockSize = 16;
 
+        /// <summary>
+        /// True when tag is the full 16-byte CMAC of message. Use this and never a plain compare, which can stop at the first wrong byte.
+        /// A tag of another length gives false. A truncated tag is out of scope here.
+        /// </summary>
+        public static bool Verify(AesKey k, byte[] message, byte[] tag)
+        {
+            Arg.NotNull(tag, "tag");
+            byte[] expected = Compute(k, message);
+            return tag.Length == BlockSize && ConstantTime.Equal(expected, 0, tag, 0, BlockSize);
+        }
+
         public static byte[] Compute(AesKey k, byte[] message)
         {
             Arg.NotNull(k, "k");

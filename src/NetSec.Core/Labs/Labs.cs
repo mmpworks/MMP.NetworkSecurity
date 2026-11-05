@@ -7,7 +7,9 @@ using NetSec.Crypto;
 using NetSec.Errors;
 using NetSec.Io;
 using NetSec.Machine;
+using NetSec.Pki;
 using NetSec.Platform;
+using NetSec.Tls13;
 using NetSec.Trace;
 
 namespace NetSec.Labs
@@ -70,6 +72,8 @@ namespace NetSec.Labs
         public IClock Clock;
         public IRandomSource Random;
         public AttackDefinition Attack;
+        /// <summary>The read deadline of each pump. Zero means LabPair.DeadlineMs. A test sets a short one.</summary>
+        public int DeadlineMs;
     }
 
     public sealed class LabResult
@@ -111,6 +115,9 @@ namespace NetSec.Labs
                 case 1: return new Lesson01Aes();
                 case 2: return new Lesson02Seals();
                 case 3: return new Lesson03Kex();
+                case 4: return Tls13Lab.Lesson4();
+                case 5: return Tls13Lab.Lesson5();
+                case 6: return new Lesson06Dukpt();
                 default: return null;
             }
         }
@@ -140,6 +147,22 @@ namespace NetSec.Labs
 
             Swap("L3-swap-server-share", 3, "X25519ServerShare", Lesson03Kex.SwappedServerShare(), ErrorCodes.KexConfirmMismatch, Lesson03Kex.ConfirmCheck),
             Flip("L3-flip-mlkem-ciphertext", 3, "MlKemCiphertext", Frame.HeaderSize + 10, ErrorCodes.KexConfirmMismatch, Lesson03Kex.ConfirmCheck),
+
+            PlainFlip("L4-flip-cert-byte", 4, "Certificate", Tls13Lab.CertSerialOffset, ChainCheck.BadSignature),
+            PlainFlip("L4-flip-cert-verify", 4, "CertificateVerify", Tls13Lab.CertVerifySignatureOffset, Tls13Codes.CertVerifyBad),
+            WithOption("L4-expired-cert", 4, Tls13Lab.OptionServerCert, Tls13Lab.CertExpired, AttackOutcome.Rejected, ChainCheck.Validity, Tls13Codes.CheckName(ChainCheck.Validity)),
+            WithOption("L4-wrong-name", 4, Tls13Lab.OptionServerCert, Tls13Lab.CertWrongName, AttackOutcome.Rejected, ChainCheck.Name, Tls13Codes.CheckName(ChainCheck.Name)),
+            WithOption("L4-unknown-ca", 4, Tls13Lab.OptionServerCert, Tls13Lab.CertUnknownCa, AttackOutcome.Rejected, ChainCheck.NoAnchor, Tls13Codes.CheckName(ChainCheck.NoAnchor)),
+
+            PlainFlip("L5-flip-finished", 5, "Finished", Tls13Lab.VerifyDataOffset, Tls13Codes.FinishedMismatch),
+            Flip("L5-flip-record-byte", 5, "EncryptedExtensions", Tls13Lab.RecordCipherOffset, Tls13Codes.AeadTag, Tls13Codes.CheckName(Tls13Codes.AeadTag)),
+            PlainFlip("L5-replace-key-share", 5, "ClientHello", Tls13Lab.ClientX25519ShareOffset, Tls13Codes.AeadTag),
+            PlainFlip("L5-flip-mlkem-ciphertext", 5, "ServerHello", Tls13Lab.ServerMlKemCiphertextOffset, Tls13Codes.AeadTag),
+            FlipLength("L5-flip-record-length", 5, "Finished"),
+
+            WithOption("L6-replay-sale", 6, Lesson06Dukpt.OptionScenario, Lesson06Dukpt.ScenarioReplaySale, AttackOutcome.Rejected, ErrorCodes.DukptKsnReplay, Lesson06Dukpt.ReplayCheck),
+            Flip("L6-flip-pin-block", 6, Lesson06Dukpt.SaleName, Lesson06Dukpt.PinBlockOffset + 3, ErrorCodes.DukptPinBlockFormat, Lesson06Dukpt.FormatCheck),
+            WithOption("L6-ask-past-key", 6, Lesson06Dukpt.OptionScenario, Lesson06Dukpt.ScenarioAskPastKey, AttackOutcome.Rejected, ErrorCodes.DukptKeyNotHeld, Lesson06Dukpt.NotHeldCheck),
         };
 
         public static AttackDefinition[] All { get { return (AttackDefinition[])Rows.Clone(); } }
@@ -156,6 +179,25 @@ namespace NetSec.Labs
         {
             row.Expect = AttackOutcome.NoCheck;
             return row;
+        }
+
+        /// <summary>A flip before protection, so a sealed record still opens and a deeper check gets the catch.</summary>
+        static AttackDefinition PlainFlip(string id, int lesson, string message, int offset, string code)
+        {
+            TamperPlan plan = new TamperPlan();
+            plan.Point = TamperPoint.Plain;
+            plan.Message = message;
+            plan.Offset = offset;
+            return Row(id, lesson, "flip-byte", plan, new LabOption[0], AttackOutcome.Rejected, code, Tls13Codes.CheckName(code));
+        }
+
+        /// <summary>The record length grows by 256 bytes that never come, so the receiver waits until its read deadline ends the run.</summary>
+        static AttackDefinition FlipLength(string id, int lesson, string message)
+        {
+            TamperPlan plan = new TamperPlan();
+            plan.Message = message;
+            plan.Offset = 3;
+            return Row(id, lesson, "flip-byte", plan, new LabOption[0], AttackOutcome.Rejected, ErrorCodes.LinkDeadline, "read deadline");
         }
 
         static AttackDefinition Swap(string id, int lesson, string message, byte[] replacement, string code, string check)

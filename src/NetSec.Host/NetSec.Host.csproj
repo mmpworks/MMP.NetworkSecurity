@@ -14,4 +14,9 @@
     <ProjectReference Include="..\NetSec.Core\NetSec.Core.csproj" />
   </ItemGroup>
 
+  <!-- Lesson 11 loads this DLL by name. Without it the lesson ends in NATIVE_LIB_MISSING. native\build.cmd makes it. -->
+  <ItemGroup>
+    <None Include="..\..\native\bin\x64\netsec_ct.dll" Condition="Exists('..\..\native\bin\x64\netsec_ct.dll')" Link="netsec_ct.dll" CopyToOutputDirectory="PreserveNewest" Visible="false" />
+  </ItemGroup>
+
 </Project>

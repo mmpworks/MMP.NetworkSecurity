@@ -1,0 +1,164 @@
+{
+  "summary": {
+    "schema": 1,
+    "timestamp": "2026-11-05T05:32:03.7695425-06:00",
+    "machine": "BEAST",
+    "command": "run.ps1 -Clauses A9,A10",
+    "productRoot": "E:\\dev\\ns-s5",
+    "productCommit": "f78b0e0",
+    "acceptanceCommit": "ba439f0",
+    "freshClone": false,
+    "productPresent": true,
+    "M": 202,
+    "selected": 11,
+    "pass": 4,
+    "fail": 0,
+    "notRun": 7,
+    "reasons": [
+      {
+        "key": "NOT RUN PRODUCT_MISSING",
+        "count": 7
+      }
+    ],
+    "selfChecks": {
+      "selected": 0,
+      "pass": 0,
+      "fail": 0,
+      "notRun": 0
+    }
+  },
+  "results": [
+    {
+      "id": "A10.privacy.no-dukpt-secrets-in-ce-and-gateway-traces",
+      "assertion": "A10",
+      "slice": "S5",
+      "group": "bridge",
+      "build": "host",
+      "referee": "live run, Go referees and taps",
+      "status": "NOT RUN",
+      "reason": "PRODUCT_MISSING",
+      "detail": "the group does not compile against the built NetSec.Core: a type or member the contract names is missing or differs. E:\\dev\\ns-s5\\acceptance\\groups\\bridge\\BridgeClauses.cs(5,7): error CS0246: The type or namespace name 'NetSec' could not be found (are you missing a using directive or an assembly reference?) | E:\\dev\\ns-s5\\acceptance\\lib\\Live\\LiveLink.cs(7,7): error CS0246: The type or namespace name 'MMP' could not be found (are you missing a using directive or an assembly reference?) | E:\\dev\\ns-s5\\acceptance\\lib\\Live\\LiveLink.cs(8,7): error CS0246: The type or namespace name 'NetSec' could not be found (are you missing a using directive or an assembly reference?)",
+      "ms": 0
+    },
+    {
+      "id": "A10.run.glass-hops",
+      "assertion": "A10",
+      "slice": "S5",
+      "group": "bridge",
+      "build": "host",
+      "referee": "live run, Go referees and taps",
+      "status": "NOT RUN",
+      "reason": "PRODUCT_MISSING",
+      "detail": "the group does not compile against the built NetSec.Core: a type or member the contract names is missing or differs. E:\\dev\\ns-s5\\acceptance\\groups\\bridge\\BridgeClauses.cs(5,7): error CS0246: The type or namespace name 'NetSec' could not be found (are you missing a using directive or an assembly reference?) | E:\\dev\\ns-s5\\acceptance\\lib\\Live\\LiveLink.cs(7,7): error CS0246: The type or namespace name 'MMP' could not be found (are you missing a using directive or an assembly reference?) | E:\\dev\\ns-s5\\acceptance\\lib\\Live\\LiveLink.cs(8,7): error CS0246: The type or namespace name 'NetSec' could not be found (are you missing a using directive or an assembly reference?)",
+      "ms": 0
+    },
+    {
+      "id": "A10.run.go-referee-hops",
+      "assertion": "A10",
+      "slice": "S5",
+      "group": "bridge",
+      "build": "host",
+      "referee": "live run, Go referees and taps",
+      "status": "NOT RUN",
+      "reason": "PRODUCT_MISSING",
+      "detail": "the group does not compile against the built NetSec.Core: a type or member the contract names is missing or differs. E:\\dev\\ns-s5\\acceptance\\groups\\bridge\\BridgeClauses.cs(5,7): error CS0246: The type or namespace name 'NetSec' could not be found (are you missing a using directive or an assembly reference?) | E:\\dev\\ns-s5\\acceptance\\lib\\Live\\LiveLink.cs(7,7): error CS0246: The type or namespace name 'MMP' could not be found (are you missing a using directive or an assembly reference?) | E:\\dev\\ns-s5\\acceptance\\lib\\Live\\LiveLink.cs(8,7): error CS0246: The type or namespace name 'NetSec' could not be found (are you missing a using directive or an assembly reference?)",
+      "ms": 0
+    },
+    {
+      "id": "A10.run.ssh-exe-forward",
+      "assertion": "A10",
+      "slice": "S5",
+      "group": "bridge",
+      "build": "host",
+      "referee": "live run, Go referees and taps",
+      "status": "NOT RUN",
+      "reason": "PRODUCT_MISSING",
+      "detail": "the group does not compile against the built NetSec.Core: a type or member the contract names is missing or differs. E:\\dev\\ns-s5\\acceptance\\groups\\bridge\\BridgeClauses.cs(5,7): error CS0246: The type or namespace name 'NetSec' could not be found (are you missing a using directive or an assembly reference?) | E:\\dev\\ns-s5\\acceptance\\lib\\Live\\LiveLink.cs(7,7): error CS0246: The type or namespace name 'MMP' could not be found (are you missing a using directive or an assembly reference?) | E:\\dev\\ns-s5\\acceptance\\lib\\Live\\LiveLink.cs(8,7): error CS0246: The type or namespace name 'NetSec' could not be found (are you missing a using directive or an assembly reference?)",
+      "ms": 0
+    },
+    {
+      "id": "A10.tamper.envelope-dukpt-mac-mismatch",
+      "assertion": "A10",
+      "slice": "S5",
+      "group": "bridge",
+      "build": "host",
+      "referee": "live run, Go referees and taps",
+      "status": "NOT RUN",
+      "reason": "PRODUCT_MISSING",
+      "detail": "the group does not compile against the built NetSec.Core: a type or member the contract names is missing or differs. E:\\dev\\ns-s5\\acceptance\\groups\\bridge\\BridgeClauses.cs(5,7): error CS0246: The type or namespace name 'NetSec' could not be found (are you missing a using directive or an assembly reference?) | E:\\dev\\ns-s5\\acceptance\\lib\\Live\\LiveLink.cs(7,7): error CS0246: The type or namespace name 'MMP' could not be found (are you missing a using directive or an assembly reference?) | E:\\dev\\ns-s5\\acceptance\\lib\\Live\\LiveLink.cs(8,7): error CS0246: The type or namespace name 'NetSec' could not be found (are you missing a using directive or an assembly reference?)",
+      "ms": 0
+    },
+    {
+      "id": "A10.tamper.hop1-ssh-packet-mac",
+      "assertion": "A10",
+      "slice": "S5",
+      "group": "bridge",
+      "build": "host",
+      "referee": "live run, Go referees and taps",
+      "status": "NOT RUN",
+      "reason": "PRODUCT_MISSING",
+      "detail": "the group does not compile against the built NetSec.Core: a type or member the contract names is missing or differs. E:\\dev\\ns-s5\\acceptance\\groups\\bridge\\BridgeClauses.cs(5,7): error CS0246: The type or namespace name 'NetSec' could not be found (are you missing a using directive or an assembly reference?) | E:\\dev\\ns-s5\\acceptance\\lib\\Live\\LiveLink.cs(7,7): error CS0246: The type or namespace name 'MMP' could not be found (are you missing a using directive or an assembly reference?) | E:\\dev\\ns-s5\\acceptance\\lib\\Live\\LiveLink.cs(8,7): error CS0246: The type or namespace name 'NetSec' could not be found (are you missing a using directive or an assembly reference?)",
+      "ms": 0
+    },
+    {
+      "id": "A10.tamper.hop2-tls13-aead-tag",
+      "assertion": "A10",
+      "slice": "S5",
+      "group": "bridge",
+      "build": "host",
+      "referee": "live run, Go referees and taps",
+      "status": "NOT RUN",
+      "reason": "PRODUCT_MISSING",
+      "detail": "the group does not compile against the built NetSec.Core: a type or member the contract names is missing or differs. E:\\dev\\ns-s5\\acceptance\\groups\\bridge\\BridgeClauses.cs(5,7): error CS0246: The type or namespace name 'NetSec' could not be found (are you missing a using directive or an assembly reference?) | E:\\dev\\ns-s5\\acceptance\\lib\\Live\\LiveLink.cs(7,7): error CS0246: The type or namespace name 'MMP' could not be found (are you missing a using directive or an assembly reference?) | E:\\dev\\ns-s5\\acceptance\\lib\\Live\\LiveLink.cs(8,7): error CS0246: The type or namespace name 'NetSec' could not be found (are you missing a using directive or an assembly reference?)",
+      "ms": 0
+    },
+    {
+      "id": "A9.cf.binaries-reference-cf-mscorlib",
+      "assertion": "A9",
+      "slice": "All",
+      "group": "binproof",
+      "build": "host",
+      "referee": "CF references and System.Reflection.Metadata",
+      "status": "PASS",
+      "reason": "",
+      "detail": "4 of 4 vectors",
+      "ms": 23
+    },
+    {
+      "id": "A9.cf.compiles-against-reference-assemblies-with-langversion-3",
+      "assertion": "A9",
+      "slice": "All",
+      "group": "binproof",
+      "build": "host",
+      "referee": "CF references and System.Reflection.Metadata",
+      "status": "PASS",
+      "reason": "",
+      "detail": "src/NetSec.Core and src/NetSec.Core.NetCF use LangVersion 3; the CF project builds against E:\\dev\\tools\\netcf35-ref",
+      "ms": 2645
+    },
+    {
+      "id": "A9.cf.same-suite-passes-on-net48-skips-pinned",
+      "assertion": "A9",
+      "slice": "All",
+      "group": "binproof",
+      "build": "host",
+      "referee": "CF references and System.Reflection.Metadata",
+      "status": "PASS",
+      "reason": "",
+      "detail": "2 of 2 vectors; net10.0 274 passed, net48 274 passed, 0 skipped (all pinned)",
+      "ms": 27770
+    },
+    {
+      "id": "A9.git-ls-files.no-cf-binary",
+      "assertion": "A9",
+      "slice": "All",
+      "group": "binproof",
+      "build": "host",
+      "referee": "CF references and System.Reflection.Metadata",
+      "status": "PASS",
+      "reason": "",
+      "detail": "335 tracked files checked against 42 CF reference files and the CF mscorlib token; none match",
+      "ms": 510
+    }
+  ]
+}

@@ -2,7 +2,8 @@ namespace NetSec.Crypto
 {
     /// <summary>
     /// Multiplication in the GCM field, SP 800-38D algorithm 1. A value is two ulongs, big-endian, and bit 0 of the
-    /// standard is the top bit of Hi. The masks replace branches, so the work does not depend on the bits of H or X.
+    /// standard is the top bit of Hi. The masks replace branches, so this source has no branch on the bits of H or X.
+    /// This is managed code, and the JIT and the CPU give no constant-time guarantee. Lesson 11 measures that.
     /// </summary>
     static class Gf128
     {
