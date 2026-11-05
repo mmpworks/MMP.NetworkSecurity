@@ -57,6 +57,7 @@ namespace NetSec.Io
         public IStepGate Gate;
         public ITamperHook Tamper;
         public string TraceId, Hop, PeerName;
+        public string SessionId, Actor;
         // The contract keeps DeviceProfile in NetSec.Bridge. tools/layer_check.py allows this one upward name.
         public NetSec.Bridge.DeviceProfile Profile;
     }
@@ -91,13 +92,15 @@ namespace NetSec.Io
 
         public string Kind { get { return "glass"; } }
 
-        /// <summary>S0 applies the policy. The TLS 1.3, TLS 1.1, and SSH engines arrive in S3 and S4.</summary>
+        /// <summary>Applies the policy, then opens the engine. TLS 1.1 and SSH arrive in S4.</summary>
         public IFuture<ISecureChannel> Open(TransportRequest request)
         {
             if (request == null) throw new ArgumentNullException("request");
             NetSec.Bridge.DeviceProfile profile = request.Profile ?? NetSec.Bridge.DeviceProfile.Modern;
             if (TransportPolicy.Decide(profile, Kind, request.Protocol) == TransportDecision.Refused)
                 return Refuse(ErrorCodes.CeTransportUnavailable, profile.Name + " refuses " + request.Protocol);
+            if (request.Protocol == WireProtocol.Tls13)
+                return Futures.FromResult<ISecureChannel>(new GlassTls13Channel(request, GlassTls13Channel.CreateEngine(request, _keys)));
             return Refuse(ErrorCodes.TransportNotBuilt, "the glass " + request.Protocol + " engine is not built yet");
         }
 

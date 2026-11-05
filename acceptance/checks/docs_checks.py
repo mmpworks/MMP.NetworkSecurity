@@ -15,6 +15,16 @@ import subprocess
 import sys
 
 TOUR_GLOB = os.path.join("app", "src", "tours", "lesson-*.json")
+
+
+def tour_files(root):
+    # Lesson 0 is the toy lesson. It sits outside the suite and has its own spec under app/e2e/ (lead decision, 2026-11-05).
+    out = []
+    for f in sorted(glob.glob(os.path.join(root, TOUR_GLOB))):
+        m = re.search(r"lesson-(\d+)\.json$", f)
+        if m and int(m.group(1)) >= 1:
+            out.append(f)
+    return out
 TERM = re.compile(r"\{\{term:([a-z0-9-]+)\}\}")
 LESSONS = range(1, 12)
 
@@ -78,7 +88,7 @@ def plain(s):
 # ---------------------------------------------------------------- loading
 
 def load_tours(root):
-    files = sorted(glob.glob(os.path.join(root, TOUR_GLOB)))
+    files = tour_files(root)
     if not files:
         raise NotRun("PRODUCT_MISSING", "no tour files at app/src/tours/lesson-*.json yet")
     tours = {}
@@ -193,7 +203,7 @@ def a15_grade(root, max_grade):
 def a15_tic_gate(root, tic_gate):
     if not os.path.exists(tic_gate):
         raise NotRun("TOOL_MISSING", "tic-gate.py not found at " + tic_gate)
-    files = sorted(glob.glob(os.path.join(root, TOUR_GLOB)))
+    files = tour_files(root)
     gp = os.path.join(root, "app", "src", "glossary.json")
     if os.path.exists(gp):
         files.append(gp)
@@ -291,6 +301,26 @@ def statement(root, lesson, patterns, label):
     raise Fail("lesson %d has no single step that states %s (needs text matching %s)" % (lesson, label, " and ".join(patterns)))
 
 
+NON_GOAL_HEADING = re.compile(r"(?i)^#{1,6}\s.*\b(non-?goals?|out of scope|not in scope|will not do)\b")
+
+
+def strip_non_goals(text, filename):
+    """
+    A plan lists the things it will NOT do, such as 'A run on a real CE device'. That line states a non-goal and claims nothing.
+    In a markdown file, lines under a heading that names non-goals are left out of the scan. The scan still reads every other line,
+    so a claim in the UI source or in a closing report is found.
+    """
+    if not filename.endswith(".md"):
+        return text
+    keep, skipping = [], False
+    for line in text.splitlines():
+        if re.match(r"^#{1,6}\s", line):
+            skipping = bool(NON_GOAL_HEADING.match(line))
+        if not skipping:
+            keep.append(line)
+    return "\n".join(keep)
+
+
 def a16_wording(root):
     src = os.path.join(root, "app", "src")
     if not os.path.isdir(src):
@@ -309,14 +339,14 @@ def a16_wording(root):
     bad = []
     for base in (src, os.path.join(root, "docs")):
         for dp, dn, fn in os.walk(base):
-            if "node_modules" in dp or os.sep + "wip" in dp:
+            if "node_modules" in dp or os.sep + "wip" in dp or os.sep + "_runs" in dp:   # run reports quote the banned phrase when a clause fails
                 continue
             for f in fn:
                 if f.endswith((".vue", ".ts", ".md", ".json", ".html")):
                     p = os.path.join(dp, f)
                     text = open(p, encoding="utf-8", errors="replace").read()
                     for pat in FORBIDDEN_CE:
-                        m = re.search(pat, text)
+                        m = re.search(pat, strip_non_goals(text, f))
                         if m:
                             bad.append("%s: '%s'" % (os.path.relpath(p, root), m.group(0)))
     if bad:

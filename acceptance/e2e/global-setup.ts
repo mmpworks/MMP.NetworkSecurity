@@ -4,11 +4,11 @@ import * as net from 'node:net';
 import * as path from 'node:path';
 import { HOST_PORT, OUT, PREVIEW_PORT, ROOT, TOKEN, stateFile } from './support';
 
-function waitPort(port: number, ms: number): Promise<boolean> {
+function waitPort(port: number, ms: number, host = '127.0.0.1'): Promise<boolean> {
   const end = Date.now() + ms;
   return new Promise(resolve => {
     const tryOnce = () => {
-      const s = net.connect(port, '127.0.0.1');
+      const s = net.connect(port, host);
       s.once('connect', () => { s.destroy(); resolve(true); });
       s.once('error', () => { s.destroy(); if (Date.now() > end) resolve(false); else setTimeout(tryOnce, 250); });
     };
@@ -31,11 +31,11 @@ export default async function globalSetup(): Promise<void> {
 
   const localAppData = path.join(OUT, 'localappdata');
   fs.mkdirSync(localAppData, { recursive: true });
-  // Design section 11, "Processes" item 3: NetSec.Host.exe --port P --token T. A .dll path runs under dotnet.
+  // Design section 11 gives --port and --token. Design section 5 gives NETSEC_PORT and NETSEC_TOKEN. The suite passes both. A .dll path runs under dotnet.
   const hostArgs = ['--port', String(HOST_PORT), '--token', TOKEN];
   const host = hostDll.toLowerCase().endsWith('.dll')
-    ? spawn('dotnet', [hostDll, ...hostArgs], { cwd: path.dirname(hostDll), detached: false, stdio: 'ignore', env: { ...process.env, LOCALAPPDATA: localAppData } })
-    : spawn(hostDll, hostArgs, { cwd: path.dirname(hostDll), detached: false, stdio: 'ignore', env: { ...process.env, LOCALAPPDATA: localAppData } });
+    ? spawn('dotnet', [hostDll, ...hostArgs], { cwd: path.dirname(hostDll), detached: false, stdio: 'ignore', env: { ...process.env, NETSEC_PORT: String(HOST_PORT), NETSEC_TOKEN: TOKEN, LOCALAPPDATA: localAppData } })
+    : spawn(hostDll, hostArgs, { cwd: path.dirname(hostDll), detached: false, stdio: 'ignore', env: { ...process.env, NETSEC_PORT: String(HOST_PORT), NETSEC_TOKEN: TOKEN, LOCALAPPDATA: localAppData } });
   host.on('error', () => { /* a start failure shows as hostUp false */ });
   if (host.pid) state.pids.push(host.pid);
   state.hostUp = await waitPort(HOST_PORT, 60_000);
@@ -43,7 +43,7 @@ export default async function globalSetup(): Promise<void> {
   const preview = spawn('npx', ['vite', 'preview', '--port', String(PREVIEW_PORT), '--strictPort', '--host', 'localhost'], { cwd: appDir, shell: true, detached: false, stdio: 'ignore' });
   preview.on('error', () => { /* a start failure shows as previewUp false */ });
   if (preview.pid) state.pids.push(preview.pid);
-  state.previewUp = await waitPort(PREVIEW_PORT, 60_000);
+  state.previewUp = await waitPort(PREVIEW_PORT, 60_000, 'localhost');   // vite preview listens on localhost, which can be ::1 only
   state.note = state.hostUp && state.previewUp ? 'live' : `host up: ${state.hostUp}, preview up: ${state.previewUp}`;
   fs.writeFileSync(stateFile(), JSON.stringify(state));
 }

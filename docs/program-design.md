@@ -312,7 +312,7 @@ Each slice ships its lesson, tour, attacks, and e2e (D12), merges to a running `
 Order under time pressure: S0, S1, S2, S3, S7, S4, S5, S6, S8. Cut order is the PRD's. A cut role makes the matching clause NOT RUN, by name.
 ## 9. Gate commands
 Run from `E:\dev\MMP.NetworkSecurity`. `$cf = -p:NetCFRefDir=E:\dev\tools\netcf35-ref`. Referee pins, asserted by version string: `NETSEC_OPENSSL` = `C:/Program Files/Git/mingw64/bin/openssl.exe` (`OpenSSL 3.5.7`), `NETSEC_SSH` = `C:/Windows/System32/OpenSSH/ssh.exe` (`OpenSSH_for_Windows_9.5p2`).
-Base gate, in every slice. `pwsh tools/gate.ps1 -Slice Sn -Clauses A1,A2` runs this and the extras, and writes `docs/_runs/<date>-Sn.md`:
+Base gate, in every slice. `pwsh tools/gate.ps1 -Slice Sn -Clauses A1,A2` runs this and the extras, adds A9 to the clause list on every run, and writes `docs/_runs/<date>-Sn.md`:
 ```
 python tools/layer_check.py src/NetSec.Core
 dotnet build src/NetSec.Core -c Release
