@@ -29,6 +29,8 @@ namespace Acceptance
 
         static LabRun RunLab(int lesson, AttackDefinition attack, int seed)
         {
+            // Lesson 11 calls netsec_ct.dll through DllImport. This program has no copy beside it, so the suite builds the library and loads it first.
+            if (lesson == 11 && Ctx.Current != null) NativeBuild.EnsureLoaded(Ctx.Current);
             ILab lab = LabCatalog.Find(lesson);
             LabContext ctx = new LabContext();
             LabRun r = new LabRun();

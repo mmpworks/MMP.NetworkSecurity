@@ -165,6 +165,63 @@ namespace Acceptance
             return MiniJson.AsObject(MiniJson.Parse(line.Substring(line.IndexOf(' ') + 1).Trim()));
         }
 
+        /// <summary>Total size of the trace files and the tap logs. It stops changing when every writer has finished.</summary>
+        long LogSignature(string hop1Log, string hop2Log)
+        {
+            long sum = 0;
+            foreach (string name in new string[] { "ce", "pinpad", "gateway", "server", "bank" })
+            {
+                string f = Path.Combine(_dir, name + ".ndjson");
+                if (File.Exists(f)) sum += new FileInfo(f).Length;
+            }
+            foreach (string f in new string[] { hop1Log, hop2Log }) if (File.Exists(f)) sum += new FileInfo(f).Length;
+            return sum;
+        }
+
+        /// <summary>For each hop, true when the wire.sent bytes of the client end and of the server end equal the tap log bytes of that direction.</summary>
+        bool WireMatchesTaps(string hop1Log, string hop2Log)
+        {
+            List<string> unparsed = new List<string>();
+            List<TraceLine> lines = new List<TraceLine>();
+            foreach (string name in new string[] { "ce", "pinpad", "gateway", "server", "bank" })
+                lines.AddRange(TraceFile.ReadAll(Path.Combine(_dir, name + ".ndjson"), unparsed));
+            BridgeOutcome probe = new BridgeOutcome();
+            probe.Trace = lines.ToArray();
+            try
+            {
+                TapLog t1 = File.Exists(hop1Log) ? TapLog.Read(hop1Log) : new TapLog();
+                // Hop 1 carries our SSH only in the glass topology (the CE speaks plain bytes to ssh.exe, and Go is the gateway in the referee topology).
+                if (_topology == Topology.Glass && (!Hex.Eq(probe.WireSent("hop1", "ce"), t1.ClientToServer) || !Hex.Eq(probe.WireSent("hop1", "gateway"), t1.ServerToClient))) return false;
+                if (_topology != Topology.GoReferees)
+                {
+                    TapLog t2 = File.Exists(hop2Log) ? TapLog.Read(hop2Log) : new TapLog();
+                    if (!Hex.Eq(probe.WireSent("hop2", "gateway"), t2.ClientToServer) || !Hex.Eq(probe.WireSent("hop2", "server"), t2.ServerToClient)) return false;
+                }
+                return true;
+            }
+            catch (FailException) { return false; }          // a tap record cut in the middle of a line: not settled yet
+        }
+
+        /// <summary>
+        /// Waits until the processes have finished writing. A process writes a wire.sent event after it writes the bytes, and tap writes its log
+        /// record as the bytes pass, so a fixed sleep can read both too early on a loaded machine. The wait ends when the files stop growing for
+        /// 1.5 s and, in a run with no tamper, the wire.sent bytes equal the tap bytes. The longest wait is 25 s. A comparison that is still unequal
+        /// after that is left to the A10a clause to report.
+        /// </summary>
+        void SettleLogs(string hop1Log, string hop2Log, bool tampered)
+        {
+            DateTime end = DateTime.UtcNow.AddSeconds(25), stableSince = DateTime.UtcNow;
+            long last = -1;
+            while (DateTime.UtcNow < end)
+            {
+                long sig = LogSignature(hop1Log, hop2Log);
+                if (sig != last) { last = sig; stableSince = DateTime.UtcNow; }
+                bool quiet = (DateTime.UtcNow - stableSince).TotalMilliseconds >= 1500;
+                if (quiet && (tampered || WireMatchesTaps(hop1Log, hop2Log))) return;
+                Thread.Sleep(200);
+            }
+        }
+
         static string CeResultLine(Proc ce)
         {
             foreach (string l in ce.Lines) if (l.StartsWith("CE-RESULT")) return l;
@@ -284,7 +341,7 @@ namespace Acceptance
             string bankResult = WaitOrCeStop(bankP, "bank HSM", ce, tampered ? 20000 : 60000);
             if (bankResult != null) o.Bank = ResultOf(bankResult);
             else if (!(_tamper.Hop1Flip || _tamper.Hop2Flip)) throw new FailException("bank HSM printed no RESULT line. " + CeSummary(ce) + " Bank output: " + bankP.AllOutput);
-            Thread.Sleep(1200);                                                     // let the last trace lines and the tap logs land
+            SettleLogs(hop1Log, hop2Log, tampered);                                  // wait for the last trace lines and tap records, not for a fixed time
 
             List<string> unparsed = new List<string>();
             List<TraceLine> lines = new List<TraceLine>();

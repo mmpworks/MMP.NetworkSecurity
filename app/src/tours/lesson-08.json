@@ -211,7 +211,7 @@
       "lesson": 8,
       "title": "Every packet carries a seal",
       "text": [
-        "The receiver checks the seal on each packet. The check is named packet MAC. It passes on the normal run.",
+        "The receiver checks the seal on each packet. The check is named packet MAC. It runs on every packet. The lab shows one pass in each direction, on the first protected packet, and later passes stay quiet.",
         "Try it: flip one byte of the protected login packet. The seal no longer fits, and the check fails."
       ],
       "glossary": [],
@@ -223,6 +223,13 @@
         "action": { "type": "run-attack", "attackId": "L8-flip-packet" },
         "expect": { "type": "check", "name": "packet MAC", "result": "fail" }
       },
+      "claims": [
+        {
+          "id": "L8-C22",
+          "text": "The packet MAC check runs on every packet. The lab shows one passing event per direction, before the first protected packet is received, and later passes stay quiet.",
+          "source": "docs/lesson-ssh-names.md (branch fix/ssh-relay-room, PR #77), check table, packet MAC row"
+        }
+      ],
       "unlock": { "mode": "action", "ref": "L8-S09-T1" }
     },
     {
@@ -260,7 +267,8 @@
       "text": [
         "With the client accepted, it opens a channel and asks the server to run a command. This is the exec request.",
         "The lab's server does not start a process. It answers from a fixed table of two commands, echo and whoami, so the lesson cannot be used to run anything.",
-        "A channel holds no more than its window of unread bytes. The window opens again only when the reader reads, so a stalled reader makes the sender wait."
+        "A channel holds no more than its window of unread bytes. The window opens again only when the reader reads, so a stalled reader makes the sender wait. The wait has a limit. A sender parked on the window looks silent, so the 30-second read deadline ends the whole session. The same deadline ends an idle tunnel.",
+        "A ninth channel is refused by name, and the session and its other channels go on."
       ],
       "glossary": [],
       "bind": { "kind": "event", "eventType": "ssh.message.sent", "match": { "actor": "client", "message": "ChannelRequestExec" } },
@@ -280,6 +288,11 @@
           "id": "L8-C20",
           "text": "A channel holds no more than its window of unread bytes. The window opens again only when the reader reads, so a stalled reader makes the sender wait.",
           "source": "RFC 4254, section 5.2 (Data Transfer: the window size specifies how many bytes the other party can send before it must wait for the window to be adjusted); docs/lesson-ssh-names.md, item 8"
+        },
+        {
+          "id": "L8-C23",
+          "text": "A stalled reader makes the sender wait only until the 30-second read deadline, which ends the whole session and also an idle tunnel. A ninth channel is refused by name, and the session goes on.",
+          "source": "docs/lesson-ssh-names.md (branch fix/ssh-relay-room, PR #77), What the tour must state, items 8 and 9"
         }
       ],
       "unlock": { "mode": "event" }
@@ -361,6 +374,7 @@
       "text": [
         "In SSH the server proves itself with a host key the client pinned earlier, and the client proves itself with a signed message. Neither side needs a certificate authority.",
         "The lab shows an old device's SSH suite beside a modern one on the desktop. The code is CF-compiled, run on the desktop CLR, never run on CE. The lab has not touched real CE hardware.",
+        "The old device path has a limit. No peer that lacks the strict KEX marker has run here, and an old device is likely that kind of peer. Our own code ran with the marker off against our own code, on both suites. Against outside code, both sides ran the old rules in two runs. So the old rules hold against outside code, and a real old peer stays unproved.",
         "Built to show the parts. Do not copy."
       ],
       "glossary": [],
@@ -370,6 +384,11 @@
           "id": "L8-C14",
           "text": "In this run, nothing has touched real Windows CE hardware. The engines are compiled for the CF runtime and run on the desktop CLR.",
           "source": "docs/prd.md, Spike results table, row 'CE compiler, emulator, device'"
+        },
+        {
+          "id": "L8-C24",
+          "text": "No peer without the strict KEX marker has run in the lab, and nothing has run on CE. Our own code ran with the marker off against our own code on both suites. Against outside code (Windows ssh.exe against our server, and our client against Go), both sides ran the old rules. A real old peer stays unproved.",
+          "source": "docs/lesson-ssh-names.md (branch fix/ssh-relay-room, PR #77), What the tour must state, item 10"
         }
       ],
       "unlock": { "mode": "ack" }

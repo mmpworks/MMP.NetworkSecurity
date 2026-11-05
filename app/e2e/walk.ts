@@ -57,3 +57,11 @@ export async function runFreePlay(page: Page, lesson: number) {
   await page.getByTestId('free-run').click()
   await expect(page.getByTestId('engine-state')).toContainText(/finished/, { timeout: 60_000 })
 }
+
+/** True when the Host lists the lesson as built. A spec for an unbuilt lesson skips with a named reason and never passes. */
+export async function isBuilt(lesson: number): Promise<boolean> {
+  const r = await fetch(`http://127.0.0.1:${PORT}/api/lessons`, { headers: { Authorization: `Bearer ${TOKEN}` } })
+  const body: any = await r.json()
+  const rows: any[] = Array.isArray(body) ? body : body?.lessons ?? []
+  return !!rows.find(x => x.lesson === lesson)?.built
+}

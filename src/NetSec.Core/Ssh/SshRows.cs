@@ -84,7 +84,9 @@ namespace NetSec.Ssh
                 case EngineCommandKind.Exec:
                 case EngineCommandKind.OpenChannel:
                     if (s.Channels.Count >= MaxChannels)
-                        return StepDecision.Fail(SshCodes.ChannelLimit, SshChecks.ChannelLimit, "this side holds " + s.Channels.Count + " open channels, the limit");
+                        return StepDecision.Stay(
+                            Effect.CheckFailed(SshChecks.ChannelLimit, SshCodes.ChannelLimit, "this side holds " + s.Channels.Count + " open channels, the limit"),
+                            Effect.Deliver(SshControl.Channel, SshControl.Encode(SshControl.ChannelRefused, c.Channel, SshCodes.ChannelLimit)));
                     return StepDecision.Stay(c.Kind == EngineCommandKind.Exec ? OpenSession(s, c) : OpenTunnel(s, c));
                 case EngineCommandKind.Send:
                     return SendOrEnd(s, c);
@@ -296,6 +298,7 @@ namespace NetSec.Ssh
             s.Channels.Remove(channel.Local);
             List<StepEffect> effects = new List<StepEffect>();
             if (!channel.SentClose) effects.Add(s.SealedPacket(SshNames.ChannelClose, new ByteWriter().U8(SshMsg.ChannelClose).U32(channel.Remote).ToArray()));
+            if (channel.WaitingForWindow) effects.Add(Effect.Deliver(SshControl.Channel, SshControl.Encode(SshControl.WindowOpen, channel.Local, "")));
             effects.Add(Effect.Deliver(channel.Local, new byte[0]));
             return StepDecision.Stay(effects.ToArray());
         }
