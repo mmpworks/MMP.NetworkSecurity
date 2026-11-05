@@ -7,6 +7,7 @@ using NetSec.Crypto;
 using NetSec.Errors;
 using NetSec.Keys;
 using NetSec.Machine;
+using NetSec.Pki;
 using NetSec.Platform;
 using NetSec.Ssh;
 using NetSec.Trace;
@@ -43,6 +44,14 @@ namespace NetSec.Io
             o.User = DefaultUser;
             o.UserKey = keys.Find(KeyIds.SshClient);
             return o;
+        }
+
+        /// <summary>The line a device holds for its gateway, so its first connect checks the host key. The suite picks which training key that is.</summary>
+        public static string KnownHostLine(ITrainingKeySource keys, SshSuite suite, string host, int port)
+        {
+            string typeName;
+            byte[] blob = SshKeyBlob.Of(keys.Find(HostKeyIdFor(suite)), out typeName);
+            return SshKnownHosts.Line(host, port, typeName, blob);
         }
 
         public static SshServerOptions Server(ITrainingKeySource keys, SshSuite suite, IRandomSource random, Func<string, int, bool> allowTunnel)
