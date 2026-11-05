@@ -7,7 +7,7 @@
       "text": [
         "In lesson 4 the server proved itself to the client. Now the client proves itself to the server. A server needs this, because it must know who is asking before it does anything.",
         "Two questions follow. First, who are you? That is authentication. Second, what may you do? That is permission. A server that answers only the first lets every logged-in user do everything.",
-        "The lab runs three phases in order: mutual TLS, a login, and then calls. A signature tells you who is calling only when someone registered the caller's public key ahead of time. The login and the calls run in the clear so you can see the token on the wire, and a real system sends them inside TLS.",
+        "The lab runs three phases in order: mutual TLS, a login, and then calls. A signature tells you who is calling only when someone enrolled the caller's public key ahead of time. The login and the calls run in the clear so you can see the token on the wire, and a real system sends them inside TLS.",
         "Built to show the parts. Do not copy."
       ],
       "glossary": [],
@@ -16,8 +16,8 @@
       "claims": [
         {
           "id": "L10-C09",
-          "text": "A signature shows who calls only because the key was registered ahead of time. The lab runs mutual TLS, then a login, then calls. The login and calls run in the clear so the token shows on the wire; a real system sends them inside TLS.",
-          "source": "docs/lesson-10-names.md, opening paragraphs and Roles and capabilities (branch feat/s6-fix, PR #46, commit 49bd50e)"
+          "text": "A signature shows who calls only because the key was enrolled ahead of time. The lab runs mutual TLS, then a login, then calls. The login and calls run in the clear so the token shows on the wire; a real system sends them inside TLS.",
+          "source": "docs/lesson-10-names.md, opening paragraph and Roles and capabilities (branch feat/s6, commit f72acef)"
         }
       ],
       "unlock": { "mode": "ack" }
@@ -48,7 +48,7 @@
       "title": "The client shows its certificate",
       "text": [
         "The client answers with its own certificate. It carries the name pump-reader-4 and the client's device key.",
-        "The server checks it the way the client checked the server's in lesson 4: does it lead to a trusted root, is the signature real, is it in date, and does the name fit.",
+        "The server checks it the way the client checked the server's in lesson 4: does it lead to a trusted root, is it in date, and does its signature verify.",
         "Anyone can copy a certificate, so the card alone proves nothing. The next step shows what does."
       ],
       "glossary": [],
@@ -101,8 +101,8 @@
         },
         {
           "id": "L10-C19",
-          "text": "In the lab the removed-certificate row ends with code TLS13_CERT_REQUIRED and alert 116; ux-design.md section 7 still says bad_certificate for this try-it, which is out of date.",
-          "source": "docs/lesson-10-names.md, Two alerts paragraph and Attacks, L10-remove-client-cert (branch feat/s6-fix, commit 49bd50e)"
+          "text": "In the lab the removed-certificate row ends with code TLS13_CERT_REQUIRED and alert 116; ux-design.md section 7 names bad_certificate for this try-it, and the names file leaves that ruling to the lead.",
+          "source": "docs/lesson-10-names.md, Mutual TLS section, attack table and last paragraph (branch feat/s6, commit f72acef)"
         }
       ],
       "unlock": { "mode": "action", "ref": "L10-S05-T1" }
@@ -165,18 +165,18 @@
       "lesson": 10,
       "title": "Is this key on record?",
       "text": [
-        "The issuer looks up the subject in its own records and checks that this public key is on record for it. The check is named device registered, and it runs before any challenge is sent.",
-        "This step gives a signature its meaning. The issuer trusts the key because someone registered it earlier.",
-        "Try it: log in with a key nobody registered. The certificate from phase 1 stays valid, so only the login key changes. The issuer still refuses."
+        "The issuer looks up the subject in its own records and checks that it holds this public key for it. The check is named device enrolled.",
+        "This step gives a signature its meaning. The issuer trusts the key because someone enrolled it earlier.",
+        "Try it: log in with a key nobody enrolled. The key can sign fine, and the issuer still refuses, because it never linked that key to the subject."
       ],
       "glossary": [],
-      "bind": { "kind": "event", "eventType": "check.result", "match": { "message": "device registered" } },
-      "highlight": ["check:name=device registered"],
+      "bind": { "kind": "event", "eventType": "check.result", "match": { "message": "device enrolled" } },
+      "highlight": ["check:name=device enrolled"],
       "tryIt": {
         "id": "L10-S09-T1",
-        "label": "Log in with a key nobody registered",
+        "label": "Log in with a key nobody enrolled",
         "action": { "type": "run-attack", "attackId": "L10-unknown-device" },
-        "expect": { "type": "check", "name": "device registered", "result": "fail" }
+        "expect": { "type": "check", "name": "device enrolled", "result": "fail" }
       },
       "claims": [
         {
@@ -186,8 +186,8 @@
         },
         {
           "id": "L10-C11",
-          "text": "In the lab the issuer refuses a login with a key not on record for the subject, with code DEVICE_UNKNOWN, before it sends any challenge.",
-          "source": "docs/lesson-10-names.md, check table and Attacks, L10-unknown-device (branch feat/s6-fix, commit 49bd50e)"
+          "text": "In the lab the issuer refuses a login with a key it does not hold for the subject, with code DEVICE_NOT_ENROLLED.",
+          "source": "docs/lesson-10-names.md, check table and Attacks, L10-unknown-device (branch feat/s6, commit f72acef)"
         }
       ],
       "unlock": { "mode": "action", "ref": "L10-S09-T1" }
@@ -197,12 +197,12 @@
       "lesson": 10,
       "title": "The issuer sets a challenge",
       "text": [
-        "The issuer answers with a random challenge, a number used once. It remembers the challenge it sent.",
+        "The issuer answers with a random challenge, a number used once. It keeps a copy of the challenge it sent. Find it in the issuer column of the secrets panel.",
         "The challenge makes the proof fresh. Because the issuer remembers it, only a challenge it really sent can be answered."
       ],
       "glossary": [],
       "bind": { "kind": "event", "eventType": "wire.sent", "match": { "actor": "issuer", "message": "Challenge" } },
-      "highlight": ["inspector:field=challenge"],
+      "highlight": ["inspector:field=challenge", "secrets:row=issuer.auth.issued-challenge"],
       "unlock": { "mode": "event" }
     },
     {
@@ -210,7 +210,7 @@
       "lesson": 10,
       "title": "Sign the challenge",
       "text": [
-        "The client signs the challenge with its private key and sends the signature back. The issuer checks it with the registered public key. A valid signature shows the sender holds the private key of a registered device.",
+        "The client signs the challenge with its private key and sends the signature back. The issuer checks it with the enrolled public key. A valid signature shows the sender holds the private key of an enrolled device.",
         "This is a passkey-shaped challenge. Real passkeys work this way. It is not WebAuthn: this lab has no browser, no authenticator device, and none of the web checks WebAuthn adds.",
         "Try it: send the same signed response a second time, after it has earned a token. The issuer has seen this challenge, so the check named challenge already used fails."
       ],
@@ -232,7 +232,7 @@
         {
           "id": "L10-C02",
           "text": "In the lab the issuer rejects a second ChallengeResponse for the same challenge with code CHALLENGE_REPLAY.",
-          "source": "docs/lesson-10-names.md, Attacks, L10-replay-challenge (branch feat/s6-fix, commit 49bd50e)"
+          "source": "docs/lesson-10-names.md, Attacks, L10-replay-challenge (branch feat/s6, commit f72acef)"
         }
       ],
       "unlock": { "mode": "action", "ref": "L10-S11-T1" }
@@ -259,7 +259,7 @@
         {
           "id": "L10-C12",
           "text": "The issuer compares the answered challenge with the one this login issued and refuses an unissued one with code CHALLENGE_NOT_ISSUED.",
-          "source": "docs/lesson-10-names.md, check table and Attacks, L10-unissued-challenge (branch feat/s6-fix, commit 49bd50e); review of PR #20, Blocker 1"
+          "source": "docs/lesson-10-names.md, check table and Attacks, L10-unissued-challenge (branch feat/s6, commit f72acef); review of PR #20, Blocker 1"
         }
       ],
       "unlock": { "mode": "action", "ref": "L10-S12-T1" }
@@ -270,8 +270,7 @@
       "title": "A token in three parts",
       "text": [
         "The issuer now hands the client a token. A token is a signed note that says who the client is and what it may do.",
-        "Look at the claims. Split the token at its two dots and you get a header, the claims, and a signature. The claims read in everyday words: the subject, a role of cashier, a capability to void a sale, and an expiry time.",
-        "A real token usually also names who issued it and who it is for. This lab's token has no issuer or audience claim, so the lab does not show audience.",
+        "Look at the claims. Split the token at its two dots and you get a header, the claims, and a signature. The claims read in everyday words: who issued it, who it is for, the subject, a role of cashier, a capability to void a sale, and an expiry time.",
         "The issuer signs the whole note. Anyone can read the claims, and nobody can change them without breaking the signature."
       ],
       "glossary": ["token"],
@@ -285,8 +284,8 @@
         },
         {
           "id": "L10-C13",
-          "text": "The iss claim identifies who issued a JWT and the aud claim identifies the recipients it is intended for; use of both is optional. The lab's token carries neither.",
-          "source": "RFC 7519, sections 4.1.1 (iss) and 4.1.3 (aud); docs/lesson-10-names.md, opening paragraphs (branch feat/s6-fix, commit 49bd50e)"
+          "text": "The iss claim identifies who issued a JWT, the sub claim identifies its subject, and the aud claim identifies the recipients it is intended for.",
+          "source": "RFC 7519, sections 4.1.1 (iss), 4.1.2 (sub) and 4.1.3 (aud); docs/lesson-10-names.md, Roles and capabilities (the token holds iss, aud, sub, roles, cap, iat, exp, cnf.jkt)"
         }
       ],
       "unlock": { "mode": "event" }
@@ -333,6 +332,38 @@
     {
       "id": "L10-S16",
       "lesson": 10,
+      "title": "A token is for one server",
+      "text": [
+        "The token names the server it is meant for, in its audience claim. The server checks that the name is its own. The check is named token audience.",
+        "Without it, a token made for one service could be used at another service that trusts the same issuer.",
+        "Try it: have the issuer write the token for another server. The check fails."
+      ],
+      "glossary": [],
+      "bind": { "kind": "event", "eventType": "check.result", "match": { "message": "token audience" } },
+      "highlight": ["check:name=token audience", "inspector:field=tokenClaims"],
+      "tryIt": {
+        "id": "L10-S16-T1",
+        "label": "Use a token written for another server",
+        "action": { "type": "run-attack", "attackId": "L10-wrong-audience" },
+        "expect": { "type": "check", "name": "token audience", "result": "fail" }
+      },
+      "claims": [
+        {
+          "id": "L10-C14",
+          "text": "Each principal intended to process a JWT must identify itself with a value in the audience claim, and if it does not, the JWT must be rejected.",
+          "source": "RFC 7519, section 4.1.3 (aud Claim)"
+        },
+        {
+          "id": "L10-C15",
+          "text": "In the lab the server refuses a token written for another server with code TOKEN_BAD_AUDIENCE.",
+          "source": "docs/lesson-10-names.md, Attacks, L10-wrong-audience (branch feat/s6, commit f72acef)"
+        }
+      ],
+      "unlock": { "mode": "action", "ref": "L10-S16-T1" }
+    },
+    {
+      "id": "L10-S17",
+      "lesson": 10,
       "title": "A stolen token is not enough",
       "text": [
         "Here is the weak spot. A token is just text. If a thief copies it, the server cannot tell the thief from the client.",
@@ -343,7 +374,7 @@
       "bind": { "kind": "event", "eventType": "measure.result", "match": { "actor": "client", "message": "proof claims" } },
       "highlight": ["inspector:field=proofClaims", "check:name=proof binding"],
       "tryIt": {
-        "id": "L10-S16-T1",
+        "id": "L10-S17-T1",
         "label": "Use the token with another key's proof",
         "action": { "type": "run-attack", "attackId": "L10-stolen-token" },
         "expect": { "type": "check", "name": "proof binding", "result": "fail" }
@@ -357,13 +388,13 @@
         {
           "id": "L10-C05",
           "text": "DPoP is a mechanism for sender-constraining OAuth 2.0 tokens via a proof-of-possession mechanism on the application level. The lab applies the same idea to its own token, not to OAuth.",
-          "source": "RFC 9449, Abstract; docs/lesson-10-names.md, check table, proof binding row (branch feat/s6-fix, commit 49bd50e)"
+          "source": "RFC 9449, Abstract; docs/lesson-10-names.md, check table, proof binding row (branch feat/s6, commit f72acef)"
         }
       ],
-      "unlock": { "mode": "action", "ref": "L10-S16-T1" }
+      "unlock": { "mode": "action", "ref": "L10-S17-T1" }
     },
     {
-      "id": "L10-S17",
+      "id": "L10-S18",
       "lesson": 10,
       "title": "Each proof works once",
       "text": [
@@ -376,7 +407,7 @@
       "bind": { "kind": "event", "eventType": "check.result", "match": { "message": "jti already used" } },
       "highlight": ["check:name=jti already used", "check:name=proof age"],
       "tryIt": {
-        "id": "L10-S17-T1",
+        "id": "L10-S18-T1",
         "label": "Send the same proof twice",
         "action": { "type": "run-attack", "attackId": "L10-replay-proof" },
         "expect": { "type": "check", "name": "jti already used", "result": "fail" }
@@ -390,7 +421,7 @@
         {
           "id": "L10-C16",
           "text": "The lab accepts a proof whose iat is within 60 seconds, and it keeps the used proof ids for one run only. It issues no DPoP nonce.",
-          "source": "docs/lesson-10-names.md, check table (proof age) and opening paragraphs (branch feat/s6-fix, commit 49bd50e); src/NetSec.Core/Labs/Lesson10Auth.cs, Session._seen (a per-session dictionary of used challenges and proof ids)"
+          "source": "docs/lesson-10-names.md, check table (proof age; no nonce check is listed) (branch feat/s6, commit f72acef); src/NetSec.Core/Labs/Lesson10Auth.cs, Session._seen (a per-session dictionary of used challenges and proof ids)"
         },
         {
           "id": "L10-C21",
@@ -398,14 +429,14 @@
           "source": "RFC 9449, section 8 (Authorization Server-Provided Nonce)"
         }
       ],
-      "unlock": { "mode": "action", "ref": "L10-S17-T1" }
+      "unlock": { "mode": "action", "ref": "L10-S18-T1" }
     },
     {
-      "id": "L10-S18",
+      "id": "L10-S19",
       "lesson": 10,
       "title": "Who you are is not what you may do",
       "text": [
-        "By now the server has checked the certificate, the token and the proof. It knows the call came from a holder of a registered key and a token the issuer signed. It still must decide whether this caller may do this action. That is the permission check.",
+        "By now the server has checked the certificate, the token and the proof. It knows the call came from a holder of an enrolled key and a token the issuer signed. It still must decide whether this caller may do this action. That is the permission check.",
         "A role is a job title. The role cashier may read totals. A capability is a single right. The capability void-sale lets the holder void a sale, and the token carries it by name.",
         "Try it: call Refund. The token has the role cashier and the capability void-sale, but it has no refund capability. The check named permission check fails."
       ],
@@ -413,7 +444,7 @@
       "bind": { "kind": "event", "eventType": "check.result", "match": { "message": "permission check" } },
       "highlight": ["check:name=permission check", "inspector:field=tokenClaims"],
       "tryIt": {
-        "id": "L10-S18-T1",
+        "id": "L10-S19-T1",
         "label": "Call Refund without the capability",
         "action": { "type": "run-attack", "attackId": "L10-ungranted-capability" },
         "expect": { "type": "check", "name": "permission check", "result": "fail" }
@@ -422,18 +453,18 @@
         {
           "id": "L10-C07",
           "text": "In the lab, read-totals needs the role cashier or manager; void-sale and refund each need a capability of that name. The normal token holds roles [cashier] and cap [void-sale].",
-          "source": "docs/lesson-10-names.md, Roles and capabilities (branch feat/s6-fix, commit 49bd50e)"
+          "source": "docs/lesson-10-names.md, Roles and capabilities (branch feat/s6, commit f72acef)"
         }
       ],
-      "unlock": { "mode": "action", "ref": "L10-S18-T1" }
+      "unlock": { "mode": "action", "ref": "L10-S19-T1" }
     },
     {
-      "id": "L10-S19",
+      "id": "L10-S20",
       "lesson": 10,
       "title": "Three ways a client proves itself",
       "text": [
         "You have now seen three ways to prove who a client is: a certificate in TLS (mutual TLS), a signed challenge, and a token with a proof.",
-        "Each one rests on a key or certificate the server trusts ahead of time. A signature on its own proves only that the signer holds a key. The registration turns that into who.",
+        "Each one rests on a key or certificate the server trusts ahead of time. A signature on its own proves only that the signer holds a key. The enrolment turns that into who.",
         "Remember the setting. The login and calls here run in the clear so you can read them. A real system sends them inside TLS.",
         "Built to show the parts. Do not copy."
       ],
