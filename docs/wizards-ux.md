@@ -61,7 +61,7 @@ Each row has these cells. The Host sends every value in `GET /api/security`. The
 | Mode | Two-button switch `Built-in key | My test key`. All 15 types are available, so neither button is ever disabled. The test ids use the Host's words `builtin` and `mine`. The label never says "Real" | `type-mode-<typeId>` |
 | State | A chip with words and an icon, never color alone: `Built-in key`, `Needs setup`, `Set up, not checked`, `Checked by <judge>`, `Saved, no outside check`, `Broken` | `type-state-<typeId>` |
 | Used by | Lessons that read this type, for example `Lessons 4, 5, 7` | `type-usedby-<typeId>` |
-| Action | One button: `Set up`, `Prove it`, `Fix it`, `Change`, or `Continue setup` | `type-action-<typeId>` |
+| Action | One button: `Set up`, `Check it`, `Fix it`, `Change`, or `Continue setup` | `type-action-<typeId>` |
 
 State words map to the Host's states (`modes-design.md` 2.2):
 
