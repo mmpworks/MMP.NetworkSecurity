@@ -164,7 +164,7 @@ public sealed class SessionManager
             Gate = session.Gate,
             Sink = session,
             Clock = new MonotonicClock(),
-            Random = new OsRandom(),
+            Random = new SeededRandom(seed),
             Attack = attack,
         };
         IFuture<LabResult> run = lab.Run(context);
