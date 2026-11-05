@@ -123,6 +123,12 @@
       "verdict": "accurate",
       "note": "Tours read at main 32f6219 (PR 54 merged); lab run at main 32f6219. RFC 4254 section 5.2: 'The window size specifies how many bytes the other party can send before it must wait for the window to be adjusted.' Unit test A_stalled_reader_stops_the_sender_at_the_window_and_a_read_resumes_it ran and passed: the server sent 3 MiB, the client received exactly the 2,097,152-byte window and sent no WindowAdjust; after the client reported consumption, all 3 MiB arrived.",
       "checkedAgainst": "RFC 4254 section 5.2 (fetched this session); unit tests run on main 32f6219 (6 passed)"
+    },
+    {
+      "id": "L8-C21",
+      "verdict": "accurate",
+      "note": "Tours read at main 6e0c1e5 (PR 60 merged); lab run at main 6e0c1e5. RFC 4251 section 4.1 gives two trust models: a local host-key database, and a host name-to-key association certified by a trusted CA. The lab pins the host key (check known_hosts match) and the control run shows no CA step.",
+      "checkedAgainst": "RFC 4251 section 4.1 (fetched this session); lab run, lesson 8"
     }
   ],
   "textRead": {
@@ -137,20 +143,23 @@
         "severity": "medium",
         "wrong": "There is no certificate authority.",
         "right": "This lab uses no certificate authority. SSH can use one, but it does not need one.",
-        "evidence": "RFC 4251 section 4.1 lists two trust models, a local key database and a host key certified by a trusted CA."
+        "evidence": "RFC 4251 section 4.1 lists two trust models, a local key database and a host key certified by a trusted CA.",
+        "status": "fixed, re-read ok at 6e0c1e5"
       },
       {
         "step": "L8-S09",
         "severity": "high",
         "wrong": "The check is named packet MAC. It passes on the normal run.",
         "right": "The check is named packet MAC. On the normal run the lab shows no event for it, as with the AEAD tag in lesson 5. Only a failure shows up.",
-        "evidence": "Lab run on main c0a105b: zero check.result events named packet MAC in the control run (both rounds). The step also binds to check.result packet MAC, which never fires on a normal run."
+        "evidence": "Lab run on main c0a105b: zero check.result events named packet MAC in the control run (both rounds). The step also binds to check.result packet MAC, which never fires on a normal run.",
+        "status": "fixed in the lab, re-read ok at 6e0c1e5: PR 66 made every protected packet emit a passing packet MAC check (40 events in the control run); the step text stands and its bind now hits"
       }
     ],
     "notes": [
       "Lesson 9 is referenced by L8-S01 and has no tour yet; plan statement.",
-      "Bind defect: L8-S09 binds to check.result 'packet MAC'; no such event exists in the control run.",
-      "New text read and run on main 32f6219: S03 (Modern means newer), S04 strict KEX (events on in both rounds; sweep and Ignore tests reproduced), S07 no pin refuses (run), S08 packet length (RFC 4253 6.3), S12 channel window (unit test run). No new problems."
-    ]
+      "New text read and run on main 32f6219: S03 (Modern means newer), S04 strict KEX (events on in both rounds; sweep and Ignore tests reproduced), S07 no pin refuses (run), S08 packet length (RFC 4253 6.3), S12 channel window (unit test run). No new problems.",
+      "Bind defect closed: check.result packet MAC now fires on the normal run (PR 66)."
+    ],
+    "problemsOpen": 0
   }
 }
