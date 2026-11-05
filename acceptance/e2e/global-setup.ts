@@ -40,7 +40,9 @@ export default async function globalSetup(): Promise<void> {
   if (host.pid) state.pids.push(host.pid);
   state.hostUp = await waitPort(HOST_PORT, 60_000);
 
-  const preview = spawn('npx', ['vite', 'preview', '--port', String(PREVIEW_PORT), '--strictPort', '--host', 'localhost'], { cwd: appDir, shell: true, detached: false, stdio: 'ignore' });
+  const previewLog = fs.openSync(path.join(OUT, 'preview.log'), 'a');   // vite's own words, kept so a dead preview can be explained
+  const preview = spawn('npx', ['vite', 'preview', '--port', String(PREVIEW_PORT), '--strictPort', '--host', 'localhost'], { cwd: appDir, shell: true, detached: false, stdio: ['ignore', previewLog, previewLog] });
+  preview.on('exit', (code, sig) => { try { fs.appendFileSync(path.join(OUT, 'preview.log'), `\n[preview exited code=${code} signal=${sig} at ${new Date().toISOString()}]\n`); } catch { /* ignore */ } });
   preview.on('error', () => { /* a start failure shows as previewUp false */ });
   if (preview.pid) state.pids.push(preview.pid);
   state.previewUp = await waitPort(PREVIEW_PORT, 60_000, 'localhost');   // vite preview listens on localhost, which can be ::1 only
