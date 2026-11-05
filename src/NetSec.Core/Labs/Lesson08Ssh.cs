@@ -64,7 +64,7 @@ namespace NetSec.Labs
             listener.Close();
 
             ITamperHook plan = LabPair.Plan(c);
-            int deadline = c.Gate is FreeRunGate ? LabPair.DeadlineMs : 0;
+            int deadline = c.DeadlineMs > 0 ? c.DeadlineMs : LabPair.DeadlineMs;
             EchoTarget target = new EchoTarget();
             GlassSshSession server = new GlassSshSession(
                 SshEngine.Server(ServerOptions(c, suite, serverRandom), LabPair.Stream(c, "server", protocol), plan, "client"),
@@ -89,6 +89,8 @@ namespace NetSec.Labs
             yield return server.Finished;
             target.Close();
             outcome.Value = LabPair.Result(client.Finished.Result, server.Finished.Result);
+            // The server decides a tunnel and stays open, so only the client ends with an error. The catch belongs to the check that decided.
+            if (outcome.Value.FailedCode == SshCodes.TunnelRefused) outcome.Value.FailedCheck = SshChecks.TunnelAllowList;
         }
 
         static SshClientOptions ClientOptions(LabContext c, SshSuite suite, IRandomSource random)

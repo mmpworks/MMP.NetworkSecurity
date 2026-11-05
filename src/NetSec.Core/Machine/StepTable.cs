@@ -6,7 +6,7 @@ using NetSec.Trace;
 namespace NetSec.Machine
 {
     public enum StepOutcome { Advance, Stay, Fail }
-    public enum EffectKind { Absorb, Send, Secret, InstallKeys, Check, Deliver, Note, Measure, Store }
+    public enum EffectKind { Absorb, Send, Secret, InstallKeys, Check, Deliver, Note, Measure, Store, CheckFailed }
     public enum Direction { Inbound, Outbound }
 
     public sealed class InboundMessage
@@ -80,6 +80,10 @@ namespace NetSec.Machine
         public static StepEffect Measure(string message, string detail, byte[] plain) { return new StepEffect(EffectKind.Measure, message, detail, plain, null, null, null, null); }
         public static StepEffect InstallKeys(Direction d, string suite, byte[] key, byte[] iv) { return new StepEffect(EffectKind.InstallKeys, suite, null, key, iv, null, null, 0, d); }
         public static StepEffect Check(string name, string code) { return Make(EffectKind.Check, name, code, null); }
+
+        /// <summary>A check that failed while the session goes on, for a side that refuses one request and stays open. StepDecision.Fail ends the session.</summary>
+        public static StepEffect CheckFailed(string name, string code, string detail) { return Make(EffectKind.CheckFailed, name, code + "|" + detail, null); }
+
         public static StepEffect Deliver(int channel, byte[] plain) { return new StepEffect(EffectKind.Deliver, null, null, plain, null, null, null, channel, Direction.Inbound); }
         public static StepEffect Note(string type, string message) { return Make(EffectKind.Note, type, message, null); }
 
