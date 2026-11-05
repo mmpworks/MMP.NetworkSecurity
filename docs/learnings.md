@@ -36,7 +36,7 @@ Each correction goes here, newest slice last. Later slices read this file first.
 
 ## S2
 
-1. **`openssl genpkey -outform DER` on OpenSSL 3.5.7 wrote a traditional `RSAPrivateKey`, not PKCS#8.** CONTRACT rule 5 needs `PrivateKeyInfo`. Run `openssl pkcs8 -topk8 -nocrypt` after it. The net10 test `An_rsa_key_is_pkcs8_with_its_matching_spki` pins the format.
+1. **`openssl genpkey -outform DER` on OpenSSL 3.5.7 wrote a traditional `RSAPrivateKey`, not PKCS#8.** CONTRACT rule 5 needs `PrivateKeyInfo`. Run `openssl pkcs8 -topk8 -nocrypt` after it. `An_rsa_key_is_pkcs8_with_its_matching_spki` pins the format on both builds.
 2. **`TrainingKeySource.Find` throws `TRAINING_KEY_UNKNOWN` for an unknown id.** It never returns null. A symmetric key's `CopyPublic` gives an empty array.
 3. **`DukptPinPad.Next` uses a new counter on each call (CONTRACT.md).** The S5 `PinEnvelope` holds one KSN, a PIN block, and a MAC. So S5 needs both keys under one counter and must add a method to the pad that returns several working keys for one counter. The derivation already allows it: `DukptDerivation.Working` takes the usage per call.
 4. **Lesson 6 has no MAC on the wire, by the UX row.** A flipped PIN block must reach `PIN block format check`, and a MAC would catch it first. `DUKPT_MAC_MISMATCH` stays for S5.
@@ -45,6 +45,7 @@ Each correction goes here, newest slice last. Later slices read this file first.
 7. **`DUKPT_COUNTER_EXHAUSTED` has no test.** The pad would need about 2^31 sales to reach it.
 8. **`PumpTests.A_flipped_length_byte_...` raced.** Two 300 ms deadlines, so the client could close first, and the server then reported `PEER_CLOSED_EARLY`. It failed 1 of 2 gate runs. The server's deadline now comes first. A test with two deadlines must say which one ends first.
 9. **The lab's reader session holds no base key.** Only `BankSession` holds it, and a test scans the reader's trace for it. S5 keeps this shape across processes (D13).
+10. **A test under `#if NET` in `tests/NetSec.Tests` turns A9 red.** `A9.cf.same-suite-passes-on-net48-skips-pinned` compares the net10.0 and net48 test sets. PR #13 did this and blocked every lane. A BCL-only check goes in `tests/NetSec.Host.Tests`, which runs on net10.0 only. Run `pwsh acceptance/run.ps1 -Clauses A9` on every PR that adds a test.
 
 ## S3
 
