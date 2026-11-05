@@ -248,6 +248,9 @@ namespace NetSec.Bridge
         public ITrainingKeySource Keys;
         public IRandomSource Random;
 
+        /// <summary>The gateway's SSH suite. One gateway speaks one suite, so a CE on the other suite stops at SSH_NO_COMMON_ALG.</summary>
+        public SshSuite Suite;
+
         /// <summary>The gateway's hop 2 draws here, so the two hops cannot race for one stream. Null shares Random.</summary>
         public IRandomSource NextHopRandom;
         public ITraceSink Sink;
@@ -290,6 +293,7 @@ namespace NetSec.Bridge
             TransportRequest ssh = new TransportRequest();
             ssh.Protocol = WireProtocol.Ssh;
             ssh.Role = EngineRole.Server;
+            ssh.Suite = o.Suite;
             ssh.Link = ce;
             ssh.Random = o.Random;
             ssh.Sink = sink;
@@ -366,8 +370,14 @@ namespace NetSec.Bridge
         static IEnumerable<IFuture> ServerBody(IByteLink gateway, HopServerOptions o, int bankPort)
         {
             LateTraceSink late = o.TraceId == null ? new LateTraceSink(o.Sink) : null;
+            // With no bank to reach, the hop ends now. The gateway and the CE then see a closed peer, and neither waits for a deadline.
             IFuture<SocketLink> bank = SocketLink.Connect(new IPEndPoint(IPAddress.Loopback, bankPort));
-            yield return bank;
+            yield return Futures.Observe(bank);
+            if (bank.IsFaulted || bank.IsCanceled)
+            {
+                gateway.Close();
+                yield break;
+            }
 
             TransportRequest tls = new TransportRequest();
             tls.Protocol = WireProtocol.Tls13;

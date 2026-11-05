@@ -63,6 +63,12 @@
       "verdict": "accurate",
       "note": "Tours read at origin/fix/tour-6-format-check (PR 40). I reproduced the 2,000-try figure myself instead of taking the relayed number. Probe: a console program against NetSec.Core at origin/main (aff0619) builds a real PIN block for KSN counter 1, flips bytes in it 2,000 times, and calls DukptBank.OpenPinSale each time on one ledger. Output: 'forged tries=2000 ksnFreeAfterEach=2000 lastCode=DUKPT_PINBLOCK_FORMAT' then 'real sale code=null pin=1234'. So the format check refuses every forged block, never records the KSN, and has no try limit; the real sale still passes afterwards. Code: DukptBank.OpenPinSale records the KSN only when sale.Code is null. PR 35 body, table row 'A forged block burns a real sale's KSN' and advisory 3 ('The format check is not integrity') agree. CMAC half: BankHsmCore.Decide (src/NetSec.Core/Bridge/PinEnvelope.cs) derives the MAC key from the BDK and KSN and verifies the CMAC before it checks the ledger, so a block from someone without the key is refused before the format check. program-design.md section 6, PIN-pad row, names the PinEnvelope with a MAC. Limits: the word 'lesson 9' is a plan statement. Lesson 9 has no tour yet, and the bridge acceptance clauses that need the server role report NODE_ROLE_NOT_BUILT in PR 35. The code facts hold today; the end-to-end lesson does not exist yet. Suggest replacing the relayed 2,000 figure in the source line with the probe command and output, since the claim then rests on a run rather than a message.",
       "checkedAgainst": "src/NetSec.Core/Dukpt/DukptBank.cs, src/NetSec.Core/Bridge/PinEnvelope.cs at origin/main (read); throwaway probe run against NetSec.Core, 2,000 tries (run this session); PR 35 body (read); docs/program-design.md section 6 (read)"
+    },
+    {
+      "id": "L6-C11",
+      "verdict": "accurate",
+      "note": "Tours read at main 6e0c1e5 (PR 60 merged); lab run at main 6e0c1e5. Lesson06Dukpt.cs: LoadReader(DukptBank.DeriveInitialKey(bdk, InitialKeyId)) derives the key outside the reader and loads it; the reader session holds no BDK; lab run shows the same dukpt.initial value on bank and reader and no wire event carrying it.",
+      "checkedAgainst": "src/NetSec.Core/Labs/Lesson06Dukpt.cs (read); lab run, lesson 6"
     }
   ],
   "textRead": {
@@ -77,11 +83,13 @@
         "severity": "high",
         "wrong": "The reader holds a starting key of its own, made from the BDK and the reader's id. ... Each side derives it.",
         "right": "The reader holds a starting key of its own. In this lab the setup derives it from the BDK and the reader's id and loads it into the reader, like a key put in at a secure facility. The bank derives the same key. The key never crosses the wire.",
-        "evidence": "Lesson06Dukpt.cs: LoadReader(DukptBank.DeriveInitialKey(bdk, InitialKeyId)). Step S02 says the reader never gets a copy of the BDK, so the reader cannot derive it."
+        "evidence": "Lesson06Dukpt.cs: LoadReader(DukptBank.DeriveInitialKey(bdk, InitialKeyId)). Step S02 says the reader never gets a copy of the BDK, so the reader cannot derive it.",
+        "status": "fixed, re-read ok at 6e0c1e5"
       }
     ],
     "notes": [
       "L6-S11 says a seal over the whole envelope closes the gap 'in the bridge lab (lesson 9)'. Lesson 9 has no tour yet; the sentence is a plan statement until it does."
-    ]
+    ],
+    "problemsOpen": 0
   }
 }

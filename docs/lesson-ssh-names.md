@@ -99,7 +99,7 @@ Offsets index `wire`, as in the other lessons.
 | `host key shape` | `client` | `SSH_HOST_KEY_BAD` |
 | `x25519 result not zero` | both | `SSH_KEX_ZERO_SECRET` |
 | `exchange signature` | `client` | `SSH_EXCHANGE_SIGNATURE` |
-| `packet MAC` | receiver, with one passing event before each protected packet's `ssh.message.received` | `SSH_PACKET_MAC` |
+| `packet MAC` | receiver. One passing event per direction, before the first protected packet's `ssh.message.received`. The check runs on every packet, and later passes stay quiet | `SSH_PACKET_MAC` |
 | `packet length` | receiver | `SSH_PACKET_LENGTH` |
 | `userauth accepted` | `client` | `SSH_AUTH_REFUSED` |
 | `userauth signature verify` | `server` | `SSH_AUTH_REFUSED` |
@@ -140,4 +140,6 @@ Try-it actions are the same as `docs/lessons-1-3-names.md`. Use `run-attack` wit
 5. The lab's SSH server has a fixed table of two commands, `echo` and `whoami`. It starts no process.
 6. The name `Modern` means "newer than the legacy suite". The suite has no encrypt-then-MAC mode, and it is no claim of the best SSH can do.
 7. Terrapin (CVE-2023-48795) removes a packet from the start of the protected stream. Both rounds run strict KEX, because the glass client and server both offer it. A peer that does not offer it leaves strict KEX off, and `ssh.kex.strict` says `off`. These two suites still stop the prefix attack then, because the MAC covers the plain text and a deleted packet moves the cipher stream. Jared's sweep on the engine before strict KEX: 0 of 4,000 accepted on each suite. An injected `Ignore` can still kill such a session.
-8. A channel holds no more than its window of unread bytes. The window opens again only when the reader reads, so a stalled reader makes the sender wait.
+8. A channel holds no more than its window of unread bytes. The window opens again only when the reader reads, so a stalled reader makes the sender wait. That wait has a limit: a sender parked on the window looks silent, so the 30 s read deadline ends the whole session. The same deadline ends an idle tunnel.
+9. A ninth channel is refused by name, and the session and its other channels go on.
+10. **The old device path has a limit.** No peer without the strict KEX marker has run here, and nothing has run on CE. Steve's CE device is likely that kind of peer. This machine holds no such peer, and no download is allowed. Windows `ssh.exe` 9.5p2 and Go `x/crypto` v0.58.0 offer the marker, by the runs below. Git `ssh` 10.3p1 and PuTTY `plink` 0.80 are the other clients found. They are newer than the Terrapin fix by version, and neither ran here. Two things did run. Our own code with the marker off ran against our own code, on both suites. Against outside code, one side had the marker off and the outside peer offered it, so both ran the old rules: `ssh.exe` against our server, and our client against Go. So the old rules hold against outside code, and a real old peer stays unproved.

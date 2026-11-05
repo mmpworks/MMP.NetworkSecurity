@@ -54,7 +54,7 @@ export const ui = reactive({
   engine: 'idle' as 'idle' | 'running' | 'stepping' | 'waiting' | 'finished',
   shortcuts: false,
   follow: true,
-  inspectorTab: 'bytes' as 'bytes' | 'picture' | 'measures' | 'chain' | 'ladder' | 'hostkey',
+  inspectorTab: 'bytes' as 'bytes' | 'picture' | 'measures' | 'chain' | 'ladder' | 'hostkey' | 'token' | 'timing' | 'onion',
 })
 
 export const tour = reactive({
