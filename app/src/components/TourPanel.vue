@@ -49,7 +49,7 @@ const note = computed(() => (ui.lesson != null ? LESSON_NOTES[ui.lesson] ?? '' :
         <v-btn color="primary" variant="flat" :disabled="!unlock.open" data-testid="tour-next" @click="tourNext">{{ last ? "Finish" : "Next" }}</v-btn>
       </div>
       <AttackResult />
-      <div v-if="!unlock.open" class="next-reason" data-testid="next-reason">{{ unlock.reason }}</div>
+      <div class="next-reason" data-testid="next-reason">{{ unlock.open ? "" : unlock.reason }}</div>
     </div>
   </div>
 </template>
