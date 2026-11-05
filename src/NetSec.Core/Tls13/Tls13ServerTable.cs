@@ -2,6 +2,7 @@ using System.Collections.Generic;
 using NetSec.Bytes;
 using NetSec.Crypto;
 using NetSec.Machine;
+using NetSec.Pki;
 
 namespace NetSec.Tls13
 {
@@ -10,10 +11,21 @@ namespace NetSec.Tls13
     {
         public const string Start = "Start";
         const string WaitClientHello = "WaitClientHello", WaitClientFinished = "WaitClientFinished", Open = MachineStates.Open;
+        const string WaitClientCertificate = "WaitClientCertificate", WaitClientVerify = "WaitClientVerify";
 
         public static readonly StepTable<Tls13Session> Table = new StepTable<Tls13Session>(
             new StepRow<Tls13Session>("tls13.s.start", Start, InboundMessage.StartType, ServerStart, WaitClientHello),
             new StepRow<Tls13Session>("tls13.s.ch", WaitClientHello, HandshakeType.ClientHello, ClientHello, WaitClientFinished),
+            new StepRow<Tls13Session>("tls13.s.fin", WaitClientFinished, HandshakeType.Finished, ClientFinished, Open),
+            new StepRow<Tls13Session>("tls13.s.app", Open, HandshakeType.ApplicationData, Tls13Rules.OpenData, Open),
+            new StepRow<Tls13Session>("tls13.s.keyupdate", Open, HandshakeType.KeyUpdate, Tls13Rules.OpenKeyUpdate, Open));
+
+        /// <summary>The server that asks for a client certificate. A Finished with no Certificate before it has no row, so the machine refuses it.</summary>
+        public static readonly StepTable<Tls13Session> MutualTable = new StepTable<Tls13Session>(
+            new StepRow<Tls13Session>("tls13.s.start", Start, InboundMessage.StartType, ServerStart, WaitClientHello),
+            new StepRow<Tls13Session>("tls13.s.ch", WaitClientHello, HandshakeType.ClientHello, ClientHello, WaitClientCertificate),
+            new StepRow<Tls13Session>("tls13.s.ccert", WaitClientCertificate, HandshakeType.Certificate, ClientCertificate, WaitClientVerify),
+            new StepRow<Tls13Session>("tls13.s.cverify", WaitClientVerify, HandshakeType.CertificateVerify, ClientVerify, WaitClientFinished),
             new StepRow<Tls13Session>("tls13.s.fin", WaitClientFinished, HandshakeType.Finished, ClientFinished, Open),
             new StepRow<Tls13Session>("tls13.s.app", Open, HandshakeType.ApplicationData, Tls13Rules.OpenData, Open),
             new StepRow<Tls13Session>("tls13.s.keyupdate", Open, HandshakeType.KeyUpdate, Tls13Rules.OpenKeyUpdate, Open));
@@ -39,8 +51,9 @@ namespace NetSec.Tls13
             Tls13Secrets s = Tls13KeySchedule.Derive(suite.Hash, kex.Shared, helloHash, null);
 
             byte[] extensions = Tls13Messages.EncryptedExtensions();
+            byte[] request = o.RequireClientCertificate ? Tls13Messages.CertificateRequest() : new byte[0];
             byte[] certificate = Tls13Messages.CertificateMessage(o.CertificateChain);
-            transcript.Put(extensions).Put(certificate);
+            transcript.Put(extensions).Put(request).Put(certificate);
             byte[] signed = Tls13Messages.SignedContent(Tls13Messages.ServerVerifyContext, Tls13KeySchedule.HashOf(suite.Hash, transcript.ToArray()));
             byte[] verify = Tls13Messages.CertificateVerify(Ed25519.Sign(o.SigningSeed, signed));
             transcript.Put(verify);
@@ -58,20 +71,15 @@ namespace NetSec.Tls13
             effects.Add(Tls13Rules.KeepHandshakeSecrets(session, suite, kex.Shared, helloHash, s, hello.Random));
             effects.Add(Tls13Rules.Install(Direction.Outbound, suite, s.ServerHandshakeTrafficSecret, "handshake"));
             effects.Add(Tls13Rules.Install(Direction.Inbound, suite, s.ClientHandshakeTrafficSecret, "handshake"));
-            AddFlight(effects, "EncryptedExtensions", HandshakeType.EncryptedExtensions, extensions);
-            AddFlight(effects, "Certificate", HandshakeType.Certificate, certificate);
-            AddFlight(effects, "CertificateVerify", HandshakeType.CertificateVerify, verify);
-            AddFlight(effects, "Finished", HandshakeType.Finished, finished);
+            Tls13Rules.AddFlight(effects, "EncryptedExtensions", HandshakeType.EncryptedExtensions, extensions);
+            if (request.Length > 0) Tls13Rules.AddFlight(effects, "CertificateRequest", HandshakeType.CertificateRequest, request);
+            Tls13Rules.AddFlight(effects, "Certificate", HandshakeType.Certificate, certificate);
+            Tls13Rules.AddFlight(effects, "CertificateVerify", HandshakeType.CertificateVerify, verify);
+            Tls13Rules.AddFlight(effects, "Finished", HandshakeType.Finished, finished);
             Tls13Rules.AddApplicationLadder(effects, session, full);
             effects.Add(Tls13Rules.KeepApplicationSecrets(session, full, hello.Random));
             effects.Add(Tls13Rules.Install(Direction.Outbound, suite, full.ServerApplicationTrafficSecret0, "application"));
             return StepDecision.Advance(effects.ToArray());
-        }
-
-        static void AddFlight(List<StepEffect> effects, string name, int type, byte[] message)
-        {
-            effects.Add(Effect.Send(name, message, Tls13Messages.FieldsOf(type, message, false)));
-            effects.Add(Effect.Absorb(message));
         }
 
         /// <summary>Null when the hello can go ahead. Each refusal names the first thing the two sides do not share.</summary>
@@ -94,6 +102,38 @@ namespace NetSec.Tls13
                 if (suite != null) return suite;
             }
             return null;
+        }
+
+        /// <summary>
+        /// RFC 8446 section 4.4.2.4: a server may abort on an empty list with certificate_required, and section 6.2 names bad_certificate for a corrupt
+        /// certificate. A chain nobody trusts or one out of date keeps its own alert. Each step of the chain check passes a named check for the learner.
+        /// </summary>
+        static StepDecision ClientCertificate(Tls13Session session, InboundMessage message)
+        {
+            CertificateInfo info = Tls13Messages.ReadCertificate(message.Bytes, false);
+            if (info.Chain.Length == 0) return Tls13Rules.Refuse(Tls13Codes.CertRequired, "the client answered the request with an empty certificate list");
+            Certificate[] chain = Tls13ClientTable.ParseAll(info.Chain);
+            Tls13Options o = session.Options;
+            ChainVerdict verdict = ChainCheck.RunForClient(chain, Tls13ClientTable.ParseAll(o.TrustAnchors), o.Now);
+            if (!verdict.Passed) return Tls13Rules.Refuse(ClientCodeOf(verdict.Code), verdict.Detail);
+            Certificate leaf = chain[0];
+            return StepDecision.Advance(
+                Effect.Absorb(message.Bytes),
+                Effect.Store(delegate { session.Leaf = leaf; }),
+                Tls13Rules.Pass(Tls13Codes.CertRequired),
+                Tls13Rules.Pass(ChainCheck.NoAnchor),
+                Tls13Rules.Pass(ChainCheck.Validity),
+                Tls13Rules.Pass(Tls13Codes.BadCertificate));
+        }
+
+        static string ClientCodeOf(string chainCode)
+        {
+            return chainCode == ChainCheck.BadSignature || chainCode == ChainCheck.NotForClients ? Tls13Codes.BadCertificate : chainCode;
+        }
+
+        static StepDecision ClientVerify(Tls13Session session, InboundMessage message)
+        {
+            return Tls13Rules.PeerSignature(session, message, Tls13Messages.ClientVerifyContext);
         }
 
         static StepDecision ClientFinished(Tls13Session session, InboundMessage message)

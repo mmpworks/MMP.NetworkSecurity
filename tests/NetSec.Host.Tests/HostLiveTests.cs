@@ -242,6 +242,8 @@ namespace NetSec.Host.Tests
             using Socket s = await Socket.Open(host);
             await s.Send("{\"type\":\"session.start\",\"requestId\":\"r1\",\"lesson\":99,\"mode\":\"run\"}");
             Assert.Equal("LESSON_NOT_BUILT", (await s.Until("error")).GetProperty("code").GetString());
+            await s.Send("{\"type\":\"session.start\",\"requestId\":\"r3\",\"lesson\":10,\"mode\":\"run\"}");
+            Assert.Equal("LESSON_NOT_BUILT", (await s.Until("error")).GetProperty("code").GetString());
             await s.Send("{\"type\":\"session.start\",\"requestId\":\"r2\",\"lesson\":0,\"mode\":\"run\",\"transport\":\"real\"}");
             Assert.Equal("REAL_MODE_NOT_BUILT", (await s.Until("error")).GetProperty("code").GetString());
         }

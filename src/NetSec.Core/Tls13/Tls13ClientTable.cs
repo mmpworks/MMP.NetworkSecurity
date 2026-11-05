@@ -104,7 +104,7 @@ namespace NetSec.Tls13
                 Tls13Rules.Pass(ChainCheck.Name));
         }
 
-        static Certificate[] ParseAll(byte[][] ders)
+        internal static Certificate[] ParseAll(byte[][] ders)
         {
             Certificate[] parsed = new Certificate[ders.Length];
             for (int i = 0; i < ders.Length; i++) parsed[i] = NetSec.Pki.Certificate.Parse(ders[i]);
@@ -113,12 +113,23 @@ namespace NetSec.Tls13
 
         static StepDecision CertificateVerify(Tls13Session session, InboundMessage message)
         {
-            CertificateVerifyInfo info = Tls13Messages.ReadCertificateVerify(message.Bytes, false);
-            byte[] signed = Tls13Messages.SignedContent(Tls13Messages.ServerVerifyContext, session.HashWith());
-            bool good = info.Scheme == Tls13Messages.Ed25519Scheme && session.Leaf.KeyIsEd25519 && info.Signature.Length == 64
-                && Ed25519.Verify(session.Leaf.PublicKey, signed, info.Signature);
-            if (!good) return Tls13Rules.Refuse(Tls13Codes.CertVerifyBad, "the signature over the transcript does not verify under the leaf key");
-            return StepDecision.Advance(Effect.Absorb(message.Bytes), Tls13Rules.Pass(Tls13Codes.CertVerifyBad));
+            return Tls13Rules.PeerSignature(session, message, Tls13Messages.ServerVerifyContext);
+        }
+
+        /// <summary>Nothing when nobody asked. RFC 8446 section 4.4.2 has a client with no certificate answer with an empty list.</summary>
+        static byte[] CertificateAnswer(Tls13Session session)
+        {
+            if (!session.ClientCertificateAsked) return new byte[0];
+            return Tls13Messages.CertificateMessage(session.Options.CertificateChain ?? new byte[0][]);
+        }
+
+        /// <summary>Only a client that sent a certificate signs. The signature covers the transcript through that certificate.</summary>
+        static byte[] KeyProof(Tls13Session session, byte[] serverFinished, byte[] certificate)
+        {
+            Tls13Options o = session.Options;
+            if (!session.ClientCertificateAsked || o.CertificateChain == null || o.CertificateChain.Length == 0) return new byte[0];
+            byte[] signed = Tls13Messages.SignedContent(Tls13Messages.ClientVerifyContext, session.HashWith(serverFinished, certificate));
+            return Tls13Messages.CertificateVerify(Ed25519.Sign(o.SigningSeed, signed));
         }
 
         static StepDecision Finished(Tls13Session session, InboundMessage message)
@@ -129,8 +140,9 @@ namespace NetSec.Tls13
 
             byte[] serverFinishedHash = session.HashWith(message.Bytes);
             Tls13Secrets s = Tls13KeySchedule.Derive(suite.Hash, session.Shared, session.HelloHash, serverFinishedHash);
-            byte[] emptyCertificate = session.ClientCertificateAsked ? Tls13Messages.CertificateMessage(new byte[0][]) : new byte[0];
-            byte[] clientVerify = Tls13KeySchedule.VerifyData(suite.Hash, s.ClientHandshakeTrafficSecret, session.HashWith(message.Bytes, emptyCertificate));
+            byte[] certificate = CertificateAnswer(session);
+            byte[] proof = KeyProof(session, message.Bytes, certificate);
+            byte[] clientVerify = Tls13KeySchedule.VerifyData(suite.Hash, s.ClientHandshakeTrafficSecret, session.HashWith(message.Bytes, certificate, proof));
             byte[] finished = Tls13Messages.Finished(clientVerify);
 
             List<StepEffect> effects = new List<StepEffect>();
@@ -138,13 +150,9 @@ namespace NetSec.Tls13
             effects.Add(Tls13Rules.Pass(Tls13Codes.FinishedMismatch));
             Tls13Rules.AddApplicationLadder(effects, session, s);
             effects.Add(Tls13Rules.KeepApplicationSecrets(session, s, session.ClientRandom));
-            if (session.ClientCertificateAsked)
-            {
-                effects.Add(Effect.Send("Certificate", emptyCertificate, Tls13Messages.FieldsOf(HandshakeType.Certificate, emptyCertificate, false)));
-                effects.Add(Effect.Absorb(emptyCertificate));
-            }
-            effects.Add(Effect.Send("Finished", finished, Tls13Messages.FieldsOf(HandshakeType.Finished, finished, false)));
-            effects.Add(Effect.Absorb(finished));
+            if (certificate.Length > 0) Tls13Rules.AddFlight(effects, "Certificate", HandshakeType.Certificate, certificate);
+            if (proof.Length > 0) Tls13Rules.AddFlight(effects, "CertificateVerify", HandshakeType.CertificateVerify, proof);
+            Tls13Rules.AddFlight(effects, "Finished", HandshakeType.Finished, finished);
             effects.Add(Tls13Rules.Install(Direction.Inbound, suite, s.ServerApplicationTrafficSecret0, "application"));
             effects.Add(Tls13Rules.Install(Direction.Outbound, suite, s.ClientApplicationTrafficSecret0, "application"));
             return StepDecision.Advance(effects.ToArray());
