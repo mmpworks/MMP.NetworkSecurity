@@ -383,7 +383,8 @@ namespace NetSec.Tests
             foreach (TraceEvent e in events.Where(e => e.Type == "wire.sent"))
                 foreach (TraceField f in e.Fields)
                     Assert.True(f.Offset + f.Length <= e.Wire.Length, e.Message + " " + f.Name);
-            TraceEvent data = events.First(e => e.Type == "wire.sent" && e.Message == "ApplicationData");
+            // The race runs both versions, so which one sends first changes between runs. This test reads the TLS 1.1 record.
+            TraceEvent data = events.First(e => e.Type == "wire.sent" && e.Message == "ApplicationData" && e.StreamId.Contains("/tls11"));
             Assert.False(data.Fields.Single(f => f.Name == "cipher").VisibleToWire);
             Assert.True(data.Fields.Single(f => f.Name == "iv").VisibleToWire);
             Assert.Equal(data.Wire.Length, data.Fields.Sum(f => f.Length));
