@@ -81,9 +81,12 @@ function Invoke-Tool {
     param([string]$Exe, [string[]]$ToolArgs, [string]$Dir = $null, [int]$TimeoutSec = 1800)
     $stdout = Join-Path $work ("tool-" + [guid]::NewGuid().ToString('N') + ".out")
     $stderr = $stdout + '.err'
+    if ($Exe -eq 'dotnet' -and $ToolArgs.Count -gt 0 -and $ToolArgs[0] -eq 'build') { $ToolArgs = @($ToolArgs) + @('-nodeReuse:false', '-p:UseSharedCompilation=false') }   # a private build, so a stuck shared build server of another session cannot hang this run
+    if ($Exe -in 'npm', 'npx') { $Exe = $Exe + '.cmd' }      # the extensionless npm and npx are shell scripts, not Win32 programs
     $psi = @{ FilePath = $Exe; ArgumentList = $ToolArgs; NoNewWindow = $true; PassThru = $true; RedirectStandardOutput = $stdout; RedirectStandardError = $stderr }
     if ($Dir) { $psi.WorkingDirectory = $Dir }
-    $p = Start-Process @psi
+    try { $p = Start-Process @psi }
+    catch { return [pscustomobject]@{ ExitCode = -998; Output = "TOOL_MISSING: $Exe could not start: $($_.Exception.Message)" } }
     if (-not $p.WaitForExit($TimeoutSec * 1000)) {
         & taskkill /T /F /PID $p.Id *> $null
         return [pscustomobject]@{ ExitCode = -999; Output = "timeout after $TimeoutSec s`n" + (Get-Content $stdout -Raw -ErrorAction SilentlyContinue) }
@@ -362,18 +365,23 @@ if ($e2eMine.Count -gt 0) {
     if ($reasonMissing) {
         Set-All $e2eMine 'NOT RUN' 'PRODUCT_MISSING' $reasonMissing
     } else {
+      try {
         $app = Join-Path $ProductRoot 'app'
-        if (-not (Test-Path (Join-Path $app 'node_modules')) -or $FreshChild) { $null = Invoke-Tool 'npm' @('ci', '--no-audit', '--no-fund') $app -TimeoutSec 1200 }
-        $bld = Invoke-Tool 'npm' @('run', 'build') $app -TimeoutSec 1200
-        if (-not (Test-Path (Join-Path $e2e 'node_modules'))) { $null = Invoke-Tool 'npm' @('ci', '--no-audit', '--no-fund') $e2e -TimeoutSec 1200 }
+        $toolRuns = @()
+        if (-not (Test-Path (Join-Path $app 'node_modules')) -or $FreshChild) { $toolRuns += Invoke-Tool 'npm' @('ci', '--no-audit', '--no-fund') $app -TimeoutSec 1200 }
+        $toolRuns += Invoke-Tool 'npm' @('run', 'build') $app -TimeoutSec 1200
+        if (-not (Test-Path (Join-Path $e2e 'node_modules'))) { $toolRuns += Invoke-Tool 'npm' @('ci', '--no-audit', '--no-fund') $e2e -TimeoutSec 1200 }
+        $missing = @($toolRuns | Where-Object { $_.ExitCode -eq -998 })
+        if ($missing.Count -gt 0) { Set-All $e2eMine 'NOT RUN' 'TOOL_MISSING' (Tail $missing[0].Output 300) } else {
         $env:ACC_ROOT = $ProductRoot; $env:ACC_HOST = $prep.host; $env:ACC_OUT = $out
-        $r = Invoke-Tool 'npx' @('playwright', 'test') $e2e -TimeoutSec 3000
+        $r = Invoke-Tool 'npx' @('playwright', 'test') $e2e -TimeoutSec 900
         $json = Join-Path $out 'playwright.json'
-        if (-not (Test-Path $json)) { Set-All $e2eMine 'FAIL' 'NO_RESULT' ("Playwright wrote no JSON report. " + (Tail $r.Output 400)) }
+        if ($r.ExitCode -eq -998) { Set-All $e2eMine 'NOT RUN' 'TOOL_MISSING' (Tail $r.Output 300) }
+        elseif (-not (Test-Path $json)) { Set-All $e2eMine 'FAIL' 'NO_RESULT' ("Playwright wrote no JSON report. " + (Tail $r.Output 400)) }
         else {
             $rep = Get-Content $json -Raw | ConvertFrom-Json
             $tests = [System.Collections.Generic.List[object]]::new()
-            function Walk-Suite($s) { foreach ($sp in @($s.specs)) { $tests.Add($sp) }; foreach ($c in @($s.suites)) { Walk-Suite $c } }
+            function Walk-Suite($s) { if ($s.PSObject.Properties["specs"]) { foreach ($sp in @($s.specs)) { $tests.Add($sp) } }; if ($s.PSObject.Properties["suites"]) { foreach ($c in @($s.suites)) { Walk-Suite $c } } }
             foreach ($s in @($rep.suites)) { Walk-Suite $s }
             foreach ($sp in $tests) {
                 $m = [regex]::Match($sp.title, '^\[(?<id>[^\]]+)\]')
@@ -382,7 +390,8 @@ if ($e2eMine.Count -gt 0) {
                 $t = @($sp.tests)[0]; $res = @($t.results)[0]
                 $err = if ($res.PSObject.Properties.Name -contains 'error' -and $res.error) { [string]$res.error.message } else { '' }
                 if ($t.status -eq 'skipped') {
-                    $ann = @($t.annotations | Where-Object { $_.type -eq 'notrun' } | ForEach-Object { $_.description })[0]
+                    $annProp = $t.PSObject.Properties["annotations"]; $annList = if ($annProp) { @($annProp.Value) } else { @() }
+                    $ann = @($annList | Where-Object { $_.type -eq "notrun" } | ForEach-Object { $_.description })[0]
                     $rs, $dt = (($ann ?? 'SKIPPED: skipped by the spec') -split ':', 2)
                     Set-Result $id 'NOT RUN' $rs.Trim() ($dt ?? '').Trim()
                 } elseif ($res.status -eq 'passed') { Set-Result $id 'PASS' '' 'Playwright test passed' }
@@ -391,6 +400,8 @@ if ($e2eMine.Count -gt 0) {
             }
             Set-All $e2eMine 'FAIL' 'NO_RESULT' 'Playwright did not report this test'
         }
+        }
+      } catch { Set-All $e2eMine 'FAIL' 'RUNNER_ERROR' ("the e2e step stopped: " + $_.Exception.Message) }
     }
 }
 
@@ -423,6 +434,12 @@ foreach ($c in @($pending | Where-Object { $_.group -eq 'driver' -and -not $resu
         'SELF.clauses-json-matches-code' {
             $r = Invoke-Tool 'python' @('-I', (Join-Path $acc 'tools\gen_clauses.py'), '--check') -TimeoutSec 120
             Set-Result $c.id $(if ($r.ExitCode -eq 0) { 'PASS' } else { 'FAIL' }) $(if ($r.ExitCode -eq 0) { '' } else { 'DRIFT' }) (Tail $r.Output 400)
+        }
+        'SELF.tool-cannot-start-still-reports' {
+            $r = Invoke-Tool 'acceptance-no-such-tool' @('x') -TimeoutSec 30
+            $np = Get-Command npm.cmd -ErrorAction SilentlyContinue
+            if ($r.ExitCode -eq -998 -and $r.Output -match '^TOOL_MISSING' -and $np) { Set-Result $c.id 'PASS' '' "a tool that cannot start gives TOOL_MISSING and the run goes on; npm.cmd resolves to $($np.Source)" }
+            else { Set-Result $c.id 'FAIL' 'ASSERTION' ("exit $($r.ExitCode), output '$((Tail $r.Output 120))', npm.cmd found: $([bool]$np)") }
         }
         'SELF.vectors-python' {
             $r = Invoke-Tool 'python' @('-I', (Join-Path $acc 'vectors\tools\selfcheck_vectors.py'), (Join-Path $acc 'vectors')) -TimeoutSec 300

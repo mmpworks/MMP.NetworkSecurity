@@ -3,34 +3,26 @@
  "lessons": [
   {
    "lesson": 0,
-   "tour": false,
+   "tour": true,
    "acceptance": {
     "schema": 1,
-    "timestamp": "2026-11-05T04:23:58.8143233-06:00",
+    "timestamp": "2026-11-05T05:27:24.8544674-06:00",
     "machine": "BEAST",
-    "command": "run.ps1 -Clauses All",
-    "productRoot": "C:\\Users\\smuch\\AppData\\Local\\Temp\\claude\\E--dev-Herald\\cb141024-1785-4e15-96bb-23f4155ffdf2\\scratchpad\\fresh",
-    "productCommit": "4518660",
-    "acceptanceCommit": "18ca011",
+    "command": "run.ps1 -Clauses A4,A5,A6,A10a",
+    "productRoot": "E:\\dev\\ns-s3",
+    "productCommit": "112a2a6",
+    "acceptanceCommit": "a85c872",
     "freshClone": false,
     "productPresent": true,
     "M": 202,
-    "selected": 202,
-    "pass": 8,
-    "fail": 1,
-    "notRun": 193,
+    "selected": 47,
+    "pass": 44,
+    "fail": 0,
+    "notRun": 3,
     "reasons": [
      {
-      "key": "FAIL ASSERTION",
-      "count": 1
-     },
-     {
-      "key": "NOT RUN NOT_A_FRESH_RUN",
-      "count": 1
-     },
-     {
       "key": "NOT RUN PRODUCT_MISSING",
-      "count": 192
+      "count": 3
      }
     ],
     "selfChecks": {
@@ -43,34 +35,26 @@
   },
   {
    "lesson": 1,
-   "tour": false,
+   "tour": true,
    "acceptance": {
     "schema": 1,
-    "timestamp": "2026-11-05T04:23:58.8143233-06:00",
+    "timestamp": "2026-11-05T05:27:24.8544674-06:00",
     "machine": "BEAST",
-    "command": "run.ps1 -Clauses All",
-    "productRoot": "C:\\Users\\smuch\\AppData\\Local\\Temp\\claude\\E--dev-Herald\\cb141024-1785-4e15-96bb-23f4155ffdf2\\scratchpad\\fresh",
-    "productCommit": "4518660",
-    "acceptanceCommit": "18ca011",
+    "command": "run.ps1 -Clauses A4,A5,A6,A10a",
+    "productRoot": "E:\\dev\\ns-s3",
+    "productCommit": "112a2a6",
+    "acceptanceCommit": "a85c872",
     "freshClone": false,
     "productPresent": true,
     "M": 202,
-    "selected": 202,
-    "pass": 8,
-    "fail": 1,
-    "notRun": 193,
+    "selected": 47,
+    "pass": 44,
+    "fail": 0,
+    "notRun": 3,
     "reasons": [
      {
-      "key": "FAIL ASSERTION",
-      "count": 1
-     },
-     {
-      "key": "NOT RUN NOT_A_FRESH_RUN",
-      "count": 1
-     },
-     {
       "key": "NOT RUN PRODUCT_MISSING",
-      "count": 192
+      "count": 3
      }
     ],
     "selfChecks": {
@@ -83,34 +67,26 @@
   },
   {
    "lesson": 2,
-   "tour": false,
+   "tour": true,
    "acceptance": {
     "schema": 1,
-    "timestamp": "2026-11-05T04:23:58.8143233-06:00",
+    "timestamp": "2026-11-05T05:27:24.8544674-06:00",
     "machine": "BEAST",
-    "command": "run.ps1 -Clauses All",
-    "productRoot": "C:\\Users\\smuch\\AppData\\Local\\Temp\\claude\\E--dev-Herald\\cb141024-1785-4e15-96bb-23f4155ffdf2\\scratchpad\\fresh",
-    "productCommit": "4518660",
-    "acceptanceCommit": "18ca011",
+    "command": "run.ps1 -Clauses A4,A5,A6,A10a",
+    "productRoot": "E:\\dev\\ns-s3",
+    "productCommit": "112a2a6",
+    "acceptanceCommit": "a85c872",
     "freshClone": false,
     "productPresent": true,
     "M": 202,
-    "selected": 202,
-    "pass": 8,
-    "fail": 1,
-    "notRun": 193,
+    "selected": 47,
+    "pass": 44,
+    "fail": 0,
+    "notRun": 3,
     "reasons": [
      {
-      "key": "FAIL ASSERTION",
-      "count": 1
-     },
-     {
-      "key": "NOT RUN NOT_A_FRESH_RUN",
-      "count": 1
-     },
-     {
       "key": "NOT RUN PRODUCT_MISSING",
-      "count": 192
+      "count": 3
      }
     ],
     "selfChecks": {
@@ -123,34 +99,26 @@
   },
   {
    "lesson": 3,
-   "tour": false,
+   "tour": true,
    "acceptance": {
     "schema": 1,
-    "timestamp": "2026-11-05T04:23:58.8143233-06:00",
+    "timestamp": "2026-11-05T05:27:24.8544674-06:00",
     "machine": "BEAST",
-    "command": "run.ps1 -Clauses All",
-    "productRoot": "C:\\Users\\smuch\\AppData\\Local\\Temp\\claude\\E--dev-Herald\\cb141024-1785-4e15-96bb-23f4155ffdf2\\scratchpad\\fresh",
-    "productCommit": "4518660",
-    "acceptanceCommit": "18ca011",
+    "command": "run.ps1 -Clauses A4,A5,A6,A10a",
+    "productRoot": "E:\\dev\\ns-s3",
+    "productCommit": "112a2a6",
+    "acceptanceCommit": "a85c872",
     "freshClone": false,
     "productPresent": true,
     "M": 202,
-    "selected": 202,
-    "pass": 8,
-    "fail": 1,
-    "notRun": 193,
+    "selected": 47,
+    "pass": 44,
+    "fail": 0,
+    "notRun": 3,
     "reasons": [
      {
-      "key": "FAIL ASSERTION",
-      "count": 1
-     },
-     {
-      "key": "NOT RUN NOT_A_FRESH_RUN",
-      "count": 1
-     },
-     {
       "key": "NOT RUN PRODUCT_MISSING",
-      "count": 192
+      "count": 3
      }
     ],
     "selfChecks": {
@@ -166,31 +134,23 @@
    "tour": false,
    "acceptance": {
     "schema": 1,
-    "timestamp": "2026-11-05T04:23:58.8143233-06:00",
+    "timestamp": "2026-11-05T05:27:24.8544674-06:00",
     "machine": "BEAST",
-    "command": "run.ps1 -Clauses All",
-    "productRoot": "C:\\Users\\smuch\\AppData\\Local\\Temp\\claude\\E--dev-Herald\\cb141024-1785-4e15-96bb-23f4155ffdf2\\scratchpad\\fresh",
-    "productCommit": "4518660",
-    "acceptanceCommit": "18ca011",
+    "command": "run.ps1 -Clauses A4,A5,A6,A10a",
+    "productRoot": "E:\\dev\\ns-s3",
+    "productCommit": "112a2a6",
+    "acceptanceCommit": "a85c872",
     "freshClone": false,
     "productPresent": true,
     "M": 202,
-    "selected": 202,
-    "pass": 8,
-    "fail": 1,
-    "notRun": 193,
+    "selected": 47,
+    "pass": 44,
+    "fail": 0,
+    "notRun": 3,
     "reasons": [
      {
-      "key": "FAIL ASSERTION",
-      "count": 1
-     },
-     {
-      "key": "NOT RUN NOT_A_FRESH_RUN",
-      "count": 1
-     },
-     {
       "key": "NOT RUN PRODUCT_MISSING",
-      "count": 192
+      "count": 3
      }
     ],
     "selfChecks": {
@@ -206,31 +166,23 @@
    "tour": false,
    "acceptance": {
     "schema": 1,
-    "timestamp": "2026-11-05T04:23:58.8143233-06:00",
+    "timestamp": "2026-11-05T05:27:24.8544674-06:00",
     "machine": "BEAST",
-    "command": "run.ps1 -Clauses All",
-    "productRoot": "C:\\Users\\smuch\\AppData\\Local\\Temp\\claude\\E--dev-Herald\\cb141024-1785-4e15-96bb-23f4155ffdf2\\scratchpad\\fresh",
-    "productCommit": "4518660",
-    "acceptanceCommit": "18ca011",
+    "command": "run.ps1 -Clauses A4,A5,A6,A10a",
+    "productRoot": "E:\\dev\\ns-s3",
+    "productCommit": "112a2a6",
+    "acceptanceCommit": "a85c872",
     "freshClone": false,
     "productPresent": true,
     "M": 202,
-    "selected": 202,
-    "pass": 8,
-    "fail": 1,
-    "notRun": 193,
+    "selected": 47,
+    "pass": 44,
+    "fail": 0,
+    "notRun": 3,
     "reasons": [
      {
-      "key": "FAIL ASSERTION",
-      "count": 1
-     },
-     {
-      "key": "NOT RUN NOT_A_FRESH_RUN",
-      "count": 1
-     },
-     {
       "key": "NOT RUN PRODUCT_MISSING",
-      "count": 192
+      "count": 3
      }
     ],
     "selfChecks": {
@@ -246,31 +198,23 @@
    "tour": false,
    "acceptance": {
     "schema": 1,
-    "timestamp": "2026-11-05T04:23:58.8143233-06:00",
+    "timestamp": "2026-11-05T05:27:24.8544674-06:00",
     "machine": "BEAST",
-    "command": "run.ps1 -Clauses All",
-    "productRoot": "C:\\Users\\smuch\\AppData\\Local\\Temp\\claude\\E--dev-Herald\\cb141024-1785-4e15-96bb-23f4155ffdf2\\scratchpad\\fresh",
-    "productCommit": "4518660",
-    "acceptanceCommit": "18ca011",
+    "command": "run.ps1 -Clauses A4,A5,A6,A10a",
+    "productRoot": "E:\\dev\\ns-s3",
+    "productCommit": "112a2a6",
+    "acceptanceCommit": "a85c872",
     "freshClone": false,
     "productPresent": true,
     "M": 202,
-    "selected": 202,
-    "pass": 8,
-    "fail": 1,
-    "notRun": 193,
+    "selected": 47,
+    "pass": 44,
+    "fail": 0,
+    "notRun": 3,
     "reasons": [
      {
-      "key": "FAIL ASSERTION",
-      "count": 1
-     },
-     {
-      "key": "NOT RUN NOT_A_FRESH_RUN",
-      "count": 1
-     },
-     {
       "key": "NOT RUN PRODUCT_MISSING",
-      "count": 192
+      "count": 3
      }
     ],
     "selfChecks": {
@@ -286,31 +230,23 @@
    "tour": false,
    "acceptance": {
     "schema": 1,
-    "timestamp": "2026-11-05T04:23:58.8143233-06:00",
+    "timestamp": "2026-11-05T05:27:24.8544674-06:00",
     "machine": "BEAST",
-    "command": "run.ps1 -Clauses All",
-    "productRoot": "C:\\Users\\smuch\\AppData\\Local\\Temp\\claude\\E--dev-Herald\\cb141024-1785-4e15-96bb-23f4155ffdf2\\scratchpad\\fresh",
-    "productCommit": "4518660",
-    "acceptanceCommit": "18ca011",
+    "command": "run.ps1 -Clauses A4,A5,A6,A10a",
+    "productRoot": "E:\\dev\\ns-s3",
+    "productCommit": "112a2a6",
+    "acceptanceCommit": "a85c872",
     "freshClone": false,
     "productPresent": true,
     "M": 202,
-    "selected": 202,
-    "pass": 8,
-    "fail": 1,
-    "notRun": 193,
+    "selected": 47,
+    "pass": 44,
+    "fail": 0,
+    "notRun": 3,
     "reasons": [
      {
-      "key": "FAIL ASSERTION",
-      "count": 1
-     },
-     {
-      "key": "NOT RUN NOT_A_FRESH_RUN",
-      "count": 1
-     },
-     {
       "key": "NOT RUN PRODUCT_MISSING",
-      "count": 192
+      "count": 3
      }
     ],
     "selfChecks": {
@@ -326,31 +262,23 @@
    "tour": false,
    "acceptance": {
     "schema": 1,
-    "timestamp": "2026-11-05T04:23:58.8143233-06:00",
+    "timestamp": "2026-11-05T05:27:24.8544674-06:00",
     "machine": "BEAST",
-    "command": "run.ps1 -Clauses All",
-    "productRoot": "C:\\Users\\smuch\\AppData\\Local\\Temp\\claude\\E--dev-Herald\\cb141024-1785-4e15-96bb-23f4155ffdf2\\scratchpad\\fresh",
-    "productCommit": "4518660",
-    "acceptanceCommit": "18ca011",
+    "command": "run.ps1 -Clauses A4,A5,A6,A10a",
+    "productRoot": "E:\\dev\\ns-s3",
+    "productCommit": "112a2a6",
+    "acceptanceCommit": "a85c872",
     "freshClone": false,
     "productPresent": true,
     "M": 202,
-    "selected": 202,
-    "pass": 8,
-    "fail": 1,
-    "notRun": 193,
+    "selected": 47,
+    "pass": 44,
+    "fail": 0,
+    "notRun": 3,
     "reasons": [
      {
-      "key": "FAIL ASSERTION",
-      "count": 1
-     },
-     {
-      "key": "NOT RUN NOT_A_FRESH_RUN",
-      "count": 1
-     },
-     {
       "key": "NOT RUN PRODUCT_MISSING",
-      "count": 192
+      "count": 3
      }
     ],
     "selfChecks": {
@@ -366,31 +294,23 @@
    "tour": false,
    "acceptance": {
     "schema": 1,
-    "timestamp": "2026-11-05T04:23:58.8143233-06:00",
+    "timestamp": "2026-11-05T05:27:24.8544674-06:00",
     "machine": "BEAST",
-    "command": "run.ps1 -Clauses All",
-    "productRoot": "C:\\Users\\smuch\\AppData\\Local\\Temp\\claude\\E--dev-Herald\\cb141024-1785-4e15-96bb-23f4155ffdf2\\scratchpad\\fresh",
-    "productCommit": "4518660",
-    "acceptanceCommit": "18ca011",
+    "command": "run.ps1 -Clauses A4,A5,A6,A10a",
+    "productRoot": "E:\\dev\\ns-s3",
+    "productCommit": "112a2a6",
+    "acceptanceCommit": "a85c872",
     "freshClone": false,
     "productPresent": true,
     "M": 202,
-    "selected": 202,
-    "pass": 8,
-    "fail": 1,
-    "notRun": 193,
+    "selected": 47,
+    "pass": 44,
+    "fail": 0,
+    "notRun": 3,
     "reasons": [
      {
-      "key": "FAIL ASSERTION",
-      "count": 1
-     },
-     {
-      "key": "NOT RUN NOT_A_FRESH_RUN",
-      "count": 1
-     },
-     {
       "key": "NOT RUN PRODUCT_MISSING",
-      "count": 192
+      "count": 3
      }
     ],
     "selfChecks": {
@@ -406,31 +326,23 @@
    "tour": false,
    "acceptance": {
     "schema": 1,
-    "timestamp": "2026-11-05T04:23:58.8143233-06:00",
+    "timestamp": "2026-11-05T05:27:24.8544674-06:00",
     "machine": "BEAST",
-    "command": "run.ps1 -Clauses All",
-    "productRoot": "C:\\Users\\smuch\\AppData\\Local\\Temp\\claude\\E--dev-Herald\\cb141024-1785-4e15-96bb-23f4155ffdf2\\scratchpad\\fresh",
-    "productCommit": "4518660",
-    "acceptanceCommit": "18ca011",
+    "command": "run.ps1 -Clauses A4,A5,A6,A10a",
+    "productRoot": "E:\\dev\\ns-s3",
+    "productCommit": "112a2a6",
+    "acceptanceCommit": "a85c872",
     "freshClone": false,
     "productPresent": true,
     "M": 202,
-    "selected": 202,
-    "pass": 8,
-    "fail": 1,
-    "notRun": 193,
+    "selected": 47,
+    "pass": 44,
+    "fail": 0,
+    "notRun": 3,
     "reasons": [
      {
-      "key": "FAIL ASSERTION",
-      "count": 1
-     },
-     {
-      "key": "NOT RUN NOT_A_FRESH_RUN",
-      "count": 1
-     },
-     {
       "key": "NOT RUN PRODUCT_MISSING",
-      "count": 192
+      "count": 3
      }
     ],
     "selfChecks": {
@@ -446,31 +358,23 @@
    "tour": false,
    "acceptance": {
     "schema": 1,
-    "timestamp": "2026-11-05T04:23:58.8143233-06:00",
+    "timestamp": "2026-11-05T05:27:24.8544674-06:00",
     "machine": "BEAST",
-    "command": "run.ps1 -Clauses All",
-    "productRoot": "C:\\Users\\smuch\\AppData\\Local\\Temp\\claude\\E--dev-Herald\\cb141024-1785-4e15-96bb-23f4155ffdf2\\scratchpad\\fresh",
-    "productCommit": "4518660",
-    "acceptanceCommit": "18ca011",
+    "command": "run.ps1 -Clauses A4,A5,A6,A10a",
+    "productRoot": "E:\\dev\\ns-s3",
+    "productCommit": "112a2a6",
+    "acceptanceCommit": "a85c872",
     "freshClone": false,
     "productPresent": true,
     "M": 202,
-    "selected": 202,
-    "pass": 8,
-    "fail": 1,
-    "notRun": 193,
+    "selected": 47,
+    "pass": 44,
+    "fail": 0,
+    "notRun": 3,
     "reasons": [
      {
-      "key": "FAIL ASSERTION",
-      "count": 1
-     },
-     {
-      "key": "NOT RUN NOT_A_FRESH_RUN",
-      "count": 1
-     },
-     {
       "key": "NOT RUN PRODUCT_MISSING",
-      "count": 192
+      "count": 3
      }
     ],
     "selfChecks": {

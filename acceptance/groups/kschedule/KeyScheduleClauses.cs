@@ -9,7 +9,7 @@ namespace Acceptance
     /// Values: acceptance/vectors/tls13-rfc8448.nsv (every octet count checked against the RFC text).
     /// The engine route (feeding the RFC server flight to the glass client) is not used. The glass client sends its own
     /// ClientHello, which differs from the RFC's, so its transcript and secrets differ by design.
-    /// Limit: Derive takes no client Finished hash, so the resumption master secret is out of reach of this seam. The exporter secret is checked.
+    /// The resumption secrets need Tls13KeySchedule.Resume (ASSUMED, CONTRACT.md). Without it the exporter-and-resumption clause is NOT RUN DERIVE_LACKS_RESUMPTION.
     /// Traffic keys, IVs and Finished keys come from the secrets Derive returned, through HKDF-Expand-Label built here on the product's Hkdf and Hmac (A2 checks those).
     /// </summary>
     public static class KeyScheduleClauses
@@ -99,7 +99,13 @@ namespace Acceptance
         {
             VectorRecord r = Rfc(c);
             Same(r, Derived(r, r.Bytes("ecdhe_shared")), "exporter master secret", "exp_master");
-            return "exp master (the resumption master secret needs the client Finished hash, which Derive does not take)";
+            // The resumption secrets need the client Finished hash, which Derive does not take. Until the product offers
+            // Tls13KeySchedule.Resume (CONTRACT.md), this clause is NOT RUN with a named reason and never PASS.
+            byte[] resMaster, resumption;
+            KSubject.Resume(r.Bytes("master_secret"), r.Bytes("hash_to_client_finished"), r.Bytes("ticket_nonce"), out resMaster, out resumption);
+            Check.Bytes("resumption master secret", r.Bytes("res_master"), resMaster);
+            Check.Bytes("resumption secret", r.Bytes("resumption_secret"), resumption);
+            return "exp master, res master, resumption";
         }
 
         [Clause("A4.rfc8448.traffic-keys-and-ivs", PerBuild = true)]

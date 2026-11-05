@@ -50,7 +50,7 @@ namespace NetSec.Native
 {
     public enum CompareKind { Leaky, ConstantTime }                                                     // ASSUMED members
 
-    public sealed class TimingCase { public double[] TicksFirstByteDiff; }                              // shape not used by the suite
+    public sealed class TimingCase { }   // opaque to the suite: it is only passed to TimingJudge
 
     public sealed class TimingVerdict { public double LeakyT, ConstantT, Threshold; public bool Separated; }                                          // ASSUMED shape: Welch t of the two cases, and whether |t| passes the stated threshold
 
