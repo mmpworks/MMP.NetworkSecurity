@@ -85,11 +85,11 @@ namespace NetSec.Io
             string actor = r.Actor ?? (isClient ? "client" : "server");
             string peer = r.PeerActor ?? (isClient ? "server" : "client");
             string session = r.SessionId ?? r.TraceId ?? "glass";
-            TraceStream stream = new TraceStream(session + "/" + actor + "/ssh", session, r.TraceId, r.Hop, actor, new MonotonicClock());
+            TraceStream stream = new TraceStream(session + "/" + actor + "/ssh", session, r.TraceId, r.Hop, actor, r.Clock ?? new MonotonicClock());
             SshEngine engine = isClient
                 ? SshEngine.Client(Client(keys, r.Suite, r.Random, r.PeerName, r.PeerPort, r.KnownHosts, r.TrustFirstUse), stream, r.Tamper, peer)
                 : SshEngine.Server(Server(keys, r.Suite, r.Random, r.AllowTunnel), stream, r.Tamper, peer);
-            return new GlassSshSession(engine, r.Link, r.Sink, r.Gate, r.Tamper, ReadDeadlineMs, null, r.OpenTarget ?? SocketTarget);
+            return new GlassSshSession(engine, r.Link, r.Sink, r.Gate, r.Tamper, ReadDeadlineMs, r.Clock, r.OpenTarget ?? SocketTarget);
         }
 
         /// <summary>A socket to a target name. The server's allow list has already passed this target.</summary>

@@ -18,7 +18,7 @@ namespace Acceptance
     ///   2. lesson 11 as a whole, since its six event types (timing.lab.started, timing.samples, timing.managed, timing.verdict, timing.guess.finished, timing.failed)
     ///      hold Stopwatch samples and results that follow them, which leaves that lab nothing to compare. A12 still judges it;
     ///   3. the Host's "&lt;sessionId&gt;/keys" stream, which this in-process run never writes.
-    /// One field is masked, in lab 9 only: atMicros, because lab 9 does not take its time from the clock it is given (see Mask).
+    /// No field is masked: every lab takes its time from the clock it is given, so atMicros repeats.
     /// Files: acceptance/golden/&lt;build&gt;/lab-NN.ndjson. Record them with `pwsh acceptance/run.ps1 -Clauses A17.mock.golden-trace-equal -RecordGolden`, from a main
     /// that holds the step-gate fixes. The recorder runs each lab three times and refuses to write a lab whose three runs differ.
     /// </summary>
@@ -49,18 +49,9 @@ namespace Acceptance
             foreach (TraceEvent e in sink.Events) if (!e.StreamId.EndsWith("/wire")) kept.Add(e);
             kept.Sort(new ByStream());
             List<string> lines = new List<string>();
-            foreach (TraceEvent e in kept) lines.Add(Mask(lesson, TraceJson.ToLine(e)));
+            foreach (TraceEvent e in kept) lines.Add(TraceJson.ToLine(e));
             if (lines.Count == 0) throw new FailException("lab " + lesson + " wrote no engine events (completed " + result.Completed + ", " + result.FailedCode + ")");
             return lines.ToArray();
-        }
-
-        /// <summary>
-        /// Lab 9 stamps some of its events with a real clock and not with the clock in LabContext (found by this recorder: the same seed gives a different atMicros on a rerun).
-        /// Its atMicros is set to 0 before the lines are kept or compared. Every other lab keeps atMicros, which FixedClock holds steady.
-        /// </summary>
-        static string Mask(int lesson, string line)
-        {
-            return lesson == 9 ? System.Text.RegularExpressions.Regex.Replace(line, "\"atMicros\":\\d+", "\"atMicros\":0") : line;
         }
 
         static string FileOf(Ctx c, int lesson)
