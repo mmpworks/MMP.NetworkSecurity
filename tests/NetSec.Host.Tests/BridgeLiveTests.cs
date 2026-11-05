@@ -68,7 +68,8 @@ namespace NetSec.Host.Tests
 
             public void Dispose()
             {
-                if (!P.HasExited) P.Kill(entireProcessTree: true);
+                // Windows answers Access is denied when the process is already exiting. The wait below covers that case.
+                try { if (!P.HasExited) P.Kill(entireProcessTree: true); } catch (System.ComponentModel.Win32Exception) { }
                 P.WaitForExit(5000);
                 P.Dispose();
             }

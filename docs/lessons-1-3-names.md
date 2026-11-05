@@ -69,7 +69,7 @@ Order: `PlainHashSealed`, `KeyedHashSealed`, `HmacSealed`, `CmacSealed`, then `S
 | `L2-flip-hmac-tag` | Flips a seal bit in `HmacSealed` | `Rejected` | `SEAL_HMAC_MISMATCH` | `HMAC compare` |
 | `L2-flip-cmac-message` | Flips a message bit in `CmacSealed` | `Rejected` | `SEAL_CMAC_MISMATCH` | `CMAC compare` |
 | `L2-flip-cmac-tag` | Flips a seal bit in `CmacSealed` | `Rejected` | `SEAL_CMAC_MISMATCH` | `CMAC compare` |
-| `L2-extend-keyed-hash` | Appends text to `KeyedHashSealed` and forges the seal with no key | `Accepted` | none | The `keyed hash compare` check passes. That pass is the lesson |
+| `L2-extend-keyed-hash` | Appends text to `KeyedHashSealed` and forges the seal with no key | `NoCheck` | none | The `keyed hash compare` check passes. That pass is the lesson |
 | `L2-extend-hmac` | The same forgery against `HmacSealed` | `Rejected` | `SEAL_HMAC_MISMATCH` | `HMAC compare` |
 
 ## Lesson 3: Agreeing in public. Protocol `kex`. Lanes `client`, `server`
@@ -104,6 +104,5 @@ Every frame adds a 4-byte header: `type`, `length`.
 | `{ "type": "run-attack", "attackId": "<id>" }` | Any row above |
 | `expect` for `Rejected` | `{ "type": "check", "name": "<check name>", "result": "fail" }` |
 | `expect` for `NoCheck` | `{ "type": "attack-outcome", "outcome": "completed" }` |
-| `expect` for `Accepted` | `{ "type": "attack-outcome", "outcome": "completed" }` |
 | `set-view`, `select-event`, `toggle-field`, `press-run` | As in `ux-design.md` section 3.1 |
 | `flip-byte` | Works on any `wire.sent`, through `session.attack {atSeq, kind, offset, xor}` |
