@@ -103,7 +103,7 @@ const short = (h: string) => (h.length > 16 ? `${h.slice(0, 8)}...${h.slice(-8)}
         <v-btn color="primary" :disabled="vault.busy" data-testid="vault-audit-run" @click="showAudit">Show the audit list</v-btn>
         <v-btn :disabled="vault.busy" data-testid="vault-audit-check" @click="checkChain">Check the chain</v-btn>
       </div>
-      <p v-if="vault.chain" class="wiz-fact" data-testid="vault-audit-chain">
+      <p v-if="vault.chain" class="wiz-fact vault-chain" data-testid="vault-audit-chain">
         <code data-testid="vault-audit-chain-code">{{ vault.chain.code }}</code>
         <span v-if="vault.chain.firstBadSeq === 0">{{ words('wizard.vault.audit.whole') }}</span>
         <span v-else>Row {{ vault.chain.firstBadSeq }} {{ words('wizard.vault.audit.bad') }}</span>

@@ -20,6 +20,7 @@ async function contrast(page: Page, theme: string, screen: string) {
   await page.evaluate(() => Promise.all(document.getAnimations().filter(a => a.effect?.getComputedTiming().iterations !== Infinity).map(a => a.finished.catch(() => null))))
   await page.waitForTimeout(300)
   const s = await scanPage(page)
+  console.log(`${theme} ${screen}: ${s.checked} texts checked, ${s.fails.length} failed`)
   expect(s.fails.map(f => `${screen}: ${f.where} "${f.text}" ${f.ratio} (${f.fg} on ${f.bg})`), `${theme} ${screen}, ${s.checked} texts checked`).toEqual([])
 }
 
