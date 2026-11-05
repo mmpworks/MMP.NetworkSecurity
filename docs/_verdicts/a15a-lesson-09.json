@@ -7,7 +7,7 @@
     {
       "id": "L9-C01",
       "verdict": "accurate",
-      "note": "Tour read at origin/feat/tour-9 commit dd08db0 (PR 63, open); lab run at origin/feat/lesson-9 56dd320 (PR 71, open). Lab run: pin.block.locked plain is the envelope. PinEnvelope.cs: version, trace id, card number, KSN, locked PIN block, CMAC. The claim says what it carries and does not say 'only'. PinPadCore.InjectedInitialKey exists (line 83). The pad reads no base key (names doc item 4; test pinned there).",
+      "note": "Tour re-read at origin/feat/tour-9 commit 7ade295 (PR 63, open). Claim now reads 'a trace id, the card number and the KSN in the clear, the PIN block locked, and a 16-byte CMAC over every byte before it'. PinEnvelope.cs: version, traceId, pan, ksn, lockedPinBlock, mac (16 bytes); Covered is every byte before the MAC. Matches. Tour read at origin/feat/tour-9 commit dd08db0 (PR 63, open); lab run at origin/feat/lesson-9 56dd320 (PR 71, open). Lab run: pin.block.locked plain is the envelope. PinEnvelope.cs: version, trace id, card number, KSN, locked PIN block, CMAC. The claim says what it carries and does not say 'only'. PinPadCore.InjectedInitialKey exists (line 83). The pad reads no base key (names doc item 4; test pinned there).",
       "checkedAgainst": "src/NetSec.Core/Bridge/PinEnvelope.cs (read); lab run, lesson 9"
     },
     {
@@ -48,38 +48,42 @@
     }
   ],
   "textRead": {
-    "readAt": "tour PR 63 head dd08db0 against the lab at PR 71 head 56dd320",
+    "readAt": "tour PR 63 head 7ade295 against the lab at PR 71 head 56dd320",
     "method": "Every sentence read against the lab, run in-process (Lesson09Bridge, control plus the 3 attack rows L9-tamper-hop1, L9-tamper-hop2, L9-flip-pin-block). All 10 event binds hit in the control run. Statements about the UI picture (closed rectangle) were not run.",
     "stepsRead": 12,
     "stepsWithProblems": 3,
     "problemsFound": 3,
-    "problemsOpen": 3,
+    "problemsOpen": 0,
     "problems": [
       {
         "step": "L9-S02",
         "severity": "medium",
         "wrong": "The envelope holds three things: the card number and the {{term:ksn}} in the clear, and the locked PIN block.",
         "right": "The envelope holds five things: a trace id, the card number and the KSN in the clear, the locked PIN block, and a seal (a CMAC) over all of them.",
-        "evidence": "PinEnvelope.cs fields: version, traceId, pan, ksn, lockedPinBlock, mac. Step S07 already says the gateway sees the trace id, and S10 says the bank checks a seal on the whole envelope."
+        "evidence": "PinEnvelope.cs fields: version, traceId, pan, ksn, lockedPinBlock, mac. Step S07 already says the gateway sees the trace id, and S10 says the bank checks a seal on the whole envelope.",
+        "status": "fixed, re-read ok at 7ade295"
       },
       {
         "step": "L9-S01",
         "severity": "low",
         "wrong": "It passes through four hands: the PIN pad, the old device (the CE), the gateway, and the server. The bank checks it last.",
         "right": "It passes through five parts: the PIN pad, the old device (the CE), the gateway, the server, and the bank.",
-        "evidence": "Lesson 9 names doc: five processes (reader, ce, gateway, server, bank); S09 says the server hands the envelope to the bank."
+        "evidence": "Lesson 9 names doc: five processes (reader, ce, gateway, server, bank); S09 says the server hands the envelope to the bank.",
+        "status": "fixed, re-read ok at 7ade295"
       },
       {
         "step": "L9-S11",
         "severity": "low",
         "wrong": "The reply is one result byte and a code, with no seal on it.",
         "right": "The reply is one result byte and a code, with no end-to-end seal on it. It rides inside the sealed hops, but the CE cannot check where it came from.",
-        "evidence": "BankReply.Build has no MAC; the reply passes back through the SSH and TLS channels."
+        "evidence": "BankReply.Build has no MAC; the reply passes back through the SSH and TLS channels.",
+        "status": "fixed, re-read ok at 7ade295"
       }
     ],
     "notes": [
       "Every try-it behaves as written: L9-tamper-hop1 fails packet MAC at the gateway, L9-tamper-hop2 fails AEAD tag at the server, L9-flip-pin-block passes both hop checks and fails at the bank.",
-      "S06 says hop 2 uses the hybrid exchange from lesson 5: the gateway ClientHello is 1,316 bytes, the same as lesson 5."
+      "S06 says hop 2 uses the hybrid exchange from lesson 5: the gateway ClientHello is 1,316 bytes, the same as lesson 5.",
+      "Fixes read: S01 'five parts' with the bank; S02 'five things: a trace id, the card number, the KSN, the locked PIN block, and a seal (a CMAC over all the rest)'; S11 'no end-to-end seal ... rides inside the sealed hops, but the CE cannot check where it came from'. All three match PinEnvelope.cs and BankReply."
     ]
   }
 }

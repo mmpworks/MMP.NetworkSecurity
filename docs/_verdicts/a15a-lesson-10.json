@@ -133,7 +133,7 @@
     {
       "id": "L10-C22",
       "verdict": "accurate",
-      "note": "Tours read at origin/fix/tour-10-keys-and-names commit 61d3265 (PR 59, open); lab run at main 5440eeb (PR 69 merged). Lesson10Auth.cs: the certificate uses KeyIds.ClientTlsEd25519 (fixed); the login key is a seed drawn from the run seed. Lab run, device-key secret for seeds 1, 2, 3, 1: f5f2384c..., 9482cece..., c362923a..., f5f2384c...; so it differs per seed and repeats for the same seed. The claim says 'a different seed drawn for each run'; precise wording is 'drawn from the run's seed'. The call phase streams are auth-call, with no certificate event.",
+      "note": "Tour re-read at origin/fix/tour-10-keys-and-names commit cf7712c (PR 59, open). Claim now reads 'The login key is drawn from the run's seed (the same seed gives the same key)', which matches my runs (seeds 1, 2, 3 differ; seed 1 repeats). Tours read at origin/fix/tour-10-keys-and-names commit 61d3265 (PR 59, open); lab run at main 5440eeb (PR 69 merged). Lesson10Auth.cs: the certificate uses KeyIds.ClientTlsEd25519 (fixed); the login key is a seed drawn from the run seed. Lab run, device-key secret for seeds 1, 2, 3, 1: f5f2384c..., 9482cece..., c362923a..., f5f2384c...; so it differs per seed and repeats for the same seed. The claim says 'a different seed drawn for each run'; precise wording is 'drawn from the run's seed'. The call phase streams are auth-call, with no certificate event.",
       "checkedAgainst": "src/NetSec.Core/Labs/Lesson10Auth.cs (read); lab run on main 5440eeb"
     },
     {
@@ -174,7 +174,7 @@
     }
   ],
   "textRead": {
-    "readAt": "tour PR 59 head 61d3265 against the lab at main 5440eeb (21 steps)",
+    "readAt": "tour PR 59 head cf7712c against the lab at main 5440eeb (21 steps; text unchanged since 61d3265)",
     "method": "Every sentence of every step text read against the lab. The lab ran in-process (NetSec.Core: LabCatalog, Lesson10Auth, TimingAttackLab), once as a control and once for every try-it attack row; trace events, secrets, field lists and check names were compared with the words. Code was read where the trace did not show the fact. Statements about the UI (colours, panels) and about lesson 9 (not built) were not run.",
     "stepsRead": 21,
     "stepsWithProblems": 5,
