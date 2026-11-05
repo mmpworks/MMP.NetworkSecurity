@@ -1,6 +1,9 @@
 using System;
 using System.Collections.Generic;
+using System.Runtime.CompilerServices;
 using NetSec.Errors;
+
+[assembly: InternalsVisibleTo("NetSec.Tests")]
 
 namespace NetSec.Dukpt
 {
@@ -26,7 +29,7 @@ namespace NetSec.Dukpt
     {
         const int RegisterCount = 32;
 
-        /// <summary>The limit on 1 bits in a counter. It caps the bank's derivation work. Counters past it are skipped. The value 16 is recalled from X9.24-3, which is paid. The free vectors do not state it.</summary>
+        /// <summary>The limit on 1 bits in a counter this pad issues, which caps the bank's work for a reader built on this class. Counters past it are skipped. The bank itself derives for any KSN. The value 16 is recalled from X9.24-3, which is paid. The free vectors do not state it.</summary>
         const int MaxOneBits = 16;
 
         readonly byte[] _initialKeyId;
@@ -43,12 +46,43 @@ namespace NetSec.Dukpt
             FillRegistersBelow(RegisterCount, initialKey, 0);
         }
 
+        /// <summary>A pad part way through its life: one register, for the given counter. The end of the counter range takes about 2^31 sales to reach, so a test starts here.</summary>
+        internal DukptPinPad(byte[] derivationKey, byte[] initialKeyId, uint counter)
+        {
+            DukptDerivation.TypeOf(derivationKey);
+            DukptDerivation.RequireInitialKeyId(initialKeyId);
+            _initialKeyId = (byte[])initialKeyId.Clone();
+            int bit = LowestOneBit(counter);
+            _registers[bit] = (byte[])derivationKey.Clone();
+            _registerCounters[bit] = counter;
+            _nextCounter = counter;
+        }
+
         /// <summary>The counter value the next key request uses.</summary>
         public ulong NextCounter { get { return _nextCounter; } }
+
+        /// <summary>The number of key registers held now. It copies no key.</summary>
+        public int HeldCount
+        {
+            get
+            {
+                int held = 0;
+                for (int i = 0; i < RegisterCount; i++)
+                    if (_registers[i] != null) held++;
+                return held;
+            }
+        }
 
         /// <summary>Gives the working key for the next counter, then erases the derivation key it came from. Each call uses a new counter.</summary>
         public DukptUse Next(DukptKeyUsage u, DukptKeyType t)
         {
+            return NextTogether(new DukptKeyUsage[] { u }, t)[0];
+        }
+
+        /// <summary>Gives one working key per usage, all from the next counter, then erases the derivation key they came from. One sale needs a PIN key and a MAC key under one KSN.</summary>
+        public DukptUse[] NextTogether(DukptKeyUsage[] usages, DukptKeyType t)
+        {
+            if (usages == null) throw new ArgumentNullException("usages");
             if (_nextCounter > uint.MaxValue)
                 throw new NetSecException(NetSecError.Of(ErrorCodes.DukptCounterExhausted, "This reader has used every counter value. It must get a new initial key."));
 
@@ -56,15 +90,19 @@ namespace NetSec.Dukpt
             int lowestBit = LowestOneBit(counter);
             byte[] derivationKey = _registers[lowestBit];
 
-            DukptUse use = new DukptUse();
-            use.Ksn = DukptDerivation.Ksn(_initialKeyId, counter);
-            use.Key = DukptDerivation.Working(derivationKey, _initialKeyId, counter, u, t);
+            DukptUse[] uses = new DukptUse[usages.Length];
+            for (int i = 0; i < usages.Length; i++)
+            {
+                uses[i] = new DukptUse();
+                uses[i].Ksn = DukptDerivation.Ksn(_initialKeyId, counter);
+                uses[i].Key = DukptDerivation.Working(derivationKey, _initialKeyId, counter, usages[i], t);
+            }
 
             bool mayAddBit = OneBits(counter) < MaxOneBits;
             if (mayAddBit) FillRegistersBelow(lowestBit, derivationKey, counter);
             Erase(lowestBit);
             _nextCounter = counter + (mayAddBit ? 1UL : 1UL << lowestBit);
-            return use;
+            return uses;
         }
 
         /// <summary>Copies of every key register held now.</summary>

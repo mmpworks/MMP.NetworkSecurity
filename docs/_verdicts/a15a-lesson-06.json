@@ -1,0 +1,62 @@
+{
+  "reader": "reader-a15a",
+  "authors": [
+    "heather-s0-tour"
+  ],
+  "claims": [
+    {
+      "id": "L6-C01",
+      "verdict": "accurate",
+      "note": "Tours read at origin/feat/tours-6-11 (PR 18). Tier: secondary source. Overview bullets: 'each transaction will have a distinct key from all other transactions, except by coincidence' and 'if a present derived key is compromised, past and future keys ... remain uncompromised'. The article describes the TDEA variant; the lab uses AES DUKPT. The claim is generic, so it holds for both.",
+      "checkedAgainst": "Wikipedia, Derived unique key per transaction (secondary source, article source text fetched this session via the MediaWiki raw endpoint)"
+    },
+    {
+      "id": "L6-C02",
+      "verdict": "accurate",
+      "note": "Tours read at origin/feat/tours-6-11 (PR 18). Tier: secondary source. History section: 'all of the initialization keys of an entire family of devices are derived from a single key, the base derivation key (BDK). ... the recipient need only store the BDK.' Keys section names the BDK. Same TDEA-variant caveat as L6-C01.",
+      "checkedAgainst": "Wikipedia, Derived unique key per transaction (secondary source, article source text fetched this session via the MediaWiki raw endpoint)"
+    },
+    {
+      "id": "L6-C03",
+      "verdict": "accurate",
+      "note": "Tours read at origin/feat/tours-6-11 (PR 18). docs/lesson-6-names.md (feat/s2-dukpt), Facts the tour needs item 4: 'The bank keeps the base key and derives each key again from the KSN. It holds no per-reader key.' Event table: dukpt.bdk 'stays at the bank for the whole run'. D13 does not say this, but item 4 does.",
+      "checkedAgainst": "docs/lesson-6-names.md on origin/feat/s2-dukpt (read); docs/prd.md D13 (read)"
+    },
+    {
+      "id": "L6-C04",
+      "verdict": "accurate",
+      "note": "Tours read at origin/feat/tours-6-11 (PR 18). Names doc: 'ksn is 12 bytes: the 8-byte initial key id, then the 4-byte counter. pinBlock is 16 bytes.' Sale table: pinBlock visibleToWire false, other fields true. The code check builds the KSN with the counter in bytes 8 to 11 (DukptTests.cs).",
+      "checkedAgainst": "docs/lesson-6-names.md on origin/feat/s2-dukpt (read); tests/NetSec.Tests/DukptTests.cs (read)"
+    },
+    {
+      "id": "L6-C05",
+      "verdict": "accurate",
+      "note": "Tours read at origin/feat/tours-6-11 (PR 18). Tier: secondary source. Communication, Origination: the device 'Invalidates the key just used, and If necessary generates more future keys'. The claim says 'when needed', which matches 'if necessary'.",
+      "checkedAgainst": "Wikipedia, Derived unique key per transaction (secondary source, article source text fetched this session via the MediaWiki raw endpoint)"
+    },
+    {
+      "id": "L6-C06",
+      "verdict": "accurate",
+      "note": "Re-checked against tours at origin/feat/tours-6-11 commit 5b18067. Source now names 'Memory release'. That section reads 'it uses a memory-copying function to compact the reachable objects in memory'. Learn also says compaction happens only when a collection finds many unreachable objects; the tour text says the heap 'can keep copies', which fits.",
+      "checkedAgainst": "Microsoft Learn, Fundamentals of garbage collection, Memory release (fetched)"
+    },
+    {
+      "id": "L6-C07",
+      "verdict": "accurate",
+      "note": "Re-checked against tours at origin/feat/tours-6-11 commit 5b18067. Tier: secondary. Claim reworded to the Wikipedia Keys section: 'The BDK is usually stored inside a tamper-resistant security module (TRSM), or hardware security module (HSM).' The two tour sentences (S09, S13) now say 'usually', which matches. The X9.24-3 claim itself is gone, so the paid-standard gap no longer blocks.",
+      "checkedAgainst": "Wikipedia, Derived unique key per transaction, Keys section (article source fetched)"
+    },
+    {
+      "id": "L6-C08",
+      "verdict": "accurate",
+      "note": "Tours read at origin/feat/tours-6-11 (PR 18). tests/NetSec.Tests/DukptTests.cs on feat/s2-dukpt asserts 32 held keys at load and 31, 31, 30, 31 after sales 1 to 4. The names doc states the same run.",
+      "checkedAgainst": "tests/NetSec.Tests/DukptTests.cs, test The_register_count_follows_the_counter (read); docs/lesson-6-names.md (read)"
+    },
+    {
+      "id": "L6-C09",
+      "verdict": "accurate",
+      "note": "Tours read at origin/fix/tour-6-pin-digits (PR 32). lesson-6-names.md Facts item 1 (fix/dukpt-verdict) says 'The PIN digits also stay on the heap, because the code holds them in a string, which cannot be cleared.' Code: PinBlock.cs takes and returns the PIN as a .NET string (EncryptFormat4, TryDecryptFormat4) and DukptBank keeps 'public string Pin'. Microsoft Learn, String class, 'Immutability and the StringBuilder class': 'A String object is called immutable (read-only), because its value cannot be modified after it has been created.' Note: Learn states immutability, not 'cannot be cleared'. The second follows for normal code; unsafe code can overwrite string memory. Suggest 'cannot be cleared by normal code'. Step L6-S11 reword ('The bank gets no PIN digits from it') matches names doc line 19: a refused sale has an empty plain.",
+      "checkedAgainst": "docs/lesson-6-names.md on local branch fix/dukpt-verdict (read); src/NetSec.Core/Dukpt/PinBlock.cs, DukptBank.cs on fix/dukpt-verdict (read); Microsoft Learn String class (page fetched)"
+    }
+  ]
+}

@@ -1,0 +1,256 @@
+{
+  "steps": [
+    {
+      "id": "L10-S01",
+      "lesson": 10,
+      "title": "Who are you, and what may you do?",
+      "text": [
+        "In lesson 4 the server proved itself to the client. Now the client proves itself to the server. A server needs this, because it must know who is asking before it does anything.",
+        "Two questions follow. First, who are you? That is authentication. Second, what may you do? That is permission. A server that answers only the first lets every logged-in user do everything.",
+        "In a real system the messages in this lesson travel inside TLS. This lab has no TLS yet, so you can see the token on the wire. A real attacker could not see it.",
+        "Built to show the parts. Do not copy."
+      ],
+      "glossary": [],
+      "bind": { "kind": "concept" },
+      "highlight": ["diagram:lane=client", "diagram:lane=issuer", "diagram:lane=server"],
+      "unlock": { "mode": "ack" }
+    },
+    {
+      "id": "L10-S02",
+      "lesson": 10,
+      "title": "A key that stays on the device",
+      "text": [
+        "The client holds a device key. It is a pair: a private key that never leaves the device, and a public key that anyone may see.",
+        "The private key is the client's proof. Whoever can sign with it is the client. Find it in the secrets panel under the client lane."
+      ],
+      "glossary": [],
+      "bind": { "kind": "event", "eventType": "secret.derived", "match": { "actor": "client" } },
+      "highlight": ["secrets:row=client.auth.device-key"],
+      "unlock": { "mode": "event" }
+    },
+    {
+      "id": "L10-S03",
+      "lesson": 10,
+      "title": "Login starts with the public key",
+      "text": [
+        "To log in, the client sends the issuer its public key. The issuer is the part of the system that hands out tokens.",
+        "Nothing secret travels here. A public key is safe to share."
+      ],
+      "glossary": [],
+      "bind": { "kind": "event", "eventType": "wire.sent", "match": { "actor": "client", "message": "LoginRequest" } },
+      "highlight": ["inspector:field=devicePublicKey"],
+      "unlock": { "mode": "event" }
+    },
+    {
+      "id": "L10-S04",
+      "lesson": 10,
+      "title": "The issuer sets a challenge",
+      "text": [
+        "The issuer answers with a random challenge. It is a number used once.",
+        "The challenge makes the proof fresh. Without it, an attacker could record an old proof and send it again."
+      ],
+      "glossary": [],
+      "bind": { "kind": "event", "eventType": "wire.sent", "match": { "actor": "issuer", "message": "Challenge" } },
+      "highlight": ["inspector:field=challenge"],
+      "unlock": { "mode": "event" }
+    },
+    {
+      "id": "L10-S05",
+      "lesson": 10,
+      "title": "Sign the challenge",
+      "text": [
+        "The client signs the challenge with its private key and sends the signature back. The issuer checks it with the public key from step 3. A valid signature shows the client holds the private key.",
+        "This is a passkey-shaped challenge. Real passkeys work this way. It is not WebAuthn: this lab has no browser, no authenticator device, and none of the web checks WebAuthn adds.",
+        "Try it: send the same signed response a second time. The issuer has seen this challenge, so the check named challenge already used fails."
+      ],
+      "glossary": ["signature"],
+      "bind": { "kind": "event", "eventType": "wire.sent", "match": { "actor": "client", "message": "ChallengeResponse" } },
+      "highlight": ["inspector:field=signature", "check:name=challenge signature"],
+      "tryIt": {
+        "id": "L10-S05-T1",
+        "label": "Send the signed response a second time",
+        "action": { "type": "run-attack", "attackId": "L10-replay-challenge" },
+        "expect": { "type": "check", "name": "challenge already used", "result": "fail" }
+      },
+      "claims": [
+        {
+          "id": "L10-C01",
+          "text": "Web Authentication (WebAuthn) is an API for creating and using public key credentials scoped to a Relying Party, with authenticators and a user agent. This lab implements a challenge-and-signature shape only.",
+          "source": "W3C Web Authentication: An API for accessing Public Key Credentials Level 2, Abstract"
+        },
+        {
+          "id": "L10-C02",
+          "text": "In the lab the issuer rejects a second ChallengeResponse for the same challenge with code CHALLENGE_REPLAY.",
+          "source": "docs/lesson-10-names.md, Attacks, L10-replay-challenge (branch feat/s6)"
+        }
+      ],
+      "unlock": { "mode": "action", "ref": "L10-S05-T1" }
+    },
+    {
+      "id": "L10-S06",
+      "lesson": 10,
+      "title": "A token in three parts",
+      "text": [
+        "The issuer now hands the client a token. A token is a signed note that says who the client is and what it may do.",
+        "Look at the claims. Split the token at its two dots and you get a header, the claims, and a signature. The claims read in everyday words: a subject, a role of cashier, a capability to void a sale, and an expiry time.",
+        "The issuer signs the whole note. Anyone can read the claims, and nobody can change them without breaking the signature."
+      ],
+      "glossary": ["token"],
+      "bind": { "kind": "event", "eventType": "measure.result", "match": { "actor": "issuer", "message": "token claims" } },
+      "highlight": ["inspector:field=tokenClaims", "inspector:field=tokenSignature"],
+      "claims": [
+        {
+          "id": "L10-C03",
+          "text": "A JWT is a set of claims carried in a signed JWS. In the compact form its three parts (header, payload, signature) are joined by dots, and the exp claim sets an expiration time.",
+          "source": "RFC 7515, section 7.1 (JWS Compact Serialization); RFC 7519, section 4.1.4 (exp Claim)"
+        }
+      ],
+      "unlock": { "mode": "event" }
+    },
+    {
+      "id": "L10-S07",
+      "lesson": 10,
+      "title": "The server checks the token's signature",
+      "text": [
+        "The client now makes a call: ReadTotals. It sends the token along. The server checks the issuer's signature on the token before it trusts any claim in it.",
+        "Try it: change one byte of the claims. The signature no longer fits, and the check named token signature fails."
+      ],
+      "glossary": [],
+      "bind": { "kind": "event", "eventType": "check.result", "match": { "message": "token signature" } },
+      "highlight": ["check:name=token signature"],
+      "tryIt": {
+        "id": "L10-S07-T1",
+        "label": "Change one byte of the token claims",
+        "action": { "type": "run-attack", "attackId": "L10-change-token-claim" },
+        "expect": { "type": "check", "name": "token signature", "result": "fail" }
+      },
+      "unlock": { "mode": "action", "ref": "L10-S07-T1" }
+    },
+    {
+      "id": "L10-S08",
+      "lesson": 10,
+      "title": "A token ends",
+      "text": [
+        "A token carries an expiry time. The server refuses a token that has run out. The check is named token expiry.",
+        "Short lives limit the harm of a stolen token. A thief can use it only until it ends.",
+        "Try it: have the issuer write a token that has already expired. The check fails."
+      ],
+      "glossary": [],
+      "bind": { "kind": "event", "eventType": "check.result", "match": { "message": "token expiry" } },
+      "highlight": ["check:name=token expiry"],
+      "tryIt": {
+        "id": "L10-S08-T1",
+        "label": "Use an expired token",
+        "action": { "type": "run-attack", "attackId": "L10-expired-token" },
+        "expect": { "type": "check", "name": "token expiry", "result": "fail" }
+      },
+      "unlock": { "mode": "action", "ref": "L10-S08-T1" }
+    },
+    {
+      "id": "L10-S09",
+      "lesson": 10,
+      "title": "A stolen token is not enough",
+      "text": [
+        "Here is the weak spot. A token is just text. If a thief copies it, the server cannot tell the thief from the client.",
+        "So every call also carries a fresh proof. The proof is a short signed note made with the client's device key. It names the method, the address, a hash of the token, and a one-time id. This idea is called {{term:dpop}}.",
+        "Try it: use the token with a proof made by a different key. The proof binds the token to the client's key, so the check named proof binding fails."
+      ],
+      "glossary": ["dpop"],
+      "bind": { "kind": "event", "eventType": "measure.result", "match": { "actor": "client", "message": "proof claims" } },
+      "highlight": ["inspector:field=proofClaims", "check:name=proof binding"],
+      "tryIt": {
+        "id": "L10-S09-T1",
+        "label": "Use the token with another key's proof",
+        "action": { "type": "run-attack", "attackId": "L10-stolen-token" },
+        "expect": { "type": "check", "name": "proof binding", "result": "fail" }
+      },
+      "claims": [
+        {
+          "id": "L10-C04",
+          "text": "A DPoP proof is a JWT signed with a private key chosen by the client. It carries the public key in its header, and its claims include jti, htm (HTTP method), htu (target URI), iat (creation time), and, with an access token, ath (hash of the access token).",
+          "source": "RFC 9449, section 4.2 (DPoP Proof JWT Syntax)"
+        },
+        {
+          "id": "L10-C05",
+          "text": "DPoP is a mechanism for sender-constraining OAuth 2.0 tokens via a proof-of-possession mechanism on the application level. The lab applies the same idea to its own token, not to OAuth.",
+          "source": "RFC 9449, Abstract; docs/lesson-10-names.md, Check name table, proof binding row (branch feat/s6)"
+        }
+      ],
+      "unlock": { "mode": "action", "ref": "L10-S09-T1" }
+    },
+    {
+      "id": "L10-S10",
+      "lesson": 10,
+      "title": "Each proof works once",
+      "text": [
+        "A thief who records one call could send the same proof again. The server defends in two ways. It rejects proofs older than 60 seconds, which is the check named proof age. It also remembers each proof's one-time id.",
+        "Try it: send ReadTotals again with the same proof. The server has seen that id, so the check named jti already used fails."
+      ],
+      "glossary": [],
+      "bind": { "kind": "event", "eventType": "check.result", "match": { "message": "jti already used" } },
+      "highlight": ["check:name=jti already used", "check:name=proof age"],
+      "tryIt": {
+        "id": "L10-S10-T1",
+        "label": "Send the same proof twice",
+        "action": { "type": "run-attack", "attackId": "L10-replay-proof" },
+        "expect": { "type": "check", "name": "jti already used", "result": "fail" }
+      },
+      "claims": [
+        {
+          "id": "L10-C06",
+          "text": "Servers must accept DPoP proofs only for a limited time after creation, and can store each proof's jti for that window to decline repeated use. A single-use check may not always be feasible when servers share no state.",
+          "source": "RFC 9449, section 11.1 (DPoP Proof Replay)"
+        }
+      ],
+      "unlock": { "mode": "action", "ref": "L10-S10-T1" }
+    },
+    {
+      "id": "L10-S11",
+      "lesson": 10,
+      "title": "Who you are is not what you may do",
+      "text": [
+        "The server now knows who is calling. It still must decide whether this caller may do this action. That is the permission check.",
+        "A role is a job title. The role cashier may read totals. A capability is a single right. The capability void-sale lets the holder void a sale, and the token carries it by name.",
+        "Try it: call Refund. The token has the role cashier and the capability void-sale, but it has no refund capability. The check named permission check fails."
+      ],
+      "glossary": [],
+      "bind": { "kind": "event", "eventType": "check.result", "match": { "message": "permission check" } },
+      "highlight": ["check:name=permission check", "inspector:field=tokenClaims"],
+      "tryIt": {
+        "id": "L10-S11-T1",
+        "label": "Call Refund without the capability",
+        "action": { "type": "run-attack", "attackId": "L10-ungranted-capability" },
+        "expect": { "type": "check", "name": "permission check", "result": "fail" }
+      },
+      "claims": [
+        {
+          "id": "L10-C07",
+          "text": "In the lab, read-totals needs the role cashier or manager; void-sale and refund each need a capability of that name. The normal token holds roles [cashier] and cap [void-sale].",
+          "source": "docs/lesson-10-names.md, Roles and capabilities (branch feat/s6)"
+        }
+      ],
+      "unlock": { "mode": "action", "ref": "L10-S11-T1" }
+    },
+    {
+      "id": "L10-S12",
+      "lesson": 10,
+      "title": "Three ways a client proves itself",
+      "text": [
+        "You have now seen the main ways to prove who a client is: a certificate in TLS (mutual TLS), a signed challenge, and a token with a proof.",
+        "Mutual TLS works like the server side in lesson 4, with the client signing the handshake. This lab does not run mutual TLS yet.",
+        "Each way answers who you are. Permission is a separate step, and the server must make it on every call.",
+        "Built to show the parts. Do not copy."
+      ],
+      "glossary": [],
+      "bind": { "kind": "concept" },
+      "claims": [
+        {
+          "id": "L10-C08",
+          "text": "A TLS server may request a certificate from the client, and the client then sends a Certificate and a CertificateVerify.",
+          "source": "RFC 8446, section 4.3.2 (Certificate Request) and section 4.4.3 (Certificate Verify)"
+        }
+      ],
+      "unlock": { "mode": "ack" }
+    }
+  ]
+}

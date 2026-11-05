@@ -1,0 +1,38 @@
+{
+  "reader": "reader-a15a",
+  "authors": [
+    "heather-s0-tour"
+  ],
+  "claims": [
+    {
+      "id": "L4-C01",
+      "verdict": "accurate",
+      "note": "Tours read at origin/feat/tours-4-5-10 (PR 23, commit 1b2fc21). RFC 5280 section 3.2: 'certification paths, are required because a public key user is only initialized with a limited number of assured CA public keys'. The path runs from the end-entity certificate through CA certificates.",
+      "checkedAgainst": "RFC 5280 section 3.2 (RFC text fetched from rfc-editor.org this session)"
+    },
+    {
+      "id": "L4-C02",
+      "verdict": "accurate",
+      "note": "Tours read at origin/feat/tours-4-5-10 (PR 23, commit 1b2fc21). Section 4.1 TBSCertificate lists serialNumber, issuer, validity, subject, subjectPublicKeyInfo; signatureValue signs it. Section 4.1.2.5: validity is notBefore and notAfter.",
+      "checkedAgainst": "RFC 5280 sections 4.1, 4.1.2.5 (RFC text fetched from rfc-editor.org this session)"
+    },
+    {
+      "id": "L4-C03",
+      "verdict": "accurate",
+      "note": "Re-checked against tours at origin/feat/tours-4-5-10 commit 78e0192 (PR 23). Source now cites RFC 8446 section 1.2 (Major Differences from TLS 1.2) and 4.4.2. Section 1.2 holds 'All handshake messages after the ServerHello are now encrypted.'",
+      "checkedAgainst": "RFC 8446 sections 1.2, 4.4.2 (fetched)"
+    },
+    {
+      "id": "L4-C04",
+      "verdict": "accurate",
+      "note": "Tours read at origin/feat/tours-4-5-10 (PR 23, commit 1b2fc21). RFC 9525 section 6 is 'Verifying Service Identity' and 6.3 is 'Matching the DNS Domain Name Portion'; it says the client determines whether the presented DNS name matches the reference DNS name.",
+      "checkedAgainst": "RFC 9525 sections 6, 6.3 (RFC text fetched from rfc-editor.org this session)"
+    },
+    {
+      "id": "L4-C05",
+      "verdict": "accurate",
+      "note": "Tours read at origin/feat/tours-4-5-10 (PR 23, commit 1b2fc21). Section 4.4.3: CertificateVerify 'is used to provide explicit proof that an endpoint possesses the private key corresponding to its certificate'; the signature covers Transcript-Hash(Handshake Context, Certificate).",
+      "checkedAgainst": "RFC 8446 section 4.4.3 (RFC text fetched from rfc-editor.org this session)"
+    }
+  ]
+}

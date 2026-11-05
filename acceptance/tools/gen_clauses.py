@@ -25,7 +25,7 @@ GROUPS = {
     "auth":       {"kind": "csharp", "project": "groups/auth/auth.csproj", "assembly": "Acceptance.Auth", "builds": ["net10"], "needsCore": True},
     "native":     {"kind": "csharp", "project": "groups/native/native.csproj", "assembly": "Acceptance.Native", "builds": ["net10", "cf"], "needsCore": False},
     "nativeprod": {"kind": "csharp", "project": "groups/nativeprod/nativeprod.csproj", "assembly": "Acceptance.NativeProd", "builds": ["net10", "cf"], "needsCore": True},
-    "bridge":     {"kind": "csharp", "project": "groups/bridge/bridge.csproj", "assembly": "Acceptance.Bridge", "builds": ["net10"], "needsCore": False},
+    "bridge":     {"kind": "csharp", "project": "groups/bridge/bridge.csproj", "assembly": "Acceptance.Bridge", "builds": ["net10"], "needsCore": True},
     "host":       {"kind": "csharp", "project": "groups/host/host.csproj", "assembly": "Acceptance.Host", "builds": ["net10"], "needsCore": False},
     "keys":       {"kind": "csharp", "project": "groups/keys/keys.csproj", "assembly": "Acceptance.Keys", "builds": ["net10"], "needsCore": False},
     "binproof":   {"kind": "csharp", "project": "groups/binproof/binproof.csproj", "assembly": "Acceptance.BinProof", "builds": ["net10"], "needsCore": False},
@@ -148,8 +148,36 @@ def build():
     return rows
 
 
+def core_use_problems():
+    """
+    A group whose code says `using NetSec.<x>` needs the product DLL on its compile line. If needsCore is false for such a group,
+    the compiler cannot find NetSec and run.ps1 would read the error as a missing product (NOT RUN PRODUCT_MISSING) while the
+    product is present. This check names the group, so the mistake fails here and not as a false "product missing".
+    """
+    problems = []
+    pat = re.compile(r"^\s*using\s+NetSec\.", re.M)
+    for name, g in GROUPS.items():
+        if g.get("kind") not in ("csharp", "selftest") or g.get("needsCore"):
+            continue
+        gdir = os.path.dirname(os.path.join(ACC, g["project"]))
+        files = [os.path.join(dp, f) for dp, dn, fn in os.walk(gdir) for f in fn if f.endswith(".cs") and os.sep + "obj" + os.sep not in dp + os.sep and os.sep + "bin" + os.sep not in dp + os.sep]
+        proj = open(os.path.join(ACC, g["project"]), encoding="utf-8").read()
+        if "lib" in proj and "Live" in proj:
+            live = os.path.join(ACC, "lib", "Live")
+            files += [os.path.join(live, f) for f in os.listdir(live) if f.endswith(".cs")]
+        for f in files:
+            if pat.search(open(f, encoding="utf-8", errors="replace").read()):
+                problems.append("%s: needsCore is false but %s uses NetSec" % (name, os.path.relpath(f, ACC)))
+                break
+    return problems
+
+
 def main():
     mode_write = "--write" in sys.argv
+    bad = core_use_problems()
+    if bad:
+        print("; ".join(bad))
+        return 1
     rows = build()
     doc = {
         "schema": 1,
