@@ -263,9 +263,16 @@ namespace NetSec.Tests
         {
             ListSink sink = new ListSink();
             LabContext c = new LabContext { SessionId = "s1", TraceId = "s1", Seed = seed, Gate = new FreeRunGate(), Sink = sink, Clock = new FixedClock(1), Random = new SeededRandom(seed), Attack = attack };
-            IFuture<LabResult> future = LabCatalog.Find(10).Run(c);
+            IFuture<LabResult> future = new Lesson10Auth().Run(c);
             Assert.True(future.Wait(60000), "the lab did not finish in 60 s");
             return new Run { Result = future.Result, Events = sink.Events };
+        }
+
+        [Fact]
+        public void Lesson_10_stays_unbuilt_until_its_tour_lands()
+        {
+            Assert.Null(LabCatalog.Find(10));
+            Assert.DoesNotContain(AttackCatalog.All, a => a.Lesson == 10);
         }
 
         [Fact]
@@ -304,7 +311,7 @@ namespace NetSec.Tests
         [Fact]
         public void Every_row_stops_at_its_named_check_with_one_thing_changed()
         {
-            AttackDefinition[] rows = AttackCatalog.All.Where(a => a.Lesson == 10).ToArray();
+            AttackDefinition[] rows = AttackCatalog.Lesson10Unreleased;
             Assert.Equal(7, rows.Length);
             foreach (AttackDefinition a in rows)
             {
@@ -319,7 +326,7 @@ namespace NetSec.Tests
         [Fact]
         public void The_flip_row_aims_inside_the_token_claims()
         {
-            AttackDefinition change = AttackCatalog.All.Single(a => a.AttackId == "L10-change-token-claim");
+            AttackDefinition change = AttackCatalog.Lesson10Unreleased.Single(a => a.AttackId == "L10-change-token-claim");
             Assert.Equal(Lesson10Auth.ClaimsOffset + 5, change.Plan.Offset);
             Run control = Go();
             TraceEvent read = control.Events.First(e => e.Type == "wire.sent" && e.Message == "ReadTotals");

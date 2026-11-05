@@ -74,4 +74,8 @@ Each row changes one thing from the control run.
 | `L10-wrong-role` | The token holds role `guest`, so `ReadTotals` is refused | `Rejected` | `ROLE_DENIED` | `permission check` |
 | `L10-replay-challenge` | Sends `ChallengeResponse` a second time | `Rejected` | `CHALLENGE_REPLAY` | `challenge already used` |
 
-The mutual TLS row, `L10-remove-client-cert` with check `bad_certificate alert`, arrives after S3. It is not in the catalog yet.
+The mutual TLS row, `L10-remove-client-cert` with check `bad_certificate alert`, arrives after S3.
+
+## Release
+
+Lesson 10 stays unbuilt until its tour lands: `LabCatalog.Find(10)` is null, and `AttackCatalog.All` holds no lesson 10 row. The commit that lands `app/src/tours/lesson-10.json` adds `case 10` to `LabCatalog.Find` and joins `Lesson10Rows` to `All`. Until then `session.start` for lesson 10 answers `LESSON_NOT_BUILT`, and the A11 row clauses cannot find their rows.

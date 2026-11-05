@@ -111,7 +111,6 @@ namespace NetSec.Labs
                 case 1: return new Lesson01Aes();
                 case 2: return new Lesson02Seals();
                 case 3: return new Lesson03Kex();
-                case 10: return new Lesson10Auth();
                 default: return null;
             }
         }
@@ -141,7 +140,18 @@ namespace NetSec.Labs
 
             Swap("L3-swap-server-share", 3, "X25519ServerShare", Lesson03Kex.SwappedServerShare(), ErrorCodes.KexConfirmMismatch, Lesson03Kex.ConfirmCheck),
             Flip("L3-flip-mlkem-ciphertext", 3, "MlKemCiphertext", Frame.HeaderSize + 10, ErrorCodes.KexConfirmMismatch, Lesson03Kex.ConfirmCheck),
+        };
 
+        public static AttackDefinition[] All { get { return (AttackDefinition[])Rows.Clone(); } }
+
+        /// <summary>
+        /// Lesson 10's rows. They join All, and the lab joins LabCatalog, in the commit that lands its tour, so no learner reaches a token lab
+        /// without the accuracy text. Tests run them from here.
+        /// </summary>
+        public static AttackDefinition[] Lesson10Unreleased { get { return (AttackDefinition[])Lesson10Rows.Clone(); } }
+
+        static readonly AttackDefinition[] Lesson10Rows =
+        {
             Flip("L10-change-token-claim", 10, "ReadTotals", Lesson10Auth.ClaimsOffset + 5, ErrorCodes.TokenBadSignature, NetSec.Auth.Token.SignatureCheck),
             WithOption("L10-expired-token", 10, Lesson10Auth.OptionTokenExpired, "yes", AttackOutcome.Rejected, ErrorCodes.TokenExpired, NetSec.Auth.Token.ExpiryCheck),
             WithOption("L10-replay-proof", 10, Lesson10Auth.OptionReplayProof, "yes", AttackOutcome.Rejected, ErrorCodes.DpopReplay, NetSec.Auth.DpopProof.ReplayCheck),
@@ -150,8 +160,6 @@ namespace NetSec.Labs
             WithOption("L10-wrong-role", 10, Lesson10Auth.OptionTokenRole, "guest", AttackOutcome.Rejected, ErrorCodes.RoleDenied, NetSec.Auth.AccessRules.PermissionCheck),
             WithOption("L10-replay-challenge", 10, Lesson10Auth.OptionReplayChallenge, "yes", AttackOutcome.Rejected, ErrorCodes.ChallengeReplay, NetSec.Auth.Challenge.ReplayCheck),
         };
-
-        public static AttackDefinition[] All { get { return (AttackDefinition[])Rows.Clone(); } }
 
         static AttackDefinition Flip(string id, int lesson, string message, int offset, string code, string check)
         {
