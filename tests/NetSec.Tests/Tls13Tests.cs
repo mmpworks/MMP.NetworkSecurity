@@ -632,9 +632,10 @@ namespace NetSec.Tests
                 Hop hop = Open(connected.Result, accepted.Result, null, null);
                 ExchangeAndClose(hop);
 
+                // A pump writes its wire.sent event after the socket write, and the tap logs before it forwards. Either side can lead for a moment, so wait for equal lengths.
                 Stopwatch clock = Stopwatch.StartNew();
                 byte[] up = WireSent(hop, "gateway"), down = WireSent(hop, "server");
-                while (clock.ElapsedMilliseconds < 5000 && (tap.Bytes("c2s").Length < up.Length || tap.Bytes("s2c").Length < down.Length))
+                while (clock.ElapsedMilliseconds < 5000 && (tap.Bytes("c2s").Length != up.Length || tap.Bytes("s2c").Length != down.Length))
                 {
                     System.Threading.Thread.Sleep(20);
                     up = WireSent(hop, "gateway");
