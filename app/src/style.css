@@ -1,12 +1,12 @@
 /* Tokens: ux-design.md section 4.1. Dark is the default; :root[data-theme="light"] switches. */
 :root, :root[data-theme="dark"] {
   --bg: #0e1318; --surface: #151c23; --surface2: #1d2630; --line: #2a3541; --text: #e6edf3; --muted: #93a1b0;
-  --readable: #56b4e9; --encrypted: #e69f00; --secret: #b39dff; --pass: #3fb950; --fail: #ff6b6b; --focus: #ffffff; --warn: #e0a82e;
+  --readable: #56b4e9; --encrypted: #e69f00; --secret: #b39dff; --pass: #3fb950; --fail: #ff6b6b; --on-mark: #0e1318; --focus: #ffffff; --warn: #e0a82e;
   --k-header: #8b98a6; --k-length: #009e73; --k-random: #56b4e9; --k-key: #b39dff; --k-cipher: #e69f00; --k-mac: #cc79a7; --k-id: #f0e442; --k-data: #9aa7b4;
 }
 :root[data-theme="light"] {
   --bg: #f6f8fa; --surface: #ffffff; --surface2: #e8edf2; --line: #cfd7df; --text: #1b2229; --muted: #5a6876;
-  --readable: #0072b2; --encrypted: #a85a00; --secret: #6a4fc2; --pass: #1a7f37; --fail: #c4242f; --focus: #000000; --warn: #8a6100;
+  --readable: #0072b2; --encrypted: #9a5000; --secret: #6a4fc2; --pass: #176f32; --fail: #c4242f; --on-mark: #ffffff; --focus: #000000; --warn: #8a6100;
   --k-header: #5a6876; --k-length: #007a5a; --k-random: #0072b2; --k-key: #6a4fc2; --k-cipher: #a85a00; --k-mac: #a2457e; --k-id: #8a7a00; --k-data: #4d5966;
 }
 html, body, #app { height: 100%; margin: 0; }
@@ -67,10 +67,10 @@ body { background: var(--bg); color: var(--text); overflow: hidden; }
 .enc-note { stroke: var(--encrypted); stroke-dasharray: 4 3; }
 .hatch-line { stroke: var(--encrypted); stroke-width: 2; opacity: .5; }
 .chk-pass circle { fill: var(--pass); } .chk-fail circle { fill: var(--fail); stroke: var(--text); stroke-dasharray: 3 2; stroke-width: 1.5; }
-.chk-mark { fill: #fff; font-size: 13px; font-weight: 800; }
+.chk-mark { fill: var(--on-mark); font-size: 13px; font-weight: 800; }
 .chk-name { font-size: 12px; font-weight: 700; } .chk-pass .chk-name { fill: var(--pass); } .chk-fail .chk-name { fill: var(--fail); }
 .chip-read { fill: var(--readable); } .chip-enc { fill: var(--encrypted); }
-.chip-text { fill: #000; font: 11px ui-monospace, Consolas, monospace; font-weight: 700; }
+.chip-text { fill: var(--on-mark); font: 11px ui-monospace, Consolas, monospace; font-weight: 700; }
 .wait-ring { fill: none; stroke: var(--warn); stroke-width: 2.5; animation: pulse 1.2s ease-out infinite; transform-box: fill-box; transform-origin: center; }
 @keyframes pulse { from { transform: scale(.8); opacity: 1; } to { transform: scale(1.8); opacity: 0; } }
 @media (prefers-reduced-motion: reduce) { .wait-ring { animation: none; } * { transition-duration: .15s !important; } }

@@ -14,7 +14,7 @@
 .cb.fail { color: var(--fail); border-color: var(--fail); border-style: dashed; }
 .regs { margin-bottom: 8px; font-size: 13px; }
 .rung { display: flex; flex-wrap: wrap; align-items: center; gap: 4px 8px; padding: 4px 8px; margin-bottom: 4px; border-radius: 6px; border-left: 3px solid var(--secret); background: var(--surface2); font-size: 12px; }
-.rung.erased { opacity: .75; border-left: 3px dashed var(--muted); }
+.rung.erased { border-left: 3px dashed var(--muted); }
 .rung.erased .rname { text-decoration: line-through; text-decoration-color: var(--muted); }
 .rung .erased-tag { color: var(--encrypted); font-style: italic; }
 .rname { font-weight: 700; }
