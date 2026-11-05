@@ -610,8 +610,14 @@ namespace NetSec.Tests
 
             public void Dispose()
             {
-                try { if (!P.HasExited) P.Kill(); } catch (InvalidOperationException) { }
-                P.WaitForExit(5000);
+                // With -naccept 1 the tap ends by itself. Kill on a process that is ending throws Access is denied, so a failed kill only means it already went.
+                if (!P.WaitForExit(2000))
+                {
+                    try { P.Kill(); }
+                    catch (InvalidOperationException) { }
+                    catch (System.ComponentModel.Win32Exception) { }
+                    P.WaitForExit(5000);
+                }
                 P.Dispose();
                 // The log is a temp file, and Windows can hold it for a moment after the process ends.
                 try { File.Delete(Log); } catch (IOException) { }
