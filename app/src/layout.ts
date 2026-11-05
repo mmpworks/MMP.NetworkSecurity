@@ -23,7 +23,11 @@ export interface Row {
 }
 export interface Layout { lanes: Lane[]; rows: Row[]; width: number; height: number; learned: number; total: number }
 
-export const isProtected = (e: TraceEvent): boolean => e.plain.length > 0 && e.plain !== e.wire
+// Only wire.sent draws an arrow. wire.received repeats the same bytes for the interop check, and engine events carry no wire.
+export const isWireSent = (e: TraceEvent): boolean => e.type === 'wire.sent'
+// Protected means the engine marked part of the wire bytes as hidden from the wire (visibleToWire false). A tampered byte also makes
+// plain differ from wire, so comparing the two would call a tamper "encrypted".
+export const isProtected = (e: TraceEvent): boolean => e.wire.length > 0 && e.fields.some(f => !f.visibleToWire)
 export const byteCount = (hex: string): number => hex.length >> 1
 
 export function laneNames(events: readonly TraceEvent[], declared: readonly string[]): string[] {
@@ -43,7 +47,7 @@ export function layoutDiagram(events: readonly TraceEvent[], declared: readonly 
   for (const e of events) {
     const y = HEAD_H + 30 + rows.length * ROW_H
     const prot = isProtected(e)
-    if (e.from && e.to && e.from.toLowerCase() !== e.to.toLowerCase()) {
+    if (isWireSent(e) && e.from && e.to && e.from.toLowerCase() !== e.to.toLowerCase()) {
       total++
       if (!prot) learned++
       const hidden = view === 'eavesdropper' && prot

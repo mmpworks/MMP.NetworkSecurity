@@ -9,7 +9,7 @@ const path = require('node:path')
 
 const PORT = Number(process.env.NETSEC_PORT) || 5180
 const TOKEN = process.env.NETSEC_TOKEN || crypto.randomBytes(24).toString('hex')
-const HOST_EXE = path.resolve(__dirname, '..', '..', 'src', 'NetSec.Host', 'bin', 'Release', 'net10.0', 'NetSec.Host.exe')
+const HOST_DLL = path.resolve(__dirname, '..', '..', 'src', 'NetSec.Host', 'bin', 'Release', 'net10.0', 'NetSec.Host.dll')
 let host = null
 
 // A dead stdout pipe throws EPIPE from the main process. Swallow the stream error and skip the write (same fix as the pump simulator).
@@ -21,8 +21,8 @@ for (const s of [process.stdout, process.stderr]) s.on('error', () => {})
 
 function startHost() {
   if (process.env.NETSEC_HOST === 'external') return
-  if (!fs.existsSync(HOST_EXE)) { say(process.stderr, `[host] not built: ${HOST_EXE}\n`); return }
-  host = spawn(HOST_EXE, [], {
+  if (!fs.existsSync(HOST_DLL)) { say(process.stderr, `[host] not built: ${HOST_DLL}\n`); return }
+  host = spawn('dotnet', [HOST_DLL], {
     detached: true, stdio: ['ignore', 'pipe', 'pipe'], windowsHide: true,
     env: { ...process.env, NETSEC_PORT: String(PORT), NETSEC_TOKEN: TOKEN },
   })

@@ -2,7 +2,8 @@
 import { computed } from 'vue'
 import { LESSON_NOTES, active, doTryIt, lessonRow, startSession, step, steps, tour, tourBack, tourNext, tourReplay, unlock, ui } from '../store'
 import { splitText } from '../tour'
-import Term from './Term.vue'
+import AttackResult from "./AttackResult.vue"
+import Term from "./Term.vue"
 
 const paragraphs = computed(() => (step.value?.text ?? []).map(splitText))
 const noTour = computed(() => steps.value.length === 0)
@@ -47,6 +48,7 @@ const note = computed(() => (ui.lesson != null ? LESSON_NOTES[ui.lesson] ?? '' :
         <v-btn data-testid="tour-replay" @click="tourReplay">Replay step</v-btn>
         <v-btn color="primary" variant="flat" :disabled="!unlock.open" data-testid="tour-next" @click="tourNext">{{ last ? "Finish" : "Next" }}</v-btn>
       </div>
+      <AttackResult />
       <div v-if="!unlock.open" class="next-reason" data-testid="next-reason">{{ unlock.reason }}</div>
     </div>
   </div>

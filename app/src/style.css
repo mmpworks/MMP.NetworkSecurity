@@ -156,3 +156,4 @@ body { background: var(--bg); color: var(--text); overflow: hidden; }
 .v-btn.hl { outline: 2px solid var(--focus); }
 .hex-ascii { white-space: nowrap; }
 .hex-row { width: max-content; min-width: 100%; }
+.attack-result { margin: 4px 12px; padding: 6px 10px; border-left: 3px solid var(--fail); background: var(--surface2); font-size: 13px; }

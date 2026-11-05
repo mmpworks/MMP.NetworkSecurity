@@ -1,5 +1,5 @@
 <script setup lang="ts">
-import { lessonDone, lessons, selectLesson, ui } from '../store'
+import { isHighlighted, lessonDone, lessons, selectLesson, ui } from '../store'
 import { TOURS } from '../tour'
 
 function status(n: number, built: boolean): string {
@@ -12,7 +12,7 @@ function status(n: number, built: boolean): string {
 <template>
   <nav class="rail" data-testid="lesson-rail" aria-label="Lessons">
     <button
-      v-for="l in lessons" :key="l.lesson" type="button" class="rail-item" :class="{ on: ui.lesson === l.lesson, off: !l.built }"
+      v-for="l in lessons" :key="l.lesson" type="button" class="rail-item" :class="{ on: ui.lesson === l.lesson, off: !l.built, hl: isHighlighted('rail', 'lesson', String(l.lesson)) }"
       :data-testid="`lesson-item-${l.lesson}`" :aria-current="ui.lesson === l.lesson ? 'true' : undefined" @click="selectLesson(l.lesson)"
     >
       <span class="rail-num">{{ l.lesson }}</span>

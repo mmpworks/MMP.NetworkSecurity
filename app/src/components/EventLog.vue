@@ -1,11 +1,12 @@
 <script setup lang="ts">
 import { computed, ref } from 'vue'
-import { active, allEvents, loadTrace, pauseEngine, restartSession, runEngine, selectEvent, selectedEvent, startSession, stepEngine, ui } from '../store'
+import { active, allEvents, attack, lessonRow, loadTrace, pauseEngine, restartSession, runEngine, selectEvent, selectedEvent, startSession, stepEngine, ui } from '../store'
 
 const actor = ref('')
 const type = ref('')
 const checksOnly = ref(false)
 const traceFile = ref('')
+import AttackResult from './AttackResult.vue'
 const actors = computed(() => [...new Set(allEvents.value.map(e => e.actor).filter(Boolean))])
 const rows = computed(() => allEvents.value.filter(e => (!actor.value || e.actor === actor.value) && (!type.value || e.type.includes(type.value)) && (!checksOnly.value || e.check)))
 </script>
@@ -29,6 +30,12 @@ const rows = computed(() => allEvents.value.filter(e => (!actor.value || e.actor
       <input v-model="traceFile" class="ns-input" placeholder="saved trace file" data-testid="open-trace-path" aria-label="Saved trace file" />
       <v-btn data-testid="open-trace" :disabled="!traceFile" @click="loadTrace(traceFile)">Open saved trace</v-btn>
     </div>
+    <div class="btn-row" data-testid="attacks-drawer">
+      <span class="side-title">ATTACKS</span>
+      <span v-if="!lessonRow?.attacks.length" class="muted">none for this lesson yet</span>
+      <v-btn v-for="a in lessonRow?.attacks ?? []" :key="a.attackId" color="error" :disabled="!active" :data-testid="`attack-${a.attackId}`" @click="attack({ attackId: a.attackId })">{{ a.label }}</v-btn>
+    </div>
+    <AttackResult />
     <div class="log-rows">
       <div
         v-for="e in rows" :key="e.seq" class="log-row" :class="{ sel: selectedEvent?.seq === e.seq, fail: e.check?.result === 'fail' }"

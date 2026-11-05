@@ -101,7 +101,7 @@ export const unlock = computed<Unlock>(() => {
   })
 })
 
-function nextReq(): string { return `r${++reqCounter}` }
+function nextReq(): string { const id = `r${++reqCounter}`; myRequests.add(id); return id }
 function fail(code: string, message: string, retryable = false) { ui.error = { code, message, retryable, requestId: '' } }
 export function clearError() { ui.error = null }
 
@@ -150,13 +150,37 @@ async function resync() {
   } catch { /* the live feed keeps going */ }
 }
 
+// The Host sends every frame to every open socket. This client owns only the sessions it asked for: a session.started whose
+// requestId it sent. A trace or finished frame can arrive ahead of its session.started, so frames of unknown sessions wait by id.
+const myRequests = new Set<string>()
+const mySessions = new Set<string>()
+const pending = new Map<string, any[]>()
+
+function hold(f: any) {
+  const id = String(f.sessionId)
+  const list = pending.get(id) ?? []
+  if (list.length < 2000) list.push(f)
+  pending.set(id, list)
+  if (pending.size > 20) pending.delete(pending.keys().next().value as string)
+}
+
 function onFrame(f: any) {
   switch (f?.type) {
-    case 'session.started': return onStarted(f)
-    case 'trace': return onTrace(f)
-    case 'session.forked': return onForked(f)
-    case 'session.finished': return onFinished(f)
-    case 'error': ui.error = normalizeError(f); return wake()
+    case 'session.started':
+      if (!myRequests.has(String(f.requestId))) return
+      mySessions.add(String(f.sessionId))
+      onStarted(f)
+      for (const p of pending.get(String(f.sessionId)) ?? []) onFrame(p)
+      pending.delete(String(f.sessionId))
+      return
+    case 'trace': case 'session.finished':
+      if (!mySessions.has(String(f.sessionId))) return hold(f)
+      return f.type === 'trace' ? onTrace(f) : onFinished(f)
+    case 'session.forked': return mySessions.has(String(f.sessionId)) || mySessions.has(String(f.parentId)) ? onForked(f) : undefined
+    case 'error':
+      if (f.requestId && !myRequests.has(String(f.requestId))) return
+      ui.error = normalizeError(f)
+      return wake()
   }
 }
 
@@ -177,7 +201,7 @@ function onStarted(f: any) {
 
 function onTrace(f: any) {
   const ev = normalizeEvent(f)
-  const s = ui.sessions.find(x => x.id === ev.sessionId) ?? active.value
+  const s = ui.sessions.find(x => x.id === ev.sessionId)
   if (!s) return
   if (!s.events.some(e => e.seq === ev.seq)) s.events = [...s.events, ev]
   if (ev.waiting) ui.engine = 'waiting'
@@ -185,13 +209,16 @@ function onTrace(f: any) {
 }
 
 function onForked(f: any) {
+  // The fork's session.started comes first and already made the record. This frame names its parent and its attack.
   const parent = ui.sessions.find(s => s.id === String(f.parentId))
-  const rec: SessionRec = {
-    id: String(f.sessionId), parentId: String(f.parentId), label: `attack: ${f.attackId ?? 'tamper'}`, lesson: parent?.lesson ?? ui.lesson ?? 0, seed: parent?.seed ?? 0,
-    trainingOnly: parent?.trainingOnly ?? true, transportKind: parent?.transportKind ?? 'glass', events: [], finished: null, replay: false,
-  }
-  ui.sessions = [...ui.sessions.filter(s => s.id !== rec.id), rec]
+  const rec = ui.sessions.find(s => s.id === String(f.sessionId))
+  if (!rec) return
+  rec.parentId = String(f.parentId)
+  rec.label = `attack: ${f.attackId ?? 'tamper'}`
+  if (parent) { rec.lesson = parent.lesson; rec.seed = parent.seed }
   ui.activeId = rec.id
+  // An attack fork runs to its result, so the failing check shows without a second click.
+  sock?.send({ type: 'session.run', sessionId: rec.id })
   ui.viewUpTo = null
   ui.selectedSeq = null
   wake()
