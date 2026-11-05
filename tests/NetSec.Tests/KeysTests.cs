@@ -94,23 +94,104 @@ namespace NetSec.Tests
             Assert.Equal(ErrorCodes.TrainingKeyUnknown, error.Error.Code);
         }
 
-#if NET
+        /// <summary>Runs on both builds with the product's RSA. tests/NetSec.Host.Tests holds the outside check through the BCL import.</summary>
         [Theory]
-        [InlineData(KeyIds.ServerTls11Rsa)]
-        [InlineData(KeyIds.SshHostRsa)]
-        public void An_rsa_key_is_pkcs8_with_its_matching_spki(string id)
+        [InlineData(KeyIds.ServerTls11Rsa, KeyIds.SshHostRsa)]
+        [InlineData(KeyIds.SshHostRsa, KeyIds.ServerTls11Rsa)]
+        public void An_rsa_key_is_pkcs8_with_its_matching_spki(string id, string otherId)
         {
             ITrainingKey key = new TrainingKeySource().Find(id);
             Assert.Equal(KeyAlgorithm.Rsa2048, key.Algorithm);
-            using (System.Security.Cryptography.RSA rsa = System.Security.Cryptography.RSA.Create())
+            RsaFields fields = RsaFields.Parse(key.CopyMaterial(), key.CopyPublic());
+            Assert.Equal(2048, fields.N.BitLength);
+            Assert.Equal(fields.N.ToBigEndian(), fields.P.Multiply(fields.Q).ToBigEndian());
+
+            byte[] message = Encoding.UTF8.GetBytes("a made-up training message");
+            byte[] signature = Pkcs1.SignSha256(new RsaPrivate(fields.N, fields.D), message);
+            RsaPublic publicKey = new RsaPublic(fields.N, fields.E);
+            Assert.True(Pkcs1.VerifySha256(publicKey, message, signature));
+
+            byte[] changed = (byte[])signature.Clone();
+            changed[20] ^= 1;
+            Assert.False(Pkcs1.VerifySha256(publicKey, message, changed));
+
+            ITrainingKey other = new TrainingKeySource().Find(otherId);
+            RsaFields otherFields = RsaFields.Parse(other.CopyMaterial(), other.CopyPublic());
+            Assert.False(Pkcs1.VerifySha256(new RsaPublic(otherFields.N, otherFields.E), message, signature));
+        }
+
+        /// <summary>Reads the fields of a PKCS#8 PrivateKeyInfo and an SPKI, and fails on any other shape. N and E must match in the two documents.</summary>
+        sealed class RsaFields
+        {
+            public BigUInt N, E, D, P, Q;
+
+            static readonly byte[] RsaAlgorithm = { 0x30, 0x0d, 0x06, 0x09, 0x2a, 0x86, 0x48, 0x86, 0xf7, 0x0d, 0x01, 0x01, 0x01, 0x05, 0x00 };
+
+            public static RsaFields Parse(byte[] pkcs8, byte[] spki)
             {
-                int read;
-                rsa.ImportPkcs8PrivateKey(key.CopyMaterial(), out read);
-                Assert.Equal(key.CopyMaterial().Length, read);
-                Assert.Equal(2048, rsa.KeySize);
-                Assert.Equal(rsa.ExportSubjectPublicKeyInfo(), key.CopyPublic());
+                Der info = new Der(new Der(pkcs8).Take(0x30));
+                Assert.Equal(new byte[] { 0 }, info.Take(0x02));
+                info.Expect(RsaAlgorithm);
+                Der rsa = new Der(new Der(info.Take(0x04)).Take(0x30));
+                Assert.True(info.AtEnd, "PrivateKeyInfo has extra fields");
+                Assert.Equal(new byte[] { 0 }, rsa.Take(0x02));
+
+                RsaFields fields = new RsaFields();
+                byte[] n = rsa.Take(0x02), e = rsa.Take(0x02);
+                fields.N = BigUInt.FromBytes(n);
+                fields.E = BigUInt.FromBytes(e);
+                fields.D = BigUInt.FromBytes(rsa.Take(0x02));
+                fields.P = BigUInt.FromBytes(rsa.Take(0x02));
+                fields.Q = BigUInt.FromBytes(rsa.Take(0x02));
+
+                Der publicInfo = new Der(new Der(spki).Take(0x30));
+                publicInfo.Expect(RsaAlgorithm);
+                byte[] bits = publicInfo.Take(0x03);
+                Assert.True(publicInfo.AtEnd, "SubjectPublicKeyInfo has extra fields");
+                Assert.Equal(0, bits[0]);
+                byte[] inner = new byte[bits.Length - 1];
+                Array.Copy(bits, 1, inner, 0, inner.Length);
+                Der publicKey = new Der(new Der(inner).Take(0x30));
+                Assert.Equal(n, publicKey.Take(0x02));
+                Assert.Equal(e, publicKey.Take(0x02));
+                Assert.True(publicKey.AtEnd, "RSAPublicKey has extra fields");
+                return fields;
             }
         }
-#endif
+
+        /// <summary>The smallest DER reader these two documents need: one tag and one definite length at a time.</summary>
+        sealed class Der
+        {
+            readonly byte[] _bytes;
+            int _at;
+
+            public Der(byte[] bytes) { _bytes = bytes; }
+
+            public bool AtEnd { get { return _at == _bytes.Length; } }
+
+            public byte[] Take(int tag)
+            {
+                Assert.Equal(tag, (int)_bytes[_at++]);
+                int length = _bytes[_at++];
+                if (length >= 0x80)
+                {
+                    int count = length & 0x7f;
+                    length = 0;
+                    for (int i = 0; i < count; i++) length = (length << 8) | _bytes[_at++];
+                }
+                byte[] value = new byte[length];
+                Array.Copy(_bytes, _at, value, 0, length);
+                _at += length;
+                return value;
+            }
+
+            public void Expect(byte[] raw)
+            {
+                byte[] actual = new byte[raw.Length];
+                Array.Copy(_bytes, _at, actual, 0, raw.Length);
+                Assert.Equal(raw, actual);
+                _at += raw.Length;
+            }
+        }
     }
 }

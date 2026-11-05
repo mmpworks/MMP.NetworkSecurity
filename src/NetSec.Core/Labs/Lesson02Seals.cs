@@ -11,7 +11,7 @@ namespace NetSec.Labs
 {
     /// <summary>
     /// Lesson 2. One message under four seals: a plain hash, a key in front of a hash, HMAC, and CMAC. A hash with the key in front
-    /// falls to a length extension, and HMAC does not. These compares stop at the first difference. Lesson 11 shows why that matters.
+    /// falls to a length extension, and HMAC does not. The three keyed seals use a constant-time compare, and lesson 11 shows why.
     /// Built to show the parts. Do not copy.
     /// </summary>
     public sealed class Lesson02Seals : ILab
@@ -105,29 +105,31 @@ namespace NetSec.Labs
 
         static StepDecision ServerPlainHash(Session s, InboundMessage m)
         {
-            return Compare(m, PlainHash(MessageOf(m.Body)), ErrorCodes.SealHashMismatch, HashCheck);
+            return Result(m, PlainSame(PlainHash(MessageOf(m.Body)), SealOf(m.Body)), ErrorCodes.SealHashMismatch, HashCheck);
         }
 
         static StepDecision ServerKeyedHash(Session s, InboundMessage m)
         {
-            return Compare(m, KeyedHash(s.Secret(KeyName), MessageOf(m.Body)), ErrorCodes.SealKeyedHashMismatch, KeyedCheck);
+            byte[] expected = KeyedHash(s.Secret(KeyName), MessageOf(m.Body)), seal = SealOf(m.Body);
+            bool fits = expected.Length == seal.Length && ConstantTime.Equal(expected, 0, seal, 0, seal.Length);
+            return Result(m, fits, ErrorCodes.SealKeyedHashMismatch, KeyedCheck);
         }
 
         static StepDecision ServerHmac(Session s, InboundMessage m)
         {
-            return Compare(m, HmacOf(s.Secret(KeyName), MessageOf(m.Body)), ErrorCodes.SealHmacMismatch, HmacCheck);
+            return Result(m, Hmac.Verify(Hashes.Sha256, s.Secret(KeyName), MessageOf(m.Body), SealOf(m.Body)), ErrorCodes.SealHmacMismatch, HmacCheck);
         }
 
         static StepDecision ServerCmac(Session s, InboundMessage m)
         {
-            StepDecision compared = Compare(m, CmacOf(s.Secret(KeyName), MessageOf(m.Body)), ErrorCodes.SealCmacMismatch, CmacCheck);
+            StepDecision compared = Result(m, Cmac.Verify(new AesKey(s.Secret(KeyName)), MessageOf(m.Body), SealOf(m.Body)), ErrorCodes.SealCmacMismatch, CmacCheck);
             if (compared.Outcome == StepOutcome.Fail) return compared;
             return StepDecision.Advance(compared.Effects[0], Effect.SendProtected(Names[SealDone], new byte[0], Frame.Build(SealDone, new byte[0]), Frame.Fields(0)));
         }
 
-        static StepDecision Compare(InboundMessage m, byte[] expected, string code, string check)
+        static StepDecision Result(InboundMessage m, bool fits, string code, string check)
         {
-            if (!Same(expected, SealOf(m.Body))) return StepDecision.Fail(code, check, m.Name + ": the seal does not fit the message");
+            if (!fits) return StepDecision.Fail(code, check, m.Name + ": the seal does not fit the message");
             return StepDecision.Advance(Effect.Check(check, code));
         }
 
@@ -185,8 +187,8 @@ namespace NetSec.Labs
             return r.Take("seal", "mac", r.Remaining);
         }
 
-        // This compare stops at the first difference on purpose. Lesson 11 measures what that leaks.
-        static bool Same(byte[] a, byte[] b)
+        // This compare stops at the first difference. It runs only on the plain hash, which uses no key, so its timing reveals nothing secret.
+        static bool PlainSame(byte[] a, byte[] b)
         {
             if (a.Length != b.Length) return false;
             for (int i = 0; i < a.Length; i++)

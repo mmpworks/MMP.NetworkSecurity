@@ -1,4 +1,5 @@
 using System;
+using NetSec.Errors;
 
 namespace NetSec.Crypto
 {
@@ -11,13 +12,19 @@ namespace NetSec.Crypto
             return Hmac.Compute(h, salt == null ? new byte[0] : salt, ikm);
         }
 
-        /// <summary>T(i) = HMAC(prk, T(i-1) + info + i), joined and cut to n bytes. The RFC allows at most 255 blocks.</summary>
+        /// <summary>
+        /// T(i) = HMAC(prk, T(i-1) + info + i), joined and cut to n bytes. The RFC allows at most 255 blocks.
+        /// RFC 5869 section 2.3 requires a prk of at least one hash length. A shorter prk throws HKDF_PRK_TOO_SHORT.
+        /// </summary>
         public static byte[] Expand(Func<IHash> h, byte[] prk, byte[] info, int n)
         {
             Arg.NotNull(h, "h");
+            Arg.NotNull(prk, "prk");
             Arg.NotNull(info, "info");
             int hashLength = h().DigestSize;
             if (n < 0 || n > 255 * hashLength) throw new ArgumentOutOfRangeException("n", "HKDF output is from 0 to 255 hash lengths");
+            if (prk.Length < hashLength)
+                throw new NetSecException(NetSecError.Of(ErrorCodes.HkdfPrkTooShort, "the HKDF prk is " + prk.Length + " bytes, and this hash needs at least " + hashLength));
 
             byte[] output = new byte[n];
             byte[] previous = new byte[0];

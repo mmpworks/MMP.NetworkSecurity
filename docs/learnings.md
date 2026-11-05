@@ -22,9 +22,12 @@ Each correction goes here, newest slice last. Later slices read this file first.
 1. **The `prim` group compiles as one program, so A1 and A2 stay NOT RUN until every Crypto type exists.** `Subject.Product.cs` names all of section 2.3. A partial Crypto folder fails the compile, and all 64 clauses report PRODUCT_MISSING, including the primitives that work. To read a partial result, add the rest of `acceptance/contract/Crypto.cs` as an uncommitted file (its bodies throw `NotImplementedException`, which maps to NOT RUN), run the clauses, and delete the file. The full gate reports the acceptance step as FAIL until both S1 lanes merge.
 2. **The `FromBytes`, `Ek`, and `Dk` names hold, not `FromBigEndian` or `EncapsulationKey`.** The acceptance suite changed these names in `fdfcf81`. Read the merged `acceptance/contract/Crypto.cs` before you code to an older `CONTRACT.md` line.
 3. **`X25519.Mult` does not refuse an all-zero result.** RFC 7748 leaves that check to the protocol. S3 must add it to the TLS 1.3 key share and S4 to the SSH exchange.
-4. **`Ed25519.Verify` accepts a small-order public key.** A public key at y = 1 with R = B and S = 1 verifies for any message. RFC 8032 allows this. A protocol that needs a stronger rule adds its own check. `Verify` does refuse S at or above L and a public key with y at or above p.
+4. **`Ed25519.Verify` accepts a small-order public key.** A public key at y = 1 with R = B and S = 1 verifies for any message. RFC 8032 allows this. A protocol that needs a stronger rule adds its own check. `Verify` refuses a wrong length, S at or above L, a public key with y at or above p, a y with no square root, x = 0 with the sign bit set (RFC 8032 section 5.1.3 step 4), and an R that differs in bytes from the computed value. Go accepts the x = 0 case with the sign bit set, so a Go referee cannot catch it. A builder test pins it.
 5. **`RsaPrivate` holds n and d only, so it runs the full-size exponent.** Parsing a PKCS#8 key can drop the CRT values. On a real device this makes a private operation slower than a CRT one by a factor of about 4 (standard estimate, not measured here).
 6. **A2 tests valid ML-KEM exchanges only.** Implicit rejection and the key checks are reached by 36 NIST ACVP records in `tests/NetSec.Tests/vectors/mlkem768-acvp.txt`.
+7. **For S4: `DhGroup14` returns 256 fixed bytes, and SSH hashes e, f, and K as mpints.** Strip the leading zeros, and add one 00 byte when the top bit is set. A value with a leading zero byte comes about 1 session in 256, so a run with no conversion can pass by luck. Test both forms: a value with a leading zero, and a value with the top bit set.
+8. **For S4: an even RSA modulus reaches `BigUInt.ModPow` as an unnamed `ArgumentException`.** SSH host keys come from the wire, so S4 needs a named error before that call.
+9. **For S4: `Pkcs1.VerifySha1` and `VerifySha256` throw `RSA_MESSAGE_TOO_LONG` on a modulus too short for the digest.** Other bad input returns false. S4 must catch this code when the key comes from the wire.
 
 ## Lessons 1 to 3
 
@@ -33,5 +36,13 @@ Each correction goes here, newest slice last. Later slices read this file first.
 
 ## S2
 
-1. **`openssl genpkey -outform DER` on OpenSSL 3.5.7 wrote a traditional `RSAPrivateKey`, not PKCS#8.** CONTRACT rule 5 needs `PrivateKeyInfo`. Run `openssl pkcs8 -topk8 -nocrypt` after it. The net10 test `An_rsa_key_is_pkcs8_with_its_matching_spki` pins the format.
+1. **`openssl genpkey -outform DER` on OpenSSL 3.5.7 wrote a traditional `RSAPrivateKey`, not PKCS#8.** CONTRACT rule 5 needs `PrivateKeyInfo`. Run `openssl pkcs8 -topk8 -nocrypt` after it. `An_rsa_key_is_pkcs8_with_its_matching_spki` pins the format on both builds.
 2. **`TrainingKeySource.Find` throws `TRAINING_KEY_UNKNOWN` for an unknown id.** It never returns null. A symmetric key's `CopyPublic` gives an empty array.
+3. **`DukptPinPad.Next` uses a new counter on each call (CONTRACT.md).** The S5 `PinEnvelope` holds one KSN, a PIN block, and a MAC. So S5 needs both keys under one counter and must add a method to the pad that returns several working keys for one counter. The derivation already allows it: `DukptDerivation.Working` takes the usage per call.
+4. **Lesson 6 has no MAC on the wire, by the UX row.** A flipped PIN block must reach `PIN block format check`, and a MAC would catch it first. `DUKPT_MAC_MISMATCH` stays for S5.
+5. **`held` does not fall on every sale.** A sale erases one register and can fill lower ones with child keys: 32 after the load, then 31, 31, 30, 31. UX moment 5 says "the reader column shrinks". The lab reports the true count, and the tour must not promise a steady fall.
+6. **The one-bit limit of 16 is from recollection of X9.24-3, which is paid.** The free vectors do not state it. Both sides agree past it in `DukptTests`, because the bank walks any counter.
+7. **`DUKPT_COUNTER_EXHAUSTED` has no test.** The pad would need about 2^31 sales to reach it.
+8. **`PumpTests.A_flipped_length_byte_...` raced.** Two 300 ms deadlines, so the client could close first, and the server then reported `PEER_CLOSED_EARLY`. It failed 1 of 2 gate runs. The server's deadline now comes first. A test with two deadlines must say which one ends first.
+9. **The lab's reader session holds no base key.** Only `BankSession` holds it, and a test scans the reader's trace for it. S5 keeps this shape across processes (D13).
+10. **A test under `#if NET` in `tests/NetSec.Tests` turns A9 red.** `A9.cf.same-suite-passes-on-net48-skips-pinned` compares the net10.0 and net48 test sets. PR #13 did this and blocked every lane. A BCL-only check goes in `tests/NetSec.Host.Tests`, which runs on net10.0 only. Run `pwsh acceptance/run.ps1 -Clauses A9` on every PR that adds a test.
