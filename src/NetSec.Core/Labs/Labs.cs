@@ -163,6 +163,7 @@ namespace NetSec.Labs
             PlainFlip("L5-replace-key-share", 5, "ClientHello", Tls13Lab.ClientX25519ShareOffset, Tls13Codes.AeadTag),
             PlainFlip("L5-flip-mlkem-ciphertext", 5, "ServerHello", Tls13Lab.ServerMlKemCiphertextOffset, Tls13Codes.AeadTag),
             FlipLength("L5-flip-record-length", 5, "Finished"),
+            Swap("L5-clear-close-notify", 5, "ApplicationData", new byte[] { 21, 3, 3, 0, 2, 1, 0 }, ErrorCodes.UnexpectedMessage, Tls13Codes.CheckName(ErrorCodes.UnexpectedMessage)),
 
             WithOption("L6-replay-sale", 6, Lesson06Dukpt.OptionScenario, Lesson06Dukpt.ScenarioReplaySale, AttackOutcome.Rejected, ErrorCodes.DukptKsnReplay, Lesson06Dukpt.ReplayCheck),
             Flip("L6-flip-pin-block", 6, Lesson06Dukpt.SaleName, Lesson06Dukpt.PinBlockOffset + 3, ErrorCodes.DukptPinBlockFormat, Lesson06Dukpt.FormatCheck),

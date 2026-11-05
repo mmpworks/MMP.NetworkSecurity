@@ -227,7 +227,7 @@ namespace NetSec.Labs
 
         static NetSecError Named(NetSecError error)
         {
-            return error != null && error.Code != ErrorCodes.PeerClosedEarly && error.Code != ErrorCodes.LinkLost && error.Code != Tls13Codes.AlertReceived && error.Code != NetSec.Tls11.Tls11Codes.Alert ? error : null;
+            return error != null && error.Code != ErrorCodes.PeerClosedEarly && error.Code != ErrorCodes.LinkLost && error.Code != Tls13Codes.AlertReceived && error.Code != Tls13Codes.Truncated && error.Code != NetSec.Tls11.Tls11Codes.Alert ? error : null;
         }
 
         public static TraceStream Stream(LabContext c, string actor, string protocol)
