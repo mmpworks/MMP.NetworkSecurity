@@ -221,7 +221,7 @@ namespace NetSec.Host
                 Fail(requestId, ready.Problems[0].Code, string.Join(" ", ready.Problems.Select(p => p.Detail)));
                 return;
             }
-            Begin(lesson, seed, Text(m, "mode") ?? "run", null, null, security.Credentials(), requestId);
+            Begin(lesson, seed, Text(m, "mode") ?? "run", null, null, security.Credentials(), requestId, null);
         }
 
         void Attack(JsonElement m, string? requestId)
@@ -233,9 +233,9 @@ namespace NetSec.Host
                 ? AttackCatalog.All.FirstOrDefault(a => a.AttackId == attackId)
                 : FreeAttack(m, parent, forkId);
             if (attack is null) { Fail(requestId, "ATTACK_NOT_FOUND", "No such attack, or that byte cannot be flipped."); return; }
-            LabSession? fork = Begin(parent.Lesson, parent.Seed, Text(m, "mode") ?? "run", attack, forkId, parent.Credentials, requestId);
-            if (fork is not null)
-                Send(new { type = "session.forked", requestId, sessionId = fork.SessionId, parentId = parent.SessionId, attackId = attack.AttackId });
+            // The fork's lab can finish at once, so session.forked goes out before the lab starts. The contract's order is started, forked, then the fork's frames.
+            Begin(parent.Lesson, parent.Seed, Text(m, "mode") ?? "run", attack, forkId, parent.Credentials, requestId,
+                fork => Send(new { type = "session.forked", requestId, sessionId = fork.SessionId, parentId = parent.SessionId, attackId = attack.AttackId }));
         }
 
         static AttackDefinition? FreeAttack(JsonElement m, LabSession parent, string forkId)
@@ -246,7 +246,7 @@ namespace NetSec.Host
             return plan is null ? null : new AttackDefinition { AttackId = "free-flip-byte", Lesson = parent.Lesson, Kind = kind, Plan = plan };
         }
 
-        LabSession? Begin(int lesson, int seed, string mode, AttackDefinition? attack, string? sessionId, CredentialSet credentials, string? requestId)
+        void Begin(int lesson, int seed, string mode, AttackDefinition? attack, string? sessionId, CredentialSet credentials, string? requestId, Action<LabSession>? afterStarted)
         {
             LabSession? session = sessions.Start(lesson, seed, mode, attack, sessionId, credentials, started =>
             {
@@ -263,9 +263,9 @@ namespace NetSec.Host
                     showKeys = security.ShowKeys,
                     security = credentials.Mine().Select(c => new { typeId = c.TypeId, mode = c.Mode.ToString(), provider = c.ProviderKind, version = c.Version, fingerprint = c.Fingerprint }),
                 });
+                afterStarted?.Invoke(started);
             }, out NetSecError? error);
             if (session is null) Fail(requestId, error!.Code, error.Message);
-            return session;
         }
 
         void Save(JsonElement m, string? requestId)
