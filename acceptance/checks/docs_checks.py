@@ -86,7 +86,9 @@ def load_tours(root):
         m = re.search(r"lesson-(\d+)\.json$", f)
         data = json.load(open(f, encoding="utf-8"))
         steps = data if isinstance(data, list) else data.get("steps", [])
-        tours[int(m.group(1))] = {"file": f, "steps": steps}
+        # Design section 11: a tour carries claims [{text, source}] at the top of the file. A step may also carry its own claims.
+        top = data.get("claims", []) if isinstance(data, dict) else []
+        tours[int(m.group(1))] = {"file": f, "steps": steps, "claims": top}
     return tours
 
 
@@ -238,13 +240,15 @@ def a15a_claims_cite(root):
     tours = load_tours(root)
     problems, claims = [], 0
     for n, tour in sorted(tours.items()):
+        found = [("lesson %d" % n, cl) for cl in tour.get("claims", [])]
         for s in tour["steps"]:
-            for cl in s.get("claims", []):
-                claims += 1
-                if not (isinstance(cl, dict) and cl.get("source") and re.search(r"\w", str(cl.get("source")))):
-                    problems.append("%s: claim '%s' has no source" % (s.get("id", "?"), str(cl)[:40]))
+            found.extend((s.get("id", "?"), cl) for cl in s.get("claims", []))
+        for where, cl in found:
+            claims += 1
+            if not (isinstance(cl, dict) and cl.get("text") and cl.get("source") and re.search(r"\w", str(cl.get("source")))):
+                problems.append("%s: claim '%s' has no text or no source" % (where, str(cl)[:40]))
     if claims == 0:
-        raise NotRun("NO_CLAIMS_DECLARED", "no tour step declares a 'claims' array {id, text, source}; a security claim with no declared source cannot be checked (CONTRACT.md, tour claims)")
+        raise NotRun("NO_CLAIMS_DECLARED", "no tour declares a 'claims' array [{text, source}]; a security claim with no declared source cannot be checked (CONTRACT.md, tour claims)")
     if problems:
         raise Fail("; ".join(problems[:5]))
     return "%d security claims, each cites a source" % claims

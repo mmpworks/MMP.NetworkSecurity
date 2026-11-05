@@ -7,7 +7,7 @@
  * unwind across the boundary.
  *
  * A compare returns 0 when the buffers are equal and a nonzero value otherwise, as memcmp does.
- * Accuracy: the constant-time result holds only for this source, this compiler and these flags. It depends on the optimizer.
+ * Accuracy: the constant-time result was measured only for this source, this compiler, these flags and this CPU. It depends on the optimizer.
  */
 #ifndef NETSEC_CT_H
 #define NETSEC_CT_H

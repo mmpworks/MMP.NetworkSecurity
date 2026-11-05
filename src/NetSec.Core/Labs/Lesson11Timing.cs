@@ -1,5 +1,6 @@
 using System;
 using System.Collections.Generic;
+using System.Globalization;
 using System.Text;
 using MMP.AsyncProxy;
 using NetSec.Errors;
@@ -13,7 +14,7 @@ namespace NetSec.Labs
     /// <summary>
     /// Lesson 11. A control run measures both compares, measures the managed compare, and runs the guess loop against both native compares.
     /// An attack row runs one guess loop. Times are measured numbers on the run's machine. Managed code has no constant-time guarantee,
-    /// and the C++ result depends on the optimizer.
+    /// and the C++ result depends on the optimizer. LabCatalog and AttackCatalog leave this lab out until its tour and UI land (docs/lesson-11-names.md).
     /// </summary>
     public sealed class TimingAttackLab : ILab
     {
@@ -32,6 +33,35 @@ namespace NetSec.Labs
         const string Attacker = "attacker", Target = "target";
 
         public string LabId { get { return "lab-11-timing"; } }
+
+        /// <summary>The attack rows of lesson 11. Each row changes one field, its option.</summary>
+        public static AttackDefinition[] AttackRows
+        {
+            get
+            {
+                return new AttackDefinition[]
+                {
+                    GuessRow("L11-guess-leaky", GuessLeaky, AttackOutcome.NoCheck, null, null),
+                    GuessRow("L11-guess-constant-time", GuessConstantTime, AttackOutcome.Rejected, ErrorCodes.TimingGuessStopped, ConstantTimeCheck),
+                };
+            }
+        }
+
+        static AttackDefinition GuessRow(string id, string target, AttackOutcome expect, string code, string check)
+        {
+            LabOption option = new LabOption();
+            option.Name = GuessOption;
+            option.Value = target;
+            AttackDefinition row = new AttackDefinition();
+            row.AttackId = id;
+            row.Lesson = 11;
+            row.Kind = "timing-guess";
+            row.Options = new LabOption[] { option };
+            row.Expect = expect;
+            row.ExpectCode = code;
+            row.ExpectCheck = check;
+            return row;
+        }
 
         public IFuture<LabResult> Run(LabContext context)
         {
@@ -104,16 +134,13 @@ namespace NetSec.Labs
             for (int i = 0; i < cases.Length; i++)
                 foreach (IFuture step in Emit(lanes, lanes.Target, SampleEvent(cases[i], "timing.samples", "Time of one compare"))) yield return step;
 
-            TimingVerdict leaky = TimingJudge.Judge(m.Leaky[0], m.Leaky[1]);
-            TimingVerdict constant = TimingJudge.Judge(m.Constant[0], m.Constant[1]);
-            TimingVerdict control = TimingJudge.Judge(m.Control[0], m.Control[1]);
-            TimingVerdict managed = TimingJudge.Judge(m.Managed[0], m.Managed[1]);
+            TimingVerdict judged = TimingJudge.Judge(m.Leaky[0], m.Leaky[1], m.Constant[0], m.Constant[1]);
 
             foreach (IFuture step in Emit(lanes, lanes.Target, SampleEvent(m.Managed[0], "timing.managed", ManagedStatement))) yield return step;
             foreach (IFuture step in Emit(lanes, lanes.Target, SampleEvent(m.Managed[1], "timing.managed", ManagedStatement))) yield return step;
 
-            bool separated = TimingJudge.Separated(leaky, constant);
-            string detail = TimingReport.Verdict(leaky, constant, control, managed);
+            bool separated = judged.Separated;
+            string detail = TimingReport.Verdict(judged, TimingJudge.PairT(m.Control[0], m.Control[1]), TimingJudge.PairT(m.Managed[0], m.Managed[1]));
             TraceEventDraft verdict = Draft("timing.verdict", "Welch t: the leaky compare against the constant-time compare", "measure", null);
             verdict.Plain = Utf8(detail);
             verdict.Check = MakeCheck(SeparationCheck, separated, separated ? null : ErrorCodes.TimingNotSeparated, detail);
@@ -149,13 +176,19 @@ namespace NetSec.Labs
             }
 
             GuessResult guess = work.Result.Value;
-            TraceEventDraft finished = Draft("timing.guess.finished", guess.CorrectBytes + " of " + guess.Recovered.Length + " secret bytes recovered from the " + guess.Compare + " compare", step, null);
+            TraceEventDraft finished = Draft("timing.guess.finished", GuessMessage(guess), step, null);
             finished.Plain = Utf8(TimingReport.Guess(guess));
             finished.From = Attacker;
             finished.To = Target;
             finished.Check = GuessCheck(kind, guess, isAttack);
             foreach (IFuture s in Emit(lanes, lanes.Attacker, finished)) yield return s;
             if (finished.Check != null && !finished.Check.Passed) Stop(result, finished.Check.Code, finished.Check.Name);
+        }
+
+        static string GuessMessage(GuessResult guess)
+        {
+            return guess.CorrectBytes + " of " + guess.Recovered.Length + " secret bytes recovered from the " + guess.Compare + " compare. Each secret byte is stretched to "
+                + TimingGuess.BlockBytes.ToString("N0", CultureInfo.InvariantCulture) + " bytes, and the timer runs in the same process.";
         }
 
         /// <summary>
@@ -168,7 +201,7 @@ namespace NetSec.Labs
             if (kind == CompareKind.Leaky)
                 return MakeCheck(LeakyGuessCheck, guess.RecoveredAll, guess.RecoveredAll ? null : ErrorCodes.TimingNotSeparated, detail);
             if (guess.RecoveredAll) return MakeCheck(ConstantTimeCheck, false, ErrorCodes.TimingNotSeparated, "the guess recovered the whole secret from the constant-time compare. " + detail);
-            return isAttack ? MakeCheck(ConstantTimeCheck, false, ErrorCodes.TimingGuessStopped, "flat timing gave the attacker " + detail) : null;
+            return isAttack ? MakeCheck(ConstantTimeCheck, false, ErrorCodes.TimingGuessStopped, "the guess loop did not recover the secret in " + TimingGuess.SamplesPerGuess + " samples per candidate. " + detail) : null;
         }
 
         static IEnumerable<IFuture> Fail(Lanes lanes, NetSecError error, string step, LabResult result)

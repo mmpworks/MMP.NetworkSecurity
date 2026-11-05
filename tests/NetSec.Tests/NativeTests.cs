@@ -93,21 +93,28 @@ namespace NetSec.Tests
             Assert.True(double.IsPositiveInfinity(TimingJudge.Welch(low, high)));
         }
 
+        static readonly TimingCase Low = Case(1, 2, 1, 2, 1, 2, 1, 2), High = Case(9, 10, 9, 10, 9, 10, 9, 8), Slightly = Case(1, 2, 2, 2, 1, 2, 2, 2);
+
         [Fact]
-        public void Judge_passes_only_above_the_stated_threshold()
+        public void Judge_passes_a_large_leaky_t_beside_a_flat_constant_time_pair()
         {
-            Assert.True(TimingJudge.Judge(Case(1, 2, 1, 2, 1, 2, 1, 2), Case(9, 10, 9, 10, 9, 10, 9, 8)).Separates);
-            Assert.False(TimingJudge.Judge(Case(1, 2, 1, 2), Case(1, 2, 1, 2)).Separates);
+            TimingVerdict v = TimingJudge.Judge(Low, High, Low, Low);
+            Assert.True(v.Separated);
+            Assert.True(Math.Abs(v.LeakyT) > v.Threshold);
+            Assert.Equal(0, v.ConstantT);
+            Assert.Equal(4.5, v.Threshold);
         }
 
-        [Theory]
-        [InlineData(100.0, 20.0, true)]
-        [InlineData(100.0, 40.0, false)]
-        [InlineData(4.0, 0.1, false)]
-        public void Separated_needs_the_minimum_and_three_times_the_constant_time_t(double leaky, double constant, bool expected)
+        [Fact]
+        public void Judge_fails_when_the_leaky_t_is_under_the_threshold()
         {
-            TimingVerdict l = new TimingVerdict(leaky, leaky > TimingJudge.MinT), c = new TimingVerdict(constant, constant > TimingJudge.MinT);
-            Assert.Equal(expected, TimingJudge.Separated(l, c));
+            Assert.False(TimingJudge.Judge(Low, Slightly, Low, Low).Separated);
+        }
+
+        [Fact]
+        public void Judge_fails_when_the_leaky_t_is_not_three_times_the_constant_time_t()
+        {
+            Assert.False(TimingJudge.Judge(Low, High, Low, High).Separated);
         }
 
         [Fact]
@@ -218,7 +225,7 @@ namespace NetSec.Tests
             TimingCase[] constant = TimingLab.Interleaved(CompareKind.ConstantTime, 4096, 20000, 0, 4095);
             Assert.Equal(20000, leaky[1].Ticks.Length);
             Assert.Equal(4095, leaky[1].DiffPosition);
-            Assert.True(TimingJudge.Separated(TimingJudge.Judge(leaky[0], leaky[1]), TimingJudge.Judge(constant[0], constant[1])));
+            Assert.True(TimingJudge.Judge(leaky[0], leaky[1], constant[0], constant[1]).Separated);
             Assert.True(TimingJudge.Mean(leaky[1].Ticks) > TimingJudge.Mean(leaky[0].Ticks));
         }
 
@@ -254,17 +261,47 @@ namespace NetSec.Tests
 
         static AttackDefinition Row(string id)
         {
-            foreach (AttackDefinition a in AttackCatalog.All) if (a.AttackId == id) return a;
+            foreach (AttackDefinition a in TimingAttackLab.AttackRows) if (a.AttackId == id) return a;
             throw new InvalidOperationException(id);
         }
 
         static string Plain(TraceEvent e) => Encoding.UTF8.GetString(e.Plain, 0, e.Plain.Length);
 
         [Fact]
+        public void Lesson_11_stays_unbuilt_until_its_tour_and_ui_land()
+        {
+            Assert.Null(LabCatalog.Find(11));
+            Assert.DoesNotContain(AttackCatalog.All, a => a.Lesson == 11);
+        }
+
+        [Fact]
+        public void Each_attack_row_changes_one_field()
+        {
+            Assert.Equal(2, TimingAttackLab.AttackRows.Length);
+            Assert.All(TimingAttackLab.AttackRows, a =>
+            {
+                Assert.Null(a.Plan);
+                Assert.Single(a.Options);
+            });
+        }
+
+        [Fact]
+        public void Guess_text_states_the_stretch_and_the_limit_of_a_failed_guess()
+        {
+            LabContext c = Context(Row("L11-guess-constant-time"));
+            IFuture<LabResult> run = new TimingAttackLab().Run(c);
+            Make.Done(run);
+            TraceEvent finished = Array.Find(((ListSink)c.Sink).Events, e => e.Type == "timing.guess.finished");
+            Assert.Contains("stretched to 1,024 bytes", finished.Message);
+            Assert.Contains("the timer runs in the same process", finished.Message);
+            Assert.Contains("did not recover the secret in 500 samples per candidate", finished.Check.Detail);
+        }
+
+        [Fact]
         public void Control_run_shows_both_histograms_the_verdict_the_guess_and_the_managed_statement()
         {
             LabContext c = Context(null);
-            IFuture<LabResult> run = LabCatalog.Find(11).Run(c);
+            IFuture<LabResult> run = new TimingAttackLab().Run(c);
             Make.Done(run);
             TraceEvent[] events = ((ListSink)c.Sink).Events;
             Assert.True(run.Result.Completed, run.Result.FailedCode + " " + run.Result.FailedCheck);
@@ -282,7 +319,7 @@ namespace NetSec.Tests
         public void Guess_against_the_leaky_compare_recovers_the_secret_and_fails_no_check()
         {
             LabContext c = Context(Row("L11-guess-leaky"));
-            IFuture<LabResult> run = LabCatalog.Find(11).Run(c);
+            IFuture<LabResult> run = new TimingAttackLab().Run(c);
             Make.Done(run);
             Assert.True(run.Result.Completed, run.Result.FailedCode + " " + run.Result.FailedCheck);
             TraceEvent[] events = ((ListSink)c.Sink).Events;
@@ -295,7 +332,7 @@ namespace NetSec.Tests
         public void Guess_against_the_constant_time_compare_is_stopped_by_the_named_check()
         {
             LabContext c = Context(Row("L11-guess-constant-time"));
-            IFuture<LabResult> run = LabCatalog.Find(11).Run(c);
+            IFuture<LabResult> run = new TimingAttackLab().Run(c);
             Make.Done(run);
             Assert.False(run.Result.Completed);
             Assert.Equal(ErrorCodes.TimingGuessStopped, run.Result.FailedCode);
@@ -308,7 +345,7 @@ namespace NetSec.Tests
         public void An_unknown_option_on_lesson_11_is_refused_by_name()
         {
             AttackDefinition bad = new AttackDefinition { AttackId = "L11-nonsense", Lesson = 11, Options = new LabOption[0] };
-            IFuture<LabResult> run = LabCatalog.Find(11).Run(Context(bad));
+            IFuture<LabResult> run = new TimingAttackLab().Run(Context(bad));
             Make.Done(run);
             Assert.True(run.IsFaulted);
             Assert.Contains("L11-nonsense", run.Exception.Message);

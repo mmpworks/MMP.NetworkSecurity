@@ -123,16 +123,22 @@ namespace Acceptance
         }
     }
 
-    /// <summary>The hex log a `tap` relay writes: one line per chunk, "C2S hex" or "S2C hex".</summary>
+    /// <summary>
+    /// The hex log a `tap` relay writes (acceptance/referees/README.md): one record per line, "&lt;conn&gt; c2s|s2c &lt;offset&gt; &lt;hex&gt;", and a
+    /// "# flip conn=.. dir=.. offset=.. from=.. to=.." line when it flipped a byte. The hex is the bytes as forwarded.
+    /// </summary>
     public sealed class TapLog
     {
         public byte[] ClientToServer = new byte[0];
         public byte[] ServerToClient = new byte[0];
+        public List<string> Flips = new List<string>();
+        public int Connections;
 
         public static TapLog Read(string path)
         {
             if (!File.Exists(path)) throw new FailException("tap log " + path + " does not exist");
-            MemoryStream c2s = new MemoryStream(), s2c = new MemoryStream();
+            Dictionary<string, MemoryStream> streams = new Dictionary<string, MemoryStream>();
+            TapLog t = new TapLog();
             using (FileStream fs = new FileStream(path, FileMode.Open, FileAccess.Read, FileShare.ReadWrite | FileShare.Delete))
             using (StreamReader sr = new StreamReader(fs))
             {
@@ -141,16 +147,29 @@ namespace Acceptance
                 {
                     line = line.Trim();
                     if (line.Length == 0) continue;
-                    int sp = line.IndexOf(' ');
-                    if (sp < 0) throw new FailException("tap log line without a direction: " + line.Substring(0, Math.Min(40, line.Length)));
-                    string dir = line.Substring(0, sp);
-                    byte[] bytes = Hex.Decode(line.Substring(sp + 1));
-                    if (dir == "C2S") c2s.Write(bytes, 0, bytes.Length);
-                    else if (dir == "S2C") s2c.Write(bytes, 0, bytes.Length);
-                    else throw new FailException("tap log direction must be C2S or S2C, got " + dir);
+                    if (line.StartsWith("#")) { if (line.StartsWith("# flip")) t.Flips.Add(line); continue; }
+                    string[] f = line.Split(new char[] { ' ' }, 4);
+                    if (f.Length != 4) throw new FailException("tap log line has " + f.Length + " fields, expected '<conn> <dir> <offset> <hex>': " + line.Substring(0, Math.Min(60, line.Length)));
+                    int conn = int.Parse(f[0]);
+                    if (conn > t.Connections) t.Connections = conn;
+                    if (f[1] != "c2s" && f[1] != "s2c") throw new FailException("tap log direction must be c2s or s2c, got " + f[1]);
+                    string key = conn.ToString("D4") + f[1];
+                    MemoryStream ms;
+                    if (!streams.TryGetValue(key, out ms)) { ms = new MemoryStream(); streams[key] = ms; }
+                    long offset = long.Parse(f[2]);
+                    if (offset != ms.Length) throw new FailException("tap log offset " + offset + " does not continue the stream (length so far " + ms.Length + ")");
+                    byte[] bytes = Hex.Decode(f[3]);
+                    ms.Write(bytes, 0, bytes.Length);
                 }
             }
-            TapLog t = new TapLog();
+            List<string> keys = new List<string>(streams.Keys);
+            keys.Sort(StringComparer.Ordinal);
+            MemoryStream c2s = new MemoryStream(), s2c = new MemoryStream();
+            foreach (string k in keys)
+            {
+                byte[] b = streams[k].ToArray();
+                if (k.EndsWith("c2s")) c2s.Write(b, 0, b.Length); else s2c.Write(b, 0, b.Length);
+            }
             t.ClientToServer = c2s.ToArray();
             t.ServerToClient = s2c.ToArray();
             return t;

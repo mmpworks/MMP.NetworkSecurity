@@ -1,11 +1,11 @@
 {
   "summary": {
     "schema": 1,
-    "timestamp": "2026-11-05T04:45:19.5887372-06:00",
+    "timestamp": "2026-11-05T04:58:52.2862549-06:00",
     "machine": "BEAST",
     "command": "run.ps1 -Clauses A12",
     "productRoot": "E:\\dev\\ns-s7",
-    "productCommit": "feb1468",
+    "productCommit": "bdd0288",
     "acceptanceCommit": "18ca011",
     "freshClone": false,
     "productPresent": true,
@@ -16,12 +16,12 @@
     "notRun": 4,
     "reasons": [
       {
-        "key": "NOT RUN NATIVE_DLL_NOT_BUILT",
-        "count": 3
+        "key": "NOT RUN LESSON_NOT_BUILT",
+        "count": 1
       },
       {
-        "key": "NOT RUN PRODUCT_MISSING",
-        "count": 1
+        "key": "NOT RUN NATIVE_DLL_NOT_BUILT",
+        "count": 3
       }
     ],
     "selfChecks": {
@@ -42,7 +42,7 @@
       "status": "PASS",
       "reason": "",
       "detail": "cl.exe builds the DLL as C++ and the same file as C, warnings as errors; 103424 bytes",
-      "ms": 3363
+      "ms": 4111
     },
     {
       "id": "A12.native.load-direct.cf",
@@ -54,7 +54,7 @@
       "status": "PASS",
       "reason": "",
       "detail": "6 of 6 vectors",
-      "ms": 3066
+      "ms": 3947
     },
     {
       "id": "A12.native.load-direct.net10",
@@ -66,7 +66,7 @@
       "status": "PASS",
       "reason": "",
       "detail": "6 of 6 vectors",
-      "ms": 3
+      "ms": 4
     },
     {
       "id": "A12.product.native-compare-loads.cf",
@@ -77,8 +77,8 @@
       "referee": "cl.exe and a live run",
       "status": "NOT RUN",
       "reason": "NATIVE_DLL_NOT_BUILT",
-      "detail": "run groups/native first with the same --work folder (A12.native.build-cl); expected E:\\dev\\ns-s7\\acceptance\\.work\\run-20261105-044455\\native-x64\\netsec_ct.dll",
-      "ms": 4
+      "detail": "run groups/native first with the same --work folder (A12.native.build-cl); expected E:\\dev\\ns-s7\\acceptance\\.work\\run-20261105-045823\\native-x64\\netsec_ct.dll",
+      "ms": 7
     },
     {
       "id": "A12.product.native-compare-loads.net10",
@@ -89,8 +89,8 @@
       "referee": "cl.exe and a live run",
       "status": "NOT RUN",
       "reason": "NATIVE_DLL_NOT_BUILT",
-      "detail": "run groups/native first with the same --work folder (A12.native.build-cl); expected E:\\dev\\ns-s7\\acceptance\\.work\\run-20261105-044455\\native-x64\\netsec_ct.dll",
-      "ms": 6
+      "detail": "run groups/native first with the same --work folder (A12.native.build-cl); expected E:\\dev\\ns-s7\\acceptance\\.work\\run-20261105-045823\\native-x64\\netsec_ct.dll",
+      "ms": 8
     },
     {
       "id": "A12.product.timing-judge-agrees",
@@ -101,7 +101,7 @@
       "referee": "cl.exe and a live run",
       "status": "NOT RUN",
       "reason": "NATIVE_DLL_NOT_BUILT",
-      "detail": "run groups/native first with the same --work folder (A12.native.build-cl); expected E:\\dev\\ns-s7\\acceptance\\.work\\run-20261105-044455\\native-x64\\netsec_ct.dll",
+      "detail": "run groups/native first with the same --work folder (A12.native.build-cl); expected E:\\dev\\ns-s7\\acceptance\\.work\\run-20261105-045823\\native-x64\\netsec_ct.dll",
       "ms": 0
     },
     {
@@ -113,8 +113,8 @@
       "referee": "cl.exe and a live run",
       "status": "PASS",
       "reason": "",
-      "detail": "samples 100000 per case, buffer 4096 bytes. which=0 (leaky) |t|=951.5 (uncropped 227.0), which=1 (constant time) |t|=43.31 (uncropped 13.17). Thresholds: leaky |t| > 4.5 and above 3 x constant-time |t|. Optimizer-dependent (accuracy rule 5).",
-      "ms": 482
+      "detail": "samples 100000 per case, buffer 4096 bytes. which=0 (leaky) |t|=861.3 (uncropped 341.8), which=1 (constant time) |t|=2.39 (uncropped 2.18). Thresholds: leaky |t| > 4.5 and above 3 x constant-time |t|. Optimizer-dependent (accuracy rule 5).",
+      "ms": 572
     },
     {
       "id": "A12.tour.states-no-constant-time-guarantee",
@@ -124,8 +124,8 @@
       "build": "host",
       "referee": "cl.exe and a live run",
       "status": "NOT RUN",
-      "reason": "PRODUCT_MISSING",
-      "detail": "no tour files at app/src/tours/lesson-*.json yet",
+      "reason": "LESSON_NOT_BUILT",
+      "detail": "lesson 11 has no tour yet",
       "ms": 0
     }
   ]

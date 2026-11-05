@@ -2532,6 +2532,17 @@
    "counts": false
   },
   {
+   "id": "SELF.referee-protocols",
+   "base": "SELF.referee-protocols",
+   "assertion": "SELF",
+   "group": "selftest",
+   "build": "host",
+   "slice": "S0",
+   "referee": "stand-ins built on the BCL, python cryptography and real OpenSSL runs",
+   "roles": [],
+   "counts": false
+  },
+  {
    "id": "SELF.reference-passes",
    "base": "SELF.reference-passes",
    "assertion": "SELF",

@@ -196,12 +196,14 @@ $groupsNeeded = @($pending | ForEach-Object { $_.group } | Sort-Object -Unique)
 $needsProductGroups = @('prim', 'dukpt', 'kschedule', 'tls13live', 'tls11', 'ssh', 'auth', 'nativeprod', 'bridge', 'host', 'keys', 'binproof', 'e2e')
 $wantProduct = @($groupsNeeded | Where-Object { $needsProductGroups -contains $_ }).Count -gt 0
 
-function Build-Piece([string]$key, [string]$projRel, [string[]]$extra, [string]$outRel) {
+function Build-Piece([string]$key, [string]$projRel, [string[]]$extra, [string[]]$outRels) {
     $proj = Join-Path $ProductRoot $projRel
     if (-not (Test-Path $proj)) { $prep.errors[$key] = "PRODUCT_MISSING:$projRel does not exist yet"; return }
     $r = Invoke-Tool 'dotnet' (@('build', $proj, '-c', 'Release', '--nologo', '-v', 'q') + $extra) -TimeoutSec 1800
-    $out = Join-Path $ProductRoot $outRel
-    if ($r.ExitCode -eq 0 -and (Test-Path $out)) { $prep[$key] = $out }
+    # The first output that exists wins. Design section 11 names the .exe outputs of Node and Host. The .dll is the fallback.
+    $out = $null
+    foreach ($rel in $outRels) { $cand = Join-Path $ProductRoot $rel; if (Test-Path $cand) { $out = $cand; break } }
+    if ($r.ExitCode -eq 0 -and $out) { $prep[$key] = $out }
     else { $prep.errors[$key] = "PRODUCT_BUILD_FAILED:dotnet build $projRel exited $($r.ExitCode): " + (Tail $r.Output) }
 }
 
@@ -213,8 +215,8 @@ if ($wantProduct -and -not $FreshChild -or ($wantProduct -and $FreshChild)) {
         Build-Piece 'core10' 'src\NetSec.Core\NetSec.Core.csproj' @() 'src\NetSec.Core\bin\Release\net10.0\NetSec.Core.dll'
         Build-Piece 'coreCf' 'src\NetSec.Core.NetCF\NetSec.Core.NetCF.csproj' $cfProps 'src\NetSec.Core.NetCF\bin\Release\net35\NetSec.Core.dll'
         Build-Piece 'ce' 'src\NetSec.CeDevice\NetSec.CeDevice.csproj' $cfProps 'src\NetSec.CeDevice\bin\Release\net35\NetSec.CeDevice.exe'
-        Build-Piece 'node' 'src\NetSec.Node\NetSec.Node.csproj' @() 'src\NetSec.Node\bin\Release\net10.0\NetSec.Node.dll'
-        Build-Piece 'host' 'src\NetSec.Host\NetSec.Host.csproj' @() 'src\NetSec.Host\bin\Release\net10.0\NetSec.Host.dll'
+        Build-Piece 'node' 'src\NetSec.Node\NetSec.Node.csproj' @() @('src\NetSec.Node\bin\Release\net10.0\NetSec.Node.exe', 'src\NetSec.Node\bin\Release\net10.0\NetSec.Node.dll')
+        Build-Piece 'host' 'src\NetSec.Host\NetSec.Host.csproj' @() @('src\NetSec.Host\bin\Release\net10.0\NetSec.Host.exe', 'src\NetSec.Host\bin\Release\net10.0\NetSec.Host.dll')
     } else {
         foreach ($k in 'core10', 'coreCf', 'ce', 'node', 'host') { $prep.errors[$k] = 'PRODUCT_MISSING:src/NetSec.Core does not exist yet' }
     }

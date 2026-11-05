@@ -3,14 +3,14 @@
  "lessons": [
   {
    "lesson": 0,
-   "tour": false,
+   "tour": true,
    "acceptance": {
     "schema": 1,
-    "timestamp": "2026-11-05T04:45:19.5887372-06:00",
+    "timestamp": "2026-11-05T04:58:52.2862549-06:00",
     "machine": "BEAST",
     "command": "run.ps1 -Clauses A12",
     "productRoot": "E:\\dev\\ns-s7",
-    "productCommit": "feb1468",
+    "productCommit": "bdd0288",
     "acceptanceCommit": "18ca011",
     "freshClone": false,
     "productPresent": true,
@@ -21,12 +21,12 @@
     "notRun": 4,
     "reasons": [
      {
-      "key": "NOT RUN NATIVE_DLL_NOT_BUILT",
-      "count": 3
+      "key": "NOT RUN LESSON_NOT_BUILT",
+      "count": 1
      },
      {
-      "key": "NOT RUN PRODUCT_MISSING",
-      "count": 1
+      "key": "NOT RUN NATIVE_DLL_NOT_BUILT",
+      "count": 3
      }
     ],
     "selfChecks": {
@@ -42,11 +42,11 @@
    "tour": false,
    "acceptance": {
     "schema": 1,
-    "timestamp": "2026-11-05T04:45:19.5887372-06:00",
+    "timestamp": "2026-11-05T04:58:52.2862549-06:00",
     "machine": "BEAST",
     "command": "run.ps1 -Clauses A12",
     "productRoot": "E:\\dev\\ns-s7",
-    "productCommit": "feb1468",
+    "productCommit": "bdd0288",
     "acceptanceCommit": "18ca011",
     "freshClone": false,
     "productPresent": true,
@@ -57,12 +57,12 @@
     "notRun": 4,
     "reasons": [
      {
-      "key": "NOT RUN NATIVE_DLL_NOT_BUILT",
-      "count": 3
+      "key": "NOT RUN LESSON_NOT_BUILT",
+      "count": 1
      },
      {
-      "key": "NOT RUN PRODUCT_MISSING",
-      "count": 1
+      "key": "NOT RUN NATIVE_DLL_NOT_BUILT",
+      "count": 3
      }
     ],
     "selfChecks": {
@@ -78,11 +78,11 @@
    "tour": false,
    "acceptance": {
     "schema": 1,
-    "timestamp": "2026-11-05T04:45:19.5887372-06:00",
+    "timestamp": "2026-11-05T04:58:52.2862549-06:00",
     "machine": "BEAST",
     "command": "run.ps1 -Clauses A12",
     "productRoot": "E:\\dev\\ns-s7",
-    "productCommit": "feb1468",
+    "productCommit": "bdd0288",
     "acceptanceCommit": "18ca011",
     "freshClone": false,
     "productPresent": true,
@@ -93,12 +93,12 @@
     "notRun": 4,
     "reasons": [
      {
-      "key": "NOT RUN NATIVE_DLL_NOT_BUILT",
-      "count": 3
+      "key": "NOT RUN LESSON_NOT_BUILT",
+      "count": 1
      },
      {
-      "key": "NOT RUN PRODUCT_MISSING",
-      "count": 1
+      "key": "NOT RUN NATIVE_DLL_NOT_BUILT",
+      "count": 3
      }
     ],
     "selfChecks": {
@@ -114,11 +114,11 @@
    "tour": false,
    "acceptance": {
     "schema": 1,
-    "timestamp": "2026-11-05T04:45:19.5887372-06:00",
+    "timestamp": "2026-11-05T04:58:52.2862549-06:00",
     "machine": "BEAST",
     "command": "run.ps1 -Clauses A12",
     "productRoot": "E:\\dev\\ns-s7",
-    "productCommit": "feb1468",
+    "productCommit": "bdd0288",
     "acceptanceCommit": "18ca011",
     "freshClone": false,
     "productPresent": true,
@@ -129,12 +129,12 @@
     "notRun": 4,
     "reasons": [
      {
-      "key": "NOT RUN NATIVE_DLL_NOT_BUILT",
-      "count": 3
+      "key": "NOT RUN LESSON_NOT_BUILT",
+      "count": 1
      },
      {
-      "key": "NOT RUN PRODUCT_MISSING",
-      "count": 1
+      "key": "NOT RUN NATIVE_DLL_NOT_BUILT",
+      "count": 3
      }
     ],
     "selfChecks": {
@@ -150,11 +150,11 @@
    "tour": false,
    "acceptance": {
     "schema": 1,
-    "timestamp": "2026-11-05T04:45:19.5887372-06:00",
+    "timestamp": "2026-11-05T04:58:52.2862549-06:00",
     "machine": "BEAST",
     "command": "run.ps1 -Clauses A12",
     "productRoot": "E:\\dev\\ns-s7",
-    "productCommit": "feb1468",
+    "productCommit": "bdd0288",
     "acceptanceCommit": "18ca011",
     "freshClone": false,
     "productPresent": true,
@@ -165,12 +165,12 @@
     "notRun": 4,
     "reasons": [
      {
-      "key": "NOT RUN NATIVE_DLL_NOT_BUILT",
-      "count": 3
+      "key": "NOT RUN LESSON_NOT_BUILT",
+      "count": 1
      },
      {
-      "key": "NOT RUN PRODUCT_MISSING",
-      "count": 1
+      "key": "NOT RUN NATIVE_DLL_NOT_BUILT",
+      "count": 3
      }
     ],
     "selfChecks": {
@@ -186,11 +186,11 @@
    "tour": false,
    "acceptance": {
     "schema": 1,
-    "timestamp": "2026-11-05T04:45:19.5887372-06:00",
+    "timestamp": "2026-11-05T04:58:52.2862549-06:00",
     "machine": "BEAST",
     "command": "run.ps1 -Clauses A12",
     "productRoot": "E:\\dev\\ns-s7",
-    "productCommit": "feb1468",
+    "productCommit": "bdd0288",
     "acceptanceCommit": "18ca011",
     "freshClone": false,
     "productPresent": true,
@@ -201,12 +201,12 @@
     "notRun": 4,
     "reasons": [
      {
-      "key": "NOT RUN NATIVE_DLL_NOT_BUILT",
-      "count": 3
+      "key": "NOT RUN LESSON_NOT_BUILT",
+      "count": 1
      },
      {
-      "key": "NOT RUN PRODUCT_MISSING",
-      "count": 1
+      "key": "NOT RUN NATIVE_DLL_NOT_BUILT",
+      "count": 3
      }
     ],
     "selfChecks": {
@@ -222,11 +222,11 @@
    "tour": false,
    "acceptance": {
     "schema": 1,
-    "timestamp": "2026-11-05T04:45:19.5887372-06:00",
+    "timestamp": "2026-11-05T04:58:52.2862549-06:00",
     "machine": "BEAST",
     "command": "run.ps1 -Clauses A12",
     "productRoot": "E:\\dev\\ns-s7",
-    "productCommit": "feb1468",
+    "productCommit": "bdd0288",
     "acceptanceCommit": "18ca011",
     "freshClone": false,
     "productPresent": true,
@@ -237,12 +237,12 @@
     "notRun": 4,
     "reasons": [
      {
-      "key": "NOT RUN NATIVE_DLL_NOT_BUILT",
-      "count": 3
+      "key": "NOT RUN LESSON_NOT_BUILT",
+      "count": 1
      },
      {
-      "key": "NOT RUN PRODUCT_MISSING",
-      "count": 1
+      "key": "NOT RUN NATIVE_DLL_NOT_BUILT",
+      "count": 3
      }
     ],
     "selfChecks": {
@@ -258,11 +258,11 @@
    "tour": false,
    "acceptance": {
     "schema": 1,
-    "timestamp": "2026-11-05T04:45:19.5887372-06:00",
+    "timestamp": "2026-11-05T04:58:52.2862549-06:00",
     "machine": "BEAST",
     "command": "run.ps1 -Clauses A12",
     "productRoot": "E:\\dev\\ns-s7",
-    "productCommit": "feb1468",
+    "productCommit": "bdd0288",
     "acceptanceCommit": "18ca011",
     "freshClone": false,
     "productPresent": true,
@@ -273,12 +273,12 @@
     "notRun": 4,
     "reasons": [
      {
-      "key": "NOT RUN NATIVE_DLL_NOT_BUILT",
-      "count": 3
+      "key": "NOT RUN LESSON_NOT_BUILT",
+      "count": 1
      },
      {
-      "key": "NOT RUN PRODUCT_MISSING",
-      "count": 1
+      "key": "NOT RUN NATIVE_DLL_NOT_BUILT",
+      "count": 3
      }
     ],
     "selfChecks": {
@@ -294,11 +294,11 @@
    "tour": false,
    "acceptance": {
     "schema": 1,
-    "timestamp": "2026-11-05T04:45:19.5887372-06:00",
+    "timestamp": "2026-11-05T04:58:52.2862549-06:00",
     "machine": "BEAST",
     "command": "run.ps1 -Clauses A12",
     "productRoot": "E:\\dev\\ns-s7",
-    "productCommit": "feb1468",
+    "productCommit": "bdd0288",
     "acceptanceCommit": "18ca011",
     "freshClone": false,
     "productPresent": true,
@@ -309,12 +309,12 @@
     "notRun": 4,
     "reasons": [
      {
-      "key": "NOT RUN NATIVE_DLL_NOT_BUILT",
-      "count": 3
+      "key": "NOT RUN LESSON_NOT_BUILT",
+      "count": 1
      },
      {
-      "key": "NOT RUN PRODUCT_MISSING",
-      "count": 1
+      "key": "NOT RUN NATIVE_DLL_NOT_BUILT",
+      "count": 3
      }
     ],
     "selfChecks": {
@@ -330,11 +330,11 @@
    "tour": false,
    "acceptance": {
     "schema": 1,
-    "timestamp": "2026-11-05T04:45:19.5887372-06:00",
+    "timestamp": "2026-11-05T04:58:52.2862549-06:00",
     "machine": "BEAST",
     "command": "run.ps1 -Clauses A12",
     "productRoot": "E:\\dev\\ns-s7",
-    "productCommit": "feb1468",
+    "productCommit": "bdd0288",
     "acceptanceCommit": "18ca011",
     "freshClone": false,
     "productPresent": true,
@@ -345,12 +345,12 @@
     "notRun": 4,
     "reasons": [
      {
-      "key": "NOT RUN NATIVE_DLL_NOT_BUILT",
-      "count": 3
+      "key": "NOT RUN LESSON_NOT_BUILT",
+      "count": 1
      },
      {
-      "key": "NOT RUN PRODUCT_MISSING",
-      "count": 1
+      "key": "NOT RUN NATIVE_DLL_NOT_BUILT",
+      "count": 3
      }
     ],
     "selfChecks": {
@@ -366,11 +366,11 @@
    "tour": false,
    "acceptance": {
     "schema": 1,
-    "timestamp": "2026-11-05T04:45:19.5887372-06:00",
+    "timestamp": "2026-11-05T04:58:52.2862549-06:00",
     "machine": "BEAST",
     "command": "run.ps1 -Clauses A12",
     "productRoot": "E:\\dev\\ns-s7",
-    "productCommit": "feb1468",
+    "productCommit": "bdd0288",
     "acceptanceCommit": "18ca011",
     "freshClone": false,
     "productPresent": true,
@@ -381,12 +381,12 @@
     "notRun": 4,
     "reasons": [
      {
-      "key": "NOT RUN NATIVE_DLL_NOT_BUILT",
-      "count": 3
+      "key": "NOT RUN LESSON_NOT_BUILT",
+      "count": 1
      },
      {
-      "key": "NOT RUN PRODUCT_MISSING",
-      "count": 1
+      "key": "NOT RUN NATIVE_DLL_NOT_BUILT",
+      "count": 3
      }
     ],
     "selfChecks": {
@@ -402,11 +402,11 @@
    "tour": false,
    "acceptance": {
     "schema": 1,
-    "timestamp": "2026-11-05T04:45:19.5887372-06:00",
+    "timestamp": "2026-11-05T04:58:52.2862549-06:00",
     "machine": "BEAST",
     "command": "run.ps1 -Clauses A12",
     "productRoot": "E:\\dev\\ns-s7",
-    "productCommit": "feb1468",
+    "productCommit": "bdd0288",
     "acceptanceCommit": "18ca011",
     "freshClone": false,
     "productPresent": true,
@@ -417,12 +417,12 @@
     "notRun": 4,
     "reasons": [
      {
-      "key": "NOT RUN NATIVE_DLL_NOT_BUILT",
-      "count": 3
+      "key": "NOT RUN LESSON_NOT_BUILT",
+      "count": 1
      },
      {
-      "key": "NOT RUN PRODUCT_MISSING",
-      "count": 1
+      "key": "NOT RUN NATIVE_DLL_NOT_BUILT",
+      "count": 3
      }
     ],
     "selfChecks": {

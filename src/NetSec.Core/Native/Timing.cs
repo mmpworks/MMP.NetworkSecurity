@@ -20,13 +20,16 @@ namespace NetSec.Native
         }
     }
 
-    /// <summary>T is the Welch t of two cases. Separates says |T| passes TimingJudge.MinT.</summary>
+    /// <summary>The Welch t of the leaky pair and of the constant-time pair. Separated says the stated rule holds. Threshold is the minimum leaky |t|.</summary>
     public sealed class TimingVerdict
     {
-        public readonly double T;
-        public readonly bool Separates;
+        public readonly double LeakyT, ConstantT, Threshold;
+        public readonly bool Separated;
 
-        public TimingVerdict(double t, bool separates) { T = t; Separates = separates; }
+        public TimingVerdict(double leakyT, double constantT, double threshold, bool separated)
+        {
+            LeakyT = leakyT; ConstantT = constantT; Threshold = threshold; Separated = separated;
+        }
     }
 
     /// <summary>
@@ -159,17 +162,20 @@ namespace NetSec.Native
 
         const double CropPercentile = 0.99;
 
-        public static TimingVerdict Judge(TimingCase firstByteDiff, TimingCase lastByteDiff)
+        /// <summary>Each pair is a difference in the first byte, then a difference in the last byte.</summary>
+        public static TimingVerdict Judge(TimingCase leakyFirst, TimingCase leakyLast, TimingCase constFirst, TimingCase constLast)
         {
-            if (firstByteDiff == null) throw new ArgumentNullException("firstByteDiff");
-            if (lastByteDiff == null) throw new ArgumentNullException("lastByteDiff");
-            double t = Welch(firstByteDiff.Ticks, lastByteDiff.Ticks);
-            return new TimingVerdict(t, Math.Abs(t) > MinT);
+            double leakyT = PairT(leakyFirst, leakyLast), constantT = PairT(constFirst, constLast);
+            bool separated = Math.Abs(leakyT) > MinT && Math.Abs(leakyT) > Factor * Math.Abs(constantT);
+            return new TimingVerdict(leakyT, constantT, MinT, separated);
         }
 
-        public static bool Separated(TimingVerdict leaky, TimingVerdict constantTime)
+        /// <summary>The Welch t of one pair of cases.</summary>
+        public static double PairT(TimingCase first, TimingCase second)
         {
-            return leaky.Separates && Math.Abs(leaky.T) > Factor * Math.Abs(constantTime.T);
+            if (first == null) throw new ArgumentNullException("first");
+            if (second == null) throw new ArgumentNullException("second");
+            return Welch(first.Ticks, second.Ticks);
         }
 
         /// <summary>Welch t. Both sets lose every sample above the 99th percentile of the two sets together, because scheduler pauses would rule the raw number.</summary>

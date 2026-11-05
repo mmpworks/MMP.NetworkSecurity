@@ -41,18 +41,18 @@ namespace NetSec.Native
             return sorted.Length - i;
         }
 
-        /// <summary>control is the constant-time compare against itself: two cases with one difference position. Its |t| is this machine's noise floor for one run.</summary>
-        public static string Verdict(TimingVerdict leaky, TimingVerdict constantTime, TimingVerdict control, TimingVerdict managed)
+        /// <summary>controlT is the constant-time compare against itself: two cases with one difference position. Its |t| is this machine's noise floor for one run.</summary>
+        public static string Verdict(TimingVerdict verdict, double controlT, double managedT)
         {
             StringBuilder s = new StringBuilder("{");
-            s.Append("\"leakyT\":").Append(Number(leaky.T));
-            s.Append(",\"constantTimeT\":").Append(Number(constantTime.T));
-            s.Append(",\"controlT\":").Append(Number(control.T));
-            s.Append(",\"managedT\":").Append(Number(managed.T));
-            s.Append(",\"minT\":").Append(Number(TimingJudge.MinT));
+            s.Append("\"leakyT\":").Append(Number(verdict.LeakyT));
+            s.Append(",\"constantTimeT\":").Append(Number(verdict.ConstantT));
+            s.Append(",\"controlT\":").Append(Number(controlT));
+            s.Append(",\"managedT\":").Append(Number(managedT));
+            s.Append(",\"minT\":").Append(Number(verdict.Threshold));
             s.Append(",\"factor\":").Append(Number(TimingJudge.Factor));
-            s.Append(",\"constantTimeOverMinT\":").Append(constantTime.Separates ? "true" : "false");
-            s.Append(",\"separated\":").Append(TimingJudge.Separated(leaky, constantTime) ? "true" : "false");
+            s.Append(",\"constantTimeOverMinT\":").Append(Math.Abs(verdict.ConstantT) > verdict.Threshold ? "true" : "false");
+            s.Append(",\"separated\":").Append(verdict.Separated ? "true" : "false");
             return s.Append('}').ToString();
         }
 
