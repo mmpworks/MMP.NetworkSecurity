@@ -1,22 +1,20 @@
 # MMP.NetworkSecurity: security modes design
 
-Author: Richard. Date: 2026-11-05. Status: design for review, no product code. Branch `docs/security-modes`, off `dfe9510`. Inputs: `docs/prd.md`, `docs/program-design.md`, `docs/learnings.md`, `acceptance/CONTRACT.md`, the code, and one spike.
+Author: Richard. Date: 2026-11-05. Status: revised after Steve's decisions and Iolo's red team. No product code. Branch `docs/security-modes`. Companion: `docs/modes-real-world.md` (Jared, accuracy). Where the two differ, section 12 says which one governs.
 
 ## Conclusion
 
-1. **The course holds 34 security items. They collapse to 15 switches that can go Real and 11 items that stay as they are.** 23 items sit behind the 15 switches. Section 1 lists all 34.
-2. **Each of the 15 security types is Mock or Real on its own.** A lab reads a snapshot of the types at `session.start`. A Real type that is not ready refuses the lab by name. It never falls back to Mock.
-3. **Engines get operations, never private bytes.** `IKeyHandle` widens and enters the glass engines, so a vault key signs inside the box, as an HSM does. Keys still show on screen, through the Host (section 6). This reverses the last sentence of D5, so it needs Steve's yes (decision O1).
-4. **SQLite works as the vault.** The spike created, stored, and read keys through `Microsoft.Data.Sqlite.Core` on .NET 10, signed inside the box, and OpenSSL verified the signature. Use the `.Core` package with `SQLitePCLRaw.bundle_e_sqlite3` 3.0.3. The plain `Microsoft.Data.Sqlite` 10.0.9 package pulls a bundle with a high-severity advisory, and `TreatWarningsAsErrors` turns that warning into a build failure.
-5. **"Real" means one thing: a real key in place of a mock one.** The `SslStream` path gets its own name, "OS transport". They are two separate axes. Transport asks whose code speaks the protocol. Keys ask whose key signs.
-6. **The spike found three limits that shape the wizards.**
-   - The glass chain check accepts Ed25519 signatures only (`Certificate.cs:216`), so a certificate from a public CA fails today.
-   - Windows `SslStream` fails against an Ed25519 server certificate. **So `A16.real-mode.os-transport-writes-no-secret-bytes` cannot pass as written**, because `HostClauses.cs:175` makes its peer key Ed25519. The clause needs an RSA peer. Echo owns that edit.
-   - The .NET BCL has no Ed25519 type, `X509Certificate2` rejects an Ed25519 PEM, and an Ed25519 PKCS#12 file fails to load. So an Ed25519 key can use only PEM, OpenSSH, or the vault, through our own readers. The OS store route is RSA only (inferred from those results; the store itself was not touched).
-7. **One app-wide "Show keys" toggle decides what shows, default ON, in Mock and Real alike.** Steve's ruling. OFF puts fingerprints in place of key bytes at the Host's trace boundary (section 6).
-8. **A separate bug waits behind the OS transport.** The clause wants `transportKind == "os"` (`HostClauses.cs:199`). The app tests for `'real'` (`app/src/store.ts:100`, `:206`). A working OS transport would still show the TRAINING ONLY chip.
+1. **The course holds 34 security items. 23 of them sit behind 15 types, and every one of the 15 can take a learner's own test key.** The other 11 items stay as they are. Section 1 lists all 34.
+2. **Steve's O1: option C. Keys reach the engines as bytes, through a facade. The engines do not change, and A16's type clauses stay green.** `CredentialSet` implements `ITrainingKeySource`, so `GlassTransportFactory` keeps its one constructor.
+3. **Sign-inside and refuse-export are taught in one separate vault exercise:** sign, derive, refuse, audit. The labs do not use those paths.
+4. **Five "make my set" flows, kept as data, cover the 15 types.** DUKPT and the passkey-shaped login stay available, and the screen says no outside tool can judge them.
+5. **One app-wide Show keys toggle, default ON, for built-in and own keys alike.** Test id `show-keys-switch`. OFF puts fingerprints in place of key bytes at the Host's trace boundary.
+6. **The UI says "My test key", never "Real".** The `SslStream` path is the "OS transport", and that button changes too.
+7. **SQLite works as the vault.** The spike's output is in section 4.4.
+8. **`A16.real-mode` cannot pass as written.** Windows `SslStream` fails on an Ed25519 peer, and `HostClauses.cs:175` makes one. Echo changes it to RSA. Slice V2 closes it, in its own PR.
+9. **This round cuts** the OS store, PKCS#12, the data-key wizard, and RSA chains on glass. Section 9.3 names each cut and the door left open.
 
-Two things for Steve: decide O1, and confirm O3 (the keys live in a gitignored `.security/` folder inside the project).
+**The M Echo should expect: 259.** That is the 208 counted today plus 51 new clauses (section 9.2). Renames add none.
 
 ## 1. Inventory
 
@@ -73,7 +71,7 @@ Format notes: "seed" is 32 bytes, "PKCS#8" is DER, as in `CONTRACT.md` rule 5.
 
 ### 1.5 Session and per-run secrets
 
-| # | Item | Lessons | Made today | Holder | Format | Real? | Switch |
+| # | Item | Lessons | Made today | Holder | Format | A learner's own? | Switch |
 |---|---|---|---|---|---|---|---|
 | 26 | `aes.key` | 1 | Drawn, `Lesson01Aes.cs:64` | Both sides | 16 bytes | A data key from a KMS | `lab.aes-key` |
 | 27 | `seal.key` | 2 | Drawn, `Lesson02Seals.cs:58` | Both sides | Bytes | A data key from a KMS | `lab.seal-key` |
@@ -85,17 +83,17 @@ Format notes: "seed" is 32 bytes, "PKCS#8" is DER, as in `CONTRACT.md` rule 5.
 | 33 | Challenge and token values | 10 | `Lesson10Auth.cs:259,265,296` | Client, issuer | Bytes | Per login | None |
 | 34 | `lab-secret` | 11 | `Lesson11Timing.cs:96`, 4 bytes | Target | 4 bytes | **Nothing. See below** | None |
 
-### 1.6 What cannot go Real, and why
+### 1.6 What stays built-in, and why
 
 | Item | Why |
 |---|---|
 | #11 attacker key | An attacker's key has no real owner. Attack rows stay the same in both modes |
 | #16 attack certificates | They need a CA that signs a bad certificate. They run only when `pki.root-ca` can sign. With a trust-only CA, rows `L4-expired-cert`, `L4-wrong-name`, and `L10-wrong-client-name` show as unavailable, with code `ATTACK_NEEDS_CA_KEY` |
 | #28 to #33 | They exist for one run. A provisioned one would be wrong |
-| #34 `lab-secret` | The timing lab needs a chosen 4-byte secret so the guess loop can finish (`Lesson11Timing.cs:31`). A real secret has no such size |
-| #25 PIN and PAN | **Pushback.** Steve said "real data", and these two stay test values. Glass traces show the clear PIN field, and a real PAN or PIN there is cardholder data. PRD line 179 records a public data class. The wizard offers no field for them, and `--pan` refuses a number outside a short list of test numbers, with code `TEST_DATA_ONLY`. I would change this only if Steve asks for it and Dave has read it |
+| #34 `lab-secret` | The timing lab needs a chosen 4-byte secret so the guess loop can finish (`Lesson11Timing.cs:31`). A learner's secret would have no such size |
+| #25 PIN and PAN | These two stay test values, and Steve uses test data. Glass traces show the clear PIN field, and a real PAN or PIN there is cardholder data. PRD line 179 records a public data class. The wizard offers no field for them, and `--pan` refuses a number outside a short list of test numbers, with code `TEST_DATA_ONLY`. I would change this only if Steve asks for it and Dave has read it |
 
-### 1.7 Labs and protocols against the switches
+### 1.7 Labs and protocols against the types
 
 | Lab | Protocol | Switches it reads |
 |---|---|---|
@@ -126,7 +124,7 @@ These limits decide which real items a wizard can accept.
 | SSH host key | Ed25519 or RSA | `SshHostKey.cs:37-38`, RSA signs with SHA-1 |
 | Token, challenge, DPoP | Ed25519 only | `Auth.cs:101` |
 
-Result: no certificate from a public CA runs in a glass engine today, and no ECDSA certificate can run there at any slice of this plan (decision O2).
+Result: no certificate from a public CA runs in a glass engine today, and no RSA-signed or ECDSA chain runs there this round (decision O2).
 
 Jared ran openssl-made chains through `ChainCheck.Run` on `dfe9510`:
 
@@ -137,38 +135,40 @@ Jared ran openssl-made chains through `ChainCheck.Run` on `dfe9510`:
 | Ed25519 root, intermediate, leaf, with the intermediate sent | Pass |
 | RSA or P-256 root | `CERT_SIGNATURE: the signature on certificate 0 does not verify` |
 
-The last row misleads: that name tells a learner the certificate was tampered with. So `ChainCheck` gains `CERT_SIGNATURE_ALG_UNSUPPORTED`, in slice M3, before any Real item can reach it. Wizards generate Ed25519 CAs by default, for this reason.
+The last row misleads: that name tells a learner the certificate was tampered with. So `ChainCheck` gains `CERT_SIGNATURE_ALG_UNSUPPORTED`, in slice V4, before a learner's key can reach it. Wizards generate Ed25519 CAs by default, for this reason.
 
 ## 2. Per-type mode
+
+**Words.** The doc and the code say `BuiltIn` and `Mine`. The UI says "Built-in key" and "My test key". The UI never says "Real" (clause `A17.ui.no-word-real`). The inventory's "a real one is" column describes production, which this course never touches.
 
 ### 2.1 Resolution rules
 
 | Question | Answer |
 |---|---|
-| Which option wins | One row per type in `modes.json`: `mode` and `binding`. There is no global switch |
+| Which option wins | One row per type in `modes.json`: `mode` and `binding`. There is no global switch. A flow sets all its types at once, and each type can then go back on its own |
 | When is it chosen | At `session.start`. The Host builds an immutable `CredentialSet`, and a fork reuses its parent's set |
 | Both exist | A type has one active binding. Older versions stay stored and unused |
-| None exists | Mock always exists. Real with no binding is `Unconfigured` |
+| None exists | `BuiltIn` always exists. `Mine` with no binding is `Unconfigured` |
 | Where is it visible | The security page, `session.started.security[]`, the session file's first line, and a chip beside TRAINING ONLY |
 | Many accounts or projects | One learner, one machine: an explicit non-goal. Each worktree has its own `.security/` folder |
 
 ### 2.2 States
 
-A type in Mock has no state to manage. A type in Real has one of the four states. `Broken` is computed at read time and is never stored.
+A `BuiltIn` type has no state to manage. `Broken` is computed at read time and is never stored.
 
 | State | Means | Moves to |
 |---|---|---|
-| `Unconfigured` | Mode is Real and no binding exists | `Configured`, when a wizard writes the binding |
-| `Configured` | A binding exists, and the proof has not passed for this version | `Verified`, when the proof passes |
-| `Verified` | The referee passed for this version | `Broken`, or `Configured` when the version changes |
-| `Broken` | Was verified, and now the file hash changed, the certificate expired, or the key is gone | `Configured` after a fix. The wizard names the cause |
+| `Unconfigured` | `Mine`, with no binding | `Configured`, when a flow writes the binding |
+| `Configured` | A binding exists, and its check has not passed for this version | `Verified`, when the check passes |
+| `Verified` | The flow's check passed for this version. **This is the product's own word, and it never counts toward the kill condition** | `Broken`, or `Configured` when the version changes |
+| `Broken` | Was verified, and now a file hash changed, a certificate expired, or a key is gone | `Configured` after a fix. The flow names the cause |
 
 ```csharp
-public enum CredentialMode { Mock, Real }
+public enum CredentialMode { BuiltIn, Mine }
 public enum Readiness { Ready, Unconfigured, Configured, Broken }
 public sealed class LabDecision { public readonly bool MayRun; public readonly TypeProblem[] Problems; }   // TypeProblem { TypeId, Code, Detail }
 public static class SecurityReadiness {
-    // Pure. Same input, same answer. A test calls it with no Host, no file, and no clock of its own.
+    // Pure. Same input, same answer. A test calls it with no Host and no file.
     public static LabDecision Decide(string[] typesTheLabReads, SecurityTypeState[] states, DateTime now);
 }
 public static class LabCatalog { public static string[] Needs(int lesson); }   // Added beside Find. The table in 1.7 as data
@@ -178,196 +178,199 @@ public static class LabCatalog { public static string[] Needs(int lesson); }   /
 
 | Case | Lab behaviour |
 |---|---|
-| All its types are Mock | Runs as today. Byte-equal to today, by the slice M0 check |
-| A Real type is `Verified` | Runs with the Real item |
-| A Real type is `Configured` | **Refuses** with `SECURITY_TYPE_NOT_PROVEN`, because an unproved key can fail for an unnamed reason inside a lesson |
-| A Real type is `Unconfigured` or `Broken` | **Refuses** with `SECURITY_TYPE_NOT_READY`, naming each type and its wizard route |
-| Types disagree | **Refuses** with `SECURITY_TYPES_DISAGREE`. Example: `tls13.server` is Real and `tls.trust` is Mock, so the chain cannot reach an anchor. The rule runs before the lab starts |
+| All its types are `BuiltIn` | Runs as today. Byte-equal to the golden trace |
+| A `Mine` type is `Verified` | Runs with that key |
+| A `Mine` type is `Configured` | **Refuses** with `SECURITY_TYPE_NOT_PROVEN`, because an unchecked key can fail for an unnamed reason inside a lesson |
+| A `Mine` type is `Unconfigured` or `Broken` | **Refuses** with `SECURITY_TYPE_NOT_READY`, naming each type and its flow |
+| Types disagree | **Refuses** with `SECURITY_TYPES_DISAGREE`. Example: `tls13.server` is `Mine` and `tls.trust` is `BuiltIn`, so the chain cannot reach an anchor |
 | An attack row needs what the item lacks | The row shows `available: false` with its code, and the lab itself runs |
-| Show keys is OFF, or a Real key is non-exportable | Runs. Neither one changes what the lab does. They change only what the Host shows (section 6) |
+| Show keys is OFF, or a key is non-exportable | Runs. Neither one changes what the lab does |
 
-A lab never falls back to Mock in silence. A silent fallback is the green-light drift the house rules name: the run would report success on the wrong key. To run with Mock, the learner flips the type to Mock.
-
-Decision point: `session.start` (gem `decide-at-authoritative-boundary`).
+A lab never falls back to built-in keys in silence. The run would report success on the wrong key. Decision point: `session.start` (gem `decide-at-authoritative-boundary`).
 
 ### 2.4 Derived bindings
-
-Three types default to following another type, so a new user meets one wizard, and the types disagree only on purpose.
 
 | Type | Default binding |
 |---|---|
 | `tls.trust` | The root of `pki.root-ca` |
-| `ssh.known-hosts` | The public key of the matching host key type |
-| `dukpt.pad` | Derived inside the box from `dukpt.bdk`, with a new key id for each lab run |
+| `ssh.known-hosts` | A prepared line from the matching host key. The flow offers no learn-on-first-connect, because lesson 9 step 3 says the pin was put on the device ahead of time (`modes-real-world.md` section 6) |
+| `dukpt.pad` | Derived from `dukpt.bdk` with the lab's fixed key id. In lesson 9, this replaces the constant at `PinEnvelope.cs:83` |
 
-A new key id per run means each sale gets an unused KSN, with no register state to store. The cost: a same-seed fork of a Real DUKPT run differs in its key id. Mock keeps today's fixed id.
+The KSN ledger is per run today, so a fixed key id repeats a KSN across runs under one key. That is a lab shortcut, and the lesson 6 tour text says so. Same-seed forks stay comparable as a result.
+
+### 2.5 Names are read-only
+
+**Pick: the flows' names are read-only this round. `Credential` carries no name field.** This also removes Iolo's M0 failure: `Lesson10Auth.cs:57-59` holds constant subject, audience, and issuer, `:415` compares the audience, and a learner-chosen name would fail there.
+
+| Name | Value | Source |
+|---|---|---|
+| Server name | `localhost` | `TrainingPki.cs:13` |
+| Client name | `pump-reader-4` | `TrainingPki.cs:14` |
+| Root name | `MMP.NetworkSecurity training root` | `TrainingCa.cs:14` |
+| Token issuer, audience | `https://pump.training/issuer`, `https://pump.training/api` | `Lesson10Auth.cs:58-59` |
+| SSH host | The lab's constant | `Lesson08Ssh.cs`, `HostName` |
+
+The flow shows these names and says why they are fixed. An imported certificate must carry them, or it gets `CERT_NAME_MISSING`. This also stops a name from moving attack offsets (section 3.4). The door left open: add the fields to `Credential` when a lesson needs them.
 
 ## 3. Plugin seam
 
 ### 3.1 Signatures
 
-All in `src/NetSec.Core/Keys`, C# 3, on both builds. This is additive except for `IKeyHandle`, which has no implementer today. Keys sits below Io in `tools/layer_check.py`, so nothing here names a Dukpt or Io type.
+All in `src/NetSec.Core/Keys`, C# 3, on both builds. Additive.
 
 ```csharp
-public enum KeyAlgorithm { Ed25519, X25519, Rsa2048, Aes128, Aes256, Raw, Rsa }   // Added Rsa: any modulus of 2048 bits or more
-public enum SignScheme { Ed25519, RsaPkcs1Sha1, RsaPkcs1Sha256, RsaPkcs1Md5Sha1 }
-
-public interface IKeyHandle {                 // Widened. No member returns private bytes
-    string KeyId {get;}  KeyAlgorithm Algorithm {get;}
-    byte[] Public();
-    byte[] Sign(SignScheme scheme, byte[] message);
-}
-public interface IKeyTransportHandle : IKeyHandle { bool TryDecryptPkcs1(byte[] cipher, out byte[] plain); }   // TLS 1.1 key transport
-public interface IBaseKey {                   // A BDK. The derivation runs in the box
-    string KeyId {get;}  KeyAlgorithm Algorithm {get;}  string CheckValue {get;}
-    byte[] DeriveInitialKey(byte[] initialKeyId);
-    byte[] DeriveWorkingKey(byte[] ksn, int usage, int keyType);
-}
-public interface IDataKeySource { byte[] NewDataKey(int size, IRandomSource labRandom); }   // Mock draws from labRandom, so same-seed runs stay equal. Real ignores it
-
 public sealed class Credential {              // One security type, resolved. Immutable
-    public readonly string TypeId, ProviderKind, Fingerprint, PeerName;
+    public readonly string TypeId, ProviderKind, Fingerprint;
     public readonly CredentialMode Mode;
     public readonly int Version;
-    public readonly IKeyHandle Key;           // Null for a type with no private half
-    public readonly IBaseKey BaseKey;         // dukpt.bdk only
-    public readonly IDataKeySource DataKeys;  // lab.aes-key and lab.seal-key only
-    public readonly byte[][] Chain, Anchors;  // DER. Leaf first
+    public readonly bool ShowBytes;           // False for a key made non-exportable
+    public readonly bool CanIssue;            // The CA key is here, so bad-certificate attack rows can run
+    public readonly bool Imported;            // Drives the lab clock, section 3.4
+    public readonly ITrainingKey Key;         // Null for a type with no private half
+    public readonly byte[][] Chain, Anchors;  // DER, leaf first, intermediates included. Null means the lab issues as today
     public readonly string Lines;             // known_hosts or authorized_keys text
-    public string Display;                    // Set by the Host, section 6.3: null, or the reason this key cannot show
 }
 public sealed class CredentialBinding { public string TypeId, ProviderKind, Locator; public int Version; }
 public interface ICredentialProvider {
-    string Kind {get;}                        // "mock", "file", "os-store", "vault"
-    CredentialCheck Check(CredentialBinding binding);   // Cheap. Uses no private key
+    string Kind {get;}                        // "builtin", "file", "vault". A string, so a later provider adds no enum value
+    CredentialCheck Check(CredentialBinding binding);   // Cheap. Reads no private key
     Credential Open(CredentialBinding binding);
-    bool TryExportForDisplay(CredentialBinding binding, out byte[] material);   // False for a non-exportable key. Only the Host calls it. Section 6.3
 }
-public sealed class CredentialSet {           // What a lab holds. A snapshot
+public sealed class CredentialSet : ITrainingKeySource {   // What a lab holds. A snapshot
     public Credential Get(string typeId);     // A missing type throws SECURITY_TYPE_NOT_READY
+    public ITrainingKey Find(string keyId);   // Routes each KeyIds value to its type. attacker-ed25519 always gives the built-in key
     public CredentialSummary[] Summary();     // Public facts only. Goes in session.started and the session file
-    public static CredentialSet Mock(ITrainingKeySource keys);
+    public static CredentialSet BuiltIn(ITrainingKeySource keys);
 }
 public static class SecurityTypes { public const string RootCa = "pki.root-ca"; /* and the other 14 */ }
+public sealed class LabContext { /* existing fields */ public CredentialSet Credentials; }   // Null means CredentialSet.BuiltIn(new TrainingKeySource())
 ```
 
-The additions outside `Keys`:
-
-```csharp
-public sealed class LabContext { /* existing fields */ public CredentialSet Credentials; }   // Null means CredentialSet.Mock(new TrainingKeySource())
-public sealed class GlassTransportFactory { public GlassTransportFactory(ITrainingKeySource keys); public GlassTransportFactory(CredentialSet credentials); }
-public sealed class TrainingCa { /* existing */ public TrainingCa(IKeyHandle key, string name); }
-public static class Token { /* existing */ public static string Issue(IKeyHandle k, string claimsJson); }
-```
-
-`ITrainingKeySource` stays the root of Mock: `MockCredentialProvider` wraps `TrainingKeySource`, and its handle calls the same `Ed25519.Sign` on the same seed.
+`ITrainingKey` now means "a test key this course may read". That is the same contract as D5's, on a key the learner made. `IKeyHandle` and `IKeyHandleSource` stay in `Keys.cs` as they are, with no implementer: they name a production key, and it still has no route into glass.
 
 ### 3.2 Providers
 
 | Provider | Project, build | Handles | Refuses by name |
 |---|---|---|---|
-| `mock` | Core, both builds | All 15 types | Nothing |
-| `file`: PEM, PKCS#8, OpenSSH | Core, both builds. Reuses `Der`, `RsaPkcs8`. It is the only Real provider the CE process can use | Ed25519, RSA | `KEY_FILE_ENCRYPTED`, `KEY_FILE_FORMAT` |
-| `file`: PKCS#12 | Host, net10 only, through `X509CertificateLoader` | RSA only. Spike: Ed25519 PKCS#12 throws | `PKCS12_ED25519_UNSUPPORTED`, `PKCS12_PASSWORD` |
-| `os-store` | Host, net10 only, `X509Store` and `RSACng` | RSA only: PKCS#1 decrypt and SHA-1 sign pass in the spike. The raw 36-byte form failed, so the TLS 1.1 ECDHE suite is out. The lab forces RSA key transport (`Lesson07Tls11.cs` `Common`), so lesson 7 still works | `OS_STORE_NOT_FOUND`, `OS_STORE_KEY_NOT_USABLE` |
-| `vault` | New `src/NetSec.Vault`, net10 only. Host and Node reference it | All key types | Section 4 |
+| `builtin` | Core, both builds. Wraps `TrainingKeySource` | All 15 types | Nothing |
+| `file`: PEM, PKCS#8, OpenSSH | Core, `Pki/KeyFileReader`, C# 3, beside `OpenSshFile`. Reuses `Der` and `RsaPkcs8` | Ed25519, RSA 2048 | `KEY_FILE_ENCRYPTED`, `KEY_FILE_FORMAT`, `KEY_SIZE_NOT_2048` |
+| `vault` | New `src/NetSec.Vault`, net10 only, Host references it | All key types | Section 4 |
 
-The CE process and the CF build never see SQLite, PKCS#12, or the OS store. `NetSec.CeDevice` takes `--key-file` and `--known-hosts-file`. `CeDevice/Program.cs:52` keeps the Mock path when the flags are absent. A vault key cannot reach CE, and that is accurate: a device holds its own key.
+Which code is net10 only: the vault, the flows, RSA key generation (BCL `RSA.Create(2048).ExportPkcs8PrivateKey()`), and the Host routes. Ed25519 generation uses `OsRandom` and Core's `Ed25519`.
 
-### 3.3 Engine changes
-
-Each row adds a field or overload, and existing contract signatures stay. A rule then calls one path, and the seed wraps once at the boundary.
+### 3.3 What changes in the labs
 
 | Site | Today | After |
 |---|---|---|
-| `Tls13ClientTable.cs:129`, `Tls13ServerTable.cs:58` | `Ed25519.Sign(o.SigningSeed, ...)` | `o.Signer.Sign(...)`. `Tls13Engine.cs:39` wraps `SigningSeed` when no signer is set |
-| `Tls11Rules.cs:301`, `:334` | `Pkcs1` on `RsaPrivate` | `IKeyTransportHandle` |
-| `SshHostKey.cs:106`, `SshClientRules.cs:169` | `CopyMaterial()` | `Sign`. Algorithm name and blob come from `Public()` |
-| `Auth.cs:102`, `:186`, `:276` | Seed to `CompactJws`, `DpopProof`, `Challenge` | Overloads that take a handle |
-| `TrainingCa.cs:104` | `Ed25519.Sign(_seed, tbs)` | Handle |
-| `DukptBank`, `BankHsmCore.Decide`, `Lesson06Dukpt.cs:82`, `Node/Program.cs:114` | `byte[] bdk` | `IBaseKey`. The byte overloads stay for A3 |
-| 12 `new TrainingKeySource()` sites in Labs | Per lab | `LabCredentials.Of(c).Get(...)` |
+| 12 `new TrainingKeySource()` sites in Labs | Per lab | `LabCredentials.Of(c)`, which returns the set |
+| `Lesson01Aes.cs:64`, `Lesson02Seals.cs:58` | Drawn from `c.Random` | `BuiltIn` draws as today, so the golden holds. `Mine` takes the type's bytes |
+| `Lesson10Auth.cs:193`, `:209` | Device seed drawn per run | `BuiltIn` as today. `Mine` takes the enrolled seed. The issuer row uses its public half |
+| `Lesson09Bridge.cs:50` | Constants | `Mine` derives the pad key from the BDK, section 2.4 |
+| `Tls13Lab.cs:149`, `Lesson07Tls11.cs:92`, `Lesson10Auth.cs:114` | Fixed lab date | `LabClock.For(credentials)`, section 3.4 |
+| `SessionManager.cs:159` | No credentials | Sets `Credentials` |
+| Engines, `Tls13Options.SigningSeed`, `SshHostSigner`, `Token.Issue`, `DukptBank`, `BankHsmCore`, `GlassTransportFactory` | | **No change** |
+| `Probe`, `SshProbe`, `TrainingPki`, `Node`, `CeDevice` | Training keys | No change. `acceptance/` grades with them. Node and CE on own keys are cut (section 9.3) |
 
-### 3.4 Effect on D5, D6, and A16
+For a generated key, `new TrainingCa(credentials)` then issues as it does today, from the learner's CA key, with the same names and dates. So its layout matches the built-in one in every byte count.
+
+### 3.4 Jared's traps
+
+**The lab clock.** `Tls13Lab.cs:40` and `Lesson07Tls11.cs:29` fix 2030-01-01. `Lesson10Auth.cs:47` fixes 2026-11-05. A new 30-day certificate reads as expired at the first date, and as not yet valid at the second.
+
+| Key origin | Rule |
+|---|---|
+| Generated by a flow | Valid 2025 to 2049, as `TrainingCa.cs:15-16`. Passes on the fixed clocks, so nothing changes |
+| Imported certificate | `LabClock.For` returns the wall clock, read once at `session.start`, for certificate checks only. Attack certificates dated 2020 stay expired. Token times stay on `LabNow`, which is consistent inside lesson 10 |
+
+**Fixed attack offsets.** A flip can land on the wrong field and still get the expected code, because the AEAD tag and the chain signature catch almost anything. So a row can pass for the wrong reason.
+
+| Constant | Value | With a generated key | With an imported key |
+|---|---|---|---|
+| `Labs.cs:209` `SshEd25519SignatureOffset` | 130 | Holds: an Ed25519 blob is always 51 bytes | Holds |
+| `Labs.cs:212` `SshProtectedBodyOffset` | 20 | Holds: no key in it | Holds |
+| `Labs.cs:215` `SshRsaSignatureOffset` | 669 | Holds at RSA 2048 only | Holds, because other sizes are refused (`KEY_SIZE_NOT_2048`) |
+| `Tls13Lab.cs:29` `CertSerialOffset` | 28 | Holds: same layout | **Moves** with DER length forms and issuer |
+| `Tls13Lab.cs:31` `CertVerifySignatureOffset` | 8 | Holds | Holds: Ed25519 only |
+| `Tls13Lab.cs:32` `VerifyDataOffset` | 4 | Holds | Holds |
+| `Tls13Lab.cs:34` `RecordCipherOffset` | 8 | Holds | Holds |
+| `Tls13Lab.cs:36` `ClientX25519ShareOffset` | 1284 | Holds, because the server name is read-only (section 2.5) | Holds, same reason |
+| `Tls13Lab.cs:38` `ServerMlKemCiphertextOffset` | 68 | Holds | Holds |
+
+Action: row `L4-flip-cert-byte` takes a named field (`TamperPlan.Field`, additive, read from `Fields`). All rows get `A17.attacks.hit-named-field`: the tamper records which field it hit, and the clause compares that as well as the code. Echo writes this clause so a wrong-reason pass fails.
+
+**Same-seed pins.** A new key changes the signature bytes and the pinned digest. No clause compares a `Mine` run with a `BuiltIn` golden. Two `Mine` runs compare only under one key version, and the session file's first line names that version. A fork reuses the parent's set, so `atSeq` still holds.
+
+### 3.5 Effect on D5, D6, and A16
 
 | Item | Effect |
 |---|---|
-| D5 last sentence, "a real key cannot enter it by type" | Replaced. New D15: a real key enters a glass engine only as operations. Showing its bytes is the Host's job, under the Show keys toggle |
-| D6 | **Rewritten.** New text: "The OS transport runs `SslStream`. It shows metadata only, because Schannel holds the secrets. A Real key is a separate setting." The last sentence, "Real-key routes... do not exist", is retired |
-| A16 secret scan | **Substance stays, name changes.** It scans an OS transport session, and Schannel still gives us no secret bytes, so the ruling does not touch it. Echo renames `A16.real-mode.*` to `A16.os-transport.*`, `transport: real` to `transport: os` (`store.ts:288`, `HostClauses.cs:197`), and `NETSEC_REAL_PEER` to `NETSEC_OS_PEER` |
-| `A16.type.keyhandle-cannot-reach-glass-factory` | **Stays green.** Its 4 attack programs still fail. A probe of the two-constructor shape gave CS1503 on both handle programs and compiled the control |
-| `A16.type.core-holds-no-keyhandle-implementation-and-no-io-member-takes-one` | **Must change.** Core gains `IKeyHandle` implementations (mock and file). The Io half stays true: `CredentialSet` is the public type there |
-| Design section 11, A16 row, "its only constructor" | Text edit |
-| `acceptance/contract/Io.cs` | The stub gains the new shape. Echo owns it |
-
-The replacement anchor is a behaviour check, not a type wall: `A17.show-keys.off-holds-no-secret` and `A17.show-keys.real-shows-all` (section 6.6). A canary key goes Real in every type, and every lesson runs both ways. The handle shape also stays: no `IKeyHandle` member returns private bytes, so an engine cannot read them.
-
-I chose not to add a same-shape interface that leaves the clause green. That would keep a passing check whose reason had already moved.
+| D5 | **Stands.** New D15 beside it: "A learner's test key is an `ITrainingKey`, fetched as bytes through a provider." `IKeyHandle` still cannot reach glass |
+| D6 | **Rewritten.** "The OS transport runs `SslStream`. It shows metadata only, because Schannel holds the secrets. A learner's key is a separate setting." The sentence "Real-key routes... do not exist" is retired |
+| `A16.type.*`, both clauses | **Stay green, no edit.** No implementer in Core, no new constructor, nothing new on `TransportRequest` |
+| `A16.real-mode.*` | Substance stays, wording changes. Section 7.1 |
+| PRD A16 text, UX chip | Echo and Heather replace "Real mode" with "OS transport". "Never use it with real secrets" stays true |
+| `acceptance/contract/` | Gains `CredentialSet` and `LabContext.Credentials` |
 
 ## 4. Vault facade
 
 ### 4.1 What it is
 
-`src/NetSec.Vault`, net10.0, C# 14. One interface, in the shape a real vault presents. The class boundary stands for the HSM's device boundary, and the tour says so.
+`src/NetSec.Vault`, net10.0, C# 14. It copies the behaviour of a vault. Its file and its process give no protection an HSM gives, and it says so on screen.
 
 ```csharp
 public interface IVault {
-    VaultKeyInfo CreateKey(string name, VaultKeyPolicy policy, string caller);
+    VaultKeyInfo CreateKey(string name, VaultKeyPolicy policy, string caller);   // Exportable and usage are set here, and are one-way
     int Generate(string name, string caller);                // Adds a version
     int Import(string name, byte[] material, string caller); // Adds a version. provenance = imported
     VaultKeyInfo Describe(string name);
     byte[] PublicKey(string name, int? version);
-    byte[] Sign(string name, SignScheme scheme, byte[] message, string caller);
-    bool TryDecrypt(string name, byte[] cipher, out byte[] plain, string caller);
-    byte[] Derive(string name, VaultDerive purpose, byte[] input, string caller);
-    VaultDataKey GenerateDataKey(string name, int size, string caller);   // Clear copy and wrapped copy
+    byte[] Sign(string name, byte[] message, string caller);          // The exercise only
+    byte[] Derive(string name, byte[] input, string caller);          // The exercise only
     byte[] Export(string name, string caller);               // VAULT_EXPORT_REFUSED for a non-exportable key
-    void Retire(string name, int version, string caller);
+    byte[] CourseRead(string name, string caller);           // How a lab gets bytes. Always works. Audited as course-read, never as export
     AuditRow[] Audit(long afterSeq, int limit);
 }
-public sealed class VaultKeyPolicy { public string Algorithm; public bool Exportable; public string[] AllowedOps; public string[] AllowedCallers; }
+public sealed class VaultKeyPolicy { public string Algorithm; public bool Exportable; public string[] AllowedOps; }
 ```
 
-Tables, as the spike ran them, plus `provenance`, `allowed_callers`, and `prev_hash`:
+Tables, as the spike ran them, plus `provenance` and `prev_hash`:
 
 ```sql
-key_names(name PK, algorithm, exportable, allowed_ops, allowed_callers, provenance, created_at)
+key_names(name PK, algorithm, exportable, allowed_ops, provenance, created_at)
 key_versions(name, version, nonce, wrapped, public_key, fingerprint, state, created_at, PK(name, version))
 audit(seq PK AUTOINCREMENT, at, caller, op, name, version, result, detail, prev_hash)
 ```
 
-Wrapping: AES-256-GCM under a master key, with `name#version` as the additional data. A row moved to another name fails to open. `audit.prev_hash` links each row to the last (`GEM:seeded-hash-linked-custody-chain`), so an edited row shows.
+Wrapping: AES-256-GCM under a master key, with `name#version` as the additional data. `audit.prev_hash` links each row to the last (`GEM:seeded-hash-linked-custody-chain`), so an edited row shows. The UI does not call it tamper-proof. Each call writes its audit row before it returns, and a failed audit write refuses the call (Jared, from Vault's audit docs). A symmetric key shows a check value, by CMAC for AES, as AWS describes (`modes-real-world.md` section 4).
+
+**The on-screen statement,** on the vault page: "Practice vault. Not an HSM. Not FIPS validated. Non-export here is a rule in our code. Anyone can open the SQLite file and read the wrapped key."
 
 ### 4.2 How far it goes for accuracy
 
-| Behaviour | Real HSM or vault | Facade |
+| Behaviour | Real vault or HSM | Facade |
 |---|---|---|
-| Named keys and versions | Yes (Vault transit: "supports versioning of keys") | Yes |
-| Policy per key | Yes | Yes: operations and callers |
-| Audit log | Yes | Yes, with a refused call logged too. Spike row 7 |
-| Wrapped at rest | Yes | Yes. Tampered row refused in the spike |
-| Sign inside the box | Yes | **Yes** |
-| Refuse export of a non-exportable key | Yes (PKCS#11 `CKA_EXTRACTABLE`, from recollection, not read this session) | **Yes. Spike: `VAULT_EXPORT_REFUSED`.** Wizard keys are exportable by default, so they show in lessons. Non-exportable is the learner's choice (section 6.3) |
-| Data key: clear copy and wrapped copy | Yes (AWS KMS `GenerateDataKey`, page read this session) | Yes, for lessons 1 and 2 |
-| DUKPT base key stays in | Yes | **Yes** |
-| DUKPT per-sale key stays in | Yes, a real HSM translates the PIN inside (from recollection) | **No.** The facade hands it out so lesson 6 can show one key per sale. A line in the UI says "A real HSM would not hand this out" |
-| Tamper-resistant hardware, FIPS, a separate process | Yes | **No.** The private bytes sit in the Host's memory during a call. The tour says so |
-| Seal and unseal, quorum | Yes | **No,** except BDK components (below) |
-| Network API, client certificates, PKCS#11 interface | Yes | **No.** `IVault` is the seam if one is ever wanted |
+| Named keys and versions | Yes | Yes |
+| Exportable set once, one way | Yes | Yes |
+| Fixed usage | Yes | Yes. A signing key refuses `Derive` with `VAULT_OP_REFUSED` |
+| Audit, including refusals | Yes | Yes |
+| Wrapped at rest | Yes | Yes |
+| Sign and derive inside | Yes | **In the exercise only** |
+| Refuse export | Yes | **Yes, on `Export`.** `CourseRead` is the labs' route, and no real vault has one |
+| Sealing, roles, wrapped-only import, scheduled deletion | Yes | **Cut this round.** Jared's table lists them, and section 9.3 leaves the door open |
+| Tamper-resistant hardware, FIPS, a separate process | Yes | No |
 
-### 4.3 How it meets the engines
+### 4.3 The vault exercise, the one place operations are taught
 
-The engines take raw bytes today (section 3.3). After the seam they call operations.
+A separate lab, id 20, outside `GET /api/lessons`, as lesson 0 is (learnings S0 item 12). Its tour is `app/src/tours/lesson-20.json`. It opens from the vault page. `VaultExerciseLab : ILab` lives in `NetSec.Vault`, and the Host's `SessionManager.Start` asks for id 20 before `LabCatalog`.
 
-| Operation | Called from | What the trace shows |
+| Step | Trace event | What the learner sees |
 |---|---|---|
-| Sign, Ed25519 | TLS 1.3 `CertificateVerify`, SSH host and user, token, challenge, DPoP, CA issue | `vault.sign`: key name, version, SHA-256 of the input, signature. Signature bytes are public anyway |
-| Decrypt, PKCS#1 | TLS 1.1 key transport | `vault.decrypt`: key name, version. The premaster still shows as a session secret, as the lab teaches |
-| Sign, RSA | TLS 1.1 ECDHE, SSH legacy | As above |
-| Derive | DUKPT bank | `vault.derive`: key name, version, KSN |
-| Data key | Lessons 1, 2 | `vault.datakey`. The key then shows as a session secret, since the lab misuses it on purpose |
+| 1 Sign | `vault.sign`: key name, version, input hash, signature | A key that never left the box signs. `openssl pkeyutl -verify` judges it against the public key, and the output shows |
+| 2 Derive | `vault.derive`: key name, version, KSN | A DUKPT working key comes from a BDK that stays in the box |
+| 3 Refuse | `vault.refused`: `VAULT_EXPORT_REFUSED` | Asks for the key, and the box says no |
+| 4 Audit | `vault.audit` | All three calls, with the refusal |
 
-These `vault.*` events appear only for a Real key, so tour bindings on Mock stay as they are. Each event pairs with an audit row, so the learner can read both sides of one call.
+It makes its own keys, `exercise/signing` and `exercise/bdk`, non-exportable, so it needs no flow first. `CourseRead` refuses the `exercise/` names, so this exercise really has no route to the bytes.
 
 ### 4.4 Package and spike
 
@@ -376,7 +379,7 @@ These `vault.*` events appear only for a Real key, so tour bindings on Mock stay
 | Package | `Microsoft.Data.Sqlite.Core` 10.0.9 with `SQLitePCLRaw.bundle_e_sqlite3` 3.0.3 |
 | In the NuGet cache | Yes, both, with `SourceGear.sqlite3` 3.50.4.5 |
 | Rejected | `Microsoft.Data.Sqlite` 10.0.9. It pulls `SQLitePCLRaw.lib.e_sqlite3` 2.1.11: NU1903, GHSA-2m69-gcr7-jv3q, high, SQLite before 3.50.2. `Directory.Build.props:5` sets `TreatWarningsAsErrors`, so a repo build would fail |
-| Native file | `runtimes/win-x64/native/e_sqlite3.dll`, in the build output, never in git. `THIRD-PARTY-NOTICES.md` gains a section. Licences not read yet: the slice M1 builder reads them |
+| Native file | `runtimes/win-x64/native/e_sqlite3.dll`, in the build output, never in git. `THIRD-PARTY-NOTICES.md` gains a section. Licences not read yet: slice V1 reads them |
 
 The spike is a throwaway console project outside the repo, in the session scratch folder. It references `NetSec.Core` for `Ed25519`. Final run, package pair above, foreground, under the 2-minute limit:
 
@@ -415,64 +418,56 @@ PKCS#12 rsa through X509CertificateLoader: HasPrivateKey=True, RSA=True, ECDsa=F
 SslStream TLS 1.3 client to s_server with rsa cert: ok, Tls13, TLS_AES_256_GCM_SHA384
 ```
 
-Limits of the probes: the raw 36-byte test tried one hash name, `MD5SHA1`, so another route may exist. The OS store itself was not touched, since that writes machine state; `RSACng` used an ephemeral key. The spike's vault is a single process. Host and Node on one file (WAL mode) is unproved until slice M6.
+Limits of the spike: its vault is one process. The raw 36-byte test tried one hash name. The OS store was not touched. Those two matter only for the cut provider.
 
 ## 5. Where things live
 
 ### 5.1 Folders
 
-One root, inside the project, per Steve's "within the project". `NETSEC_SECURITY_DIR` overrides it, and `acceptance/` sets that to a temp folder. The Host finds the default by the walk up from `AppContext.BaseDirectory` that `Program.cs:114` already uses.
+**O3 stands as the default: a gitignored `.security/` inside the project.** `NETSEC_SECURITY_DIR` overrides it, and `acceptance/` sets that to a temp folder. The Host finds the default by the walk up from `AppContext.BaseDirectory` that `Program.cs:114` already uses.
 
 ```
 <repo>/.security/                  gitignored as a whole
   README.txt                       What this folder is. Written by the Host
-  modes.json                       Mode, binding, proof result per type. No secret
+  modes.json                       Mode, binding, check result per type, showKeys. No secret
   vault/vault.db, -wal, -shm       Section 4
   vault/master.key                 32 random bytes
   files/<typeId>/v<N>/             Copies of imported files, plus chain.pem
   ssh/known_hosts                  Written when the pin is not derived
   ssh/authorized_keys
-  pads/<keyId>.key                 Lesson 9 process run only. The pad deletes it on load, as a key loader's job ends
-  proof/<wizardId>/                Referee scratch. Deleted when the proof ends
+  proof/<flowId>/                  Check scratch. Deleted when the check ends. ssh.exe needs its key file locked to one reader, so the flow sets that
 ```
 
-Session files stay in `%LOCALAPPDATA%\MMP.NetworkSecurity\sessions\` (`Program.cs:26`), since `A16.real-mode` and the UI read them there.
+Session files stay in `%LOCALAPPDATA%\MMP.NetworkSecurity\sessions\` (`Program.cs:26`). A flow copies an imported file into `files/`, so a moved original cannot break a verified type. The stored hash feeds `Broken`. A flow writes generated keys only under `.security/`, and never to a default such as `~/.ssh`, where it could overwrite a daily key.
 
-| Stored by | What |
-|---|---|
-| Thumbprint in `modes.json`, nothing on disk | OS store items |
-| A copy in `files/` | An imported file. A moved original then cannot break a verified type. The stored hash feeds `Broken` |
+**The `~/.ssh` warning.** An import path under `%USERPROFILE%\.ssh` gets a warning step, `KEY_PATH_PERSONAL`: "This looks like a key you use every day. This course shows every key. Use a test key." The learner can go on, because Steve's rule is a stated rule and not a hard stop.
 
 `.gitignore` gains `.security/`, `*.pfx`, `*.p12`, and `*.db`.
 
-### 5.2 The check that a real key is never committed
+### 5.2 The check that a key is never committed
 
-**One enforcement: an acceptance clause that runs a script. Proposed id: `A17.repo.no-real-key-tracked`.** A git hook would not travel with a clone and can be skipped. A clause cannot. `tools/gate.ps1` calls the same script on every slice.
+**One enforcement: an acceptance clause that runs a script, `A17.repo.no-key-tracked`.** A git hook would not travel with a clone and can be skipped. A clause cannot. `tools/gate.ps1` calls the same script on every slice.
 
 `tools/secret_guard.py` runs over `git ls-files` plus the staged set, and fails on:
 
 | Rule | Detail |
 |---|---|
-| Path | Anything under `.security/`, or any `.pfx`, `.p12`, `.db`, `.key`, `.ndjson`, `master.key`, `id_rsa`, `id_ed25519`, `known_hosts`. A session file can hold keys, and `git ls-files` finds no `.ndjson` today |
+| Path | Anything under `.security/`, or any `.pfx`, `.p12`, `.db`, `.key`, `.ndjson`, `master.key`, `id_rsa`, `id_ed25519`, `known_hosts`. A session file can hold keys. `git ls-files` finds none of these today |
 | PEM header | `PRIVATE KEY` in a file outside the allow-list. Today that is 3 files: `src/NetSec.Core/Pki/TrainingPki.cs`, `tests/NetSec.Tests/Tls13Tests.cs`, `acceptance/lib/Harness/OpenSshKey.cs` |
 | Ignore rule | `.gitignore` must hold the `.security/` line, and `git check-ignore .security/x` must agree |
 
-The clause runs beside a control: on a temp clone, a planted PEM file and a planted `.security/` file must each fail the script by name, and the unchanged tree must pass. Current state: `git ls-files` finds no key file today.
-
-This check stays whatever the Show keys toggle says. The ruling that keys may show on screen does not make them fit for git.
+The clause runs beside a control: on a temp clone, a planted PEM file and a planted `.security/` file must each fail by name, and the unchanged tree must pass.
 
 ## 6. Trace and display
 
-**Decision: one app-wide "Show keys" toggle, default ON.** It works the same in Mock and in Real. ON shows every key on screen and in session files. OFF replaces key bytes with a fingerprint on screen, in saved session files, and in exports. The Host applies it at its trace boundary, so the bytes never leave the Host when it is OFF. Test id: `show-keys-switch`.
+**Decision: one app-wide "Show keys" toggle, default ON.** It works the same for built-in keys and own keys. ON shows every key the provider can export, long-term and session, on screen and in session files. OFF replaces key bytes with a fingerprint on screen, in saved files, and in exports. The Host applies it at its trace boundary. Test id: `show-keys-switch`.
 
 ### 6.1 Steve's rulings
 
-| Date | Ruling | Effect |
-|---|---|---|
-| 2026-11-05 | "I only ever use test keys... This is training." | A Real key shows as a Mock key does. The earlier fingerprint-only design for Real is gone, and so is the per-item control. The gitignore and the no-commit check stay (section 5) |
-| 2026-11-05 | "We should make the showing of keys optional. a toggle switch." | One toggle, independent of Mock or Real, default ON because the course teaches by showing keys |
-
-The toggle is the only redaction in the product. Mode does not change what shows.
+| Ruling | Effect |
+|---|---|
+| "I only ever use test keys... This is training." | Own keys show as built-in keys do. The gitignore and the no-commit check stay |
+| "We should make the showing of keys optional. a toggle switch." | One toggle, independent of mode, default ON because the course teaches by showing keys |
 
 ### 6.2 What the toggle does
 
@@ -484,80 +479,77 @@ The toggle is the only redaction in the product. Mode does not change what shows
 | `session.load` replay | As the file holds it | Any bytes in the file become fingerprints before they reach a frame |
 | `/api/sessions/{id}/keylog` | As today | Refused with `KEYS_HIDDEN` |
 | OS transport session | No secrets, by A16 | No secrets, by A16 |
-| Security page and wizards, `GET /api/security/types/{typeId}/key` | Key hex, for an exportable key | Fingerprint. The route gives `{ fingerprint, hidden }` and no bytes |
+| Security page, `GET /api/security/types/{typeId}/key` | Key hex, for a key that can show | Fingerprint. No bytes |
 
 Limits, stated:
 
-1. Files written while ON stay on disk with their bytes. OFF does not rewrite them. `session.save` and replay filter what leaves through the app. The file itself is still readable in `%LOCALAPPDATA%`.
-2. OFF hides `secrets[]`. It does not touch `wire` or `plain`. The bearer token in lesson 10 still shows, because that lab sends it in the clear on purpose. The clear PIN field stays in `plain` where a lab shows it. `keys.installed` carries no bytes (`Interpreter.cs:204-208`).
-3. Lesson 11 stores the guessed bytes in `plain` (`TimingReport.cs:71`), since the attack result is the lesson. A 4-byte `lab-secret` also falls to a brute-force search of its fingerprint. It protects nothing, so this costs nothing.
-4. OFF is a screen and file setting, for a shared screen or a shared trace. It is not a security boundary. The Host still holds the bytes in memory.
+1. Files written while ON stay on disk with their bytes. OFF does not rewrite them. The file itself is still readable in `%LOCALAPPDATA%`.
+2. OFF hides `secrets[]`. It does not touch `wire` or `plain`. The bearer token in lesson 10 still shows, because that lab sends it in the clear on purpose. `keys.installed` carries no bytes (`Interpreter.cs:204-208`).
+3. Lesson 11 stores the guessed bytes in `plain` (`TimingReport.cs:71`), since the attack result is the lesson. A 4-byte `lab-secret` also falls to a brute-force search of its fingerprint.
+4. OFF is a setting for a shared screen or a shared trace. It is not a security boundary. The Host still holds the bytes in memory.
 
 ### 6.3 Showing every key
 
-Today's traces show few long-term keys, in Mock too. Only `Lesson06Dukpt.cs:138,205,206` and `Lesson10Auth.cs:250` emit one. No TLS, SSH, CA, or token private key is ever in a trace. So "every key" needs one addition.
+Today's traces show few long-term keys, built-in ones too. Only `Lesson06Dukpt.cs:138,205,206` and `Lesson10Auth.cs:250` emit one. No TLS, SSH, CA, or token private key is ever in a trace. So "every key" needs one addition.
 
-| Addition | Detail |
+**Event `key.in-use`.** At `session.start`, for each type the lab reads (`LabCatalog.Needs`), the Host writes one event on its own stream, `<sessionId>/keys`, in both modes: holder, type, version, provider, and the key's bytes as a normal `secrets[]` entry.
+
+| Property | Why |
 |---|---|
-| Event `key.in-use` | At `session.start`, for each type the lab reads (`LabCatalog.Needs`), the Host writes one event: holder, type, version, provider, and the key's bytes as a normal `secrets[]` entry. Own stream `<sessionId>/keys`, in both modes |
-| Why at the Host | It adds nothing to an engine stream, so `streamSeq`, tamper addresses, `atSeq` forks, and the M0 golden traces stay as they are. It skips the step gate, so a tour does not gain a step |
-| Where bytes come from | The path below |
-| The engines | Still get operations only (O1, section 3.3). Showing a key does not route through an engine |
+| Written by the Host | It adds nothing to an engine stream, so `streamSeq`, tamper addresses, `atSeq` forks, and the golden traces stay as they are |
+| Skips the step gate | A tour gains no step |
+| Bytes come from `Credential.Key.CopyMaterial()` | The Host holds the same set the lab holds. For a vault key, that bytes read was one `CourseRead`, and the audit list shows it as a course read |
 
-**The display path, in order:**
+**One exception, on accuracy: a key made non-exportable shows its fingerprint, even with the toggle ON.** The lab still runs on its bytes, by Steve's O1. The Host's boundary replaces any secret whose bytes equal a `ShowBytes = false` key, with `hidden: "non-exportable"` and the public fingerprint. Beside it the Secrets panel shows this line, word for word:
 
-1. At `session.start` the Host builds the `CredentialSet`. The set holds handles and no private bytes, and the lab receives only this set.
-2. For each type the lab reads, the Host calls `ICredentialProvider.TryExportForDisplay(binding, out material)`. Mock returns `CopyMaterial()`. File reads its own copy. Vault calls `IVault.Export(name, "host/display")`, which writes an audit row, so the learner can see each read. OS store calls `ExportPkcs8` and gets a refusal on a non-exportable key.
-3. The Host writes `key.in-use` with those bytes through `LabSession.Write`, and the toggle applies there like any event.
-4. The sites that emit a long-term key today (`Lesson06Dukpt.cs:138,205,206`, `Lesson10Auth.cs:250`) take a trace-only copy from the Host, through `LabContext`. `Lesson06Dukpt.cs:138` already works this way, with `InitialKeyTraceCopy`. In Real, the rule's crypto goes through `IBaseKey` or `IKeyHandle`, and the copy is used only to fill the event. A null copy gives a fingerprint entry.
-5. The Host fetches whatever the toggle says. A flip to ON can then restore the screen with no new fetch. Flipping changes which stored line goes out.
+> The course refuses to show it. A real HSM would refuse too. These files could still open it here.
 
-**One exception, on accuracy: a vault or OS key made non-exportable shows its fingerprint, even with the toggle ON.** Step 2 returns false, so the Host has no bytes to write. The fingerprint is the public `Credential.Fingerprint`, and the entry carries `hidden: "non-exportable"`. The Secrets panel shows this line beside it: "This key cannot be read. A real HSM would refuse too." The exception teaches the point, and the learner chose it. **Wizard-generated keys default to exportable,** so every key shows unless the learner picks this on its own step. `exportable` is set at creation and is one-way, with no call to change it (Jared's vault note).
+The learner chose this, on its own flow step. **Flows generate keys as exportable by default,** so every key shows unless the learner picks this. Per-sale and session keys derived from it still show, as section 1.5 lists.
 
 ### 6.4 The boundary
 
-The redaction is one pure function in Core and one line at each exit in the Host. Rules, engines, and labs never read the toggle. A fork still runs on the real bytes.
+One pure function in Core and one line at each exit in the Host. Rules, engines, and labs never read the toggle. A fork still runs on the real bytes.
 
 ```csharp
 public sealed class TraceSecret { /* existing */ public string Fingerprint; public int Length; public string Hidden; }   // Hidden: null, "toggle", "non-exportable"
 public static class TraceRedaction {            // NetSec.Trace, C# 3. Same input, same output
     public static string Fingerprint(byte[] secret);      // "fp:" and the first 8 bytes of SHA-256, as hex
-    public static TraceEvent Hide(TraceEvent e);          // A new event. Secrets lose Bytes and gain the three fields. All else is the same
+    public static TraceEvent Hide(TraceEvent e, Func<byte[], bool> hideThis);   // A new event. A chosen secret loses Bytes and gains the three fields. All else is the same
 }
 ```
 
 | Exit | Today | Change |
 |---|---|---|
-| `SessionManager.cs:43` `LabSession.Write` | One line to store, file, and broadcast | Makes two lines, shown and hidden. `StoredEvent` holds both. File and broadcast take the one the toggle names at that moment |
+| `SessionManager.cs:43` `LabSession.Write` | One line to store, file, and broadcast | Makes two lines, shown and hidden. `StoredEvent` holds both. File and broadcast take the one the toggle names at that moment. The shown line has already lost any non-exportable key |
 | `SessionManager.cs:55` `After` | Stored line | Picks by the toggle now |
 | `Program.cs:275` `session.load` | File line to frame | `HideLine(string)` in the Host, on the JSON, when OFF |
 | `Program.cs:259` `session.save` | Returns the path | Section 6.2 |
 | `Program.cs:57` key log | Empty text | `KEYS_HIDDEN` when OFF |
 
-**Flipping it during a session.** The Host stores the value, broadcasts `security.show-keys {on}`, and the UI replaces its copy of each open session from `/events` (gem `server-replaces-never-merges`). So OFF clears bytes from the screen at once, and ON brings them back for the 20 sessions held in memory. A session file holds each line as the toggle stood when the line was written, so one file can hold both kinds.
+**Flipping it during a session.** The Host stores the value, broadcasts `security.show-keys {on}`, and the UI replaces its copy of each open session from `/events` (gem `server-replaces-never-merges`). So OFF clears bytes from the screen at once, and ON brings them back for the 20 sessions held in memory. A session file holds each line as the toggle stood when the line was written.
 
 **Stored:** `showKeys` in `.security/modes.json`. A missing file or field means ON.
 
-**Outside the Host:** `NetSec.Node` and `NetSec.CeDevice` write `--trace-file` directly, and the Host starts neither one with a trace file today (`CeProcess.cs` has no trace argument). Those files are a test tool, and they always hold bytes. If a later UI starts them, it passes a `--hide-keys` flag that calls `TraceRedaction.Hide`.
+**Outside the Host:** `NetSec.Node` and `NetSec.CeDevice` write `--trace-file` directly, and the Host starts neither one with a trace file today. Those files are a test tool, and they always hold bytes.
 
 ### 6.5 Lessons that need the bytes
 
-Every lesson runs with the toggle OFF. Each one loses the bytes and keeps the comparison. A fingerprint is a stand-in with one job: same fingerprint, same key.
+Every lesson runs with the toggle OFF. Each one loses the bytes and keeps the comparison. A fingerprint has one job: same fingerprint, same key.
 
 | Lesson | On screen when OFF | Still teaches |
 |---|---|---|
-| 1 AES | `aes.key` as a fingerprint. Picture lab uses `wire` and `plain`, so it does not change | ECB leak, nonce reuse, tag failure |
+| 1 AES | `aes.key` as a fingerprint. The picture lab uses `wire` and `plain` | ECB leak, nonce reuse, tag failure |
 | 2 Seals | `seal.key` as a fingerprint. Tags are on the wire | All tamper rows |
-| 3 Key agreement, "two sides, one key" | **Grids show fingerprint cells.** Matching lines tie the two sides when fingerprints match. The swap attack shows them differ | The two sides reach one secret |
-| 4, 5 TLS 1.3 | Key ladder shows a fingerprint per rung. `derivedFrom` chips stay | What derives from what |
+| 3 Key agreement, **"two sides, one key"** | **The grids show fingerprint cells.** Lines tie the two sides when the fingerprints match. The swap attack shows them differ | The two sides reach one secret |
+| 4, 5 TLS 1.3 | The key ladder shows a fingerprint per rung. `derivedFrom` chips stay | What derives from what |
 | 6 DUKPT | One fingerprint per sale. Held counts come from `HeldCount` | A new key per sale, and erased keys |
-| 7, 8, 9 | Session keys as fingerprints. Host key card and onion do not change | All checks |
-| 10 Auth | Device key as a fingerprint. Token stays visible on the wire, by that lab's design | All rows |
-| 11 Timing | `lab-secret` as a fingerprint. The guess chart does not change | Whole lesson |
+| 7, 8, 9 | Session keys as fingerprints | All checks |
+| 10 Auth | Device key as a fingerprint. The token stays visible on the wire | All rows |
+| 11 Timing | `lab-secret` as a fingerprint | Whole lesson |
 
-**Nancy, a trap.** `SecretsPanel.vue:36` decides a match with `v.every(r => r.hex === v[0].hex)`. With `hex` empty that is always true, so two different keys would show as a match. The compare must use the fingerprint when `hidden` is set. `SecretsPanel.vue:70` counts bytes from `hex`, and must read `length`. `:73` copy has nothing to copy. `:81` and `lab.ts:107` draw from `hex`. `host.ts:48` must carry the three new fields.
+**Nancy, a trap.** `SecretsPanel.vue:36` decides a match with `v.every(r => r.hex === v[0].hex)`. With `hex` empty that is always true, so two different keys would show as a match. The compare must use the fingerprint when `hidden` is set. `:70` counts bytes from `hex`, and must read `length`. `:73` copy has nothing to copy. `:81` and `lab.ts:107` draw from `hex`. `host.ts:48` must carry the three new fields.
 
-**Tours.** No tour branches on the toggle. Tour bindings match `type`, `actor`, `message`, and `step` (design section 5), so A14 holds. While OFF, the tour panel shows one banner: "Show keys is off, so you see a short fingerprint of each key. Two keys with the same fingerprint are the same key." The banner goes through `tools/tour_lint.py` and the tic gate.
+**Tours and the toggle.** No tour branches on it. Tour bindings match `type`, `actor`, `message`, and `step` (design section 5), so A14 holds. While OFF, the tour panel shows one banner: "Show keys is off, so you see a short fingerprint of each key. Two keys with the same fingerprint are the same key."
 
 ### 6.6 Replay and the suite
 
@@ -567,244 +559,305 @@ Every lesson runs with the toggle OFF. Each one loses the bytes and keeps the co
 |---|---|
 | Saved ON, replayed OFF | Fingerprints |
 | Saved OFF, replayed ON | Fingerprints. The bytes are gone from that file, and the banner says so |
-| `A6.keylog.*` | **Not affected, and the suite runs it ON anyway.** It reads `ProbeResult.KeyLog` in process (`Tls13LiveClauses.cs:72-77`), and that never crosses the Host. The Host's own key log route is the one the toggle refuses |
+| `A6.keylog.*` | **Not affected, and the suite runs it ON anyway.** It reads `ProbeResult.KeyLog` in process (`Tls13LiveClauses.cs:72-77`), and that never crosses the Host. The Host's own key log route is the one OFF refuses |
 | A4, A10, A10a | Not affected. A4 calls `Tls13KeySchedule`. A10 and A10a read `--trace-file` from Node and CE (`TraceLine.cs:43`) |
 | `tests/NetSec.Tests` | Not affected. They run a lab into a `ListSink`, with no Host |
-| `A16.real-mode` | **Needs ON.** Its glass control at `HostClauses.cs:193` counts `secrets[]` entries and its key log check at `:195` wants success. OFF would refuse the key log. Note for Echo: the control counts entries, so it would pass on hidden entries too. It should require `hex` |
-| A13 walks, `tests/NetSec.Host.Tests` | **Run with ON,** because they were written against shown values. A14 binds on event names, so it passes either way |
+| `A16.real-mode` | **Needs ON.** Its key log check at `HostClauses.cs:195` wants success. Note for Echo: the control at `:193` counts `secrets[]` entries, so it would pass on hidden entries too. It should require `hex` |
+| A13 walks, `tests/NetSec.Host.Tests` | **Run with ON,** because they were written against shown values |
 
-**How a test run gets ON.** `run.ps1` sets `NETSEC_SECURITY_DIR` to a temp folder, so `modes.json` is absent and the toggle is ON by default. `/api/health` gains `showKeys`, and the suite fails a run early with `SUITE_NEEDS_SHOW_KEYS_ON` if it reads false. There is no env flag for the toggle, since a second control for one decision would be a way for a run to differ from the app.
-
-**New clauses Echo owes** (proposed ids):
-
-| Clause | Check |
-|---|---|
-| `A17.show-keys.default-on` | New folder: `/api/health` says true, and a lab shows `hex` |
-| `A17.show-keys.off-holds-no-secret` | Same seed, ON then OFF, every lesson, in Mock and with canary Real items. Each ON `secrets[].hex` value is absent from OFF frames, `/events`, the session file, the saved copy, and a replay. The ON run is the control that proves the scan can see them |
-| `A17.show-keys.real-shows-all` | ON, canary Real item for each exportable type: its private bytes appear in `key.in-use` |
-| `A17.show-keys.fingerprint-compare` | OFF: equal secrets give equal fingerprints across holders in lesson 3. The swap attack row gives different ones |
-| `A17.show-keys.mock-golden-unmoved` | Engine streams stay byte-equal to golden with the toggle ON and OFF. Only the Host's copy differs |
-| `A17.ui.show-keys-switch` | Playwright: `show-keys-switch` flips, the open session's panel changes with no new run, and the state survives a Host restart |
+**How a test run gets ON.** `run.ps1` sets `NETSEC_SECURITY_DIR` to a temp folder, so `modes.json` is absent and the toggle is ON. `/api/health` gains `showKeys`, and the suite fails a run early with `SUITE_NEEDS_SHOW_KEYS_ON` if it reads false. There is no env flag for the toggle, since a second control for one decision would let a run differ from the app.
 
 ## 7. Relationship to the unbuilt OS transport
 
-**Recommendation: two axes.** They answer different questions and fail in different ways. The design's own words already separate them: D6 is about transport, and D5 is about keys.
+**Two axes, and "Real" names neither.** Transport asks whose code speaks the protocol. Keys ask whose key is in use.
 
-| | Keys: all Mock | Keys: some Real |
+| | All built-in keys | Some "My test key" |
 |---|---|---|
-| **Transport: glass** | Today. 207 of 208 pass | New. All lessons. Keys show or hide by the Show keys toggle, as in Mock |
-| **Transport: OS** (`SslStream`) | Needs a non-Ed25519 peer certificate. Spike: Schannel fails on Ed25519. Metadata only | Lesson 5, with `tls.trust` as the custom trust store. RSA peer certificate. Metadata only |
+| **Transport: glass** | Today. 207 of 208 pass | New. Keys show or hide by the toggle |
+| **Transport: OS** (`SslStream`) | Needs a non-Ed25519 peer certificate. The spike: Schannel fails on Ed25519. Metadata only | Lesson 5, with `tls.trust` as the custom trust store. RSA peer certificate. Metadata only |
 
-The axes touch at one place: the wizard's key choice. "Ed25519" runs on glass only. "RSA" runs on OS transport, and on glass after slice M5. The CA wizard states this choice in short, clear words.
-
-The new dropdown from PR #98, `ui.target` (`store.ts:41-48`), is a third axis. It stays independent, and the CE rows stay disabled. Real credentials reach a future CE through the file provider.
+The dropdown from PR #98, `ui.target` (`store.ts:41-48`), is a third axis. It stays independent, and the CE rows stay disabled.
 
 ### 7.1 What the OS transport needs
 
+**This is slice V2, in its own PR.** It closes the one failed clause with no dependence on the key work.
+
 | Item | Detail | Owner |
 |---|---|---|
-| `OsTransportFactory` | Unbuilt. Design section 2.2 places it in the Host. `Program.cs:203` answers `REAL_MODE_NOT_BUILT` | Builder |
-| Lab route | `Tls13Lab.cs:78` builds both engines directly, and no lab reads `LabContext.Transports`. So lesson 5 on the OS transport needs its own lab path, one client and a peer from `NETSEC_REAL_PEER` | Builder |
-| Clause peer key | `HostClauses.cs:175` makes an Ed25519 key. Evidence above: `SslStream` fails on it, and RSA passes on the same probe. Change to `-algorithm rsa -pkeyopt rsa_keygen_bits:2048` | **Echo** |
+| `OsTransportFactory` | Unbuilt. `Program.cs:203` answers `REAL_MODE_NOT_BUILT`, which becomes `OS_TRANSPORT_NOT_BUILT` | Builder |
+| Lab route | `Tls13Lab.cs:78` builds both engines directly, and no lab reads `LabContext.Transports`. So lesson 5 on the OS transport needs its own lab path, one client and a peer from the env | Builder |
+| Clause peer key | `HostClauses.cs:175` makes an Ed25519 key. `SslStream` fails on it, and RSA passes on the same probe. Change to `-algorithm rsa -pkeyopt rsa_keygen_bits:2048` | **Echo** |
 | Clause trust | `HostClauses.cs:186` sets `SSL_CERT_FILE`. From recollection, Schannel does not read it. The product reads that variable and loads a `CustomTrustStore`. This needs a line in `CONTRACT.md` | Echo, builder |
-| Chip bug | `store.ts:100` and `:206` use `'real'`. The clause wants `os`. Change both | Nancy |
-| Button text | `App.vue:143` says "Real mode". It must change to "OS transport", so "Real" has one meaning, as Jared also asks. `transport-switch` stays as the test id | Nancy |
-| Today's button | Per the closing report, it changes the label, and the error shows at the next lesson start | Fixed by the factory |
+| Clause wording | `A16.real-mode.*` becomes `A16.os-transport.*`, `transport: real` becomes `transport: os` (`store.ts:288`, `HostClauses.cs:197`), `NETSEC_REAL_PEER` becomes `NETSEC_OS_PEER`. The count stays the same | **Echo** |
+| Chip bug | `store.ts:100` and `:206` test `'real'`. The clause wants `os`. Change both | Nancy |
+| **Button text** | **The rename from "Real" touches this button.** `App.vue:143` says "Real mode", and it becomes "OS transport". `transport-switch` stays as the test id | Nancy |
+| D6, PRD A16 text | Section 3.5 | Lead, Heather |
 
 ### 7.2 Open PRs
 
-| PR | Content | Effect here |
-|---|---|---|
-| #90 | `StepGate` holds one early step, `EnginePump.cs` | No overlap in purpose. Merge first, because slice M0 records golden traces, and those should come from the final gate code |
-| #91 | Removes the tour's 3-second resend, `app/src/store.ts`. Depends on #90 | Touches a different block of the file slice M2 edits. Merge first |
+**#90 and #91 merge before V0.** Echo records golden traces from the final gate code, and #90 changes `StepGate`. #91 depends on #90 and touches `app/src/store.ts`.
 
 ## 8. Wizard contract
 
 UI choices belong to Nancy. This section is data only. Words live in `app/src/wizard-copy.json`, keyed by `copyId`, as `field-gloss.json` does for fields. So `tools/tour_lint.py` can hold them to grade 8.9, the tic gate can scan them, and a reader can check claims under A15a. Cussler humanizes that file. **The copy assumes no knowledge:** each step says what this thing is, why it exists, what you do now, and what breaks if it is wrong.
 
-### 8.1 Routes
+### 8.1 Five flows, as data
+
+`src/NetSec.Host/wizard-flows.json` holds the flows. `WizardMachine` reads rows. Adding or moving a type is a data edit.
+
+| Flow id | UI name | Types | Count | Who judges |
+|---|---|---|---|---|
+| `my-certificates` | My certificates | `pki.root-ca`, `tls.trust`, `tls13.server`, `tls13.client`, `tls11.server` | 5 | OpenSSL. **Checked against the root you gave it** |
+| `my-ssh` | My SSH keys | `ssh.host-ed25519`, `ssh.host-rsa`, `ssh.known-hosts`, `ssh.client` | 4 | `ssh.exe` |
+| `my-payment` | My payment keys | `dukpt.bdk`, `dukpt.pad` | 2 | **No outside tool.** Our code matches the published X9 vectors |
+| `my-login` | My login keys | `token.issuer`, `device.enrolment` | 2 | OpenSSL for the token signature. **No outside tool for the passkey-shaped login** |
+| `my-lesson-keys` | Keys for lessons 1 and 2 | `lab.aes-key`, `lab.seal-key` | 2 | OpenSSL |
+
+Total: 15 of 15. No type is dropped.
+
+`my-lesson-keys` is one screen that makes or takes bytes. It is not the cut data-key wizard: it has no `GenerateDataKey` and no wrapping key.
+
+### 8.2 The spine
+
+Every flow runs these states:
+
+| State | Kind | Content |
+|---|---|---|
+| `Intro` | `explain` | What this set is. The test-keys line |
+| `ChooseSource` | `choose` | "Make them for me" (default) or "Use my files" |
+| `PickFiles` | `file` | Only for "Use my files". One row per type. A path under `~/.ssh` gets `KEY_PATH_PERSONAL` |
+| `Options` | `choose` | Only `my-ssh`, `my-payment`, `my-login`: "Keep this key from showing", default off, with the non-exportable line |
+| `ReadBack` | `review` | Every type: names (read-only), dates, algorithm, fingerprint |
+| `Place` | `generate` | Writes a new version of each type and keeps the old one |
+| `Check` | `prove` | Section 8.6 |
+| `Done` | `done` | Which lessons now use these keys |
+
+`back` works up to `Place`.
+
+**The test-keys line,** copy id `wizard.common.test-keys-only`, on every `Intro` and on the security page:
+
+> Use test keys only. This course shows your keys on screen and in saved files.
+
+Nothing can detect a production key, and imports stay open for vendor test keys. So this line is the control, with the `~/.ssh` warning beside it.
+
+### 8.3 Routes
 
 All routes sit behind `HostGuard`, per D14. Errors carry `code`, `message`, `retryable`, `requestId`, the shape at `Program.cs:51`.
 
 | Route | Returns or does |
 |---|---|
-| `GET /api/security` | `{ schema, root, types: [{ typeId, titleId, mode, state, providerKind, version, fingerprint, notAfter, usedBy[], followsType, canGoReal, whyNot, problem }] }` |
-| `PUT /api/security/types/{typeId}/mode` `{ mode }` | Sets the mode. Going to Mock always works, and the binding stays for later. Going to Real with no binding sets `Unconfigured`, and the UI opens the wizard |
-| `POST /api/security/wizards` `{ typeId }` | `{ wizardId, step }` |
-| `GET /api/security/wizards/{id}` | `{ step }`. The UI replaces its copy (gem `server-replaces-never-merges`) |
-| `POST /api/security/wizards/{id}/events` `{ event, stepSeq, data }` | `{ step }`, with `errors[]` when a check refuses |
+| `GET /api/security` | `{ schema, root, showKeys, flows[], types: [{ typeId, flowId, titleId, mode, state, providerKind, version, fingerprint, notAfter, usedBy[], followsType, problem }] }` |
+| `PUT /api/security/types/{typeId}/mode` `{ mode }` | Sets the mode. Going to `BuiltIn` always works, and the binding stays for later |
+| `POST /api/security/flows/{flowId}/runs` | `{ runId, step }` |
+| `GET /api/security/runs/{id}` | `{ step }`. The UI replaces its copy (gem `server-replaces-never-merges`) |
+| `POST /api/security/runs/{id}/events` `{ event, stepSeq, data }` | `{ step }`, with `errors[]` when a check refuses |
 | `GET /api/security/readiness?lesson=N` | `{ mayRun, problems[] }`, from `SecurityReadiness.Decide` |
-| `GET /api/security/vault/keys` | Name, algorithm, versions, policy, provenance. No private bytes. Bytes for display come only from the `/key` route |
-| `GET /api/security/types/{typeId}/key` | Section 6.2. Follows the toggle. A vault read writes an audit row |
-| `GET /api/security/vault/audit?after=N` | Audit rows |
-| `POST /api/security/vault/keys/{name}/export` | Runs the export. A non-exportable key gives `VAULT_EXPORT_REFUSED`. The UI can show this on purpose |
+| `GET /api/security/types/{typeId}/key` | Section 6.2. A vault read writes an audit row |
+| `GET /api/security/vault/keys`, `GET /api/security/vault/audit?after=N` | Names, versions, policy, provenance. Audit rows |
+| `GET`, `PUT /api/security/show-keys` `{ on }` | The toggle. A set broadcasts `security.show-keys {on}`. `/api/health` also reports it. UI test id `show-keys-switch` |
 | `GET /api/lessons` | Existing. `attacks[]` gains `available` and `whyNot` |
 | WebSocket `session.started` | Existing. Gains `security[]` and `showKeys` |
-| `GET /api/security/show-keys`, `PUT` `{ on }` | Reads or sets the toggle. A set broadcasts `security.show-keys {on}`. `/api/health` also reports it. UI test id `show-keys-switch` |
 
-A key file moves by **path**, chosen in Electron's file dialog, and the Host reads it (gem `paths-plain-at-the-boundary`). This is about one route for a file. It hides nothing: with the toggle ON, the bytes reach the screen through the routes above. DUKPT components are the one secret typed into a field, and `fields[].mask` is true there.
+A key file moves by **path**, chosen in Electron's file dialog, and the Host reads it (gem `paths-plain-at-the-boundary`). The one secret typed into a field is a pasted test BDK, and `fields[].mask` is true there.
 
-### 8.2 The test-keys line
-
-Every wizard's `Intro` step shows one line, copy id `wizard.common.test-keys-only`, before any source choice:
-
-> Use test keys only. This course shows your keys on screen and in saved files.
-
-It shows whatever the toggle says, because the learner can flip the toggle later. The line also stands on the security page. Bindings and files stay out of git by section 5.2.
-
-This line is the whole control. Nothing can detect a production key, and imports stay open for vendor test keys, so Steve's rule stands as a stated rule: test keys only.
-
-### 8.3 Step payload
+### 8.4 Step payload and the machine
 
 ```json
-{ "wizardId": "w1", "typeId": "tls13.server", "state": "ReadBack", "stepSeq": 4, "stepIndex": 3, "stepCount": 6,
-  "kind": "review", "copyId": "wizard.tls13-server.read-back",
-  "facts": { "subject": "localhost", "issuer": "my lab root", "notAfter": "2028-01-01", "algorithm": "Ed25519", "fingerprint": "SHA256:..." },
+{ "runId": "r1", "flowId": "my-certificates", "state": "ReadBack", "stepSeq": 4, "stepIndex": 3, "stepCount": 6,
+  "kind": "review", "copyId": "wizard.my-certificates.read-back",
+  "facts": [{ "typeId": "tls13.server", "name": "localhost", "notAfter": "2049-12-31", "algorithm": "Ed25519", "fingerprint": "SHA256:..." }],
   "fields": [], "choices": [], "allowed": ["next", "back", "cancel"], "errors": [] }
 ```
 
-`kind` is one of `explain`, `choose`, `file`, `entry`, `generate`, `review`, `prove`, `done`. `allowed` comes from the table, so the UI cannot offer a move the machine refuses.
-
-### 8.4 The machine owns the moves
-
-A table, in the shape of `StepTable`. `WizardMachine.Decide` is pure, and the Host applies the effects (the house decide-then-act rule). An event with no row from the current state gets `WIZARD_EVENT_NOT_ALLOWED`, naming both, as `UNEXPECTED_MESSAGE` does in the engines. A stale `stepSeq` gets `WIZARD_STEP_STALE`.
+`allowed` comes from the table, so the UI cannot offer a move the machine refuses. `WizardMachine.Decide` is pure, and the Host applies its effects. An event with no row from the current state gets `WIZARD_EVENT_NOT_ALLOWED`, naming both, as `UNEXPECTED_MESSAGE` does in the engines. A stale `stepSeq` gets `WIZARD_STEP_STALE`.
 
 ```csharp
-public sealed record WizardRow(string From, string Event, Func<WizardFacts, WizardCheck> Guard, string To, WizardEffect[] Effects);
-public static class WizardMachine { public static WizardDecision Decide(WizardTable table, WizardState state, WizardEvent e); }
+public sealed record WizardRow(string From, string Event, string Guard, string To, string[] Effects);   // Loaded from wizard-flows.json. Guard and effects are named, and a test fails on an unknown name
+public static class WizardMachine { public static WizardDecision Decide(WizardTable table, WizardState state, WizardEvent e, WizardFacts facts); }
 ```
-
-Every family runs this spine: `Intro`, `ChooseSource`, source steps, `ReadBack`, `Place`, `Prove`, `Done`. `back` works up to `Place`. `Place` writes a new version and leaves the old one, so a failed proof loses nothing.
-
-| Family | Types | Sources offered | Source steps |
-|---|---|---|---|
-| F1 Certificate and key | `pki.root-ca`, `tls13.server`, `tls13.client`, `tls11.server` | Make one for me (vault, default). Import PEM. Import PKCS#12 (RSA). OS store (RSA) | Choose the key kind: Ed25519 or RSA. Name. Or pick the file, then the key and chain |
-| F2 Trust list | `tls.trust` | Follow my root (default). Import certificates | Pick files, read each back |
-| F3 SSH key | `ssh.host-ed25519`, `ssh.host-rsa`, `ssh.client` | Make one for me (vault, default). Import OpenSSH. `ssh.client` adds "for the CE process": file only | Pick the file. Show the public line |
-| F4 Pin | `ssh.known-hosts` | Follow my host key (default). Paste a `known_hosts` line. Learn on first connect | Show the fingerprint, and ask the learner to compare it another way. `Lesson08Ssh.cs` already teaches this moment |
-| F5 Key ceremony | `dukpt.bdk`, `dukpt.pad` | Enter components (default). Import a vendor test key. `dukpt.pad` follows | Component 1, its check value. Component 2, its check value. Optional 3. Combine by XOR in the box. Compare the final check value. Offer non-exportable as a choice, with the line from section 6.3 |
-| F6 Signer | `token.issuer` | Make one for me (vault, default). Import PEM | Pick issuer name and audience |
-| F7 Device | `device.enrolment` | Make one for me (default). Import PEM | Subject name. Show the enrolment row |
-| F8 Data key | `lab.aes-key`, `lab.seal-key` | Make a wrapping key for me | One screen |
-
-Generating a key and importing a certificate from an outside CA needs a CSR step. It is left out of the first build, and the `kind` list has room for it (decision O8).
 
 ### 8.5 Named errors
 
-| Code | Means | Family |
-|---|---|---|
-| `KEY_FILE_UNREADABLE`, `KEY_FILE_FORMAT`, `KEY_FILE_ENCRYPTED` | Cannot read it. The copy says how to remove the passphrase on a test key | F1, F3, F6, F7 |
-| `KEY_ALGORITHM_NOT_IN_ENGINE` | Example: ECDSA. Names what the engine takes, and names OS transport as the route | F1, F3 |
-| `KEY_CERT_MISMATCH` | Certificate and key are not a pair | F1 |
-| `CERT_EXPIRED`, `CERT_NOT_YET_VALID` | Dates. Same codes as `ChainCheck` where they exist | F1, F2 |
-| `CERT_NAME_MISSING`, `CERT_USAGE_WRONG`, `CERT_NOT_A_CA` | Name, EKU, or basic constraints | F1, F2 |
-| `CHAIN_INCOMPLETE`, `CHAIN_SIGNATURE_NOT_IN_ENGINE` | Missing issuer, or an unsupported signature. A leaf under an issuing CA must come with its intermediate, for a client too. Jared: Go refused a leaf-only mutual TLS client with `certificate signed by unknown authority`, and passed with `-cert_chain`. The one-level training root hides this | F1 |
-| `PKCS12_PASSWORD`, `PKCS12_ED25519_UNSUPPORTED` | From the spike | F1 |
-| `OS_STORE_NOT_FOUND`, `OS_STORE_KEY_NOT_USABLE` | Thumbprint gone, or wrong key kind | F1 |
-| `KNOWN_HOSTS_LINE_BAD` | The line does not parse. Wildcards refused, as `SshKnownHosts` does | F4 |
-| `DUKPT_COMPONENT_LENGTH`, `DUKPT_KCV_MISMATCH` | Wrong size, or a typing error | F5 |
-| `VAULT_KEY_UNKNOWN`, `VAULT_OP_REFUSED`, `VAULT_EXPORT_REFUSED`, `VAULT_UNWRAP_FAILED`, `VAULT_CALLER_REFUSED` | Section 4 | All |
-| `KEYS_HIDDEN` | The key log was asked for with Show keys OFF | Host |
-| `CERT_SIGNATURE_ALG_UNSUPPORTED` | Engine code. The chain's signature algorithm is not one this engine can check. Replaces `CERT_SIGNATURE` for that case | Labs, F1 |
-| `REFEREE_MISSING` | Referee not on this machine | Prove |
-| `PROOF_FAILED` | The referee said no. The output is attached | Prove |
-| `WIZARD_EVENT_NOT_ALLOWED`, `WIZARD_STEP_STALE`, `WIZARD_NOT_FOUND` | Machine | All |
+| Code | Means |
+|---|---|
+| `KEY_FILE_UNREADABLE`, `KEY_FILE_FORMAT`, `KEY_FILE_ENCRYPTED` | Cannot read it. The copy says how to remove the passphrase on a test key |
+| `KEY_PATH_PERSONAL` | A warning, not a refusal. Section 5.1 |
+| `KEY_ALGORITHM_NOT_IN_ENGINE`, `KEY_SIZE_NOT_2048` | Example: ECDSA, or RSA 4096. Names what the engine takes |
+| `KEY_CERT_MISMATCH` | Certificate and key are not a pair |
+| `CERT_EXPIRED`, `CERT_NOT_YET_VALID` | Dates, on the wall clock |
+| `CERT_NAME_MISSING`, `CERT_USAGE_WRONG`, `CERT_NOT_A_CA` | Names the fixed name, EKU, or basic constraints |
+| `CHAIN_INCOMPLETE` | A leaf under an issuing CA must come with its intermediate, for a client too. Jared ran it: Go refused a leaf-only mutual TLS client, and passed with `-cert_chain` |
+| `CERT_SIGNATURE_ALG_UNSUPPORTED` | **Engine and flow code.** An RSA or P-256 root. Today it reads `CERT_SIGNATURE`, which says tampering. Names the OS transport as the route |
+| `KNOWN_HOSTS_LINE_BAD` | The line does not parse. Wildcards refused, as `SshKnownHosts` does |
+| `DUKPT_KEY_SIZE`, `DUKPT_KCV_MISMATCH` | A test BDK must be 16 bytes this round, since lessons use AES-128. A typing error |
+| `VAULT_KEY_UNKNOWN`, `VAULT_OP_REFUSED`, `VAULT_EXPORT_REFUSED`, `VAULT_UNWRAP_FAILED` | Section 4. Jared's doc calls the refusal `KEY_NOT_EXPORTABLE`. The spike printed `VAULT_EXPORT_REFUSED`, and that name stands |
+| `KEYS_HIDDEN` | The key log was asked for with Show keys OFF |
+| `REFEREE_MISSING`, `CHECK_FAILED` | Tool absent, or it said no, with its output attached |
+| `WIZARD_EVENT_NOT_ALLOWED`, `WIZARD_STEP_STALE`, `WIZARD_RUN_NOT_FOUND` | Machine |
 
 Each branch ends in one sentence on what happened and what to do, with detail to the log (gem `plain-sentence-error-surface`).
 
-### 8.6 Prove it works
+### 8.6 The check
 
-`Prove` runs a real tool against the real item, and shows the learner the command and its real output. A pass stores `{ referee, command, outputTail, passed, at, version }` and moves the type to `Verified`.
+`Check` runs a tool against the item, and shows the command, its output, and who judged it. **A pass says "Checked against the root you gave it", never "trusted".** A local root is trusted only by what was told to trust it.
 
-| Type | Referee command | Fallback when absent |
-|---|---|---|
-| `pki.root-ca` | `openssl verify -CAfile root.pem root.pem`, then issue a test leaf and verify it | BCL chain check, for RSA only. For Ed25519 none, so `REFEREE_MISSING` |
-| `tls13.server` | `openssl s_client -tls1_3 -CAfile <anchors> -verify_return_error` against a glass server on this handle | None |
-| `tls13.client` | `openssl s_server -tls1_3 -Verify 1 -CAfile <anchors>` against the glass client | None |
-| `tls.trust` | `openssl verify -CAfile <anchors> <active leaf>` | None |
-| `tls11.server` | `openssl s_client -tls1_1 -cipher AES128-SHA:@SECLEVEL=0 -CAfile <anchors>`, as `Tls11Tests` does | None |
-| `ssh.host-*` | `ssh.exe -F NUL -o BatchMode=yes -o UserKnownHostsFile=<pin> ...` runs `echo hello` on the glass server | None |
-| `ssh.client` | `ssh.exe` with the key file for a file key. For a vault key, the glass client against the glass server, marked as lower tier, because no outside tool can use a vault key | Same |
-| `ssh.known-hosts` | Connect to the host key type's server. A pin mismatch names `SSH_HOST_KEY_CHANGED` | None |
-| `dukpt.bdk` | Two steps. First, a control: the vault's derive code, on the published X9 test BDK, must give the published vector. Then a round trip under the real key, with the final check value compared | The vector needs its fetch script (PRD licence item 1) |
-| `dukpt.pad` | PIN-pad to bank round trip on one sale | None |
-| `token.issuer` | `openssl pkeyutl -verify -pubin -rawin` on a fresh token's signing input. The spike ran this form | Core `Token.Verify`, lower tier |
-| `device.enrolment` | Same form, on a challenge answer | Same |
-| `lab.aes-key`, `lab.seal-key` | Wrap, unwrap, and compare with BCL `AesGcm` | None needed |
+**No self-verify.** `openssl verify -CAfile root.pem root.pem` cannot fail, so it is no check. Each row below has a way to fail, and the root row runs a negative control.
 
-Referees: `openssl` and `ssh.exe` at the pinned paths in design section 9, overridable by `NETSEC_OPENSSL` and `NETSEC_SSH`. `/api/health` `referees` returns an empty list today (`Program.cs:45`), and it should report these two. The product does not call `acceptance/referees/go`, because the Host must not depend on the suite's folder (D11).
-
-A proof states its tier. A proof against an outside tool is the higher tier. A glass-to-glass proof is lower, and the UI says so.
-
-## 9. Slices
-
-Each slice is vertical and merges to a running `main`. Builders never write `acceptance/`. Echo writes the clauses first, and the ids below are proposals. Agents use canary keys only (PRD boundary: "use any real key" stays Steve's).
-
-| Slice | Delivers | Closes on | Clauses Echo owes |
+| Type | Command | Judge | Screen says |
 |---|---|---|---|
-| Pre | Merge #90 and #91. D15 in the PRD after O1. Echo edits the A16 clauses and writes A17 | `run.ps1 -Contract` compiles | `A17.*` |
-| **M0 skeleton** | **Golden traces from main, before any change.** `Credential`, `CredentialSet`, mock and file providers, `SecurityReadiness`, `modes.json`, routes, `WizardMachine`, one security page. **The Show keys toggle:** `TraceRedaction`, `LabSession.Write`, `key.in-use`, and the `SecretsPanel` compare. **`token.issuer` end to end,** F6, file source only | Mock traces byte-equal to golden, on both builds, all 12 labs, fixed seed. Toggle OFF leaves no ON secret in frames or files, for all 12 labs. Lesson 10 runs on a canary issuer. OpenSSL proof passes. Refusal shows beside a passing control. Playwright walks the wizard | `A17.mock.golden-trace-equal`, `A17.readiness.refuses-by-name`, `A17.show-keys.*`, `A17.ui.show-keys-switch`, `A17.repo.no-real-key-tracked`, `A17.wizard.token-issuer-walk` |
-| **M1 vault** | `NetSec.Vault`, `token.issuer` from the vault, audit page, export refusal, `vault.sign` events | Lesson 10 signs inside the box. Export refused and audited. Tampered row refused. OpenSSL verifies | `A17.vault.*` |
-| **M2 OS transport** | `OsTransportFactory`, lesson 5 path, chip fix, button text. Can run beside M1: no shared files but `Program.cs` | **`A16.real-mode` passes: 208 of 208** | Clause edit from section 7.1 |
-| **M3 TLS 1.3** | `pki.root-ca`, `tls13.server`, `tls13.client`, `tls.trust`, F1 and F2. `TrainingCa` on a handle. Attack availability. `TamperPlan.Field`, a named field in place of offset 1284, since a real server name moves it (`Tls13Lab.cs:36`, learnings S3 item 7) | Lessons 4, 5, 10 on canary items. OpenSSL and Go pass, including a client under an issuing CA with its intermediate sent, beside a leaf-only control that fails. An RSA root gets `CERT_SIGNATURE_ALG_UNSUPPORTED`. Each attack row gets its named code, or `available: false` | `A17.tls13.*` |
-| **M4 SSH** | `ssh.host-*`, `ssh.client`, `ssh.known-hosts`, F3 and F4. `CeDevice --key-file` | Lessons 8, 9 on canary keys. `ssh.exe` and Go pass. A9 stays green with the new file reader on net48. RSA row offset 669 moves to a named field (`Labs.cs:215`) | `A17.ssh.*` |
-| **M5 RSA reach** | `tls11.server`, `KeyAlgorithm.Rsa`, RSA signatures in `Certificate.VerifySignedBy`, `rsa_pss_rsae_sha256` in TLS 1.3 per O2. PKCS#12 and OS store providers | Lesson 7 on a canary RSA chain. OpenSSL `-tls1_1` passes. A public-shape RSA chain reaches TLS 1.3 on glass and on OS | `A17.tls11.*`, `A17.rsa.*` |
-| **M6 DUKPT** | `dukpt.bdk`, `dukpt.pad`, F5, `IBaseKey`. Node `--vault`. Host and Node on one vault file | X9 vector through the vault. Lessons 6, 9 on a canary BDK. A10 process run on it. No trace holds the BDK | `A17.dukpt.*` |
-| **M7 the rest** | `device.enrolment`, `lab.aes-key`, `lab.seal-key`, F7, F8. Session file header | 15 of 15 types go `Verified` on canaries in one run. Each exportable type's bytes show with the toggle ON | `A17.all-types` |
-| **M8 words and close** | Cussler pass on wizard copy, A15a reader, Real callouts in tours, Iolo red team, fresh-clone run | All clauses from a fresh clone. Grade and tic gates | `A17.copy.*` |
+| `pki.root-ca` | Issue a test leaf. `openssl verify -x509_strict -CAfile root.pem leaf.pem` passes. **Then the same leaf against a different throwaway root must fail** | OpenSSL | Checked against the root you gave it |
+| `tls.trust` | `openssl verify -CAfile <anchors> -verify_hostname localhost <active leaf>` | OpenSSL | Same |
+| `tls13.server` | `openssl s_client -tls1_3 -CAfile <anchors> -verify_return_error -verify_hostname localhost` against a glass server with this key | OpenSSL | Same |
+| `tls13.client` | `openssl s_server -tls1_3 -Verify 1 -verify_return_error -CAfile <anchors>` against the glass client, with intermediates sent | OpenSSL | Same |
+| `tls11.server` | `openssl s_client -tls1_1 -cipher AES128-SHA:@SECLEVEL=0 -CAfile <anchors>` against the glass server. SECLEVEL=0 is not a normal setting, and the screen says so | OpenSSL | Same |
+| `ssh.host-*`, `ssh.known-hosts` | `ssh.exe -F NUL -o BatchMode=yes -o StrictHostKeyChecking=yes -o UserKnownHostsFile=<pin>` runs `echo hello` on the glass server | `ssh.exe` | Checked with `ssh.exe` |
+| `ssh.client` | Same run, `-i <key>` | `ssh.exe` | Checked with `ssh.exe` |
+| `token.issuer` | `openssl pkeyutl -verify -pubin -rawin` on a fresh token's signing input. The spike ran this form | OpenSSL | Checked with OpenSSL |
+| `device.enrolment` | Our own check of a challenge answer | **None** | **"No outside tool can judge this. Our own check passed."** |
+| `dukpt.bdk`, `dukpt.pad` | Our derive code on the published X9 test BDK gives the published vector, then a PIN-pad to bank round trip under this key | **None live** | **"No outside tool can judge this. Our code matches the published vectors."** |
+| `lab.aes-key`, `lab.seal-key` | `openssl mac -cipher AES-128-CBC ... CMAC` against Core's tag. `lab.aes-key` also: `openssl enc -aes-128-ecb -nopad -K` on one block against `Modes` | OpenSSL | Checked with OpenSSL |
 
-**Kill condition (proposed).** The work ends when 15 of 15 types reach `Verified` on canary items and every clause passes from a fresh clone, or on 2026-11-12, whichever comes first. The report states N of 15 and N of M.
+Not run yet: `-x509_strict` against a chain from `TrainingCa`, since Jared ran it on openssl-made chains. If `TrainingCa`'s leaf lacks a field that mode wants, V4 drops the flag and says so.
+
+Tools: `openssl` and `ssh.exe` at the pinned paths in design section 9, overridable by `NETSEC_OPENSSL` and `NETSEC_SSH`. `/api/health` `referees` is empty today (`Program.cs:45`), and it should report these two. The product does not call `acceptance/referees/go`, because the Host must not depend on the suite's folder (D11). **The clauses judge from `acceptance/`, on their own. A product check is a help to the learner, and it is no evidence for the plan.**
+
+### 8.7 Tour text bound to the key
+
+Some tour sentences go false on a learner's key (`modes-real-world.md` section 6). A step gains an optional `textMine`, chosen by `session.started.security[]`, and A15 and A15a cover it.
+
+| Step | Today says | Fix |
+|---|---|---|
+| Lesson 4 step 1 | "a training CA made for this course" | `textMine` |
+| Lesson 4 step 4 | "the chain has two cards" | Read the length from the trace |
+| Lesson 6 step 12 | "anyone can read the base key in the source" | `textMine` |
+| Lesson 9 steps 1, 2, 11 | Training keys public on purpose | `textMine` |
+| Lesson 10 step 6 | "issued under the same training root" | `textMine` |
+
+Lesson 6 also gains a line for all modes: a real HSM shows only a key id and a check value.
+
+## 9. Slices and clauses
+
+### 9.1 Slices
+
+Each slice is vertical and merges to a running `main`. Builders never write `acceptance/`. Agents use canary test keys only.
+
+| Slice | Delivers | Closes on |
+|---|---|---|
+| **Pre** | #90 and #91 merged. **Echo records golden traces in `acceptance/`, first, from that main. No builder records them.** Echo writes A17 and the A16 wording edits. D15 and D6 in the PRD | `run.ps1 -Contract` compiles. A rerun of Echo's recorder matches, twice |
+| **V0 skeleton, one type** | `Credential`, `CredentialSet`, `builtin` and `file` providers, `SecurityReadiness`, `modes.json`, routes, `WizardMachine`, `wizard-flows.json`, one security page, `secret_guard.py`. **`token.issuer` end to end**, `my-login` with one type | Golden equal. Lesson 10 runs on a canary issuer with the fixed names. Go `tokenverify` in `acceptance/` accepts its token. Refusal shows beside a passing control |
+| **V1 vault** | `NetSec.Vault`, `CourseRead`, audit page, the vault exercise (lab 20), `device.enrolment`, `my-login` whole | Export refused and audited. Course read audited as such. OpenSSL judges the exercise's signature |
+| **V2 OS transport, own PR** | `OsTransportFactory`, lesson 5 path, chip fix, button text | **`A16.os-transport.*` passes** |
+| **V3 Show keys** | `TraceRedaction`, `LabSession.Write`, `key.in-use`, `show-keys-switch`, `SecretsPanel` compare | ON and OFF, same seed, all 12 labs: no ON secret in an OFF frame or file |
+| **V4 certificates** | `my-certificates`, 5 types. `LabClock`. `CERT_SIGNATURE_ALG_UNSUPPORTED`. `TamperPlan.Field`, attack availability | Lessons 4, 5, 7, 10 on canary keys. Mutual TLS under an issuing CA with its intermediate, beside a leaf-only control. **Lesson 10 is now whole on own keys** |
+| **V5 SSH** | `my-ssh`, 4 types | Lessons 8, 9 hop 1. `ssh.exe` and Go judge from `acceptance/` |
+| **V6 payment** | `my-payment`, 2 types. Lesson 9 pad key derived | X9 vectors through the flow's code. Lessons 6, 9 on a canary BDK |
+| **V7 lesson keys** | `my-lesson-keys`, 2 types | Lessons 1, 2. OpenSSL on tags. **15 of 15 types take own keys** |
+| **V8 words, cold reader** | Cussler pass on wizard copy, `textMine`, A15a reader, Iolo red team. **A cold reader runs lesson 10 on their own test keys from a fresh clone** | The kill condition |
+
+**Golden, by name.** Echo records every lab's engine streams, sorted by `(StreamId, StreamSeq)`, with `FixedClock` and a fixed seed, on both builds. Three exclusions, each by name:
+
+1. `<streamId>/wire` streams, since TCP chunking changes between runs (learnings S0 item 3).
+2. Lesson 11's six event types: `timing.lab.started`, `timing.samples`, `timing.managed`, `timing.verdict`, `timing.guess.finished`, and `timing.failed`. They hold `Stopwatch` samples (`Timing.cs:94`), native tick counts, and results that follow them. That leaves lesson 11 nothing to compare, so **the golden covers 11 labs, and lesson 11 is out by these names.** Clause A12 still judges it.
+3. The Host's `<sessionId>/keys` stream, which does not exist in the golden.
+
+**Kill condition.** The work ends when a cold reader runs lesson 10 on their own test keys from a fresh clone, an `acceptance/` referee confirms it, and the count is N of 259, or at **2026-11-12 17:00 local**, whichever comes first. The product's `Verified` never counts. The report states N of 259, and names each clause not met. V4 is the earliest point the reader's run is possible, and V8 is where it is scheduled, so all 15 types land first. If the date comes earlier, the reader runs on what exists.
 
 **Complexity hotspots, named now.**
 
 | Where | Why | Plan |
 |---|---|---|
 | `SecurityReadiness.Decide` | Consistency across types can grow branches | A list of named pure rules, one per pair of types |
-| `FileCredentialProvider` | PEM, PKCS#8, OpenSSH, and CF limits | One small reader per format. Tests on real OpenSSL and `ssh-keygen` output |
-| `WizardMachine` tables | 8 families | Data rows on one spine. One test per family walks every row |
-| SSH signer | Ed25519 and RSA paths share `SshHostSigner` | Keep one class. It reads scheme from the handle's algorithm |
+| `KeyFileReader` | PEM, PKCS#8, OpenSSH | One small reader per format. Tests on real OpenSSL and `ssh-keygen` output |
+| `wizard-flows.json` | Guards named as strings | A test walks every row of all 5 flows, and fails on an unknown name |
+| `LabSession.Write` | Two lines per event | One call to `TraceRedaction`. No branch on mode |
 
-## 10. Open decisions
+### 9.2 What Echo should expect: M = 259
 
-| # | Decision | Options | Pick | What would change my mind |
-|---|---|---|---|---|
-| O1 | **How a real key meets a glass engine (changes D5). Needs Steve** | A: operations-only handle in the engine. B: keep the wall, so real keys run only on OS transport. C: load real keys as `ITrainingKey` bytes | **A.** It is what a real server with an HSM does, and Steve asked for accuracy. B cannot show a real key at work in SSH, DUKPT, or tokens, because OS transport covers TLS only. Steve's show-keys ruling removes the safety reason against C. C still cannot sign inside the box or refuse an export | If Steve holds D5 as a hard wall, B stands. If Steve does not need sign-inside-the-box, C wins: it drops the section 3.3 engine work and keeps all A16 clauses green |
-| O2 | Real-world certificates in glass | A: Ed25519 only. B: add RSA signatures and RSA-PSS. C: also write P-256 ECDSA in C# 3 | **B.** About the size of the `Pkcs1` work, and a public-shape RSA chain works. ECDSA gives `KEY_ALGORITHM_NOT_IN_ENGINE` with OS transport as the route | If Steve wants a Let's Encrypt-style ECDSA certificate on glass, C becomes a slice |
-| O3 | **Where items live. Confirm with Steve** | A: `<repo>/.security/`. B: `%LOCALAPPDATA%` | **A,** per his words, with the guard in 5.2. Cost: `git clean -xdf` deletes it, and each worktree has its own | If "within the project" meant the configuration model and not a folder, or if the repo goes public, B is better. The override makes that one line |
-| O4 | Facade in or out of process | A: in-process class. B: separate process, as D13 does for DUKPT | **A.** 2.35 ms per call. `IVault` keeps the door open. The tour states the difference | A lesson that attacks a compromised Host would need B |
-| O5 | Master key protection | A: plain file. B: DPAPI. C: seal and unseal | **A,** per Steve's "not super-secure". Anyone with both files reads every key, and the wizard says so | Any sign that a real production key will go in. Then B, and the design asks again |
-| O6 | Showing keys | **Decided by Steve.** One app-wide toggle, default ON, for Mock and Real alike. A non-exportable key shows its fingerprint even when ON, on accuracy (lead's ruling). Section 6 | Decided | Closed |
-| O7 | Axes | One or two | **Two.** Section 7 | Nothing I can foresee: OS transport cannot show secrets by design, so one axis would fail for keys either way |
-| O8 | CSR flow for an outside CA | Now or later | **Later.** Its only customer is an outside CA, and most users of this course will not have one on hand | Steve has a CA he wants to use |
-| O9 | Lessons 1 and 2 going Real | A: data keys from the vault. B: Mock only | **A, last.** Steve said every mode, and `GenerateDataKey` is an accurate pattern. It is also the first thing to cut | A deletion pass finds nobody uses it |
-| O10 | PIN and PAN | Test values only, or free entry | **Test values only,** which stands, since Steve uses test data. Section 1.6 | Steve asks, and Dave has read it |
+208 counted today, plus 51. The A16 renames add none. Echo owns the final ids.
+
+| Slice | New clauses | Count |
+|---|---|---|
+| V0 | `A17.mock.golden-trace-equal` on net10 and on net48 (2), `A17.readiness.refuses-by-name`, `A17.readiness.types-disagree`, `A17.repo.no-key-tracked`, `A17.import.warns-on-personal-ssh-path`, `A17.flow.login.walk`, `A17.referee.token-issuer-go` | 8 |
+| V1 | `A17.vault.export-refused-and-audited`, `.course-read-audited`, `.tampered-row-refused`, `.audit-failure-refuses`, `.exportable-is-one-way`, `.exercise-sign-judged-by-openssl`, `.exercise-walk` | 7 |
+| V2 | None. It closes the renamed A16 clause | 0 |
+| V3 | `A17.show-keys.default-on`, `.off-holds-no-secret`, `.mine-shows-exportable`, `.non-exportable-hidden-when-on`, `.fingerprint-compare`, `A17.ui.show-keys-switch` | 6 |
+| V4 | `A17.flow.certificates.walk`, `A17.referee.tls13-server-openssl`, `.tls13-client-go-with-intermediate`, `.tls11-server-openssl`, `A17.proof.root-negative-control`, `A17.chain.alg-unsupported-named`, `A17.clock.new-certificate-not-expired`, `A17.attacks.hit-named-field`, `A17.attacks.unavailable-names-code` | 9 |
+| V5 | `A17.flow.ssh.walk`, `A17.referee.ssh-host-ssh-exe`, `.ssh-client-go` | 3 |
+| V6 | `A17.flow.payment.walk`, `A17.payment.vectors-through-flow-code` | 2 |
+| V7 | `A17.flow.lesson-keys.walk`, `A17.referee.lesson-keys-openssl-mac` | 2 |
+| V8 | `A17.lesson-N.my-keys` for lessons 1, 2, 4, 5, 6, 7, 8, 9, 10 (9), `A17.ui.no-word-real`, `A17.ui.test-keys-line`, `A17.ui.no-outside-judge-line`, `A17.copy.grade-and-tics`, `A17.cold.lesson-10-fresh-clone` | 14 |
+| **Total** | | **51** |
+
+Note for Echo: if a clause uses `PerBuild`, M grows. Only the golden pair is counted as two here, because the rest run in the Host, on net10.
+
+### 9.3 Cut this round, with the door left open
+
+| Cut | Why | Door left open |
+|---|---|---|
+| OS store provider | RSA only (spike), and writes machine state | `ProviderKind` is a string. Add a provider |
+| PKCS#12 | RSA only through the BCL (spike) | Same |
+| F8, the data-key wizard, `GenerateDataKey` | `my-lesson-keys` is enough | `IVault` can gain the call |
+| Old M5: RSA signatures and RSA-PSS on glass | A learner's chain is Ed25519-signed. An RSA leaf under an Ed25519 root already works (Jared's run) | `CERT_SIGNATURE_ALG_UNSUPPORTED` names the gap, and the OS transport is the route today |
+| RSA other than 2048, AES-256 BDK | Offset 669, and lessons use AES-128 | `KEY_SIZE_NOT_2048` and `DUKPT_KEY_SIZE` are the two places to change |
+| Sign-inside in the engines | Steve's O1 | `IKeyHandle` still stands in `Keys.cs` |
+| Node and CE on own keys | Lesson 9 runs in the Host. A10 stays on training keys | `KeyFileReader` is C# 3, so the CE process can take a `--key-file` later |
+| Learner-chosen names | Section 2.5 | Fields on `Credential` |
+| Learn-on-first-connect pin, key component ceremony | Each teaches something false here (`modes-real-world.md` sections 3.5, 3.7) | A flow row each |
+| Sealing, roles, wrapped-only import, scheduled deletion | Steve's "not super-secure" | Jared's section 4 table is the list |
+| CSR for an outside CA | A public CA will not sign `localhost` | A `kind` for the outside wait |
+
+## 10. Decisions
+
+| # | Decision | Result | What would change it |
+|---|---|---|---|
+| O1 | How a key meets a glass engine | **Decided by Steve: C, bytes through the facade.** Engines stay. The exercise teaches operations | Steve asks for sign-inside in a lesson |
+| O2 | Chains on glass | **Ed25519-signed only this round.** RSA and ECDSA chains go to the OS transport, with a named refusal | Steve wants a chain he did not make on glass |
+| O3 | Where items live | **Default stands: gitignored `.security/` in the project** | The repo goes public. Then `%LOCALAPPDATA%`, a one-line change |
+| O4 | Facade in or out of process | **In-process.** 2.35 ms per call. `IVault` keeps the door open | A lesson that attacks a compromised Host |
+| O5 | Master key | **Plain file,** per Steve's "not super-secure". The vault page says so | Steve wants sealing taught |
+| O6 | Showing keys | **Decided by Steve:** the toggle, section 6. Non-exportable keys show a fingerprint, per the lead's ruling | Closed |
+| O7 | Axes | **Two.** Section 7 | Closed |
+| O8 | Wizards | **Decided by Steve: 5 flows as data, all 15 types** | Closed |
+| O9 | DUKPT and passkey | **Decided by Steve: stay available,** and the screen says no outside tool can judge them | Closed |
+| O10 | PIN and PAN | **Test values only.** Stands. Section 1.6 | Steve asks, and Dave has read it |
+| O11 | Names | **Read-only this round** (my call, on Iolo's finding). Section 2.5 | A lesson needs a learner's name |
 
 ## 11. Prior art and arithmetic
 
 | Item | Finding |
 |---|---|
-| Catalog check | `E:\dev\MMP.Library\docs\system-design-catalog.md`: no vault or HSM entry. Took its "multi-step process with independent failure at each step" for the wizard, so each step names its own failure. Took the arithmetic habit. Rejected queues and caches |
+| Catalog check | `E:\dev\MMP.Library\docs\system-design-catalog.md`: no vault or HSM entry. Took "multi-step process with independent failure at each step" for the flows, and the arithmetic habit. Rejected queues and caches |
 | Style | Modular monolith plus lab node processes, unchanged. One new module, `NetSec.Vault` |
-| Closest shape, keys | HashiCorp Vault transit: "encryption as a service", "doesn't store the data", versioned keys, sign and verify (page read this session). The page does not cover `exportable`, so that name is from recollection. AWS KMS `GenerateDataKey`: clear copy and encrypted copy (page read this session) |
-| Closest shape, handle | PKCS#11 and a TLS server with an HSM key: the handshake stays in process, and one sign call crosses. From recollection |
-| Closest shape, wizard | An XState-style machine that owns its moves (house rule, `1rMgw0Q5MgY`) |
-| Where we differ | One learner, one machine, loopback. No network API, no tokens, no HA, no real tamper resistance. We show the audit log and the failure on purpose, since teaching is the job. Reasoning: those are what a learner must see, and the rest is operations |
-| When this is wrong | A team sharing a vault, or a production key in the folder. Then use a real vault behind `ICredentialProvider` |
+| Closest shape, keys | HashiCorp Vault transit: "encryption as a service", versioned keys, sign and verify (page read this session). Jared read `exportable` and sealing in Vault's API docs |
+| Closest shape, flows | An XState-style machine that owns its moves (house rule, `1rMgw0Q5MgY`) |
+| Where we differ | One learner, one machine, loopback, test keys. The labs read key bytes through a route no real vault has, and the course says so. We show the audit log and the keys on purpose, since teaching is the job |
+| When this is wrong | A team sharing a vault, or a production key in the folder |
 
 | Arithmetic | Value |
 |---|---|
-| Assumption | 1 learner, 20 lesson runs a day, 20 audit rows a run |
+| Assumption | 1 learner, 20 lesson runs a day, up to 15 course reads a run |
 | Rate | Average well under 1 call per second. Measured ceiling: about 425 sign calls per second, with an audit row each (1000 in 2348 ms) |
-| Added time per run | About 47 ms at 20 calls. A handshake's trace is read by a person, so this does not show |
+| Added time per run | About 35 ms at 15 reads, and a person reads the result |
 | Key rows | 15 types, 5 versions, about 300 B each: about 22 KB |
-| Audit growth | About 100 B per row (1011 rows in 106 KB). 400 rows a day is 40 KB a day, about 44 MB in 3 years. No pruning needed |
+| Audit growth | About 100 B per row (1011 rows in 106 KB). 300 rows a day is 30 KB a day, about 33 MB in 3 years. No pruning needed |
 | Result | One SQLite file. No cache, no queue, no pool |
 
 | Gems | Use |
 |---|---|
-| Used | `decide-at-authoritative-boundary` (readiness), `replaceable-seam` (provider), `plain-sentence-error-surface` (wizard errors), `paths-plain-at-the-boundary` (key files), `server-replaces-never-merges` (wizard step), `seeded-hash-linked-custody-chain` (audit) |
-| Novel | None needed yet. A per-type mode seam may earn a gem after M3 |
+| Used | `decide-at-authoritative-boundary` (readiness), `replaceable-seam` (provider), `plain-sentence-error-surface` (flow errors), `paths-plain-at-the-boundary` (key files), `server-replaces-never-merges` (flow step, toggle flip), `seeded-hash-linked-custody-chain` (audit) |
+| Novel | None needed yet |
 
 ## 12. Disposition
 
-The design is ready for review. Next: Steve decides O1 and confirms O3. Echo takes the A16 edits from sections 3.4 and 7.1 and writes A17. Nancy takes sections 6.5, 7.1, and 8, including `show-keys-switch`. After that, slice M0 can start.
+Ready to build after Pre. Echo takes sections 6.6, 7.1, 9.1, and 9.2. Nancy takes sections 6.5, 7.1, and 8. Heather takes section 8.7 with Cussler. The first builder takes V0.
+
+**Where this doc and `docs/modes-real-world.md` differ, this doc governs, because each row is a later decision:**
+
+| Jared's doc | This doc | Authority |
+|---|---|---|
+| Section 3.12: keep the passkey shape on Mock | Available, with the no-outside-judge line | Steve, O9 |
+| Section 4: the course view shows a non-export key's bytes always | Fingerprint and the line in section 6.3 | Lead's ruling |
+| Section 4: sealing, roles, wrapped import, deletion | Cut this round | Lead's cut list, Steve's "not super-secure" |
+| Section 1: the word "Real" | "My test key" | Lead's list, item c |
+
+Jared's traps, proof rows, and accuracy limits all stand. His section 3 is the reference for wizard copy.
