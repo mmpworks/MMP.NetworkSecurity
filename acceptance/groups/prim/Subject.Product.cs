@@ -98,9 +98,9 @@ namespace Acceptance
             return o;
         }
 
-        // ---- RSA (ASSUMED: BigUInt.FromBigEndian) ----
-        static RsaPublic Pub(byte[] n, byte[] e) { return new RsaPublic(BigUInt.FromBigEndian(n), BigUInt.FromBigEndian(e)); }
-        static RsaPrivate Priv(byte[] n, byte[] d) { return new RsaPrivate(BigUInt.FromBigEndian(n), BigUInt.FromBigEndian(d)); }
+        // ---- RSA (ASSUMED: BigUInt.FromBytes) ----
+        static RsaPublic Pub(byte[] n, byte[] e) { return new RsaPublic(BigUInt.FromBytes(n), BigUInt.FromBytes(e)); }
+        static RsaPrivate Priv(byte[] n, byte[] d) { return new RsaPrivate(BigUInt.FromBytes(n), BigUInt.FromBytes(d)); }
 
         public static byte[] RsaSignSha1(byte[] n, byte[] d, byte[] msg) { return Pkcs1.SignSha1(Priv(n, d), msg); }
         public static bool RsaVerify(string hash, byte[] n, byte[] e, byte[] msg, byte[] sig)
@@ -125,8 +125,8 @@ namespace Acceptance
         public static void MlKemKeyGen(byte[] d, byte[] z, out byte[] ek, out byte[] dk)
         {
             MlKemPair p = MlKem768.KeyGen(d, z);
-            ek = p.EncapsulationKey;
-            dk = p.DecapsulationKey;
+            ek = p.Ek;
+            dk = p.Dk;
         }
         public static void MlKemEncaps(byte[] ek, byte[] m, out byte[] ct, out byte[] ss)
         {

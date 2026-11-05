@@ -215,12 +215,85 @@ namespace Acceptance
             ms.Write(new byte[16], 0, 16);
             Check.Equal("first encrypted offset", expectOffset, (long)SshWire.FirstEncryptedPacket(ms.ToArray(), out clear));
 
-            // Tap log
-            string logPath = Path.Combine(dir, "hop.hex");
-            File.WriteAllText(logPath, "C2S 0102\nS2C ff\nC2S 03\n");
-            TapLog tap = TapLog.Read(logPath);
-            Check.True(Hex.Encode(tap.ClientToServer) == "010203" && Hex.Encode(tap.ServerToClient) == "ff", "tap log directions mixed up");
-            return "MiniJson, TLS records and hellos (real hybrid capture), SSH clear packets (real ssh.exe bytes plus a synthetic NEWKEYS stream), TapLog";
+            // Tap log: the real tap referee between a client and an echo server, once clean and once with a flip.
+            TapRun clean = RunTap(c, dir, "clean", -1);
+            Check.Bytes("tap log client-to-server", clean.Sent, clean.Log.ClientToServer);
+            Check.Bytes("tap log server-to-client", clean.Sent, clean.Log.ServerToClient);
+            Check.True(clean.Log.Flips.Count == 0 && clean.Log.Connections == 1, "clean tap run: " + clean.Log.Flips.Count + " flips, " + clean.Log.Connections + " connections");
+            TapRun flipped = RunTap(c, dir, "flip", 3);
+            byte[] expectFlipped = (byte[])flipped.Sent.Clone();
+            expectFlipped[3] ^= 0xFF;
+            Check.Bytes("tap log after a flip holds what the receiver got", expectFlipped, flipped.Log.ClientToServer);
+            Check.True(flipped.Log.Flips.Count == 1, "expected one '# flip' line, got " + flipped.Log.Flips.Count);
+            return "MiniJson, TLS records and hellos (real hybrid capture), SSH clear packets (real ssh.exe bytes plus a synthetic NEWKEYS stream), TapLog (real tap referee, clean and flipped)";
+        }
+
+        sealed class TapRun { public byte[] Sent; public TapLog Log; }
+
+        static TapRun RunTap(Ctx c, string dir, string stem, int flipAt)
+        {
+            string log = Path.Combine(dir, "tap-" + stem + ".hex");
+            using (EchoServer echo = new EchoServer())
+            using (GoPeer tap = GoPeer.StartListening(c, "tap", "-listen 127.0.0.1:0 -to 127.0.0.1:" + echo.Port + " -log \"" + log + "\" -naccept 1" + (flipAt >= 0 ? " -flip-at " + flipAt : "")))
+            {
+                byte[] sent = new Rng(77).Bytes(10);
+                using (System.Net.Sockets.TcpClient cl = new System.Net.Sockets.TcpClient("127.0.0.1", tap.Port))
+                {
+                    System.Net.Sockets.NetworkStream ns = cl.GetStream();
+                    ns.Write(sent, 0, sent.Length);
+                    byte[] buf = new byte[10];
+                    int got = 0;
+                    ns.ReadTimeout = 10000;
+                    while (got < buf.Length) { int n = ns.Read(buf, got, buf.Length - got); if (n <= 0) break; got += n; }
+                    Check.True(got == 10, "the echo through the tap returned " + got + " bytes");
+                }
+                Thread.Sleep(500);
+                TapRun r = new TapRun();
+                r.Sent = sent;
+                r.Log = TapLog.Read(log);
+                return r;
+            }
+        }
+
+        [Clause("SELF.referee-protocols")]
+        public static string RefereeProtocols(Ctx c)
+        {
+            // BCL oracle: JSON lines (acceptance/referees/README.md). SHA-256 of "abc" is a known value.
+            using (BclOracle o = BclOracle.Start(c))
+            {
+                Check.Equal("sha256(abc) from the oracle", "ba7816bf8f01cfea414140de5dae2223b00361a396177a9cb410ff61f20015ad", Hex.Encode(o.Bytes("digest", "hash", "alg", "sha256", "data", Encoding.ASCII.GetBytes("abc"))));
+                byte[] none = o.Bytes("digest", "hash", true, "alg", "no-such-hash", "data", new byte[0]);
+                Check.True(none == null && o.LastCode != null, "the oracle accepted an unknown algorithm");
+            }
+            // tokenverify: a malformed token gets the named code, and the harness reads it from the JSON event.
+            string tv = Referees.GoTool(c, "tokenverify");
+            string dir = Path.Combine(c.WorkDir, "refproto");
+            Directory.CreateDirectory(dir);
+            string pub = Path.Combine(dir, "issuer.pub"), key = Path.Combine(dir, "issuer.key"), o2;
+            string openssl = Referees.OpenSsl(c);
+            if (Proc.Run(openssl, "genpkey -algorithm ed25519 -out \"" + key + "\"", dir, 30000, out o2) != 0) throw new FailException(o2);
+            if (Proc.Run(openssl, "pkey -in \"" + key + "\" -pubout -out \"" + pub + "\"", dir, 30000, out o2) != 0) throw new FailException(o2);
+            using (GoPeer g = GoPeer.Start(c, "tokenverify", "-pub \"" + pub + "\" -token not-a-token"))
+            {
+                Check.True(g.P.WaitExit(15000), "tokenverify did not exit");
+                Dictionary<string, object> ev = g.WaitEvent("result", 5000);
+                Check.True(ev != null, "tokenverify printed no result event: " + g.Output);
+                Check.Equal("tokenverify code for a malformed token", "TOKEN_MALFORMED", MiniJson.Str(ev, "code"));
+            }
+            // tlspeer: the first stdout line is the port, then JSON events.
+            string cert = Path.Combine(dir, "c.pem"), tkey = Path.Combine(dir, "k.pem");
+            if (Proc.Run(openssl, "genpkey -algorithm ed25519 -out \"" + tkey + "\"", dir, 30000, out o2) != 0) throw new FailException(o2);
+            if (Proc.Run(openssl, "req -new -x509 -key \"" + tkey + "\" -subj \"/CN=localhost\" -days 2 -addext \"subjectAltName=DNS:localhost\" -out \"" + cert + "\"", dir, 30000, out o2) != 0) throw new FailException(o2);
+            using (GoPeer srv = GoPeer.StartListening(c, "tlspeer", "-mode server -listen 127.0.0.1:0 -naccept 1 -groups x25519mlkem768 -cert \"" + cert + "\" -key \"" + tkey + "\""))
+            using (OpenSslPeer cl = OpenSslPeer.StartClient(c, "-connect 127.0.0.1:" + srv.Port + " -tls1_3 -groups X25519MLKEM768 -servername localhost -CAfile \"" + cert + "\" -brief"))
+            {
+                cl.P.WriteLine("hello");
+                Dictionary<string, object> hs = srv.WaitEvent("handshake", 20000);
+                Check.True(hs != null, "tlspeer printed no handshake event. Output: " + srv.Output);
+                Check.Equal("tlspeer curveID", "X25519MLKEM768", MiniJson.Str(hs, "curveID"));
+                Check.Equal("tlspeer version", "TLS 1.3", MiniJson.Str(hs, "version"));
+            }
+            return "BCL oracle JSON protocol, tokenverify result events, tlspeer port line and handshake event, all against the real referee programs";
         }
 
         /// <summary>Runs ssh.exe against a stub that sends a version line, and returns what ssh.exe sent first.</summary>

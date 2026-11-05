@@ -1,10 +1,14 @@
 <Project Sdk="Microsoft.NET.Sdk">
   <Import Project="..\Group.props" />
-  <!-- Process-level group: it starts the lab executables and reads bytes, traces and result lines. It links no product code,
-       so it compiles and runs the same way whether or not NetSec.Core exists. It needs only net10.0: the CE executable that
+  <!-- Process-level group: it starts the lab executables and reads bytes, trace files and result lines. The lab runs in separate processes.
+       This program links NetSec.Core only for two seams of design section 11: TrainingPki.Export (the key files the Go referees read) and
+       TrainingKeySource (the base derivation key, which the privacy scan looks for). It needs only net10.0: the CE executable that
        it starts is the CF-compiled one. -->
   <PropertyGroup>
     <TargetFramework>net10.0</TargetFramework>
     <AssemblyName>Acceptance.Bridge</AssemblyName>
   </PropertyGroup>
+  <ItemGroup>
+    <Compile Include="..\..\lib\Live\*.cs" Link="Live\%(Filename)%(Extension)" />
+  </ItemGroup>
 </Project>

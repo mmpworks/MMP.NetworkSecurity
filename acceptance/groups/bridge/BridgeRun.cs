@@ -36,6 +36,7 @@ namespace Acceptance
         public string TraceId;
         public ulong Seed;
         public byte[] Ksn;
+
         public string FailedCodes
         {
             get
@@ -45,12 +46,40 @@ namespace Acceptance
                 return string.Join(",", codes.ToArray());
             }
         }
+
+        /// <summary>The bank's RESULT code. Absent, empty or OK means the bank recovered the PIN block.</summary>
+        public bool BankOk
+        {
+            get
+            {
+                if (Bank == null) return false;
+                string code = MiniJson.Str(Bank, "code");
+                return string.IsNullOrEmpty(code) || code == "OK";
+            }
+        }
+
+        /// <summary>The event bytes a process wrote to the socket, joined in file order (type wire.sent, design section 2.1).</summary>
+        public byte[] WireSent(string hop, string actor)
+        {
+            List<byte[]> parts = new List<byte[]>();
+            foreach (TraceLine t in Trace)
+                if (t.Type == "wire.sent" && t.Hop == hop && t.Actor == actor && t.Wire != null && t.Wire.Length > 0) parts.Add(t.Wire);
+            return Hex.Concat(parts.ToArray());
+        }
+
+        public int WireSentEvents(string hop, string actor)
+        {
+            int n = 0;
+            foreach (TraceLine t in Trace) if (t.Type == "wire.sent" && t.Hop == hop && t.Actor == actor) n++;
+            return n;
+        }
     }
 
     /// <summary>
-    /// Starts the lab processes from outside, as program-design.md section 9 describes: nodes behind two tap relays, the CE exe,
-    /// a wait for CE-READY, then the PIN pad. Nothing here links against NetSec.Core. The command lines the suite needs from the
-    /// builders are in acceptance/CONTRACT.md (section "Process contract").
+    /// Starts the lab processes from outside, as program-design.md sections 6, 9 and 11 describe: nodes behind two tap relays, the CE exe,
+    /// a wait for CE-READY, and the PIN pad that the CE connects to. Every node prints READY port=P first and a final RESULT line, and writes
+    /// its trace to a file given by --trace-file. The suite reads those files after the run. Command lines the suite uses beyond section 11
+    /// (--seed on a node, --tamper-envelope on the gateway) are ASSUMED and listed in CONTRACT.md.
     /// </summary>
     public sealed class BridgeRun : IDisposable
     {
@@ -61,19 +90,12 @@ namespace Acceptance
         readonly bool _useSeed;
         readonly List<IDisposable> _owned = new List<IDisposable>();
         readonly string _dir;
-        TraceCollector _traces;
 
         BridgeRun(Ctx c, Topology t, Tamper tamper, ulong seed, bool useSeed, string name)
         {
             _c = c; _topology = t; _tamper = tamper; _seed = seed; _useSeed = useSeed;
-            _dir = LivePkiDir(c, name);
-        }
-
-        static string LivePkiDir(Ctx c, string name)
-        {
-            string d = Path.Combine(c.WorkDir, name);
-            Directory.CreateDirectory(d);
-            return d;
+            _dir = Path.Combine(c.WorkDir, name);
+            Directory.CreateDirectory(_dir);
         }
 
         public void Dispose() { for (int i = _owned.Count - 1; i >= 0; i--) { try { _owned[i].Dispose(); } catch (Exception) { } } }
@@ -97,17 +119,19 @@ namespace Acceptance
 
         // ---------------------------------------------------------------- paths
 
-        string NodeDll { get { string p = _c.Prop("node", ""); if (p.Length == 0 || !File.Exists(p)) throw new NotRunException("PRODUCT_MISSING", "NetSec.Node is not built (node=" + p + ")"); return p; } }
+        string NodePath { get { string p = _c.Prop("node", ""); if (p.Length == 0 || !File.Exists(p)) throw new NotRunException("PRODUCT_MISSING", "NetSec.Node is not built (node=" + p + ")"); return p; } }
         string CeExe { get { string p = _c.Prop("ce", ""); if (p.Length == 0 || !File.Exists(p)) throw new NotRunException("PRODUCT_MISSING", "NetSec.CeDevice.exe is not built (ce=" + p + ")"); return p; } }
 
         Proc StartNode(string args)
         {
-            Proc p = Proc.Start("dotnet", "\"" + NodeDll + "\" " + args);
+            string path = NodePath;
+            Proc p = path.EndsWith(".dll", StringComparison.OrdinalIgnoreCase) ? Proc.Start("dotnet", "\"" + path + "\" " + args) : Proc.Start(path, args);
             _owned.Add(p);
             return p;
         }
 
         string Seed(int salt) { return _useSeed ? " --seed " + (_seed + (ulong)salt) : ""; }
+        string TraceArg(string name) { return " --trace-file \"" + Path.Combine(_dir, name + ".ndjson") + "\""; }
 
         static string WaitLine(Proc p, string startsWith, int ms, string what)
         {
@@ -116,95 +140,107 @@ namespace Acceptance
             return line;
         }
 
+        /// <summary>Waits for "READY port=P" and returns P.</summary>
+        static int WaitReady(Proc p, string what)
+        {
+            string line = WaitLine(p, "READY", 60000, what);
+            Match m = Regex.Match(line, @"^READY port=(?<port>\d+)\s*$");
+            if (!m.Success) throw new FailException(what + " printed '" + line + "', expected 'READY port=<p>' (design section 11)");
+            return int.Parse(m.Groups["port"].Value);
+        }
+
+        static Dictionary<string, object> ResultOf(string line)
+        {
+            return MiniJson.AsObject(MiniJson.Parse(line.Substring(line.IndexOf(' ') + 1).Trim()));
+        }
+
         // ---------------------------------------------------------------- the run
 
         BridgeOutcome Execute()
         {
             BridgeOutcome o = new BridgeOutcome();
             o.Topology = _topology; o.Seed = _seed;
-            o.TraceId = "acc-" + Guid.NewGuid().ToString("N").Substring(0, 8);
-            _traces = new TraceCollector();
-            _owned.Add(_traces);
-            int bank = Proc.FreePort(), server = Proc.FreePort(), gateway = Proc.FreePort(), cePort = Proc.FreePort();
-            int h1 = Proc.FreePort(), h2 = Proc.FreePort(), plain = Proc.FreePort(), forward = Proc.FreePort();
-            string common = " --trace-port " + _traces.Port + " --trace-id " + o.TraceId;
             string hop1Log = Path.Combine(_dir, "hop1.hex"), hop2Log = Path.Combine(_dir, "hop2.hex");
-
-            string pki = Path.Combine(_dir, "pki");
-            Directory.CreateDirectory(pki);
-            NetSecPki goPki = null;
+            PkiDir pki = PkiDir.Export(_c, "bridge-pki-" + Path.GetFileName(_dir));
 
             // bank HSM, then the server end of hop 2
-            Proc bankP = StartNode("--role bankhsm --listen " + bank + common + Seed(1));
-            WaitLine(bankP, "NODE-READY", 60000, "bank HSM");
+            Proc bankP = StartNode("--role bankhsm --listen 0" + TraceArg("bank") + Seed(1));
+            int bank = WaitReady(bankP, "bank HSM");
             Proc serverP = null; GoPeer serverGo = null, gatewayGo = null;
+            int server;
+            NetSecPki goPki = null;
             if (_topology == Topology.GoReferees)
             {
-                goPki = NetSecPki.Prepare(_c, pki);
-                serverGo = GoPeer.StartListening(_c, "tlspeer", "-mode server -relay 127.0.0.1:" + bank + " -listen 127.0.0.1:" + server + " -groups x25519mlkem768 -cert \"" + goPki.CertPem + "\" -key \"" + goPki.KeyPem + "\"");
+                goPki = NetSecPki.Prepare(_c, Path.Combine(_dir, "gopki"));
+                serverGo = GoPeer.StartListening(_c, "tlspeer", "-mode server -relay 127.0.0.1:" + bank + " -listen 127.0.0.1:0 -groups x25519mlkem768 -cert \"" + goPki.CertPem + "\" -key \"" + goPki.KeyPem + "\"");
                 _owned.Add(serverGo);
+                server = serverGo.Port;
             }
             else
             {
-                serverP = StartNode("--role server --listen " + server + " --bank-port " + bank + common + Seed(2));
-                WaitLine(serverP, "NODE-READY", 60000, "server");
+                serverP = StartNode("--role server --listen 0 --bank " + bank + TraceArg("server") + Seed(2));
+                server = WaitReady(serverP, "server");
             }
             // tap 2 sits between gateway and server
-            GoPeer tap2 = GoPeer.StartListening(_c, "tap", "-listen 127.0.0.1:" + h2 + " -to 127.0.0.1:" + server + " -log \"" + hop2Log + "\"" + (_tamper.Hop2Flip ? " -flip-at " + _tamper.Hop2Offset : ""));
+            GoPeer tap2 = GoPeer.StartListening(_c, "tap", "-listen 127.0.0.1:0 -to 127.0.0.1:" + server + " -log \"" + hop2Log + "\"" + (_tamper.Hop2Flip ? " -flip-at " + _tamper.Hop2Offset : ""));
             _owned.Add(tap2);
 
             // the gateway end of hop 1
             Proc gatewayP = null;
-            string link = _topology == Topology.GlassSshExeForward ? "external-forward" : "glass-ssh";
+            int gateway;
             if (_topology == Topology.GoReferees)
             {
-                string hostKey = Path.Combine(pki, "host_ed25519"), authorized = Path.Combine(pki, "user.pub");
-                NodeKeys.WriteSshKey(NodeDll, "ssh-host-ed25519", hostKey, null);
-                NodeKeys.WriteSshKey(NodeDll, "ssh-client", null, authorized);
-                gatewayGo = GoPeer.StartListening(_c, "gogateway", "-listen 127.0.0.1:" + gateway + " -host-key \"" + hostKey + "\" -authorized \"" + authorized + "\" -kex curve25519-sha256 -cipher aes128-ctr -mac hmac-sha2-256 -upstream 127.0.0.1:" + h2 + " -upstream-ca \"" + goPki.RootPem + "\" -upstream-name localhost -groups x25519mlkem768");
+                gatewayGo = GoPeer.StartListening(_c, "gogateway", "-listen 127.0.0.1:0 -host-key \"" + pki.HostKey + "\" -authorized \"" + pki.UserPub + "\" -kex curve25519-sha256 -cipher aes128-ctr -mac hmac-sha2-256 -next 127.0.0.1:" + tap2.Port + " -ca \"" + goPki.RootPem + "\" -server-name localhost -groups x25519mlkem768");
                 _owned.Add(gatewayGo);
+                gateway = gatewayGo.Port;
             }
             else
             {
-                gatewayP = StartNode("--role gateway --listen " + gateway + " --server-port " + h2 + " --link " + link + " --suite modern" + (_topology == Topology.GlassSshExeForward ? " --plain-listen " + plain : "") + (_tamper.EnvelopeFlip ? " --tamper-envelope" : "") + common + Seed(3));
-                WaitLine(gatewayP, "NODE-READY", 60000, "gateway");
+                gatewayP = StartNode("--role gateway --listen 0 --server " + tap2.Port + " --link ssh" + (_tamper.EnvelopeFlip ? " --tamper-envelope" : "") + TraceArg("gateway") + Seed(3));
+                gateway = WaitReady(gatewayP, "gateway");
             }
-            GoPeer tap1 = GoPeer.StartListening(_c, "tap", "-listen 127.0.0.1:" + h1 + " -to 127.0.0.1:" + gateway + " -log \"" + hop1Log + "\"" + (_tamper.Hop1Flip ? " -flip-at " + _tamper.Hop1Offset : ""));
+            GoPeer tap1 = GoPeer.StartListening(_c, "tap", "-listen 127.0.0.1:0 -to 127.0.0.1:" + gateway + " -log \"" + hop1Log + "\"" + (_tamper.Hop1Flip ? " -flip-at " + _tamper.Hop1Offset : ""));
             _owned.Add(tap1);
 
-            // Windows ssh.exe -L for the forward topology: local port forward -> tap 1 -> gateway SSH server -> gateway plain port
-            Proc sshExe = null;
+            // Windows ssh.exe -L for the forward topology: local port -> tap 1 -> gateway SSH server. The gateway ignores the target the client names.
+            int forward = Proc.FreePort();
             if (_topology == Topology.GlassSshExeForward)
             {
-                string clientKey = Path.Combine(pki, "ssh_client");
-                NodeKeys.WriteSshKey(NodeDll, "ssh-client", clientKey, null);
-                OpenSshKey.RestrictToCurrentUser(clientKey);
-                string known = Path.Combine(pki, "known_hosts");
+                OpenSshKey.RestrictToCurrentUser(pki.UserKey);
+                string known = Path.Combine(pki.Dir, "known_hosts");
                 File.WriteAllText(known, "");
-                sshExe = Proc.Start(Referees.SshExe(_c), "-F NUL -o BatchMode=yes -o UserKnownHostsFile=\"" + known + "\" -o StrictHostKeyChecking=no -o ExitOnForwardFailure=yes -i \"" + clientKey + "\" -L " + forward + ":127.0.0.1:" + plain + " -N training@127.0.0.1 -p " + h1);
+                Proc sshExe = Proc.Start(Referees.SshExe(_c), "-F NUL -o BatchMode=yes -o UserKnownHostsFile=\"" + known + "\" -o StrictHostKeyChecking=no -o ExitOnForwardFailure=yes -i \"" + pki.UserKey + "\" -L " + forward + ":127.0.0.1:1 -N training@127.0.0.1 -p " + tap1.Port);
                 _owned.Add(sshExe);
                 if (!Net.WaitPort(forward, 30000)) throw new FailException("ssh.exe did not open the local forward on port " + forward + ". Output: " + sshExe.AllOutput);
             }
 
+            // the PIN pad listens. The CE connects to it, then to the gateway side.
+            Proc pad = StartNode("--role pinpad --listen 0 --pin 1234 --pan 4111111111111111" + TraceArg("pinpad") + Seed(5));
+            int padPort = WaitReady(pad, "PIN pad");
+
             // the CE exe, built from CF binaries, runs on the desktop CLR
             string ceLink = _topology == Topology.GlassSshExeForward ? "external-forward" : "glass-ssh";
-            int ceGateway = _topology == Topology.GlassSshExeForward ? forward : h1;
-            Proc ce = Proc.Start(CeExe, "--pinpad " + cePort + " --gateway " + ceGateway + " --trace " + _traces.Port + " --trace-id " + o.TraceId + " --link " + ceLink + " --suite modern" + (_useSeed ? " --seed " + (_seed + 4) : "") + " --pool 25");
+            int ceGateway = _topology == Topology.GlassSshExeForward ? forward : tap1.Port;
+            Proc ce = Proc.Start(CeExe, "--pinpad " + padPort + " --gateway " + ceGateway + " --trace-file \"" + Path.Combine(_dir, "ce.ndjson") + "\" --link " + ceLink + " --suite modern" + (_useSeed ? " --seed " + (_seed + 4) : "") + " --pool 25");
             _owned.Add(ce);
             o.CeReady = WaitLine(ce, "CE-READY", 10000, "CE");                      // a CE that stays silent is a failure (CE_DEVICE_SILENT)
 
-            // the PIN pad starts the sale
-            Proc pad = StartNode("--role pinpad --ce-port " + cePort + " --pin 1234 --pan 4111111111111111 --sales 1" + common + Seed(5));
-            string padResult = WaitLine(pad, "PINPAD-RESULT", 60000, "PIN pad");
-            o.PinPad = MiniJson.AsObject(MiniJson.Parse(padResult.Substring("PINPAD-RESULT".Length).Trim()));
+            bool tampered = _tamper.Hop1Flip || _tamper.Hop2Flip || _tamper.EnvelopeFlip;
+            string padResult = pad.WaitForLine(delegate (string l) { return l.StartsWith("RESULT"); }, tampered ? 20000 : 60000);
+            if (padResult != null) o.PinPad = ResultOf(padResult);
+            else if (!tampered) throw new FailException("PIN pad printed no RESULT line. Output: " + pad.AllOutput);
 
-            // the bank ends the lab: it prints one result per envelope, ok or not. A tamper that stops the flow gets a shorter wait.
-            string bankResult = bankP.WaitForLine(delegate (string l) { return l.StartsWith("BANK-RESULT"); }, (_tamper.Hop1Flip || _tamper.Hop2Flip || _tamper.EnvelopeFlip) ? 20000 : 60000);
-            if (bankResult != null) o.Bank = MiniJson.AsObject(MiniJson.Parse(bankResult.Substring("BANK-RESULT".Length).Trim()));
-            else if (!(_tamper.Hop1Flip || _tamper.Hop2Flip)) throw new FailException("bank HSM printed no BANK-RESULT. Bank output: " + bankP.AllOutput);
+            // the bank ends the lab. A tamper that stops the flow gets a shorter wait.
+            string bankResult = bankP.WaitForLine(delegate (string l) { return l.StartsWith("RESULT"); }, tampered ? 20000 : 60000);
+            if (bankResult != null) o.Bank = ResultOf(bankResult);
+            else if (!(_tamper.Hop1Flip || _tamper.Hop2Flip)) throw new FailException("bank HSM printed no RESULT line. Bank output: " + bankP.AllOutput);
             Thread.Sleep(1200);                                                     // let the last trace lines and the tap logs land
 
-            o.Trace = _traces.Lines;
+            List<string> unparsed = new List<string>();
+            List<TraceLine> lines = new List<TraceLine>();
+            foreach (string name in new string[] { "ce", "pinpad", "gateway", "server", "bank" })
+                lines.AddRange(TraceFile.ReadAll(Path.Combine(_dir, name + ".ndjson"), unparsed));
+            o.Trace = lines.ToArray();
             o.Hop1 = File.Exists(hop1Log) ? TapLog.Read(hop1Log) : new TapLog();
             o.Hop2 = File.Exists(hop2Log) ? TapLog.Read(hop2Log) : new TapLog();
             o.Output["bank"] = bankP.AllOutput; o.Output["ce"] = ce.AllOutput; o.Output["pinpad"] = pad.AllOutput;
@@ -212,29 +248,30 @@ namespace Acceptance
             if (serverP != null) o.Output["server"] = serverP.AllOutput;
             if (gatewayGo != null) o.Output["gogateway"] = gatewayGo.Output;
             if (serverGo != null) o.Output["tlspeer"] = serverGo.Output;
-            string ksn = o.PinPad != null && o.PinPad.ContainsKey("ksn") ? o.PinPad["ksn"] as string : null;
+            string ksn = o.PinPad != null ? MiniJson.Str(o.PinPad, "ksn") : null;
             if (ksn != null) o.Ksn = Hex.Decode(ksn);
-            if (_traces.Unparsed.Length > 0) o.Output["unparsed-trace-lines"] = string.Join("\n", _traces.Unparsed);
+            foreach (TraceLine t in o.Trace) if (!string.IsNullOrEmpty(t.TraceId)) { o.TraceId = t.TraceId; break; }
+            if (unparsed.Count > 0) o.Output["unparsed-trace-lines"] = string.Join("\n", unparsed.ToArray());
             return o;
         }
     }
 
-    /// <summary>Keys and certificates for the Go referee topology. The Go tlspeer needs a certificate the glass gateway trusts.</summary>
+    /// <summary>Keys and certificates for the Go referee topology. The Go tlspeer needs a certificate the Go gateway trusts, made with OpenSSL.</summary>
     public sealed class NetSecPki
     {
         public string RootPem, CertPem, KeyPem;
-        /// <summary>Uses acceptance/lib/Live in no way: this group links no product code. The CA root and the leaf come from the Node executable.</summary>
+
         public static NetSecPki Prepare(Ctx c, string dir)
         {
-            // The gateway under test is OUR glass TLS client in some runs and a Go client in others. The Go-referee topology uses
-            // gogateway as the TLS client, so its trust anchor is a CA that the suite makes with OpenSSL itself.
+            Directory.CreateDirectory(dir);
+            // The Go-referee topology uses gogateway as the TLS client, so its trust anchor is a CA that the suite makes with OpenSSL itself.
             string openssl = Referees.OpenSsl(c);
             NetSecPki p = new NetSecPki();
             string caKey = Path.Combine(dir, "ca.key");
             p.RootPem = Path.Combine(dir, "root.pem");
             p.KeyPem = Path.Combine(dir, "srv.key");
             p.CertPem = Path.Combine(dir, "srv.pem");
-            string csr = Path.Combine(dir, "srv.csr"), ext = Path.Combine(dir, "ext.cnf"), o;
+            string csr = Path.Combine(dir, "srv.csr"), ext = Path.Combine(dir, "ext.cnf");
             File.WriteAllText(ext, "subjectAltName=DNS:localhost\n");
             Run(openssl, "genpkey -algorithm ed25519 -out \"" + caKey + "\"", dir);
             Run(openssl, "req -new -x509 -key \"" + caKey + "\" -subj \"/CN=Acceptance Go-topology CA\" -days 2 -out \"" + p.RootPem + "\"", dir);
@@ -249,35 +286,6 @@ namespace Acceptance
             string output;
             int code = Proc.Run(exe, args, dir, 60000, out output);
             if (code != 0) throw new FailException(exe + " " + args + " exited " + code + ": " + output);
-        }
-    }
-
-    /// <summary>
-    /// Training keys, read from the product's Node executable so this group links no product code. Process contract:
-    /// `NetSec.Node --print-training-key &lt;keyId&gt;` prints "material &lt;hex&gt;" (the bytes ITrainingKey.CopyMaterial returns) and,
-    /// for asymmetric keys, "public &lt;hex&gt;" (CopyPublic). Key ids are the KeyIds values.
-    /// </summary>
-    static class NodeKeys
-    {
-        public static void Print(string nodeDll, string keyId, out byte[] material, out byte[] pub)
-        {
-            string output;
-            int code = Proc.Run("dotnet", "\"" + nodeDll + "\" --print-training-key " + keyId, null, 60000, out output);
-            if (code != 0) throw new NotRunException("PRODUCT_MISSING", "NetSec.Node --print-training-key " + keyId + " exited " + code + ": " + output.Trim());
-            Match s = Regex.Match(output, @"(?m)^material ([0-9a-f]+)\s*$"), p = Regex.Match(output, @"(?m)^public ([0-9a-f]+)\s*$");
-            if (!s.Success) throw new FailException("--print-training-key " + keyId + " must print 'material <hex>'. Output: " + output.Trim());
-            material = Hex.Decode(s.Groups[1].Value);
-            pub = p.Success ? Hex.Decode(p.Groups[1].Value) : null;
-        }
-
-        /// <summary>Writes the OpenSSH private key file and the authorized_keys line for one Ed25519 training key.</summary>
-        public static void WriteSshKey(string nodeDll, string keyId, string privatePath, string publicPath)
-        {
-            byte[] seed, pub;
-            Print(nodeDll, keyId, out seed, out pub);
-            if (pub == null) throw new FailException("--print-training-key " + keyId + " printed no 'public' line, and an SSH key needs one");
-            if (privatePath != null) File.WriteAllText(privatePath, OpenSshKey.PrivatePem(seed, pub, keyId));
-            if (publicPath != null) File.WriteAllText(publicPath, OpenSshKey.AuthorizedLine(pub, keyId));
         }
     }
 }

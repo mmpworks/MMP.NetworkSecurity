@@ -2,14 +2,15 @@ using System;
 using System.Collections.Generic;
 using System.IO;
 using System.Text;
+using NetSec.Keys;
 
 namespace Acceptance
 {
     /// <summary>
     /// A10 and A10a: the whole lab as separate processes, run from outside. PIN pad, CE (built from CF binaries), gateway, server and
     /// bank HSM; a locked PIN block travels through SSH, then TLS 1.3 hybrid, and the bank recovers it. The evidence is the bytes the
-    /// tap relays saw, the NDJSON traces the processes sent, and the result lines the bank and the PIN pad printed.
-    /// Process command lines: CONTRACT.md "Process contract". Referee programs: referee-contract.md.
+    /// tap relays saw, the NDJSON trace files the processes wrote, and the RESULT lines the bank and the PIN pad printed.
+    /// Process command lines: design section 11, with the additions listed in CONTRACT.md. Referee programs: acceptance/referees/README.md.
     /// </summary>
     public static class BridgeClauses
     {
@@ -34,9 +35,9 @@ namespace Acceptance
             Check.True(o.Trace.Length > 0, "no trace lines arrived. Unparsed: " + (o.Output.ContainsKey("unparsed-trace-lines") ? o.Output["unparsed-trace-lines"] : "none"));
             Check.True(o.FailedCodes.Length == 0, "the control run has failed checks: " + o.FailedCodes);
             Check.True(o.Bank != null, "bank HSM reported nothing");
-            Check.Equal("bank ok", true, o.Bank.ContainsKey("ok") && o.Bank["ok"] is bool && (bool)o.Bank["ok"]);
-            Check.True(o.PinPad != null && Str(o.PinPad, "pinBlockPlain") != null, "PINPAD-RESULT has no pinBlockPlain");
-            Check.Equal("clear PIN block, bank against pin pad", Str(o.PinPad, "pinBlockPlain").ToLowerInvariant(), (Str(o.Bank, "pinBlockPlain") ?? "").ToLowerInvariant());
+            Check.True(o.BankOk, "bank RESULT code is '" + Str(o.Bank, "code") + "' and check '" + Str(o.Bank, "check") + "'; the control run must recover the PIN block");
+            Check.True(o.PinPad != null && Str(o.PinPad, "pinBlockHex") != null, "the PIN pad RESULT has no pinBlockHex (the clear PIN block it locked; ASSUMED name, see CONTRACT.md)");
+            Check.Equal("clear PIN block, bank against pin pad", Str(o.PinPad, "pinBlockHex").ToLowerInvariant(), (Str(o.Bank, "pinBlockHex") ?? "").ToLowerInvariant());
             // one trace id across both hops
             Dictionary<string, bool> ids = new Dictionary<string, bool>();
             bool hop1 = false, hop2 = false;
@@ -46,10 +47,10 @@ namespace Acceptance
                 if (t.Hop == "hop1") hop1 = true;
                 if (t.Hop == "hop2") hop2 = true;
             }
-            Check.True(ids.Count == 1 && ids.ContainsKey(o.TraceId), "trace ids in the lab: " + string.Join(",", new List<string>(ids.Keys).ToArray()) + "; expected only " + o.TraceId);
+            Check.True(ids.Count == 1, "trace ids in the lab: " + string.Join(",", new List<string>(ids.Keys).ToArray()) + "; expected exactly one across all five processes");
             Check.True(hop1 && hop2, "the trace does not label both hops (hop1 seen: " + hop1 + ", hop2 seen: " + hop2 + ")");
             // the bytes: nothing the PIN pad locked is readable on either hop
-            byte[] clearField = Hex.Decode(Str(o.PinPad, "pinBlockPlain"));
+            byte[] clearField = Hex.Decode(Str(o.PinPad, "pinBlockHex"));
             Check.True(!Contains(o.Hop1.ClientToServer, clearField) && !Contains(o.Hop1.ServerToClient, clearField), "the clear PIN block is on hop 1");
             Check.True(!Contains(o.Hop2.ClientToServer, clearField) && !Contains(o.Hop2.ServerToClient, clearField), "the clear PIN block is on hop 2");
             // hop 2 is TLS 1.3 with the hybrid group, read from the ClientHello bytes
@@ -109,8 +110,7 @@ namespace Acceptance
         {
             Check.True(attack.FailedCodes.Split(',').Length > 0 && ("," + attack.FailedCodes + ",").Contains("," + expectedCode + ","),
                 "expected failed check " + expectedCode + ", the run reported [" + attack.FailedCodes + "]");
-            bool bankOk = attack.Bank != null && attack.Bank.ContainsKey("ok") && attack.Bank["ok"] is bool && (bool)attack.Bank["ok"];
-            Check.True(!bankOk, "the bank recovered a PIN block although the run was tampered");
+            Check.True(!attack.BankOk, "the bank recovered a PIN block although the run was tampered");
         }
 
         [Clause("A10.tamper.hop1-ssh-packet-mac")]
@@ -159,11 +159,10 @@ namespace Acceptance
         {
             BridgeOutcome o = Control(c);
             CommonRun(o, true);
-            Check.True(o.Ksn != null && o.Ksn.Length == 12, "PINPAD-RESULT has no 12 byte ksn");
+            Check.True(o.Ksn != null && o.Ksn.Length == 12, "the PIN pad RESULT has no 12 byte ksn");
             byte[] ikid = Hex.Slice(o.Ksn, 0, 8);
             uint counter = (uint)((o.Ksn[8] << 24) | (o.Ksn[9] << 16) | (o.Ksn[10] << 8) | o.Ksn[11]);
-            byte[] bdk, ignored;
-            NodeKeys.Print(c.Prop("node", ""), "dukpt-bdk-128", out bdk, out ignored);
+            byte[] bdk = new TrainingKeySource().Find(KeyIds.DukptBdk128).CopyMaterial();
             Dictionary<string, byte[]> needles = new Dictionary<string, byte[]>();
             needles["base derivation key"] = bdk;
             needles["initial key"] = DukptReference.InitialKey(bdk, ikid);
@@ -171,7 +170,7 @@ namespace Acceptance
             needles["PIN encryption key"] = DukptReference.WorkingKey(bdk, ikid, counter, 0x1000, 16);
             needles["MAC key"] = DukptReference.WorkingKey(bdk, ikid, counter, 0x2000, 16);
             needles["data key"] = DukptReference.WorkingKey(bdk, ikid, counter, 0x3000, 16);
-            needles["clear PIN block"] = Hex.Decode(Str(o.PinPad, "pinBlockPlain"));
+            needles["clear PIN block"] = Hex.Decode(Str(o.PinPad, "pinBlockHex"));
 
             // Positive control first: the scan can see a secret when one is there. The bank derives the PIN key and shows it.
             string bankText = Joined(o.Trace, "bank").ToLowerInvariant();
@@ -201,36 +200,32 @@ namespace Acceptance
 
         // ---------------------------------------------------------------- A10a
 
-        static byte[] Concat(List<byte[]> parts) { return Hex.Concat(parts.ToArray()); }
-
-        static void TapEqualsTrace(BridgeOutcome o, string hop, string clientActor, string serverActor, TapLog tap)
+        /// <summary>
+        /// A10a (design section 2.1): each process writes a wire.sent event for the bytes it put on the socket, after tamper. For one hop,
+        /// the client side's wire.sent bytes joined must equal the tap's client-to-server log, and the server side's must equal server-to-client.
+        /// </summary>
+        static void TapEqualsWireSent(BridgeOutcome o, string hop, string clientActor, string serverActor, TapLog tap)
         {
-            List<byte[]> sent = new List<byte[]>(), received = new List<byte[]>();
-            foreach (TraceLine t in o.Trace)
-            {
-                if (t.Hop != hop || t.Actor != clientActor || t.Wire == null || t.Wire.Length == 0) continue;
-                if (t.To == serverActor) sent.Add(t.Wire);
-                else if (t.From == serverActor) received.Add(t.Wire);
-            }
-            Check.True(sent.Count > 0 && received.Count > 0, hop + ": the " + clientActor + " trace has " + sent.Count + " sent and " + received.Count + " received wire events");
-            Check.Bytes(hop + " client-to-server: trace vs tap", tap.ClientToServer, Concat(sent));
-            Check.Bytes(hop + " server-to-client: trace vs tap", tap.ServerToClient, Concat(received));
+            Check.True(o.WireSentEvents(hop, clientActor) > 0 && o.WireSentEvents(hop, serverActor) > 0,
+                hop + ": wire.sent events from " + clientActor + " = " + o.WireSentEvents(hop, clientActor) + " and from " + serverActor + " = " + o.WireSentEvents(hop, serverActor));
+            Check.Bytes(hop + " client-to-server: wire.sent vs tap", tap.ClientToServer, o.WireSent(hop, clientActor));
+            Check.Bytes(hop + " server-to-client: wire.sent vs tap", tap.ServerToClient, o.WireSent(hop, serverActor));
         }
 
         [Clause("A10a.tap-equals-trace.hop1")]
         public static string TapTraceHop1(Ctx c)
         {
             BridgeOutcome o = Control(c);
-            TapEqualsTrace(o, "hop1", "ce", "gateway", o.Hop1);
-            return "hop 1: " + o.Hop1.ClientToServer.Length + " bytes up, " + o.Hop1.ServerToClient.Length + " bytes down, equal to the CE trace";
+            TapEqualsWireSent(o, "hop1", "ce", "gateway", o.Hop1);
+            return "hop 1: " + o.Hop1.ClientToServer.Length + " bytes up, " + o.Hop1.ServerToClient.Length + " bytes down, equal to the wire.sent events";
         }
 
         [Clause("A10a.tap-equals-trace.hop2")]
         public static string TapTraceHop2(Ctx c)
         {
             BridgeOutcome o = Control(c);
-            TapEqualsTrace(o, "hop2", "gateway", "server", o.Hop2);
-            return "hop 2: " + o.Hop2.ClientToServer.Length + " bytes up, " + o.Hop2.ServerToClient.Length + " bytes down, equal to the gateway trace";
+            TapEqualsWireSent(o, "hop2", "gateway", "server", o.Hop2);
+            return "hop 2: " + o.Hop2.ClientToServer.Length + " bytes up, " + o.Hop2.ServerToClient.Length + " bytes down, equal to the wire.sent events";
         }
 
         static byte[] KexCookie(byte[] c2s)

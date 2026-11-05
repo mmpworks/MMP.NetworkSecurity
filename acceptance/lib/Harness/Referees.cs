@@ -1,13 +1,14 @@
 using System;
 using System.Collections.Generic;
 using System.IO;
+using System.Text;
 
 namespace Acceptance
 {
     /// <summary>
     /// Finds referee programs and talks to the .NET 10 BCL oracle. run.ps1 builds the referees from acceptance/referees
     /// and passes their paths as --prop referee.bcl=... and --prop referee.go=... A missing referee is NOT RUN by name.
-    /// See acceptance/referee-contract.md for the command lines and output lines this code expects.
+    /// The command lines and output lines are in acceptance/referees/README.md (written by the referee author).
     /// </summary>
     public static class Referees
     {
@@ -40,11 +41,19 @@ namespace Acceptance
                 throw new NotRunException("REFEREE_VERSION", "ssh.exe reports: " + output.Trim());
             return path;
         }
+
+        /// <summary>ssh-keygen.exe from the same OpenSSH folder as ssh.exe.</summary>
+        public static string SshKeygen(Ctx c)
+        {
+            string path = Path.Combine(Path.GetDirectoryName(SshExe(c)), "ssh-keygen.exe");
+            if (!File.Exists(path)) throw new NotRunException("REFEREE_MISSING", "ssh-keygen.exe not found at " + path);
+            return path;
+        }
     }
 
     /// <summary>
-    /// A Go referee program (tlspeer, sshpeer, gogateway, tap, tokenverify). Servers print "LISTEN host:port" once ready.
-    /// Other lines are free text, parsed by the clause that started the program. See acceptance/referee-contract.md.
+    /// A Go referee program (tlspeer, sshpeer, gogateway, tap, tokenverify). A server prints its port as the first stdout line.
+    /// Every later stdout line is one JSON object with an "event" field. A failure is {"event":"error","code":"..."}.
     /// </summary>
     public sealed class GoPeer : IDisposable
     {
@@ -53,16 +62,17 @@ namespace Acceptance
         public string Tool;
         GoPeer(Proc p, string tool) { P = p; Tool = tool; }
 
-        /// <summary>Starts a program that listens, and waits for its LISTEN line.</summary>
+        /// <summary>Starts a program that listens, and waits for the port line.</summary>
         public static GoPeer StartListening(Ctx c, string tool, string args)
         {
             GoPeer g = Start(c, tool, args);
-            string line = g.P.WaitForLine(delegate (string s) { return s.StartsWith("LISTEN "); }, 30000);
-            if (line == null) { string o = g.P.AllOutput; g.Dispose(); throw new FailException(tool + " did not print 'LISTEN host:port' within 30 s. Output: " + o); }
-            int colon = line.LastIndexOf(':');
-            g.Port = int.Parse(line.Substring(colon + 1).Trim());
+            string line = g.P.WaitForLine(delegate (string s) { return s.Trim().Length > 0 && s.Trim().Length <= 5 && IsDigits(s.Trim()); }, 30000);
+            if (line == null) { string o = g.P.AllOutput; g.Dispose(); throw new FailException(tool + " did not print its port as the first line within 30 s. Output: " + o); }
+            g.Port = int.Parse(line.Trim());
             return g;
         }
+
+        static bool IsDigits(string s) { foreach (char ch in s) if (ch < '0' || ch > '9') return false; return true; }
 
         public static GoPeer Start(Ctx c, string tool, string args)
         {
@@ -70,13 +80,49 @@ namespace Acceptance
         }
 
         public string Output { get { return P.AllOutput; } }
+
+        /// <summary>Every JSON event line printed so far.</summary>
+        public List<Dictionary<string, object>> Events()
+        {
+            List<Dictionary<string, object>> r = new List<Dictionary<string, object>>();
+            foreach (string l in P.Lines)
+            {
+                string t = l.Trim();
+                if (!t.StartsWith("{")) continue;
+                try { Dictionary<string, object> d = MiniJson.AsObject(MiniJson.Parse(t)); if (d != null) r.Add(d); } catch (FormatException) { }
+            }
+            return r;
+        }
+
+        /// <summary>Waits for the first event with this name. Returns null on timeout.</summary>
+        public Dictionary<string, object> WaitEvent(string name, int timeoutMs)
+        {
+            DateTime end = DateTime.UtcNow.AddMilliseconds(timeoutMs);
+            while (DateTime.UtcNow < end)
+            {
+                foreach (Dictionary<string, object> d in Events()) if (MiniJson.Str(d, "event") == name) return d;
+                System.Threading.Thread.Sleep(50);
+            }
+            return null;
+        }
+
+        /// <summary>The code of the first error event, or null.</summary>
+        public string ErrorCode
+        {
+            get { foreach (Dictionary<string, object> d in Events()) if (MiniJson.Str(d, "event") == "error") return MiniJson.Str(d, "code"); return null; }
+        }
+
         public void Dispose() { P.Dispose(); }
     }
 
-    /// <summary>Line oracle over stdin and stdout. Hex arguments, "-" for empty. Reply "OK a b" or "ERR CODE".</summary>
+    /// <summary>
+    /// The .NET 10 BCL oracle. One JSON request per line on stdin, one JSON reply per line on stdout.
+    /// Byte values are lowercase hex. Operations and fields: acceptance/referees/README.md, "BCL oracle".
+    /// </summary>
     public sealed class BclOracle : IDisposable
     {
         readonly Proc _p;
+        int _id;
         BclOracle(Proc p) { _p = p; }
 
         public static BclOracle Start(Ctx c)
@@ -87,38 +133,67 @@ namespace Acceptance
             Proc p = target.EndsWith(".dll", StringComparison.OrdinalIgnoreCase)
                 ? Proc.Start("dotnet", "\"" + target + "\"")
                 : Proc.Start(target, "");
-            string ready = p.WaitForLine(delegate (string s) { return s.StartsWith("READY"); }, 30000);
-            if (ready == null || !ready.StartsWith("READY bcl-oracle/1"))
+            BclOracle o = new BclOracle(p);
+            Dictionary<string, object> info = o.Request("info");
+            if (info == null || !(info.ContainsKey("ok") && info["ok"] is bool && (bool)info["ok"]))
             {
-                string got = ready ?? p.AllOutput;
-                p.Dispose();
-                throw new NotRunException("REFEREE_PROTOCOL", "BCL oracle did not say 'READY bcl-oracle/1': " + got);
+                string got = p.AllOutput; p.Dispose();
+                throw new NotRunException("REFEREE_PROTOCOL", "BCL oracle did not answer {\"op\":\"info\"} with ok:true. Output: " + got);
             }
-            return new BclOracle(p);
+            return o;
         }
 
-        /// <summary>Sends one request. Returns the reply fields, or null when the oracle replies ERR.</summary>
-        public string[] Call(string op, params string[] args)
+        static string J(string s)
         {
-            string line = op;
-            foreach (string a in args) line += " " + (a.Length == 0 ? "-" : a);
-            _p.WriteLine(line);
-            string reply = _p.NextLine(delegate (string s) { return s.StartsWith("OK") || s.StartsWith("ERR"); }, 60000);
+            StringBuilder sb = new StringBuilder("\"");
+            foreach (char ch in s)
+            {
+                if (ch == '"' || ch == '\\') sb.Append('\\').Append(ch); else sb.Append(ch);
+            }
+            return sb.Append('"').ToString();
+        }
+
+        /// <summary>Sends one request (op, then key and value pairs; a byte[] is sent as hex, an int as a number). Returns the reply object.</summary>
+        public Dictionary<string, object> Request(string op, params object[] kv)
+        {
+            int id = ++_id;
+            StringBuilder sb = new StringBuilder("{\"id\":").Append(id).Append(",\"op\":").Append(J(op));
+            for (int i = 0; i + 1 < kv.Length; i += 2)
+            {
+                sb.Append(',').Append(J((string)kv[i])).Append(':');
+                object v = kv[i + 1];
+                if (v is byte[]) sb.Append(J(Hex.Encode((byte[])v)));
+                else if (v is int) sb.Append((int)v);
+                else sb.Append(J((string)v));
+            }
+            sb.Append('}');
+            _p.WriteLine(sb.ToString());
+            string reply = _p.NextLine(delegate (string s) { return s.TrimStart().StartsWith("{"); }, 60000);
             if (reply == null) throw new FailException("BCL oracle gave no reply to '" + op + "'");
-            if (reply.StartsWith("ERR")) { LastError = reply.Length > 4 ? reply.Substring(4) : ""; return null; }
-            LastError = null;
-            string rest = reply.Length > 3 ? reply.Substring(3).Trim() : "";
-            return rest.Length == 0 ? new string[0] : rest.Split(' ');
+            return MiniJson.AsObject(MiniJson.Parse(reply));
         }
 
-        public string LastError;
+        public bool LastOk;
+        public string LastCode;
 
-        public byte[] Bytes(string op, params string[] args)
+        /// <summary>Calls an op and returns the named result field as bytes. A reply with ok:false throws, unless allowFail is true (then null and LastCode is set).</summary>
+        public byte[] Bytes(string field, string op, bool allowFail, params object[] kv)
         {
-            string[] r = Call(op, args);
-            if (r == null) throw new FailException("BCL oracle error for " + op + ": " + LastError);
-            return r.Length == 0 || r[0] == "-" ? new byte[0] : Hex.Decode(r[0]);
+            Dictionary<string, object> r = Request(op, kv);
+            object ok;
+            LastOk = r.TryGetValue("ok", out ok) && ok is bool && (bool)ok;
+            LastCode = MiniJson.Str(r, "error") ?? MiniJson.Str(r, "code");
+            if (!LastOk)
+            {
+                if (allowFail) return null;
+                throw new FailException("BCL oracle error for " + op + ": " + (LastCode ?? "?") + " " + MiniJson.Str(r, "detail"));
+            }
+            string hx = MiniJson.Str(r, field);
+            if (hx == null) throw new FailException("BCL oracle reply to " + op + " has no field " + field);
+            return hx.Length == 0 ? new byte[0] : Hex.Decode(hx);
         }
+
+        public byte[] Bytes(string field, string op, params object[] kv) { return Bytes(field, op, false, kv); }
 
         public void Dispose() { _p.CloseInput(); _p.Dispose(); }
     }
