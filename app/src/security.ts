@@ -124,8 +124,7 @@ export function chipFor(t: TypeRow): Chip {
   }
 }
 
-// The Host sends no judge on a type row yet. Device and card keys have none, so the type id stands in until it does.
-const noJudge = (t: TypeRow) => t.judge === 'none' || t.says === 'no-outside-judge' || (!t.judge && (t.typeId.startsWith('device.') || t.typeId.startsWith('dukpt.')))
+const noJudge = (t: TypeRow) => t.judge === 'none' || t.says === 'no-outside-judge'
 
 export function actionFor(t: TypeRow): string {
   const c = chipFor(t).id
