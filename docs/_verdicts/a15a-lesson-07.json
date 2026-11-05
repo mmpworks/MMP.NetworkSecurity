@@ -87,6 +87,12 @@
       "verdict": "accurate",
       "note": "Re-checked against tours at origin/feat/tours-7-8-10 commit f648cab (PR 25). Text now starts 'In this run', matching the PRD spike row scope.",
       "checkedAgainst": "docs/prd.md Spike results (read)"
+    },
+    {
+      "id": "L7-C15",
+      "verdict": "accurate",
+      "note": "Tours read at origin/fix/tour-7-timing commit beaa3f2 (PR 56, open); lab run at main 32f6219. Source check: Jared's comment on PR 49 (id 6658261494) states 'bad MAC, same size record, padding 0 49.7 microseconds per record' and 'padding 255 40.2 microseconds per record'. The claim quotes them as one machine's figures and as direction only, which matches. Reproduction with a throwaway program on this machine: records of the same total size (320-byte inner part, IV and cipher 336 bytes), bad MAC, padding length 0 against padding length 255, Tls11RecordCipher.TryOpen, 31 interleaved rounds. Release build, three runs, medians of padding 0 against padding 255: 12.8 against 12.1, 12.4 against 11.6, 12.8 against 12.1 microseconds. The direction reproduces (padding 0 slower, about 6 percent, 3 of 3 runs). The size of the gap does not: Jared's gap is about 19 percent (9.5 microseconds) and mine is about 0.7 microseconds. A Debug build showed no gap (40.4 against 39.8). Plausible cause: the MAC runs over 299 bytes when padding is 0 and 44 bytes when padding is 255, but AES decryption of the same 320 bytes dominates. The tour text says the numbers belong to one machine and show direction, so it stays accurate. I did not reproduce 49.7 and 40.2. Suggest naming the source in the tour sentence: 'In Jared's measurement on one machine'.",
+      "checkedAgainst": "Jared's PR 49 comment (fetched with gh); throwaway timing program (run this session, 3 Release runs and 2 Debug runs); RFC 7457 section 2.4 (fetched earlier)"
     }
   ],
   "textRead": {
@@ -97,7 +103,8 @@
     "problemsFound": 0,
     "problems": [],
     "notes": [
-      "L7-S09 says 'Lesson 9 builds that bridge'. Lesson 9 has no tour yet; plan statement."
+      "L7-S09 says 'Lesson 9 builds that bridge'. Lesson 9 has no tour yet; plan statement.",
+      "PR 56 version (beaa3f2) adds two sentences to L7-S07: 'The time can still differ, and that is the Lucky Thirteen class of attack' (RFC 7457 2.4 calls Lucky Thirteen a timing side-channel attack; accurate) and the 49.7/40.2 measurement (see L7-C15). Steps read: 10. No new problems."
     ]
   }
 }

@@ -55,7 +55,7 @@
     {
       "id": "L8-C09",
       "verdict": "accurate",
-      "note": "Re-checked against tours at origin/feat/tours-7-8-10 commit cadcff7. Claim text is now: direct-tcpip opens a connection to a host and port, and the receiving side must decide whether to allow the forwarding. RFC 4254 section 7.2: 'The receiving side must decide whether to allow the forwarding.' and the direct-tcpip message carries 'host to connect' and 'port to connect'. Lab fact behind step L8-S11 ('The server checks the target against it'): true in committed code. SshServerRules.cs line 181 calls s.Server.AllowTunnel(host, port) and sends an open failure when the target is off the list. MERGE-ORDER FLAG: the claim's source line cites the names doc row with actor 'server'. That row says 'server' only in an uncommitted working-tree change on fix/ssh-followups (E:/dev/ns-s4ssh). The committed names doc (main and the branch tip 9b81e42) says actor 'client', and the committed client rules emit the 'tunnel allow list' check on the client lane when the open failure arrives. Until the builder's names and rules change is committed, the learner sees the check on the client lane while the step says the server checks. Merge the tour change after that commit, or keep the old wording until then.",
+      "note": "Tours read at main 32f6219 (PR 54 merged); lab run at main 32f6219. Re-read: the source line named an uncommitted names change. PR 51 merged it, and the control run shows 'tunnel allow list' on the server lane. Re-checked against tours at origin/feat/tours-7-8-10 commit cadcff7. Claim text is now: direct-tcpip opens a connection to a host and port, and the receiving side must decide whether to allow the forwarding. RFC 4254 section 7.2: 'The receiving side must decide whether to allow the forwarding.' and the direct-tcpip message carries 'host to connect' and 'port to connect'. Lab fact behind step L8-S11 ('The server checks the target against it'): true in committed code. SshServerRules.cs line 181 calls s.Server.AllowTunnel(host, port) and sends an open failure when the target is off the list.",
       "checkedAgainst": "RFC 4254 section 7.2 (fetched); src/NetSec.Core/Ssh/SshServerRules.cs and SshClientRules.cs at fix/ssh-followups 9b81e42 (read); docs/lesson-ssh-names.md at 9b81e42 (actor client) and in the uncommitted working tree of E:/dev/ns-s4ssh (actor server)"
     },
     {
@@ -87,12 +87,48 @@
       "verdict": "accurate",
       "note": "Re-checked against tours at origin/feat/tours-7-8-10 commit f648cab (PR 25). Text now starts 'In this run', matching the PRD spike row scope.",
       "checkedAgainst": "docs/prd.md Spike results (read)"
+    },
+    {
+      "id": "L8-C15",
+      "verdict": "inaccurate",
+      "note": "Tours read at main 32f6219 (PR 54 merged); lab run at main 32f6219. The NVD description of CVE-2023-48795 (fetched from the NVD API) says an attacker can 'bypass integrity checks such that some packets are omitted (from the extension negotiation message), and a client and server may consequently end up with a connection for which some security features have been downgraded or disabled'. The claim says the packets are 'from the start of the handshake'. NVD names the extension negotiation message, and the tour step says 'the start of the protected stream'. Fix: 'some packets from the start of the protected stream are omitted (NVD names the extension negotiation message)'. The rest of the claim matches NVD.",
+      "checkedAgainst": "NVD CVE-2023-48795 description (fetched this session)"
+    },
+    {
+      "id": "L8-C16",
+      "verdict": "accurate",
+      "note": "Tours read at main 32f6219 (PR 54 merged); lab run at main 32f6219. Run on main 32f6219: both rounds emit ssh.kex.strict 'on' for client and server. Unit test A_peer_with_no_strict_marker_leaves_it_off passes (event says 'off'). I reproduced the sweep with a throwaway program (strict KEX switched off in a scratch copy): clear Ignore injected before the server KexInit, then the server's first encrypted packet dropped, then one more encrypted packet sent. Modern suite: 0 of 4,000 accepted (4,000 refused). Legacy suite: 0 of 1,000 accepted (1,000 refused); I stopped at 1,000 for time, so Jared's 4,000 is confirmed for Modern and Legacy is 1,000. Positive control, no attack: 200 of 200 accepted on each suite. Ignore injected and nothing deleted: refused 30 of 30 (Modern) and 10 of 10 (Legacy), so an injected Ignore does kill such a session. One nuance: every refusal came from the packet length check (SSH_PACKET_LENGTH), because the moved cipher stream garbles the encrypted length field before the MAC runs. The claim's reason, 'the MAC covers the plain text and a deleted packet moves the cipher stream', is right in its second half; suggest 'the length field is encrypted'. NVD names ChaCha20-Poly1305 and CBC with encrypt-then-MAC as the exposed modes; neither is in the lab. The names doc dates Jared's sweep 'before strict KEX', which the claim does not say.",
+      "checkedAgainst": "docs/lesson-ssh-names.md at main 32f6219 (read); throwaway sweep program against NetSec.Core with strict KEX off in a scratch copy; unit test run (6 tests passed)"
+    },
+    {
+      "id": "L8-C17",
+      "verdict": "accurate",
+      "note": "Tours read at main 32f6219 (PR 54 merged); lab run at main 32f6219. Names doc item 6: 'The name Modern means newer than the legacy suite. The suite has no encrypt-then-MAC mode.' Lab run: keys.installed shows aes128-ctr,hmac-sha2-256, which is not an -etm MAC.",
+      "checkedAgainst": "docs/lesson-ssh-names.md at main 32f6219 (read); lab run"
+    },
+    {
+      "id": "L8-C18",
+      "verdict": "accurate",
+      "note": "Tours read at main 32f6219 (PR 54 merged); lab run at main 32f6219. RFC 4253 section 6.3: 'the packet length, padding length, payload, and padding fields of each packet MUST be encrypted'; section 6: 'the packet_length field is also encrypted'. Section 6 also says random padding 'may help thwart traffic analysis', which supports that sizes can still show. The source line cites section 6; the encryption sentence is in 6.3. The size-visibility sentence is an inference from the RFC and the TCP stream, and not run.",
+      "checkedAgainst": "RFC 4253 sections 6, 6.3 (fetched this session); docs/lesson-ssh-names.md at main 32f6219 (read)"
+    },
+    {
+      "id": "L8-C19",
+      "verdict": "accurate",
+      "note": "Tours read at main 32f6219 (PR 54 merged); lab run at main 32f6219. Run with a throwaway program: client with no pin and TrustFirstUse false fails with SSH_HOST_KEY_UNKNOWN on check 'known_hosts match'. The same client with TrustFirstUse true opens and emits ssh.hostkey.seen then ssh.hostkey.first-use with the fingerprint, which is the key the caller must store. Unit tests Trust_on_first_use_returns_the_key_to_store and A_factory_client_with_no_pin_refuses_by_name read.",
+      "checkedAgainst": "docs/lesson-ssh-names.md at main 32f6219 (read); throwaway program run"
+    },
+    {
+      "id": "L8-C20",
+      "verdict": "accurate",
+      "note": "Tours read at main 32f6219 (PR 54 merged); lab run at main 32f6219. RFC 4254 section 5.2: 'The window size specifies how many bytes the other party can send before it must wait for the window to be adjusted.' Unit test A_stalled_reader_stops_the_sender_at_the_window_and_a_read_resumes_it ran and passed: the server sent 3 MiB, the client received exactly the 2,097,152-byte window and sent no WindowAdjust; after the client reported consumption, all 3 MiB arrived.",
+      "checkedAgainst": "RFC 4254 section 5.2 (fetched this session); unit tests run on main 32f6219 (6 passed)"
     }
   ],
   "textRead": {
-    "readAt": "main c0a105b; tour text identical to main 562047e (lessons 0 to 8, 10, 11)",
+    "readAt": "main 32f6219; tour text read in full on the 14-step version (PR 54 merged)",
     "method": "Every sentence of every step text read against the lab. The lab ran in-process (NetSec.Core: LabCatalog, Lesson10Auth, TimingAttackLab), once as a control and once for every try-it attack row; trace events, secrets, field lists and check names were compared with the words. Code was read where the trace did not show the fact. Statements about the UI (colours, panels) and about lesson 9 (not built) were not run.",
-    "stepsRead": 13,
+    "stepsRead": 14,
     "stepsWithProblems": 2,
     "problemsFound": 2,
     "problems": [
@@ -104,7 +140,7 @@
         "evidence": "RFC 4251 section 4.1 lists two trust models, a local key database and a host key certified by a trusted CA."
       },
       {
-        "step": "L8-S08",
+        "step": "L8-S09",
         "severity": "high",
         "wrong": "The check is named packet MAC. It passes on the normal run.",
         "right": "The check is named packet MAC. On the normal run the lab shows no event for it, as with the AEAD tag in lesson 5. Only a failure shows up.",
@@ -112,8 +148,9 @@
       }
     ],
     "notes": [
-      "L8-S01 and others say 'Lesson 9 builds on this one'; plan statement.",
-      "Bind defect: L8-S08 binds to check.result 'packet MAC'; no such event exists in the control run."
+      "Lesson 9 is referenced by L8-S01 and has no tour yet; plan statement.",
+      "Bind defect: L8-S09 binds to check.result 'packet MAC'; no such event exists in the control run.",
+      "New text read and run on main 32f6219: S03 (Modern means newer), S04 strict KEX (events on in both rounds; sweep and Ignore tests reproduced), S07 no pin refuses (run), S08 packet length (RFC 4253 6.3), S12 channel window (unit test run). No new problems."
     ]
   }
 }
