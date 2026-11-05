@@ -2,7 +2,7 @@
 
 Status: stable. Tours and UI bind to these names. A change goes through Richard. Date: 2026-11-05. The rules in `docs/lessons-1-3-names.md` (arrows, binds, fields, measures, try-its) apply here too.
 
-Lesson 10: Client proof and permission. Protocol `auth`. Lanes `client`, `issuer`, `server`. The lab has no TLS yet, so a token shows on the wire. The tour must say a real system sends it inside TLS.
+Lesson 10: Client proof and permission. Protocol `auth`. Lanes `client`, `issuer`, `server`. The lab starts with one mutual TLS handshake. The login and the calls then run in the clear, so a token shows on the wire. The tour must say a real system sends them inside TLS.
 
 ## Login: client and issuer
 
@@ -111,4 +111,4 @@ RFC 8446 sections 4.4.2.4 and 6.2 name `certificate_required` for an empty list 
 
 ## Release
 
-Lesson 10 stays unbuilt until its tour lands: `LabCatalog.Find(10)` is null, and `AttackCatalog.All` holds no lesson 10 row. The commit that lands `app/src/tours/lesson-10.json` adds `case 10` to `LabCatalog.Find` and joins `Lesson10Rows` to `All`. Until then `session.start` for lesson 10 answers `LESSON_NOT_BUILT`, and the A11 row clauses cannot find their rows.
+Lesson 10 is released: `LabCatalog.Find(10)` returns the lab, and `AttackCatalog.All` holds its 12 rows. `session.start` for lesson 10 runs it.
