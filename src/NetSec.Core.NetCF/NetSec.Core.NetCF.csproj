@@ -1,0 +1,40 @@
+<Project Sdk="Microsoft.NET.Sdk">
+
+  <!-- The Compact Framework 3.5 build of src/NetSec.Core. No source lives here. There is no CF reference pack on
+       NuGet, so the SDK framework references are off and the CF assemblies are named by path, the same route as
+       MMP.AsyncProxy.NetCF. The references stay outside the repo. Pass -p:NetCFRefDir=<dir> or keep the default. -->
+
+  <PropertyGroup>
+    <TargetFramework>net35</TargetFramework>
+    <LangVersion>3</LangVersion>
+    <AssemblyName>NetSec.Core</AssemblyName>
+    <RootNamespace>NetSec</RootNamespace>
+    <DefineConstants>$(DefineConstants);NETCF</DefineConstants>
+    <AutomaticallyUseReferenceAssemblyPackages>false</AutomaticallyUseReferenceAssemblyPackages>
+    <FrameworkPathOverride>$(NetCFRefDir)</FrameworkPathOverride>
+    <GenerateAssemblyFileVersionAttribute>false</GenerateAssemblyFileVersionAttribute>
+    <NoStdLib>true</NoStdLib>
+    <NoCompilerStandardLib>true</NoCompilerStandardLib>
+    <DisableImplicitFrameworkReferences>true</DisableImplicitFrameworkReferences>
+    <GenerateTargetFrameworkAttribute>false</GenerateTargetFrameworkAttribute>
+    <EnableDefaultCompileItems>false</EnableDefaultCompileItems>
+    <IsPackable>false</IsPackable>
+    <NoWarn>$(NoWarn);CS1591;CS1685</NoWarn>
+  </PropertyGroup>
+
+  <ItemGroup>
+    <Compile Include="..\NetSec.Core\**\*.cs" Exclude="..\NetSec.Core\bin\**;..\NetSec.Core\obj\**" />
+  </ItemGroup>
+
+  <ItemGroup>
+    <ProjectReference Include="$(AsyncProxyRoot)\src\MMP.AsyncProxy.NetCF\MMP.AsyncProxy.NetCF.csproj" />
+    <Reference Include="mscorlib"><HintPath>$(NetCFRefDir)\mscorlib.dll</HintPath><Private>false</Private></Reference>
+    <Reference Include="System"><HintPath>$(NetCFRefDir)\System.dll</HintPath><Private>false</Private></Reference>
+    <Reference Include="System.Core"><HintPath>$(NetCFRefDir)\System.Core.dll</HintPath><Private>false</Private></Reference>
+  </ItemGroup>
+
+  <Target Name="CheckNetCFRefDir" BeforeTargets="CoreCompile">
+    <Error Condition="!Exists('$(NetCFRefDir)\mscorlib.dll')" Text="CF 3.5 reference assemblies missing at $(NetCFRefDir)." />
+  </Target>
+
+</Project>

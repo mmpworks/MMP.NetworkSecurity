@@ -1,0 +1,10 @@
+bin/
+obj/
+.vs/
+.idea/
+node_modules/
+*.user
+native/bin/
+docs/_runs/trx/
+app/dist/
+app/test-results/

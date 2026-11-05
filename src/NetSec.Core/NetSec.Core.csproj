@@ -1,0 +1,18 @@
+<Project Sdk="Microsoft.NET.Sdk">
+
+  <!-- The shared source, compiled for .NET 10. src/NetSec.Core.NetCF compiles the same files for CF 3.5.
+       LangVersion stays 3 on both builds, so the code the learner reads is the code the CE lab runs (D1). -->
+
+  <PropertyGroup>
+    <TargetFramework>net10.0</TargetFramework>
+    <LangVersion>3</LangVersion>
+    <AssemblyName>NetSec.Core</AssemblyName>
+    <RootNamespace>NetSec</RootNamespace>
+    <IsPackable>false</IsPackable>
+  </PropertyGroup>
+
+  <ItemGroup>
+    <ProjectReference Include="$(AsyncProxyRoot)\src\MMP.AsyncProxy\MMP.AsyncProxy.csproj" />
+  </ItemGroup>
+
+</Project>
