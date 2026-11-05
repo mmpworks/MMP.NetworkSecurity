@@ -94,6 +94,73 @@ namespace Acceptance
             return sb.ToString().TrimEnd();
         }
 
+        /// <summary>A built-in key's bytes as the suite can name them: a lowercase hex needle and a label for the failure text.</summary>
+        sealed class Needle { public string TypeId, Kind, Hex; }
+
+        const int MinNeedleHexChars = 32;       // 16 bytes: shorter values could match by chance
+
+        /// <summary>
+        /// The bytes of the built-in keys the lesson reads, read from the key route before any flow runs. Each secret is one needle. The public half is a needle too,
+        /// because a Certificate message carries the public key and never the secret: an Ed25519 seed (32 bytes) gives its public key, and a longer DER key
+        /// gives a 32-byte stretch of its public modulus. A key that openssl will not read adds only its secret.
+        /// </summary>
+        static List<Needle> BuiltInNeedles(Ctx c, HostProc h, int lesson, SessionRun baseline)
+        {
+            List<Needle> needles = new List<Needle>();
+            List<string> refused = new List<string>();
+            foreach (string typeId in Needs(lesson))
+            {
+                Reply key = A17.Key(h, typeId);
+                if (!key.Ok || key.Json == null) { refused.Add(typeId + " " + key); continue; }
+                string body = key.Body ?? "";
+                refused.Add(typeId + " answered " + (body.Length > 160 ? body.Substring(0, 160) : body));
+                string secret = (MiniJson.Str(key.Json, "hex") ?? "").ToLowerInvariant();
+                string pub = (MiniJson.Str(key.Json, "publicHex") ?? "").ToLowerInvariant();
+                if (secret.Length >= MinNeedleHexChars) needles.Add(new Needle { TypeId = typeId, Kind = "secret", Hex = secret });
+                if (pub.Length >= MinNeedleHexChars) needles.Add(new Needle { TypeId = typeId, Kind = "public", Hex = pub });
+                string derived = secret.Length >= MinNeedleHexChars ? PublicStretch(c, secret, typeId) : null;
+                if (derived != null && derived != pub) needles.Add(new Needle { TypeId = typeId, Kind = "public", Hex = derived });
+            }
+            // The built-in run names its own secrets in key.in-use (provider builtin), which reaches the types whose key route shows no bytes.
+            foreach (Dictionary<string, object> ev in baseline.Events)
+            {
+                if (MiniJson.Str(ev, "type") != "key.in-use") continue;
+                foreach (object so in MiniJson.Arr(ev, "secrets") ?? new List<object>())
+                {
+                    string hex = (MiniJson.Str(MiniJson.AsObject(so), "hex") ?? "").ToLowerInvariant();
+                    if (hex.Length >= MinNeedleHexChars) needles.Add(new Needle { TypeId = MiniJson.Str(ev, "typeId") ?? "?", Kind = "secret", Hex = hex });
+                }
+            }
+            if (needles.Count == 0)
+                throw new NotRunException("PRODUCT_MISSING", "no built-in key bytes are in reach for lesson " + lesson + " (the key route shows none, and the built-in run has no key.in-use secret), so the own-key run has nothing to be scanned for: " + string.Join("; ", refused.ToArray()));
+            return needles;
+        }
+
+        static string PublicStretch(Ctx c, string secretHex, string typeId)
+        {
+            try
+            {
+                byte[] secret = Hex.Decode(secretHex);
+                byte[] der = secret.Length == 32
+                    ? Hex.Concat(Hex.Decode("302e020100300506032b657004220420"), secret)       // PKCS#8 wrapper of an Ed25519 seed
+                    : secret;
+                string dir = A17.TempDir(c, "builtin-" + typeId.Replace('.', '-'));
+                string o, priv = System.IO.Path.Combine(dir, "k.der"), pub = System.IO.Path.Combine(dir, "k.pub.der");
+                System.IO.File.WriteAllBytes(priv, der);
+                if (Proc.Run(Referees.OpenSsl(c), "pkey -inform DER -in \"" + priv + "\" -pubout -outform DER -out \"" + pub + "\"", dir, 30000, out o) != 0) return null;
+                byte[] spki = System.IO.File.ReadAllBytes(pub);
+                if (spki.Length == 44) return Hex.Encode(Hex.Slice(spki, 12, 32));                                                  // Ed25519: the 32 public bytes
+                return spki.Length >= 64 ? Hex.Encode(Hex.Slice(spki, spki.Length - 5 - 32, 32)) : null;                           // RSA: 32 bytes inside the modulus
+            }
+            catch (Exception) { return null; }
+        }
+
+        static Needle FirstSeen(string haystackLower, List<Needle> needles)
+        {
+            foreach (Needle n in needles) if (haystackLower.IndexOf(n.Hex, StringComparison.Ordinal) >= 0) return n;
+            return null;
+        }
+
         static string Tail(string streamId) { int i = (streamId ?? "").IndexOf('/'); return i < 0 ? streamId : streamId.Substring(i + 1); }
 
         static string Ending(SessionRun run)
@@ -112,9 +179,19 @@ namespace Acceptance
                 List<string> shape0 = Shape(baseline);
                 Check.True(shape0.Count > 0, "lesson " + lesson + " on built-in keys sent no events, so there is nothing to compare");
 
+                // The scan's control: the built-in run must show at least one built-in key byte string (a secret in key.in-use, or a public key on the wire),
+                // or a scan of the own-key run could not see a leak and its silence would prove nothing.
+                List<Needle> builtIn = BuiltInNeedles(c, h, lesson, baseline);
+                Check.True(FirstSeen(A17.Everything(h, baseline).ToLowerInvariant(), builtIn) != null,
+                    "lesson " + lesson + " on built-in keys shows none of the " + builtIn.Count + " built-in key byte strings, so a scan of the own-key run could not see a leak");
+
                 foreach (string flow in FlowsFor(lesson)) A17.RunFlow(h, flow);
                 SessionRun mine = HostSession.Run(h, lesson, "glass", null);
                 Check.True(mine.Error == null && mine.Finished != null, "lesson " + lesson + " on own keys did not finish: " + (mine.Frames.Count == 0 ? "no frames" : mine.Frames[mine.Frames.Count - 1]));
+                // No built-in key may appear anywhere in the run on own keys. A lab that keeps a built-in key for one half of its work (a second context built
+                // without the credentials) leaves the same shape of events, so only the bytes give it away.
+                Needle leak = FirstSeen(A17.Everything(h, mine).ToLowerInvariant(), builtIn);
+                Check.True(leak == null, leak == null ? "" : "lesson " + lesson + " on own keys holds the built-in " + leak.Kind + " bytes of " + leak.TypeId + ", so part of the lab ran on a built-in key");
                 Check.Equal("ending of lesson " + lesson, Ending(baseline), Ending(mine));
                 List<string> shape1 = Shape(mine);
                 if (shape0.Count != shape1.Count)
