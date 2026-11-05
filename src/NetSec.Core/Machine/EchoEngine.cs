@@ -30,6 +30,8 @@ namespace NetSec.Machine
             public void Absorb(byte[] message) { }
             public byte[] Protect(string message, byte[] body) { return body; }
             public void InstallKeys(Direction direction, string suite, byte[] key, byte[] iv) { }
+            public void Remember(string name, byte[] value) { }
+            public byte[] PlainOf(InboundMessage message) { return message.Bytes; }
         }
 
         static readonly StepTable<Session> ClientTable = new StepTable<Session>(
