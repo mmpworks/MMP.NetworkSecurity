@@ -104,7 +104,7 @@ const pulse = computed(() => replayTick.value)
           <g v-if="r.check" :data-testid="`diagram-check-${r.seq}`" :class="r.check.result === 'fail' ? 'chk-fail' : 'chk-pass'">
             <circle :cx="r.kind === 'arrow' ? r.toX : r.fromX + 104" :cy="r.y" r="11" :data-testid="r.check.result === 'fail' ? 'check-fail-badge' : 'check-pass-badge'" />
             <text :x="r.kind === 'arrow' ? r.toX : r.fromX + 104" :y="r.y + 5" text-anchor="middle" class="chk-mark">{{ r.check.result === 'fail' ? '✕' : '✓' }}</text>
-            <text :x="(r.kind === 'arrow' ? r.toX : r.fromX + 104) + 16" :y="r.y + 4" class="chk-name" data-testid="check-name">{{ r.check.name }}</text>
+            <text :x="(r.kind === 'arrow' ? r.toX : r.fromX + 104) + 16" :y="r.y + 4" class="chk-name" :class="{ hl: isHighlighted('check', 'name', r.check.name) }" data-testid="check-name">{{ r.check.name }}</text>
           </g>
         </g>
         <!-- The packet chip rides the newest arrow. It shows the first 8 bytes of that event's wire hex. -->

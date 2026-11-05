@@ -1,6 +1,6 @@
 <script setup lang="ts">
 import { computed, ref } from 'vue'
-import { active, allEvents, attack, lessonRow, loadTrace, pauseEngine, restartSession, runEngine, selectEvent, selectedEvent, startSession, stepEngine, ui } from '../store'
+import { active, allEvents, attack, isHighlighted, lessonRow, loadTrace, pauseEngine, restartSession, runEngine, selectEvent, selectedEvent, startSession, stepEngine, ui } from '../store'
 
 const actor = ref('')
 const type = ref('')
@@ -41,7 +41,7 @@ const rows = computed(() => allEvents.value.filter(e => (!actor.value || e.actor
         v-for="e in rows" :key="e.seq" class="log-row" :class="{ sel: selectedEvent?.seq === e.seq, fail: e.check?.result === 'fail' }"
         :data-testid="`event-row-${e.seq}`" tabindex="0" @click="selectEvent(e.seq)" @keydown.enter="selectEvent(e.seq)"
       >
-        <span class="muted">{{ e.seq }}</span><span>{{ e.actor }}</span><span>{{ e.type }}</span><span v-if="e.check" :class="e.check.result === 'fail' ? 'chk-fail-t' : 'chk-pass-t'">{{ e.check.result === 'fail' ? '✕' : '✓' }} {{ e.check.name }}</span>
+        <span class="muted">{{ e.seq }}</span><span>{{ e.actor }}</span><span>{{ e.type }}</span><span v-if="e.check" :class="[e.check.result === 'fail' ? 'chk-fail-t' : 'chk-pass-t', { hl: isHighlighted('check', 'name', e.check.name) }]">{{ e.check.result === 'fail' ? '✕' : '✓' }} {{ e.check.name }}</span>
       </div>
     </div>
   </div>
