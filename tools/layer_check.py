@@ -33,6 +33,7 @@ ASYNC_ALLOWED_FILES = {"Machine/IStepGate.cs"}
 USING = re.compile(r"^\s*using\s+(?P<name>[A-Za-z0-9_.]+)\s*;", re.M)
 FULL_BRIDGE = re.compile(r"NetSec\.Bridge\.(?P<member>[A-Za-z0-9_]+)")
 FULL_LABS = re.compile(r"NetSec\.Labs\.(?P<member>[A-Za-z0-9_]+)")
+SIBLING_REFERENCE = re.compile(r"<ProjectReference[^>]*AsyncProxyRoot")
 IF_NETCF = re.compile(r"^\s*#\s*(?:if|elif)\b.*\bNETCF\b", re.M)
 
 
@@ -62,8 +63,24 @@ def problems_in(rel, folder, text):
     return found
 
 
+def sibling_writes(root):
+    """A ProjectReference into the sibling makes every worktree write its one output folder, and lanes that build at once fail on file locks."""
+    found = []
+    repo = os.path.dirname(os.path.dirname(os.path.abspath(root)))
+    for top in ("src", "tests"):
+        for directory, folders, names in os.walk(os.path.join(repo, top)):
+            folders[:] = [f for f in folders if f not in ("bin", "obj")]
+            for name in names:
+                if not name.endswith(".csproj"):
+                    continue
+                with open(os.path.join(directory, name), encoding="utf-8") as handle:
+                    if SIBLING_REFERENCE.search(handle.read()):
+                        found.append("%s: a ProjectReference names $(AsyncProxyRoot); use src/AsyncProxy.Local or src/AsyncProxy.Local.NetCF" % name)
+    return found
+
+
 def main(root):
-    problems, files = [], 0
+    problems, files = sibling_writes(root), 0
     for folder in sorted(os.listdir(root)):
         path = os.path.join(root, folder)
         if not os.path.isdir(path) or folder in ("bin", "obj"):
