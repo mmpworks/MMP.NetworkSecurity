@@ -254,7 +254,7 @@ namespace NetSec.Tests
         {
             public LabResult Result;
             public TraceEvent[] Events;
-            public string[] Sent(string actor) => Events.Where(e => e.Type == "wire.sent" && e.Actor == actor).Select(e => e.Message).ToArray();
+            public string[] Sent(string actor) => Events.Where(e => e.Type == "wire.sent" && e.Actor == actor && !e.StreamId.Contains("auth-mtls")).Select(e => e.Message).ToArray();
         }
 
         static Run Go(AttackDefinition attack = null, int seed = 7)
@@ -281,7 +281,7 @@ namespace NetSec.Tests
             Assert.Equal(new[] { "LoginRequest", "ChallengeResponse", "LoginDone", "ReadTotals", "VoidSale", "CallsDone" }, run.Sent("client"));
             Assert.Equal(new[] { "Challenge", "TokenIssued" }, run.Sent("issuer"));
             Assert.Equal(new[] { "CallOk", "CallOk" }, run.Sent("server"));
-            string[] passed = run.Events.Where(e => e.Type == "check.result" && e.Check.Passed).Select(e => e.Message).Distinct().ToArray();
+            string[] passed = run.Events.Where(e => e.Type == "check.result" && e.Check.Passed && !e.StreamId.Contains("auth-mtls")).Select(e => e.Message).Distinct().ToArray();
             Assert.Equal(new[] { "device enrolled", "challenge issued", "challenge signature", "challenge already used", "token signature", "token expiry", "token audience", "proof signature", "proof binding", "proof age", "jti already used", "permission check" }, passed);
             Assert.DoesNotContain(run.Events, e => e.Check != null && !e.Check.Passed);
         }
@@ -310,7 +310,7 @@ namespace NetSec.Tests
         public void Every_row_stops_at_its_named_check_with_one_thing_changed()
         {
             AttackDefinition[] rows = AttackCatalog.Lesson10Unreleased;
-            Assert.Equal(10, rows.Length);
+            Assert.Equal(12, rows.Length);
             foreach (AttackDefinition a in rows)
             {
                 Assert.Equal(1, (a.Plan != null ? 1 : 0) + a.Options.Length);

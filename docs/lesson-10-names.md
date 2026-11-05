@@ -83,7 +83,20 @@ Each row changes one thing from the control run.
 | `L10-unknown-device` | Logs in with a key nobody enrolled | `Rejected` | `DEVICE_NOT_ENROLLED` | `device enrolled` |
 | `L10-wrong-audience` | The issuer writes the token for another server | `Rejected` | `TOKEN_BAD_AUDIENCE` | `token audience` |
 
-The mutual TLS row, `L10-remove-client-cert` with check `bad_certificate alert`, arrives after S3.
+## Mutual TLS, the first phase
+
+The lab starts with one TLS 1.3 handshake, on streams `client/auth-mtls` and `server/auth-mtls`. The login and the calls follow it.
+
+The server sends `CertificateRequest` between `EncryptedExtensions` and `Certificate`. The client sends `Certificate` and `CertificateVerify` before its `Finished`.
+
+| Attack | One change | Code | Check | Alert |
+|---|---|---|---|---|
+| `L10-remove-client-cert` | The client answers with an empty list | `TLS13_CERT_REQUIRED` | `certificate_required alert` | 116 |
+| `L10-corrupt-client-cert` | One changed bit in the certificate signature | `TLS13_BAD_CERTIFICATE` | `bad_certificate alert` | 42 |
+
+The server checks on a good handshake, in order: `certificate_required alert`, `chain to trust anchor`, `validity window`, `bad_certificate alert`, `CertificateVerify signature`, `Finished verify_data`.
+
+RFC 8446 sections 4.4.2.4 and 6.2 name `certificate_required` for an empty list and `bad_certificate` for a corrupt certificate. `ux-design.md` section 7 names `bad_certificate alert` for a removed certificate. The lead holds that ruling.
 
 ## Release
 

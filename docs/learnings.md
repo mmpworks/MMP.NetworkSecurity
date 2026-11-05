@@ -67,3 +67,5 @@ Each correction goes here, newest slice last. Later slices read this file first.
 2. **A signature shows who calls only when the verifier already holds the key.** The first lab checked a signature against the key the caller sent, so any key earned a token. The issuer now holds an enrolment row, and it compares the answer to the challenge it sent.
 3. **`Convert.FromBase64String` accepts set spare bits and whitespace on both builds.** To hold one spelling, encode the result and compare it to the text.
 4. **`DateTime` subtraction ignores `Kind`.** A verifier that takes a `DateTime` must convert a local value and refuse one with no zone, or a local clock moves every expiry.
+
+5. **The contract named the wrong alert for a removed client certificate.** RFC 8446 sections 4.4.2.4 and 6.2 name `certificate_required` for an empty list and `bad_certificate` for a corrupt certificate. Go sends alert 116 in a live run. Read the RFC before you wire an alert name from a design doc.

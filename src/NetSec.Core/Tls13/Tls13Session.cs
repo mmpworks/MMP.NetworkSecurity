@@ -22,6 +22,8 @@ namespace NetSec.Tls13
         public bool OfferOnlyTls11;
         public byte[][] CertificateChain;
         public byte[] SigningSeed;
+        /// <summary>A server that sets this asks for a client certificate, checks it against TrustAnchors, and refuses a client with none.</summary>
+        public bool RequireClientCertificate;
     }
 
     /// <summary>

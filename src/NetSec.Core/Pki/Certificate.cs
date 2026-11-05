@@ -12,6 +12,8 @@ namespace NetSec.Pki
         const string Ed25519Oid = "2b6570";
         const string SanOid = "551d11";
         const string BasicConstraintsOid = "551d13";
+        const string ExtendedKeyUsageOid = "551d25";
+        const string ClientAuthOid = "2b06010505070302";
         const int DnsNameTag = 0x82;
         const int ExplicitVersionTag = 0xA0;
         const int ExplicitExtensionsTag = 0xA3;
@@ -27,6 +29,7 @@ namespace NetSec.Pki
         public bool KeyIsEd25519 { get; private set; }
         public bool SignedWithEd25519 { get; private set; }
         public bool IsCa { get; private set; }
+        public bool AllowsClientAuth { get; private set; }
         public string[] DnsNames { get; private set; }
 
         readonly List<FieldMark> _marks = new List<FieldMark>();
@@ -101,6 +104,7 @@ namespace NetSec.Pki
                 DerItem value = extension.Read(NetSec.Pki.Der.TagOctetString);
                 if (oid == SanOid) ReadNames(value);
                 else if (oid == BasicConstraintsOid) ReadBasicConstraints(value);
+                else if (oid == ExtendedKeyUsageOid) ReadKeyUsages(value);
             }
         }
 
@@ -115,6 +119,13 @@ namespace NetSec.Pki
             }
             DnsNames = found.ToArray();
             Mark("cert.subject_alt_name", value, "id");
+        }
+
+        void ReadKeyUsages(DerItem value)
+        {
+            DerReader usages = value.Inner.Read(NetSec.Pki.Der.TagSequence).Inner;
+            while (usages.HasMore)
+                if (Hex.Encode(usages.Read(NetSec.Pki.Der.TagOid).Value) == ClientAuthOid) AllowsClientAuth = true;
         }
 
         void ReadBasicConstraints(DerItem value)
@@ -212,8 +223,26 @@ namespace NetSec.Pki
         public const string Validity = "CERT_VALIDITY";
         public const string Name = "CERT_NAME";
         public const string BadSignature = "CERT_SIGNATURE";
+        public const string NotForClients = "CERT_NOT_FOR_CLIENTS";
 
         public static ChainVerdict Run(Certificate[] chain, Certificate[] anchors, string dnsName, DateTime now)
+        {
+            ChainVerdict trusted = Trusted(chain, anchors, now);
+            if (!trusted.Passed) return trusted;
+            if (!chain[0].Matches(dnsName)) return new ChainVerdict(Name, "the leaf does not carry the name " + dnsName);
+            return ChainVerdict.Ok;
+        }
+
+        /// <summary>A server asks the same chain questions of a client, but no client has a name to match. The leaf must list client authentication. A leaf with no key usage list is refused, which is stricter than RFC 5280.</summary>
+        public static ChainVerdict RunForClient(Certificate[] chain, Certificate[] anchors, DateTime now)
+        {
+            ChainVerdict trusted = Trusted(chain, anchors, now);
+            if (!trusted.Passed) return trusted;
+            if (!chain[0].AllowsClientAuth) return new ChainVerdict(NotForClients, "the leaf does not allow client authentication");
+            return ChainVerdict.Ok;
+        }
+
+        static ChainVerdict Trusted(Certificate[] chain, Certificate[] anchors, DateTime now)
         {
             if (chain == null || chain.Length == 0) return new ChainVerdict(NoAnchor, "the peer sent no certificate");
             Certificate[] issuers = new Certificate[chain.Length];
@@ -227,7 +256,6 @@ namespace NetSec.Pki
                 if (!chain[i].VerifySignedBy(issuers[i].PublicKey)) return new ChainVerdict(BadSignature, "the signature on certificate " + i + " does not verify");
             for (int i = 0; i < chain.Length; i++)
                 if (now < chain[i].NotBefore || now > chain[i].NotAfter) return new ChainVerdict(Validity, "certificate " + i + " is outside its validity window");
-            if (!chain[0].Matches(dnsName)) return new ChainVerdict(Name, "the leaf does not carry the name " + dnsName);
             return ChainVerdict.Ok;
         }
 

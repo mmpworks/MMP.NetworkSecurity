@@ -20,6 +20,8 @@ namespace NetSec.Tls13
         public const string NoCommonSuite = "TLS13_NO_COMMON_SUITE";
         public const string NoCommonSignature = "TLS13_NO_COMMON_SIGNATURE";
         public const string AlertReceived = "TLS13_ALERT_RECEIVED";
+        public const string CertRequired = "TLS13_CERT_REQUIRED";
+        public const string BadCertificate = "TLS13_BAD_CERTIFICATE";
 
         sealed class Row
         {
@@ -44,6 +46,8 @@ namespace NetSec.Tls13
             new Row(NoCommonGroup, "common group", 40),
             new Row(NoCommonSuite, "common cipher suite", 40),
             new Row(NoCommonSignature, "common signature scheme", 40),
+            new Row(CertRequired, "certificate_required alert", 116),
+            new Row(BadCertificate, "bad_certificate alert", 42),
             new Row("CHAIN_NO_ANCHOR", "chain to trust anchor", 48),
             new Row("CERT_VALIDITY", "validity window", 45),
             new Row("CERT_NAME", "name match", 42),

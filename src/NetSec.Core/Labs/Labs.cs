@@ -182,6 +182,8 @@ namespace NetSec.Labs
             WithOption("L10-ungranted-capability", 10, Lesson10Auth.OptionCallRefund, "yes", AttackOutcome.Rejected, ErrorCodes.CapabilityDenied, NetSec.Auth.AccessRules.PermissionCheck),
             WithOption("L10-wrong-role", 10, Lesson10Auth.OptionTokenRole, "guest", AttackOutcome.Rejected, ErrorCodes.RoleDenied, NetSec.Auth.AccessRules.PermissionCheck),
             WithOption("L10-replay-challenge", 10, Lesson10Auth.OptionReplayChallenge, "yes", AttackOutcome.Rejected, ErrorCodes.ChallengeReplay, NetSec.Auth.Challenge.ReplayCheck),
+            WithOption("L10-remove-client-cert", 10, Lesson10Auth.OptionClientCert, Lesson10Auth.ClientCertNone, AttackOutcome.Rejected, NetSec.Tls13.Tls13Codes.CertRequired, NetSec.Tls13.Tls13Codes.CheckName(NetSec.Tls13.Tls13Codes.CertRequired)),
+            WithOption("L10-corrupt-client-cert", 10, Lesson10Auth.OptionClientCert, Lesson10Auth.ClientCertCorrupt, AttackOutcome.Rejected, NetSec.Tls13.Tls13Codes.BadCertificate, NetSec.Tls13.Tls13Codes.CheckName(NetSec.Tls13.Tls13Codes.BadCertificate)),
             WithOption("L10-unissued-challenge", 10, Lesson10Auth.OptionAnswerUnissued, "yes", AttackOutcome.Rejected, ErrorCodes.ChallengeNotIssued, NetSec.Auth.Challenge.IssuedCheck),
             WithOption("L10-unknown-device", 10, Lesson10Auth.OptionUnknownDevice, "yes", AttackOutcome.Rejected, ErrorCodes.DeviceNotEnrolled, NetSec.Auth.Challenge.EnrolledCheck),
             WithOption("L10-wrong-audience", 10, Lesson10Auth.OptionTokenAudience, "https://other.training/api", AttackOutcome.Rejected, ErrorCodes.TokenBadAudience, NetSec.Auth.Token.AudienceCheck),

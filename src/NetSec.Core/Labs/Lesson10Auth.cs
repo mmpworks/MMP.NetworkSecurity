@@ -8,12 +8,14 @@ using NetSec.Crypto;
 using NetSec.Errors;
 using NetSec.Keys;
 using NetSec.Machine;
+using NetSec.Pki;
+using NetSec.Tls13;
 using NetSec.Trace;
 
 namespace NetSec.Labs
 {
     /// <summary>
-    /// Lesson 10. A device enrolled ahead of time answers a challenge and gets a signed token bound to its key. A signature shows who calls only
+    /// Lesson 10. A device first shows a certificate to the server over mutual TLS. A device enrolled ahead of time then answers a challenge and gets a signed token bound to its key. A signature shows who calls only
     /// because the issuer already holds that key for that subject. The device then calls a server, with a fresh DPoP proof on each call, and the
     /// token's role or capability decides what it may do. This lab has no TLS, so the token shows on the wire.
     /// A passkey-shaped challenge is not WebAuthn. Built to show the parts. Do not copy.
@@ -30,6 +32,13 @@ namespace NetSec.Labs
         public const string OptionUnknownDevice = "unknown-device";
         public const string OptionDeviceKeyHex = "device-key-hex";
         public const string OptionTokenAudience = "token-audience";
+        public const string OptionClientCert = "client-cert";
+        public const string ClientCertNone = "none";
+        public const string ClientCertCorrupt = "corrupt";
+        const string ClientCertServerUsage = "server-usage";
+        const string ClientCertUnknownCa = "unknown-ca";
+        const string ClientCertExpired = "expired";
+        const string ClientCertWrongKey = "wrong-key";
 
         // A fixed lab time, so a same-seed run gives the same bytes.
         const long LabNow = 1793836800;
@@ -93,10 +102,84 @@ namespace NetSec.Labs
             return AsyncProxy.Run<LabResult>(delegate(Return<LabResult> ret) { return Body(c, ret); });
         }
 
+        /// <summary>The device's first connection. The bytes it echoes do not matter. The handshake is the point.</summary>
+        static IFuture<LabResult> RunMutualTls(LabContext c, ITamperHook plan)
+        {
+            ITrainingKeySource keys = new TrainingKeySource();
+            TrainingCa ca = new TrainingCa(keys);
+            ITrainingKey serverKey = keys.Find(KeyIds.ServerTlsEd25519);
+            DateTime now = AuthTime.FromUnix(LabNow);
+
+            Tls13Options client = TlsOptions(c, plan, "client", "server", ca, now);
+            PresentClientCertificate(client, LabPair.Option(c, OptionClientCert), keys, ca);
+
+            Tls13Options server = TlsOptions(c, plan, "server", "client", ca, now);
+            server.CertificateChain = new byte[][] { TrainingPki.ServerCertificate(ca, serverKey) };
+            server.SigningSeed = serverKey.CopyMaterial();
+            server.RequireClientCertificate = true;
+
+            Tls13Engine clientEngine = Tls13Engine.CreateClient(client);
+            clientEngine.Command(new EngineCommand(EngineCommandKind.Send, 0, Encoding.UTF8.GetBytes("device hello" + (char)10), null));
+            return LabPair.Run(c, clientEngine, Tls13Engine.CreateServer(server), plan, Tls13Lab.EchoThenClose);
+        }
+
+        static Tls13Options TlsOptions(LabContext c, ITamperHook plan, string actor, string peer, TrainingCa ca, DateTime now)
+        {
+            Tls13Options o = new Tls13Options();
+            o.Stream = LabPair.Stream(c, actor, "auth-mtls");
+            o.Peer = peer;
+            o.Random = LabPair.Fork(c);
+            o.Tamper = plan;
+            o.Group = Tls13Group.X25519;
+            o.ServerName = TrainingPki.ServerName;
+            o.Now = now;
+            o.TrustAnchors = new byte[][] { ca.RootCertificateDer };
+            return o;
+        }
+
+        /// <summary>The one thing each attack changes about what the client shows. The control shows a good certificate and signs with its key.</summary>
+        static void PresentClientCertificate(Tls13Options o, string scenario, ITrainingKeySource keys, TrainingCa ca)
+        {
+            if (scenario == ClientCertNone) return;
+            ITrainingKey key = keys.Find(KeyIds.ClientTlsEd25519);
+            ITrainingKey attacker = keys.Find(KeyIds.AttackerEd25519);
+            byte[] spki = TrainingCa.Ed25519Spki(key.CopyPublic());
+            byte[] leaf = TrainingPki.ClientCertificate(ca, key);
+            byte[] seed = key.CopyMaterial();
+            switch (scenario)
+            {
+                case ClientCertCorrupt:
+                    leaf[leaf.Length - 1] ^= 1;
+                    break;
+                case ClientCertServerUsage:
+                    leaf = ca.IssueServerCertificate(TrainingPki.ClientName, spki, TrainingCa.DefaultNotBefore, TrainingCa.DefaultNotAfter);
+                    break;
+                case ClientCertUnknownCa:
+                    leaf = TrainingPki.ClientCertificate(new TrainingCa(attacker, "Attacker training root"), key);
+                    break;
+                case ClientCertExpired:
+                    leaf = ca.IssueClientCertificate(TrainingPki.ClientName, spki, new DateTime(2020, 1, 1, 0, 0, 0, DateTimeKind.Utc), new DateTime(2021, 1, 1, 0, 0, 0, DateTimeKind.Utc));
+                    break;
+                case ClientCertWrongKey:
+                    seed = attacker.CopyMaterial();
+                    break;
+            }
+            o.CertificateChain = new byte[][] { leaf };
+            o.SigningSeed = seed;
+        }
+
         static IEnumerable<IFuture> Body(LabContext c, Return<LabResult> ret)
         {
             ITrainingKey issuerKey = new TrainingKeySource().Find(KeyIds.TokenIssuer);
             ITamperHook plan = LabPair.Plan(c);
+
+            IFuture<LabResult> mutual = RunMutualTls(c, plan);
+            yield return mutual;
+            if (!mutual.Result.Completed)
+            {
+                ret.Value = mutual.Result;
+                yield break;
+            }
 
             // Enrolment happens ahead of the login, out of band. The issuer learns this device's public key, and the device keeps its seed.
             byte[] deviceSeed = new byte[SeedSize];
