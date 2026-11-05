@@ -12,7 +12,14 @@ Status: stable from 2026-11-05. Tours and UI bind to these names. A change goes 
 | Forced suite | `TLS_RSA_WITH_AES_128_CBC_SHA`. The lab forces the weak suite, because a default run picks the best case (accuracy rule 3) |
 | Race counters | The UI counts `wire.sent` per protocol and invents no number. The first `tls11` message and the first `tls13` message share a start time |
 
-The `tls13` half uses the names of lesson 5. Only the `tls11` names are listed here.
+The `tls13` half uses the names of lesson 5 (`docs/lessons-4-5-names.md`). Only the `tls11` names are listed here.
+
+| Run | Client stream | Server stream |
+|---|---|---|
+| Control (the race) | Both pairs run together: `client/tls11` with `server/tls11`, and `client/tls13` with `server/tls13` | as left |
+| `L7-downgrade` | `client/tls13` | `server/tls11` |
+| `L7-modern-server` | `client/tls11` | `server/tls13` |
+| `L7-flip-record` | `client/tls11`. The `tls13` pair runs clean beside it | `server/tls11` |
 
 ## Message order, control run
 
@@ -67,7 +74,7 @@ Round trips before the client can send data: 2 in TLS 1.1. The UI counts them fr
 
 | Attack id | What it does | `Expect` | Code | Check name |
 |---|---|---|---|---|
-| `L7-downgrade` | Rewrites the TLS 1.3 `ClientHello` so it offers only TLS 1.1. The server agrees and writes `DOWNGRD` into its random | `Rejected` | `TLS13_DOWNGRADE_SENTINEL` | `downgrade sentinel` |
+| `L7-downgrade` | Stands for a rewrite of the TLS 1.3 `ClientHello`: the hello offers only TLS 1.1. The server speaks TLS 1.3 too, so it agrees and writes `DOWNGRD` into its random. The bytes sit in `ServerHello` on `wire.sent` | `Rejected` | `TLS13_DOWNGRADE_SENTINEL` | `downgrade sentinel` |
 | `L7-modern-server` | Connects the TLS 1.1 client to a server that speaks only TLS 1.3 | `Rejected` | `TLS11_ALERT_PROTOCOL_VERSION` | `protocol_version alert` |
 | `L7-flip-record` | Flips one bit in the client's `ApplicationData` cipher | `Rejected` | `TLS11_RECORD_MAC` | `record HMAC` |
 

@@ -316,6 +316,22 @@ namespace NetSec.Tests
             Assert.Equal(ErrorCodes.LinkDeadline, run.Result.Error.Code);
         }
 
+        [Fact]
+        public void The_glass_factory_opens_tls11_under_the_ce_profile_and_carries_bytes()
+        {
+            MemoryLink[] links = MemoryLink.Pair();
+            GlassTransportFactory factory = new GlassTransportFactory(Keys);
+            IFuture<ISecureChannel> server = factory.Open(new TransportRequest { Protocol = WireProtocol.Tls11, Role = EngineRole.Server, Tls11Suite = Tls11Suite.RsaAes128CbcSha, Link = links[1], Random = new SeededRandom(2), Sink = new NullSink(), Gate = new FreeRunGate() });
+            IFuture<ISecureChannel> client = factory.Open(new TransportRequest { Protocol = WireProtocol.Tls11, Role = EngineRole.Client, Tls11Suite = Tls11Suite.RsaAes128CbcSha, Link = links[0], Random = new SeededRandom(1), Sink = new NullSink(), Gate = new FreeRunGate(), Profile = NetSec.Bridge.DeviceProfile.Ce });
+            client.Result.Send(0, Encoding.UTF8.GetBytes("ping"));
+            IFuture<AppChunk> received = server.Result.Receive();
+            Assert.True(received.Wait(20000), "the server received nothing in 20 s");
+            Assert.Equal("ping", Encoding.UTF8.GetString(received.Result.Bytes));
+            Assert.Equal("TLSv1.1", client.Result.Info.Protocol);
+            Assert.Equal("TLS_RSA_WITH_AES_128_CBC_SHA", client.Result.Info.Suite);
+            client.Result.Close();
+        }
+
         // ---------------------------------------------------------------- lesson 7
 
         static (LabResult result, TraceEvent[] events) RunLab(AttackDefinition attack = null)

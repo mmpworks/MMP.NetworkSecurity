@@ -52,3 +52,13 @@ Each correction goes here, newest slice last. Later slices read this file first.
 9. **`Probe` throws `NotImplementedException` for TLS 1.1 and SSH until S4.** The suite maps that to NOT RUN. A7 and A8 stay NOT RUN for that reason, and S4 removes `Probe.NeedBuilt`.
 10. **The glass client offers no CCS and an empty session id, and tolerates a CCS from the peer.** OpenSSL and Go accept this. The glass server echoes the client's session id and sends no CCS.
 11. **`EncryptedExtensions` has no `group unchanged` check.** Design section 2.6 lists one. The group check runs at ServerHello, against the one group the client offered, so a second check at `ee` would always pass and show the learner nothing.
+
+## S4, TLS 1.1
+
+1. **A rule reads earlier facts from the transcript, and the session holds no second copy.** `Tls11Session.ClientRandom`, `ServerRandom`, and the server key parse the absorbed messages again. So the rules need no `Store` effect. TLS 1.3 keeps its facts through `Effect.Store`. Both shapes work. A new engine picks the one that fits how often the fact is read.
+2. **One Probe session loop serves each TLS version through `ITlsEngine`.** The design had the session loop typed to one engine. `GlassTlsChannel` uses the same interface. SSH needs its own loop, because channels and exec have no match in TLS.
+3. **`LabPair` names the server's check first.** In `L7-modern-server` both sides fail: the server names its refusal, and the client names alert 70. The lesson is the client's view, so `Lesson07Tls11` reports the client's code when alert 70 arrived. `TLS11_ALERT` is on the "peer only" list in `LabPair.Named`, as `TLS13_ALERT_RECEIVED` is, so `L7-downgrade` reports the TLS 1.3 client's sentinel check.
+4. **A premaster's first two bytes must repeat the offered version.** RFC 4346 section 7.4.7.1 asks for this, and a failed check goes on with a random premaster, so the failure shows only at Finished.
+5. **`Pkcs1` had no block with an empty DigestInfo prefix.** TLS 1.1 signs 36 bytes of MD5 then SHA-1 with no prefix. `SignMd5Sha1` and `VerifyMd5Sha1` share `EncodeDigestBlock` with the SHA-1 and SHA-256 forms.
+6. **A key from the wire gets a shape check before any arithmetic.** `Tls11RsaKeys.TryReadPublic` refuses an even modulus, a modulus under 59 bytes, and an even exponent or one below 3, as `TLS11_SERVER_KEY_UNUSABLE`. Without it `BigUInt` throws an unnamed `ArgumentException` on an even modulus and `Pkcs1` throws `RSA_MESSAGE_TOO_LONG`.
+7. **In Git Bash, `-p:NetCFRefDir=E:\dev\tools\netcf35-ref` loses its backslashes.** The build then says the CF references are missing. Use forward slashes or leave the flag out, because `Directory.Build.props` holds that default.
