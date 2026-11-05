@@ -29,7 +29,7 @@ namespace NetSec.Dukpt
     {
         const int RegisterCount = 32;
 
-        /// <summary>The limit on 1 bits in a counter this pad issues, which caps the bank's work for an honest reader. Counters past it are skipped. The bank itself derives for any KSN. The value 16 is recalled from X9.24-3, which is paid. The free vectors do not state it.</summary>
+        /// <summary>The limit on 1 bits in a counter this pad issues, which caps the bank's work for a reader built on this class. Counters past it are skipped. The bank itself derives for any KSN. The value 16 is recalled from X9.24-3, which is paid. The free vectors do not state it.</summary>
         const int MaxOneBits = 16;
 
         readonly byte[] _initialKeyId;
