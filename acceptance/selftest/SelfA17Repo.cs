@@ -11,7 +11,8 @@ namespace Acceptance
         static string Guard(string mode)
         {
             if (mode == "always-pass") return "import sys\nsys.exit(0)\n";
-            string securityRule = mode == "pem-only" ? "" : "    if PATH.search(f): bad.append(f + ': forbidden path'); continue\n";
+            string exempt = mode == "no-golden-exempt" ? "" : " and not (f.startswith('acceptance/golden/') and f.endswith('.ndjson'))";
+            string securityRule = mode == "pem-only" ? "" : "    if PATH.search(f)" + exempt + ": bad.append(f + ': forbidden path'); continue\n";
             return @"import re, subprocess, sys
 ALLOW = {'src/NetSec.Core/Pki/TrainingPki.cs', 'tests/NetSec.Tests/Tls13Tests.cs', 'acceptance/lib/Harness/OpenSshKey.cs'}
 MARK = 'PRIV' + 'ATE KEY'
@@ -90,11 +91,16 @@ sys.exit(1 if bad else 0)
             Expect(Outcome(On(c, MakeRepo(c, "unstarted", "none", false, null), "unstarted")), "NOT RUN PRODUCT_MISSING", "a product that has not started the .security/ folder");
             Expect(Outcome(On(c, MakeRepo(c, "alwayspass", "always-pass", true, null), "alwayspass")), "FAIL", "a guard that passes everything"); bites++;
             Expect(Outcome(On(c, MakeRepo(c, "pemonly", "pem-only", true, null), "pemonly")), "FAIL", "a guard that ignores .security/"); bites++;
+            Action<string> golden = d => { Directory.CreateDirectory(Path.Combine(d, "acceptance", "golden", "net10")); File.WriteAllText(Path.Combine(d, "acceptance", "golden", "net10", "lab-00.ndjson"), "{}\n"); };
+            Expect(Outcome(On(c, MakeRepo(c, "golden", "good", true, golden), "golden")), "PASS", "tracked golden traces under acceptance/golden/");
+            Expect(Outcome(On(c, MakeRepo(c, "goldenguard", "no-golden-exempt", true, golden), "goldenguard")), "FAIL", "a guard that flags the golden traces"); bites++;
+            Expect(Outcome(On(c, MakeRepo(c, "ndjson", "good", true, d => { File.WriteAllText(Path.Combine(d, "src", "session.ndjson"), "{}\n"); }), "ndjson")), "FAIL", "a tracked .ndjson outside acceptance/golden/"); bites++;
+            Expect(Outcome(On(c, MakeRepo(c, "goldenkey", "good", true, d => { golden(d); File.WriteAllText(Path.Combine(d, "acceptance", "golden", "net10", "host.key"), "x"); }), "goldenkey")), "FAIL", "a tracked .key under acceptance/golden/"); bites++;
             Expect(Outcome(On(c, MakeRepo(c, "noguard", "none", true, null), "noguard")), "NOT RUN PRODUCT_MISSING", "no tools/secret_guard.py");
             string nogit = Path.Combine(c.WorkDir, "repo-nogit");
             Directory.CreateDirectory(nogit);
             Expect(Outcome(On(c, nogit, "nogit")), "NOT RUN PRODUCT_MISSING", "a folder that is no git repository");
-            return "a clean repository with a sound guard PASSes; " + bites + " defects (tracked key header, tracked .security/ file, tracked .db, no ignore line, a guard that passes all, a guard that ignores .security/) each FAIL; no guard or no git reads NOT RUN PRODUCT_MISSING";
+            return "a clean repository with a sound guard PASSes; " + bites + " defects (tracked key header, tracked .security/ file, tracked .db, no ignore line, a guard that passes all, a guard that ignores .security/, a guard that flags the golden traces, a tracked .ndjson outside the golden folder, a tracked .key inside it) each FAIL; the golden traces alone PASS; no guard or no git reads NOT RUN PRODUCT_MISSING";
         }
     }
 }
