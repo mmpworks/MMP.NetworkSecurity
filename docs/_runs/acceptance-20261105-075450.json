@@ -1,0 +1,75 @@
+{
+  "summary": {
+    "schema": 1,
+    "timestamp": "2026-11-05T07:56:43.5330014-06:00",
+    "machine": "BEAST",
+    "command": "run.ps1 -Clauses A9",
+    "productRoot": "E:\\dev\\ns-s7",
+    "productCommit": "a2fd16e",
+    "acceptanceCommit": "c3e1a5e",
+    "freshClone": false,
+    "productPresent": true,
+    "M": 208,
+    "selected": 4,
+    "pass": 4,
+    "fail": 0,
+    "notRun": 0,
+    "reasons": [],
+    "selfChecks": {
+      "selected": 0,
+      "pass": 0,
+      "fail": 0,
+      "notRun": 0
+    }
+  },
+  "results": [
+    {
+      "id": "A9.cf.binaries-reference-cf-mscorlib",
+      "assertion": "A9",
+      "slice": "All",
+      "group": "binproof",
+      "build": "host",
+      "referee": "CF references and System.Reflection.Metadata",
+      "status": "PASS",
+      "reason": "",
+      "detail": "4 of 4 vectors",
+      "ms": 21
+    },
+    {
+      "id": "A9.cf.compiles-against-reference-assemblies-with-langversion-3",
+      "assertion": "A9",
+      "slice": "All",
+      "group": "binproof",
+      "build": "host",
+      "referee": "CF references and System.Reflection.Metadata",
+      "status": "PASS",
+      "reason": "",
+      "detail": "src/NetSec.Core and src/NetSec.Core.NetCF use LangVersion 3; the CF project builds against E:\\dev\\tools\\netcf35-ref",
+      "ms": 2434
+    },
+    {
+      "id": "A9.cf.same-suite-passes-on-net48-skips-pinned",
+      "assertion": "A9",
+      "slice": "All",
+      "group": "binproof",
+      "build": "host",
+      "referee": "CF references and System.Reflection.Metadata",
+      "status": "PASS",
+      "reason": "",
+      "detail": "2 of 2 vectors; net10.0 575 passed, net48 575 passed, 0 skipped (all pinned)",
+      "ms": 62244
+    },
+    {
+      "id": "A9.git-ls-files.no-cf-binary",
+      "assertion": "A9",
+      "slice": "All",
+      "group": "binproof",
+      "build": "host",
+      "referee": "CF references and System.Reflection.Metadata",
+      "status": "PASS",
+      "reason": "",
+      "detail": "509 tracked files checked against 42 CF reference files and the CF mscorlib token; none match",
+      "ms": 409
+    }
+  ]
+}
