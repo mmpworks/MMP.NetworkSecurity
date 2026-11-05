@@ -104,7 +104,8 @@ namespace NetSec.Pki
             return Der.Sequence(tbs, algorithm, Der.BitString(Ed25519.Sign(_seed, tbs)));
         }
 
-        static byte[] Name(string commonName)
+        /// <summary>The DER of a subject that holds one common name, as these certificates carry it.</summary>
+        public static byte[] Name(string commonName)
         {
             return Der.Sequence(Der.Set(Der.Sequence(Der.Oid(CommonNameOid), Der.Utf8(commonName))));
         }

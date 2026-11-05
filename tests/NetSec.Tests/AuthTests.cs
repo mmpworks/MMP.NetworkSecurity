@@ -310,7 +310,7 @@ namespace NetSec.Tests
         public void Every_row_stops_at_its_named_check_with_one_thing_changed()
         {
             AttackDefinition[] rows = AttackCatalog.Lesson10Unreleased;
-            Assert.Equal(12, rows.Length);
+            Assert.Equal(13, rows.Length);
             foreach (AttackDefinition a in rows)
             {
                 Assert.Equal(1, (a.Plan != null ? 1 : 0) + a.Options.Length);
