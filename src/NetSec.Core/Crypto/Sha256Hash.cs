@@ -1,3 +1,5 @@
+using System;
+
 namespace NetSec.Crypto
 {
     /// <summary>SHA-256, FIPS 180-4 section 6.2. The function names follow the standard.</summary>
@@ -19,6 +21,19 @@ namespace NetSec.Crypto
         uint[] _w = new uint[64];
 
         public Sha256Hash() : base(32, 64, 8, false) { }
+
+        public static Sha256Hash Resume(byte[] digest, long bytesAlreadyHashed)
+        {
+            Arg.NotNull(digest, "digest");
+            if (digest.Length != 32) throw new ArgumentException("a SHA-256 digest is 32 bytes", "digest");
+            if (bytesAlreadyHashed < 0 || bytesAlreadyHashed % 64 != 0)
+                throw new ArgumentOutOfRangeException("bytesAlreadyHashed", "the state exists only at a block boundary, so this is a multiple of 64");
+
+            Sha256Hash hash = new Sha256Hash();
+            for (int i = 0; i < 8; i++) hash._h[i] = Endian.LoadBe32(digest, i * 4);
+            hash.CountBytesAlreadyHashed((ulong)bytesAlreadyHashed);
+            return hash;
+        }
 
         protected override void DetachState()
         {

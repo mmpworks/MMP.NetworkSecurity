@@ -30,3 +30,8 @@ Each correction goes here, newest slice last. Later slices read this file first.
 
 1. **Each side of a lab needs its own random stream.** Two pumps draw in an order the threads choose, so one shared stream gives different bytes on a same-seed rerun. `LabPair.Fork` draws a seed per side before the pumps start. Fork matching (`atSeq`) depends on this.
 2. **A rule reads a value only through `FrameSession.Secret`, and `Effect.Secret` stores it.** The interpreter calls `Remember`, so a rule stays free of side effects except `Draw`, which reads the side's random stream in rule order.
+
+## S2
+
+1. **`openssl genpkey -outform DER` on OpenSSL 3.5.7 wrote a traditional `RSAPrivateKey`, not PKCS#8.** CONTRACT rule 5 needs `PrivateKeyInfo`. Run `openssl pkcs8 -topk8 -nocrypt` after it. The net10 test `An_rsa_key_is_pkcs8_with_its_matching_spki` pins the format.
+2. **`TrainingKeySource.Find` throws `TRAINING_KEY_UNKNOWN` for an unknown id.** It never returns null. A symmetric key's `CopyPublic` gives an empty array.
