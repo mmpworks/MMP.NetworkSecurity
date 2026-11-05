@@ -211,7 +211,7 @@ if ($needX9 -and -not (Test-Path $x9Out)) {
 $productExists = Test-Path (Join-Path $ProductRoot 'src\NetSec.Core\NetSec.Core.csproj')
 $prep = [ordered]@{ core10 = $null; coreCf = $null; ce = $null; node = $null; host = $null; ap = $null; errors = [ordered]@{} }
 $groupsNeeded = @($pending | ForEach-Object { $_.group } | Sort-Object -Unique)
-$needsProductGroups = @('prim', 'dukpt', 'kschedule', 'tls13live', 'tls11', 'ssh', 'auth', 'nativeprod', 'bridge', 'host', 'keys', 'binproof', 'e2e')
+$needsProductGroups = @('prim', 'dukpt', 'kschedule', 'tls13live', 'tls11', 'ssh', 'auth', 'nativeprod', 'bridge', 'host', 'a17', 'keys', 'binproof', 'e2e')
 $wantProduct = @($groupsNeeded | Where-Object { $needsProductGroups -contains $_ }).Count -gt 0
 
 function Build-Piece([string]$key, [string]$projRel, [string[]]$extra, [string[]]$outRels) {
@@ -344,7 +344,7 @@ foreach ($name in ($doc.groups.PSObject.Properties.Name)) {
             Set-All @($pending | Where-Object { $ids -contains $_.id }) $(if ($reason -eq 'PRODUCT_BUILD_FAILED') { 'FAIL' } else { 'NOT RUN' }) $reason $detail
             continue
         }
-        if ($name -eq 'host' -and -not $prep.host) {
+        if ($name -in 'host', 'a17' -and -not $prep.host) {
             $reason, $detail = (($prep.errors['host']) ?? 'PRODUCT_MISSING:NetSec.Host not built') -split ':', 2
             Set-All @($pending | Where-Object { $ids -contains $_.id }) $(if ($reason -eq 'PRODUCT_BUILD_FAILED') { 'FAIL' } else { 'NOT RUN' }) $reason $detail
             continue

@@ -27,6 +27,7 @@ GROUPS = {
     "nativeprod": {"kind": "csharp", "project": "groups/nativeprod/nativeprod.csproj", "assembly": "Acceptance.NativeProd", "builds": ["net10", "cf"], "needsCore": True},
     "bridge":     {"kind": "csharp", "project": "groups/bridge/bridge.csproj", "assembly": "Acceptance.Bridge", "builds": ["net10"], "needsCore": True},
     "host":       {"kind": "csharp", "project": "groups/host/host.csproj", "assembly": "Acceptance.Host", "builds": ["net10"], "needsCore": False},
+    "a17":        {"kind": "csharp", "project": "groups/a17/a17.csproj", "assembly": "Acceptance.A17", "builds": ["net10"], "needsCore": False},
     "keys":       {"kind": "csharp", "project": "groups/keys/keys.csproj", "assembly": "Acceptance.Keys", "builds": ["net10"], "needsCore": False},
     "binproof":   {"kind": "csharp", "project": "groups/binproof/binproof.csproj", "assembly": "Acceptance.BinProof", "builds": ["net10"], "needsCore": False},
     "docs":       {"kind": "python", "script": "checks/docs_checks.py"},
@@ -53,19 +54,20 @@ ASSERTIONS = {
     "A14": "Every tour step binds to a live trace event or is marked as a concept step; at most 30 percent concept steps per lesson; a test fails on a dangling binding",
     "A15": "All tour text scores Flesch-Kincaid grade 8.9 or lower by script and passes tic-gate.py",
     "A15a": "Each security claim in a tour cites a source section, and an agent that did not write it reads it for accuracy",
-    "A16": "A real IKeyHandle given to the glass-box factory fails by type; real mode runs SslStream and its output holds no secret bytes; the UI labels the glass-box engine TRAINING ONLY; the CE wording is used",
+    "A16": "A real IKeyHandle given to the glass-box factory fails by type; the OS transport runs SslStream and its output holds no secret bytes; the UI labels the glass-box engine TRAINING ONLY; the CE wording is used",
+    "A17": "Per-type Mock or My test key modes: the readiness rule refuses by name, the five wizards are driven by a machine that owns the moves, the vault keeps keys and an audit chain, Show keys hides values, and every claim of proof names an outside referee or says known-answer",
     "SELF": "Harness self-check: the suite bites",
 }
 
 # Owning slice per prd.md "Acceptance assertions" and the S-table of program-design.md section 8. A1 splits by primitive.
 S4_PRIMITIVES = ("A1.md5", "A1.sha1", "A1.hmac-md5", "A1.hmac-sha1", "A1.hkdf-sha1", "A1.rsa", "A1.tdes", "A1.dh-group14")
 SLICE = {"A2": "S1", "A3": "S2", "A4": "S3", "A5": "S3", "A6": "S3", "A7": "S4", "A8": "S4", "A9": "All", "A10": "S5", "A10a": "S5",
-         "A11": "S6", "A12": "S7", "A13": "Each", "A14": "Each", "A15": "Each", "A15a": "Each", "A16": "S8", "SELF": "S0"}
+         "A11": "S6", "A12": "S7", "A13": "Each", "A14": "Each", "A15": "Each", "A15a": "Each", "A16": "S8", "A17": "V0", "SELF": "S0"}
 
 REFEREE = {"A1": "published vectors", "A2": ".NET 10 BCL oracle", "A3": "x9.org vectors", "A4": "RFC 8448", "A5": "OpenSSL 3.5.7 and Go crypto/tls", "A6": "OpenSSL 3.5.7",
            "A7": "OpenSSL 3.5.7", "A8": "Go x/crypto/ssh and ssh.exe", "A9": "CF references and System.Reflection.Metadata", "A10": "live run, Go referees and taps",
            "A10a": "Go tap", "A11": "Go tokenverify", "A12": "cl.exe and a live run", "A13": "Playwright", "A14": "test over the tour files and a live Host",
-           "A15": "script", "A15a": "accuracy reader", "A16": "test, Playwright, OpenSSL key log", "SELF": "stand-ins built on the BCL, python cryptography and real OpenSSL runs"}
+           "A15": "script", "A15a": "accuracy reader", "A16": "test, Playwright, OpenSSL key log", "A17": "test over HTTP and WebSocket, OpenSSL, ssh.exe, Go referees; known-answer where no outside referee exists", "SELF": "stand-ins built on the BCL, python cryptography and real OpenSSL runs"}
 
 # A role is a part of the build that the PRD lets the team cut. A cut role makes these clauses NOT RUN, named (roles.json).
 def roles_of(cid):

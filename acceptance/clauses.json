@@ -19,7 +19,8 @@
   "A14": "Every tour step binds to a live trace event or is marked as a concept step; at most 30 percent concept steps per lesson; a test fails on a dangling binding",
   "A15": "All tour text scores Flesch-Kincaid grade 8.9 or lower by script and passes tic-gate.py",
   "A15a": "Each security claim in a tour cites a source section, and an agent that did not write it reads it for accuracy",
-  "A16": "A real IKeyHandle given to the glass-box factory fails by type; real mode runs SslStream and its output holds no secret bytes; the UI labels the glass-box engine TRAINING ONLY; the CE wording is used",
+  "A16": "A real IKeyHandle given to the glass-box factory fails by type; the OS transport runs SslStream and its output holds no secret bytes; the UI labels the glass-box engine TRAINING ONLY; the CE wording is used",
+  "A17": "Per-type Mock or My test key modes: the readiness rule refuses by name, the five wizards are driven by a machine that owns the moves, the vault keeps keys and an audit chain, Show keys hides values, and every claim of proof names an outside referee or says known-answer",
   "SELF": "Harness self-check: the suite bites"
  },
  "groups": {
@@ -125,6 +126,15 @@
    "kind": "csharp",
    "project": "groups/host/host.csproj",
    "assembly": "Acceptance.Host",
+   "builds": [
+    "net10"
+   ],
+   "needsCore": false
+  },
+  "a17": {
+   "kind": "csharp",
+   "project": "groups/a17/a17.csproj",
+   "assembly": "Acceptance.A17",
    "builds": [
     "net10"
    ],
@@ -1335,8 +1345,8 @@
    "counts": true
   },
   {
-   "id": "A16.real-mode.os-transport-writes-no-secret-bytes",
-   "base": "A16.real-mode.os-transport-writes-no-secret-bytes",
+   "id": "A16.os-transport.writes-no-secret-bytes",
+   "base": "A16.os-transport.writes-no-secret-bytes",
    "assertion": "A16",
    "group": "host",
    "build": "host",
@@ -1397,6 +1407,61 @@
    "build": "host",
    "slice": "S8",
    "referee": "test, Playwright, OpenSSL key log",
+   "roles": [],
+   "counts": true
+  },
+  {
+   "id": "A17.flow.login.walk",
+   "base": "A17.flow.login.walk",
+   "assertion": "A17",
+   "group": "a17",
+   "build": "host",
+   "slice": "V0",
+   "referee": "test over HTTP and WebSocket, OpenSSL, ssh.exe, Go referees; known-answer where no outside referee exists",
+   "roles": [],
+   "counts": true
+  },
+  {
+   "id": "A17.import.warns-on-personal-ssh-path",
+   "base": "A17.import.warns-on-personal-ssh-path",
+   "assertion": "A17",
+   "group": "a17",
+   "build": "host",
+   "slice": "V0",
+   "referee": "test over HTTP and WebSocket, OpenSSL, ssh.exe, Go referees; known-answer where no outside referee exists",
+   "roles": [],
+   "counts": true
+  },
+  {
+   "id": "A17.readiness.refuses-by-name",
+   "base": "A17.readiness.refuses-by-name",
+   "assertion": "A17",
+   "group": "a17",
+   "build": "host",
+   "slice": "V0",
+   "referee": "test over HTTP and WebSocket, OpenSSL, ssh.exe, Go referees; known-answer where no outside referee exists",
+   "roles": [],
+   "counts": true
+  },
+  {
+   "id": "A17.readiness.types-disagree",
+   "base": "A17.readiness.types-disagree",
+   "assertion": "A17",
+   "group": "a17",
+   "build": "host",
+   "slice": "V0",
+   "referee": "test over HTTP and WebSocket, OpenSSL, ssh.exe, Go referees; known-answer where no outside referee exists",
+   "roles": [],
+   "counts": true
+  },
+  {
+   "id": "A17.referee.token-issuer-go",
+   "base": "A17.referee.token-issuer-go",
+   "assertion": "A17",
+   "group": "a17",
+   "build": "host",
+   "slice": "V0",
+   "referee": "test over HTTP and WebSocket, OpenSSL, ssh.exe, Go referees; known-answer where no outside referee exists",
    "roles": [],
    "counts": true
   },
@@ -2508,6 +2573,28 @@
    "referee": "CF references and System.Reflection.Metadata",
    "roles": [],
    "counts": true
+  },
+  {
+   "id": "SELF.a17-absent-host-is-not-run",
+   "base": "SELF.a17-absent-host-is-not-run",
+   "assertion": "SELF",
+   "group": "selftest",
+   "build": "host",
+   "slice": "S0",
+   "referee": "stand-ins built on the BCL, python cryptography and real OpenSSL runs",
+   "roles": [],
+   "counts": false
+  },
+  {
+   "id": "SELF.a17-clauses-pass-and-bite",
+   "base": "SELF.a17-clauses-pass-and-bite",
+   "assertion": "SELF",
+   "group": "selftest",
+   "build": "host",
+   "slice": "S0",
+   "referee": "stand-ins built on the BCL, python cryptography and real OpenSSL runs",
+   "roles": [],
+   "counts": false
   },
   {
    "id": "SELF.absent-product-is-not-run",

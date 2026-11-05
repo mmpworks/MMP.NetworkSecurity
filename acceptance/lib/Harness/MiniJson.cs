@@ -123,5 +123,87 @@ namespace Acceptance
             object v;
             return d != null && d.TryGetValue(key, out v) ? v as List<object> : null;
         }
+
+        public static bool Bool(Dictionary<string, object> d, string key, bool whenMissing)
+        {
+            object v;
+            return d != null && d.TryGetValue(key, out v) && v is bool ? (bool)v : whenMissing;
+        }
+
+        public static double Num(Dictionary<string, object> d, string key, double whenMissing)
+        {
+            object v;
+            return d != null && d.TryGetValue(key, out v) && v is double ? (double)v : whenMissing;
+        }
+
+        /// <summary>The JSON text of a string, with quotes and escapes.</summary>
+        public static string Quote(string s)
+        {
+            if (s == null) return "null";
+            StringBuilder sb = new StringBuilder("\"");
+            foreach (char ch in s)
+            {
+                switch (ch)
+                {
+                    case '"': sb.Append("\\\""); break;
+                    case '\\': sb.Append("\\\\"); break;
+                    case '\n': sb.Append("\\n"); break;
+                    case '\r': sb.Append("\\r"); break;
+                    case '\t': sb.Append("\\t"); break;
+                    default:
+                        if (ch < 0x20) sb.Append("\\u").Append(((int)ch).ToString("x4")); else sb.Append(ch);
+                        break;
+                }
+            }
+            return sb.Append('"').ToString();
+        }
+
+        /// <summary>Writes a Dictionary, List, string, bool, number or null as JSON text.</summary>
+        public static string Write(object o)
+        {
+            StringBuilder sb = new StringBuilder();
+            WriteTo(sb, o);
+            return sb.ToString();
+        }
+
+        static void WriteTo(StringBuilder sb, object o)
+        {
+            if (o == null) { sb.Append("null"); return; }
+            string str = o as string;
+            if (str != null) { sb.Append(Quote(str)); return; }
+            if (o is bool) { sb.Append((bool)o ? "true" : "false"); return; }
+            if (o is double) { sb.Append(((double)o).ToString("R", System.Globalization.CultureInfo.InvariantCulture)); return; }
+            if (o is int || o is long) { sb.Append(Convert.ToString(o, System.Globalization.CultureInfo.InvariantCulture)); return; }
+            Dictionary<string, object> d = o as Dictionary<string, object>;
+            if (d != null)
+            {
+                sb.Append('{');
+                bool first = true;
+                foreach (KeyValuePair<string, object> kv in d)
+                {
+                    if (!first) sb.Append(',');
+                    first = false;
+                    sb.Append(Quote(kv.Key)).Append(':');
+                    WriteTo(sb, kv.Value);
+                }
+                sb.Append('}');
+                return;
+            }
+            System.Collections.IEnumerable list = o as System.Collections.IEnumerable;
+            if (list != null)
+            {
+                sb.Append('[');
+                bool first = true;
+                foreach (object item in list)
+                {
+                    if (!first) sb.Append(',');
+                    first = false;
+                    WriteTo(sb, item);
+                }
+                sb.Append(']');
+                return;
+            }
+            throw new FormatException("MiniJson.Write cannot write " + o.GetType().Name);
+        }
     }
 }

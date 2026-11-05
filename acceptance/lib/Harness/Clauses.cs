@@ -27,7 +27,10 @@ namespace Acceptance
     /// <summary>The clause ran and the product is wrong.</summary>
     public class FailException : Exception
     {
-        public FailException(string detail) : base(detail) { }
+        /// <summary>The reason shown in the report. ASSERTION unless the clause names a more exact one.</summary>
+        public readonly string Reason;
+        public FailException(string detail) : base(detail) { Reason = "ASSERTION"; }
+        public FailException(string reason, string detail) : base(detail) { Reason = reason; }
     }
 
     public sealed class Ctx
@@ -206,7 +209,7 @@ namespace Acceptance
             NotRunException nr = ex as NotRunException;
             if (nr != null) return new Result(id, "NOT RUN", nr.Reason, nr.Message, 0);
             FailException fe = ex as FailException;
-            if (fe != null) return new Result(id, "FAIL", "ASSERTION", fe.Message, 0);
+            if (fe != null) return new Result(id, "FAIL", fe.Reason, fe.Message, 0);
             if (ex is NotImplementedException || ex is TypeLoadException || ex is MissingMethodException || ex is MissingMemberException
                 || (ex is FileNotFoundException && ex.Message.IndexOf("NetSec", StringComparison.Ordinal) >= 0)
                 || (ex is TypeInitializationException && ex.InnerException is NotImplementedException))

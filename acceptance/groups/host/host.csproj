@@ -5,4 +5,7 @@
     <TargetFramework>net10.0</TargetFramework>
     <AssemblyName>Acceptance.Host</AssemblyName>
   </PropertyGroup>
+  <ItemGroup>
+    <Compile Include="..\..\lib\Host\*.cs" Link="HostKit\%(Filename)%(Extension)" />
+  </ItemGroup>
 </Project>
