@@ -2,7 +2,7 @@
 
 Author: Echo. Date: 2026-11-05. Branch: `test/acceptance-suite`. Rule: D11. Builders never write under `acceptance/`.
 
-Conclusion: the suite has **M = 204 product clauses** (`clauses.json`). With no product built it reports **0 of 204 PASS, 0 FAIL, 204 NOT RUN**.
+Conclusion: the suite has **M = 208 product clauses** (`clauses.json`). With no product built it reports **0 of 208 PASS, 0 FAIL, 208 NOT RUN**.
 Its 22 checks on itself all PASS. The suite is written against `docs/program-design.md` section 11 and the merged referees in `acceptance/referees`. Every group compiles against the contract stub on net10.0 and on net48 with the CF build of MMP.AsyncProxy.
 Disposition: merge this branch before S0 starts. Send the open items in section 7 to Richard and Jared.
 
@@ -25,10 +25,10 @@ Exit code 0 means every selected clause passed. Anything else exits 1.
 Command: `pwsh acceptance/run.ps1 -Clauses All -SelfTest` on this branch. Nothing under `src/` exists yet.
 
 ```
-[acceptance] 204 clauses selected of M = 204 (+ 22 self-checks in the file)
+[acceptance] 208 clauses selected of M = 208 (+ 22 self-checks in the file)
 [acceptance] group prim (net10): 32 clauses
   ... (one line for each group and build: dukpt, kschedule, tls13live, tls11, ssh, auth, nativeprod, native, bridge, host, keys, binproof, selftest, docs, e2e)
-[acceptance] 0 of 204 clauses PASS (0 FAIL, 204 NOT RUN); M = 204
+[acceptance] 0 of 208 clauses PASS (0 FAIL, 208 NOT RUN); M = 208
 [acceptance] self-checks: 22 of 22 PASS
 ```
 
@@ -40,7 +40,7 @@ Command: `pwsh acceptance/run.ps1 -Clauses All -SelfTest` on this branch. Nothin
 | A4 | 20 | 0 | 0 | 20 | S3 | RFC 8448 |
 | A5 | 20 | 0 | 0 | 20 | S3 | OpenSSL 3.5.7 and Go crypto/tls |
 | A6 | 4 | 0 | 0 | 4 | S3 | OpenSSL 3.5.7 |
-| A7 | 8 | 0 | 0 | 8 | S4 | OpenSSL 3.5.7 |
+| A7 | 12 | 0 | 0 | 12 | S4 | OpenSSL 3.5.7 |
 | A8 | 12 | 0 | 0 | 12 | S4 | Go x/crypto/ssh and ssh.exe |
 | A9 | 4 | 0 | 0 | 4 | All | CF references and System.Reflection.Metadata |
 | A10 | 7 | 0 | 0 | 7 | S5 | live run, Go referees and taps |
@@ -55,7 +55,7 @@ Command: `pwsh acceptance/run.ps1 -Clauses All -SelfTest` on this branch. Nothin
 
 | Status and reason | Clauses |
 |---|---|
-| NOT RUN PRODUCT_MISSING | 203 |
+| NOT RUN PRODUCT_MISSING | 207 |
 | NOT RUN NOT_A_FRESH_RUN (`A13.fresh-clone.acceptance-unchanged`, needs `-Fresh`) | 1 |
 
 Self-checks (full text in the report): 22 of 22 PASS.
