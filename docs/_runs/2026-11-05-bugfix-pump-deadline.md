@@ -19,7 +19,7 @@ Past finding: no past entries.
 
 | Change | File |
 |---|---|
-| The test becomes a theory with two orders. Each order asserts the exact code on each side, and `read deadline` on the side that timed out | `tests/NetSec.Tests/CoreTests.cs` |
+| The test becomes a theory with two orders. Each order asserts one named code on each side, and `read deadline` on the side that timed out | `tests/NetSec.Tests/CoreTests.cs` |
 | New test: with equal deadlines, each side ends by name and at least one side names the deadline | `tests/NetSec.Tests/CoreTests.cs` |
 
 | A second flake, found by this gate. `Process.Kill` can throw `Win32Exception` (`Access is denied`) when the process is already exiting. Main's #47 fixed it in `TapRun`. The bridge test's cleanup had the same shape, so it now catches the exception, and the existing 5 s wait follows. Seen once, in `TapRun`, with the stack as evidence. I could not force it on demand, so it has no red run | `tests/NetSec.Host.Tests/BridgeLiveTests.cs` |
