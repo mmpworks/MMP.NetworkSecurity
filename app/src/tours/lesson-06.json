@@ -53,13 +53,20 @@
       "lesson": 6,
       "title": "The reader gets its own starting key",
       "text": [
-        "The reader holds a starting key of its own, made from the BDK and the reader's id. The bank made the same key on its side.",
+        "The bank derives a starting key from the BDK and the reader's id. The reader is loaded with the same key before the run, like a key put in at a secure facility.",
         "Compare the reader and bank columns in the secrets panel. The two values match.",
-        "The match is the point. The two sides never send this key to each other. Each side derives it."
+        "The match is the point. The key never crosses the wire."
       ],
       "glossary": [],
       "bind": { "kind": "event", "eventType": "dukpt.key.derived", "match": { "actor": "reader", "message": "dukpt.initial" } },
       "highlight": ["secrets:row=reader.dukpt.initial", "secrets:row=bank.dukpt.initial"],
+      "claims": [
+        {
+          "id": "L6-C11",
+          "text": "In the lab the starting key is derived from the BDK and loaded into the reader at setup; the reader never holds the BDK, and the key never crosses the wire.",
+          "source": "src/NetSec.Core/Labs/Lesson06Dukpt.cs, LoadReader(DeriveInitialKey), as read by reader-a15a (PR #57); docs/lesson-6-names.md, Facts the tour needs, item 4"
+        }
+      ],
       "unlock": { "mode": "event" }
     },
     {

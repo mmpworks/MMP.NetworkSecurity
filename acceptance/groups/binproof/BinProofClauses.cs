@@ -135,7 +135,7 @@ namespace Acceptance
             string trxDir = Path.Combine(c.WorkDir, "trx-" + dirTag);
             Directory.CreateDirectory(trxDir);
             int code;
-            string output = Run("dotnet", "test \"" + tests + "\" -c Release -f " + framework + " -p:NetCFRefDir=\"" + RefDir(c) + "\" --logger \"trx;LogFileName=" + dirTag + ".trx\" --results-directory \"" + trxDir + "\"", c.RepoRoot, 1800000, out code);
+            string output = Run("dotnet", "test \"" + tests + "\" -c Release -f " + framework + " -p:NetCFRefDir=\"" + RefDir(c) + "\" --logger \"trx;LogFileName=" + dirTag + ".trx\" --results-directory \"" + trxDir + "\" --blame-hang-timeout 3m --blame-hang-dump-type none", c.RepoRoot, 1800000, out code);   // a test that hangs ends the run after 3 minutes and is named
             string[] files = Directory.GetFiles(trxDir, "*.trx");
             if (files.Length == 0) throw new FailException("dotnet test (" + framework + ") wrote no TRX file (exit " + code + "): " + Tail(output));
             XNamespace ns = "http://microsoft.com/schemas/VisualStudio/TeamTest/2010";

@@ -50,6 +50,42 @@ namespace Acceptance
         [Clause("A7.tls11.openssl.ecdhe-cbc", PerBuild = true)]
         public static string EcdheCbc(Ctx c) { return Tls11Against(c, "TLS_ECDHE_RSA_WITH_AES_128_CBC_SHA", "ECDHE-RSA-AES128-SHA", "a7-ecdhe-cbc"); }
 
+        // ---------------------------------------------------------------- the glass TLS 1.1 server, judged by OpenSSL
+
+        /// <summary>
+        /// Probe.Listen with Protocol Tls11 and a named Suite ends the session on one whole line. OpenSSL s_client is the client: it must report TLSv1.1,
+        /// verify the server certificate against the training root (return code 0), and what it writes must reach ProbeResult.Received.
+        /// </summary>
+        static string Tls11Server(Ctx c, string ianaSuite, string openSslCipher, string stem)
+        {
+            PkiDir p = PkiDir.Export(c, stem);
+            ProbeRequest req = ProbeKit.Request(WireProtocol.Tls11, 0, "localhost");
+            req.Suite = ianaSuite;
+            ProbeListener listener = Probe.Listen(req);
+            Check.True(listener != null && listener.Port > 0, "Probe.Listen returned no port");
+            Proc client = OpenSslPeer.StartClient(c, "-tls1_1 -cipher " + openSslCipher + ":@SECLEVEL=0 -CAfile \"" + p.Root + "\" -verify_return_error -verify_hostname localhost -connect 127.0.0.1:" + listener.Port).P;
+            using (client)
+            {
+                client.WriteLine("hello");
+                ProbeResult r = Futs.Get(listener.Result, 60000, "glass TLS 1.1 server");
+                Check.True(r.Completed, "glass TLS 1.1 server (" + openSslCipher + ") stopped: " + r.CheckName + " [" + r.Code + "]. OpenSSL output: " + client.AllOutput);
+                string got = Encoding.ASCII.GetString(r.Received ?? new byte[0]);
+                Check.True(got.Contains("hello"), "the server received '" + got.Trim() + "' and not hello");
+                client.WaitForLine(delegate (string l) { return l.Contains("Verify return code"); }, 20000);
+                string output = client.AllOutput;
+                Check.True(System.Text.RegularExpressions.Regex.IsMatch(output, @"Protocol\s*:\s*TLSv1\.1"), "OpenSSL did not report TLSv1.1. Output: " + output);
+                Check.True(output.Contains("Verify return code: 0 (ok)"), "OpenSSL did not verify the server certificate. Output: " + output);
+                Check.Equal("suite reported by the product", ianaSuite, r.Suite);
+                return "TLS 1.1 server, " + openSslCipher + ": OpenSSL reports TLSv1.1 and verify code 0, and the line 'hello' arrived";
+            }
+        }
+
+        [Clause("A7.tls11.server.openssl.rsa-transport", PerBuild = true)]
+        public static string ServerRsaTransport(Ctx c) { return Tls11Server(c, "TLS_RSA_WITH_AES_128_CBC_SHA", "AES128-SHA", "a7-srv-rsa-transport"); }
+
+        [Clause("A7.tls11.server.openssl.ecdhe-cbc", PerBuild = true)]
+        public static string ServerEcdheCbc(Ctx c) { return Tls11Server(c, "TLS_ECDHE_RSA_WITH_AES_128_CBC_SHA", "ECDHE-RSA-AES128-SHA", "a7-srv-ecdhe-cbc"); }
+
         // ---------------------------------------------------------------- alert 70
 
         [Clause("A7.alert70.modern-server-beside-legacy-control", PerBuild = true)]

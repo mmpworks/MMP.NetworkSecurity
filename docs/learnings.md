@@ -64,6 +64,9 @@ Each correction goes here, newest slice last. Later slices read this file first.
 9. **`Probe` throws `NotImplementedException` for TLS 1.1 and SSH until S4.** The suite maps that to NOT RUN. A7 and A8 stay NOT RUN for that reason, and S4 removes `Probe.NeedBuilt`.
 10. **The glass client offers no CCS and an empty session id, and tolerates a CCS from the peer.** OpenSSL and Go accept this. The glass server echoes the client's session id and sends no CCS.
 11. **`EncryptedExtensions` has no `group unchanged` check.** Design section 2.6 lists one. The group check runs at ServerHello, against the one group the client offered, so a second check at `ee` would always pass and show the learner nothing.
+12. **`Tls13KeySchedule.Resume` holds the resumption rung, and no engine calls it.** This engine reads a ticket and drops it. The RFC 8448 check is its only caller. Finished checks go through `VerifyFinished`, which calls `Hmac.Verify`.
+13. **`EnginePump` ran the engine and queued its output under two locks, so a caller's `Enqueue` could pass the read loop.** A record cipher numbers records in engine order, so the swap failed `TLS13_AEAD_TAG` on a clean link, about 1 run in 20 at 100% CPU. `PumpOrderTests` forces the window: 15 to 538 swaps per run before the fix, on both builds. `Drive` now holds one lock across both. A gate that shows a tag failure with no tamper is this class first.
+14. **A tap can lead a trace.** A pump writes `wire.sent` after the socket write, and the tap logs before it forwards. A comparison must wait for equal lengths and never for "at least". Unit tests alone hide this: the tap test passed 48 of 48 alone and failed under the full suite at load, so repeat a flake inside the full suite.
 
 ## S4, TLS 1.1
 
@@ -74,6 +77,13 @@ Each correction goes here, newest slice last. Later slices read this file first.
 5. **`Pkcs1` had no block with an empty DigestInfo prefix.** TLS 1.1 signs 36 bytes of MD5 then SHA-1 with no prefix. `SignMd5Sha1` and `VerifyMd5Sha1` share `EncodeDigestBlock` with the SHA-1 and SHA-256 forms.
 6. **A key from the wire gets a shape check before any arithmetic.** `Tls11RsaKeys.TryReadPublic` refuses an even modulus, a modulus under 59 bytes, and an even exponent or one below 3, as `TLS11_SERVER_KEY_UNUSABLE`. Without it `BigUInt` throws an unnamed `ArgumentException` on an even modulus and `Pkcs1` throws `RSA_MESSAGE_TOO_LONG`.
 7. **In Git Bash, `-p:NetCFRefDir=E:\dev\tools\netcf35-ref` loses its backslashes.** The build then says the CF references are missing. Use forward slashes or leave the flag out, because `Directory.Build.props` holds that default.
+
+8. **Review of PR 49 (Jared), fixed in the follow-up.** OpenSSL's default client refuses a server with no `renegotiation_info` answer, even at `@SECLEVEL=0`, so the server role needs an outside judge beside the client role. A7 judges only the client, and `Tls11Tests` now runs `s_client` against the glass server.
+9. **A failed engine's alert write can hit a closed socket.** `EnginePump` then reported `LINK_LOST` over the engine's named failure. The pump now keeps the engine's failure. This applies to TLS 1.3 and SSH too.
+10. **Three readings of the sources.** RFC 9325 section 4.5 sets the RSA floor at 2048 bits, and the same document says TLS 1.1 must not be negotiated, so a floor cannot make this engine current. RFC 4346 section 7.2.2 sends `record_overflow` above 2^14 + 1024 decrypted bytes, and section 6.2.1 says plaintext should not exceed 2^14. This engine uses the smaller number. Section 7.2.2 leaves some alert levels to the sender, so "must send a fatal alert" is too strong for that section.
+11. **TLS has no flow window, so `GlassTlsChannel` caps its unread queue at 16 MiB and then names `CHANNEL_BUFFER_FULL`.** The cap is a call: a quarter of the CE profile's 64 MB. A real device needs a measured number.
+
+12. **Second review of the TLS 1.1 fixes (Jared).** A clear warning alert must not cancel the fatal alert a later failure owes. The queue cap now aborts with a fatal alert, through `EngineCommand.Abort`, because a `close_notify` after dropped data says a clean end. The cap still ends the session where TCP could wait: the pump could stop reading while the queue is full. That change stays open. The cap is enough unless a real flow sends 16 MiB to a stalled reader.
 
 ## S6
 

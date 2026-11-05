@@ -106,14 +106,29 @@ $M = @($all | Where-Object { $_.counts }).Count
 
 # ------------------------------------------------------------------ contract (compile-check) mode
 function Get-AsyncProxyDlls {
+    # The sibling MMP.AsyncProxy is shared by every lane. Builds that write into it can collide (CS2012). When the product holds its own
+    # AsyncProxy.Local projects (src/AsyncProxy.Local and src/AsyncProxy.Local.NetCF, which compile the sibling's sources into the product's own bin
+    # folders), the suite builds those. Without them it builds the sibling, as before. The assembly versions are the same either way.
     $r = [ordered]@{ ns2 = $null; cf = $null; error = $null }
     if (-not (Test-Path (Join-Path $AsyncProxyRoot 'src\MMP.AsyncProxy'))) { $r.error = "MMP.AsyncProxy not found at $AsyncProxyRoot (set AsyncProxyRoot)"; return $r }
-    $b = Invoke-Tool 'dotnet' @('build', (Join-Path $AsyncProxyRoot 'src\MMP.AsyncProxy'), '-c', 'Release', '-f', 'netstandard2.0', '--nologo', '-v', 'q') -TimeoutSec 600
-    $ns2 = Join-Path $AsyncProxyRoot 'src\MMP.AsyncProxy\bin\Release\netstandard2.0\MMP.AsyncProxy.dll'
+    $localNs = Join-Path $ProductRoot 'src\AsyncProxy.Local'
+    $localCf = Join-Path $ProductRoot 'src\AsyncProxy.Local.NetCF'
+    if (@(Get-ChildItem $localNs -Filter *.csproj -ErrorAction SilentlyContinue).Count -gt 0) {
+        $b = Invoke-Tool 'dotnet' @('build', $localNs, '-c', 'Release', "-p:AsyncProxyRoot=$AsyncProxyRoot", '--nologo', '-v', 'q') -TimeoutSec 600
+        $ns2 = Join-Path $localNs 'bin\Release\netstandard2.0\MMP.AsyncProxy.dll'
+    } else {
+        $b = Invoke-Tool 'dotnet' @('build', (Join-Path $AsyncProxyRoot 'src\MMP.AsyncProxy'), '-c', 'Release', '-f', 'netstandard2.0', '--nologo', '-v', 'q') -TimeoutSec 600
+        $ns2 = Join-Path $AsyncProxyRoot 'src\MMP.AsyncProxy\bin\Release\netstandard2.0\MMP.AsyncProxy.dll'
+    }
     if ($b.ExitCode -eq 0 -and (Test-Path $ns2)) { $r.ns2 = $ns2 } else { $r.error = "MMP.AsyncProxy netstandard2.0 build failed: " + (Tail $b.Output) }
     if (Test-Path (Join-Path $NetCFRefDir 'mscorlib.dll')) {
-        $c = Invoke-Tool 'dotnet' @('build', (Join-Path $AsyncProxyRoot 'src\MMP.AsyncProxy.NetCF'), '-c', 'Release', "-p:NetCFRefDir=$NetCFRefDir", '--nologo', '-v', 'q') -TimeoutSec 600
-        $cf = Join-Path $AsyncProxyRoot 'src\MMP.AsyncProxy.NetCF\bin\Release\net35\MMP.AsyncProxy.dll'
+        if (@(Get-ChildItem $localCf -Filter *.csproj -ErrorAction SilentlyContinue).Count -gt 0) {
+            $c = Invoke-Tool 'dotnet' @('build', $localCf, '-c', 'Release', "-p:AsyncProxyRoot=$AsyncProxyRoot", "-p:NetCFRefDir=$NetCFRefDir", '--nologo', '-v', 'q') -TimeoutSec 600
+            $cf = Join-Path $localCf 'bin\Release\net35\MMP.AsyncProxy.dll'
+        } else {
+            $c = Invoke-Tool 'dotnet' @('build', (Join-Path $AsyncProxyRoot 'src\MMP.AsyncProxy.NetCF'), '-c', 'Release', "-p:NetCFRefDir=$NetCFRefDir", '--nologo', '-v', 'q') -TimeoutSec 600
+            $cf = Join-Path $AsyncProxyRoot 'src\MMP.AsyncProxy.NetCF\bin\Release\net35\MMP.AsyncProxy.dll'
+        }
         if ($c.ExitCode -eq 0 -and (Test-Path $cf)) { $r.cf = $cf } else { $r.error = "MMP.AsyncProxy CF build failed: " + (Tail $c.Output) }
     } else { $r.error = "CF references not found at $NetCFRefDir" }
     return $r

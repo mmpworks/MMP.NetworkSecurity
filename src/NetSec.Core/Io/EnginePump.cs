@@ -120,7 +120,7 @@ namespace NetSec.Io
 
         public IFuture<PumpResult> Run()
         {
-            Append(StartEngine());
+            Drive(delegate { return _engine.Start(); });
             Observed(AsyncProxy.Run(OutboxLoop()));
             Observed(AsyncProxy.Run(ReadLoop()));
             return _result.Future;
@@ -128,15 +128,8 @@ namespace NetSec.Io
 
         public IFuture Enqueue(EngineCommand command)
         {
-            EngineOutput output;
-            lock (_lock) output = _engine.Command(command);
-            Append(output);
+            Drive(delegate { return _engine.Command(command); });
             return Drained();
-        }
-
-        EngineOutput StartEngine()
-        {
-            lock (_lock) return _engine.Start();
         }
 
         void Observed(IFuture loop)
@@ -192,10 +185,9 @@ namespace NetSec.Io
 
         void Take(byte[] buffer, int count)
         {
-            EngineOutput output;
             if (count == 0)
             {
-                lock (_lock) output = _engine.Command(EngineCommand.PeerClosed);
+                Drive(delegate { return _engine.Command(EngineCommand.PeerClosed); });
             }
             else
             {
@@ -203,13 +195,12 @@ namespace NetSec.Io
                 byte[] chunk = new byte[count];
                 Buffer.BlockCopy(buffer, 0, chunk, 0, count);
                 TraceEvent arrival = WireEvent("wire.received", _engine.Peer, _engine.Stream.Actor, null, chunk, null, null);
-                lock (_lock)
+                Drive(delegate
                 {
                     _received.Enqueue(arrival);
-                    output = _engine.Feed(buffer, 0, count);
-                }
+                    return _engine.Feed(buffer, 0, count);
+                });
             }
-            Append(output);
         }
 
         IEnumerable<IFuture> OutboxLoop()
@@ -298,12 +289,16 @@ namespace NetSec.Io
             return _wireStream.Stamp(draft);
         }
 
-        void Append(EngineOutput output)
+        /// <summary>
+        /// Runs the engine and queues what it made under one lock. A record cipher numbers records in the order the engine makes them.
+        /// With a gap between the call and the queue, a caller's Enqueue and the read loop could swap, and a clean link then failed its AEAD tag.
+        /// </summary>
+        void Drive(Func<EngineOutput> call)
         {
             Promise wake;
             lock (_lock)
             {
-                _outbox.Enqueue(output);
+                _outbox.Enqueue(call());
                 wake = _outboxWake;
                 _outboxWake = null;
             }
@@ -336,7 +331,8 @@ namespace NetSec.Io
 
         void Conclude()
         {
-            End(_linkError);
+            // A failed engine's last write is its alert, and the peer may already be gone. The engine's named failure is the news, so a lost write does not replace it.
+            End(_engine.Status == EngineStatus.Failed ? null : _linkError);
         }
 
         /// <summary>Ends the run once. A link error wins over the engine's status, because the engine never saw the failure.</summary>
