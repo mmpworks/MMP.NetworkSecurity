@@ -2,6 +2,7 @@
 import { computed, ref } from 'vue'
 import { lessons } from '../store'
 import ShowKeysSwitch from './ShowKeysSwitch.vue'
+import { openVault } from '../vault'
 import {
   FLOWS, GROUPS, actionFor, chipFor, closeSecurity, flowOf, flowRow, openFlow, sec, setMode, typeRow, useBuiltinEverywhere, words, type KeyMode, type TypeRow,
 } from '../security'
@@ -87,6 +88,7 @@ async function runWithMine() {
 
     <footer class="sec-foot">
       <v-btn variant="text" :disabled="!anyMine" data-testid="sec-all-builtin" @click="useBuiltinEverywhere">Use built-in keys everywhere</v-btn>
+      <v-btn variant="text" data-testid="sec-vault-exercise" @click="openVault">Practice vault</v-btn>
     </footer>
   </section>
 </template>

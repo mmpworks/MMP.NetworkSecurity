@@ -19,5 +19,7 @@ export default defineConfig({
   webServer: [
     { command: 'npx vite preview --port 4180 --strictPort', port: 4180, reuseExistingServer: true, timeout: 60_000 },
     { command: `dotnet "${hostDll}"`, port: HOST_PORT, reuseExistingServer: false, timeout: 60_000, env: { NETSEC_PORT: String(HOST_PORT), NETSEC_TOKEN: TOKEN } },
+    // A second Host on a damaged vault master key, for the VAULT_MASTER_KEY_BAD spec only.
+    { command: 'node e2e/start-bad-key-host.cjs', port: 5191, reuseExistingServer: false, timeout: 60_000, env: { NETSEC_HOST_DLL: hostDll } },
   ],
 })

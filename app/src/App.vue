@@ -25,6 +25,8 @@ import { isLadderEvent, pictureOf, protocols, raceStats } from './lab'
 import type { TraceEvent } from './types'
 import NeedsBanner from './components/NeedsBanner.vue'
 import SecurityPage from './components/SecurityPage.vue'
+import VaultPage from './components/VaultPage.vue'
+import { closeVault, vault } from './vault'
 import ShowKeysSwitch from './components/ShowKeysSwitch.vue'
 import WizardSheet from './components/WizardSheet.vue'
 import { badgeCount, closeSecurity, keysChip, loadSecurity, openSecurity, sec } from './security'
@@ -97,7 +99,7 @@ function onKey(ev: KeyboardEvent) {
   if (ev.ctrlKey || ev.metaKey || ev.altKey) return
   const k = ev.key
   const inDiagram = !!t?.closest?.('.diagram')
-  if (sec.open) { if (k === 'Escape' && !sec.run) closeSecurity(); return }
+  if (sec.open) { if (k === 'Escape' && !sec.run) { if (vault.open) closeVault(); else closeSecurity() } return }
   if (k === 'Escape') { lightbox.value = false; ui.shortcuts = false }
   else if (k === 'ArrowRight' && !ev.shiftKey || k === 'n' || k === 'N') void tourNext()
   else if (k === 'ArrowLeft' && !ev.shiftKey || k === 'b' || k === 'B') tourBack()
@@ -178,7 +180,8 @@ const shortcuts: [string, string][] = [
         </v-alert>
 
         <NeedsBanner />
-        <SecurityPage v-if="sec.open" />
+        <SecurityPage v-if="sec.open && !vault.open" />
+        <VaultPage v-if="sec.open && vault.open" />
         <WizardSheet v-if="sec.run" />
 
         <Splitpanes v-show="!sec.open" class="main-split">

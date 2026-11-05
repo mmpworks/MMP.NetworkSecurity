@@ -58,7 +58,7 @@ export function normalizeError(m: any): HostError {
 
 export async function hostGet(addr: HostAddress, path: string): Promise<any> {
   const r = await fetch(`http://127.0.0.1:${addr.port}${path}`, { headers: { Authorization: `Bearer ${addr.token}` } })
-  if (!r.ok) throw Object.assign(new Error(`GET ${path} returned ${r.status}`), { status: r.status })
+  if (!r.ok) throw Object.assign(new Error(`GET ${path} returned ${r.status}`), { status: r.status, body: await r.json().catch(() => null) })
   return r.json()
 }
 
