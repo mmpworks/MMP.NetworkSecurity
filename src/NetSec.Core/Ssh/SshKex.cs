@@ -25,7 +25,7 @@ namespace NetSec.Ssh
         {
             SshAlgorithms a = s.Algorithms;
             return new ByteWriter().U8(SshMsg.KexInit).Put(s.Draw(CookieSize))
-                .Prefixed(a.Kex + "," + (s.IsClient ? StrictClient : StrictServer)).Prefixed(a.HostKey)
+                .Prefixed(!s.OffersStrictKex ? a.Kex : a.Kex + "," + (s.IsClient ? StrictClient : StrictServer)).Prefixed(a.HostKey)
                 .Prefixed(a.Cipher).Prefixed(a.Cipher)
                 .Prefixed(a.Mac).Prefixed(a.Mac)
                 .Prefixed(None).Prefixed(None)
@@ -48,7 +48,7 @@ namespace NetSec.Ssh
                 byte[] list = r.Prefixed("list", "data");
                 if (!SshExchange.ListHas(list, want[i]))
                     return StepDecision.Fail(SshCodes.NoCommonAlg, SshChecks.Algorithm, "the peer does not list " + want[i]);
-                if (i == 0) s.StrictKex = SshExchange.ListHas(list, s.IsClient ? StrictServer : StrictClient);
+                if (i == 0) s.StrictKex = s.OffersStrictKex && SshExchange.ListHas(list, s.IsClient ? StrictServer : StrictClient);
             }
             r.Prefixed("languages", "data");
             r.Prefixed("languages", "data");
