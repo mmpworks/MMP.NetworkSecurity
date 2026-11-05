@@ -154,6 +154,39 @@ namespace NetSec.Bridge
         }
     }
 
+    /// <summary>What the bank's decision looks like in a trace. On a pass the bank shows the PIN key it derived, because the bank is the one place it may show.</summary>
+    public static class BankTrace
+    {
+        public static TraceEvent[] Events(TraceStream stream, BankDecision d)
+        {
+            List<TraceEvent> events = new List<TraceEvent>();
+            if (d.Ok)
+            {
+                TraceSecret key = new TraceSecret();
+                key.Holder = "bank";
+                key.Name = "dukpt.pin-key";
+                key.Bytes = d.PinKey;
+                key.DerivedFrom = new string[] { "dukpt.bdk" };
+                TraceEventDraft derived = new TraceEventDraft();
+                derived.Type = "secret.derived";
+                derived.Secrets = new TraceSecret[] { key };
+                events.Add(stream.Stamp(derived));
+            }
+            TraceCheck check = new TraceCheck();
+            check.Id = d.Code ?? ErrorCodes.DukptMacMismatch;
+            check.Name = d.Check ?? BankHsmCore.MacCheck;
+            check.Passed = d.Ok;
+            check.Code = d.Code;
+            check.Detail = d.Detail;
+            TraceEventDraft result = new TraceEventDraft();
+            result.Type = "check.result";
+            result.Message = check.Name;
+            result.Check = check;
+            events.Add(stream.Stamp(result));
+            return events.ToArray();
+        }
+    }
+
     /// <summary>A plain link's framing: a 4-byte big-endian length, then that many bytes. It is the same on every plain hop, and an SSH channel or a TLS stream carries it unchanged.</summary>
     public static class FrameIo
     {
