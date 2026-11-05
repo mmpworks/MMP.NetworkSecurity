@@ -58,6 +58,8 @@ namespace NetSec.Errors
         public const string TrainingKeyUnknown = "TRAINING_KEY_UNKNOWN";
         public const string DukptCounterExhausted = "DUKPT_COUNTER_EXHAUSTED";
         public const string DukptKsnReplay = "DUKPT_KSN_REPLAY";
+        public const string DukptMacMismatch = "DUKPT_MAC_MISMATCH";
+        public const string EnvelopeMalformed = "ENVELOPE_MALFORMED";
         public const string DukptPinBlockFormat = "DUKPT_PINBLOCK_FORMAT";
         public const string DukptKeyNotHeld = "DUKPT_KEY_NOT_HELD";
     }

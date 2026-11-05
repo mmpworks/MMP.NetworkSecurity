@@ -17,6 +17,7 @@
 
   <ItemGroup>
     <ProjectReference Include="..\..\src\NetSec.Host\NetSec.Host.csproj" ReferenceOutputAssembly="false" />
+    <ProjectReference Include="..\..\src\NetSec.Node\NetSec.Node.csproj" ReferenceOutputAssembly="false" />
     <ProjectReference Include="..\..\src\NetSec.CeDevice\NetSec.CeDevice.csproj" ReferenceOutputAssembly="false" SetTargetFramework="TargetFramework=net35" />
   </ItemGroup>
 
