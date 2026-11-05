@@ -1,0 +1,171 @@
+{
+  "summary": {
+    "schema": 1,
+    "timestamp": "2026-11-05T05:43:59.0956594-06:00",
+    "machine": "BEAST",
+    "command": "run.ps1 -Clauses A12,A9",
+    "productRoot": "E:\\dev\\ns-s7",
+    "productCommit": "8daad15",
+    "acceptanceCommit": "b2d1951",
+    "freshClone": false,
+    "productPresent": true,
+    "M": 202,
+    "selected": 12,
+    "pass": 12,
+    "fail": 0,
+    "notRun": 0,
+    "reasons": [],
+    "selfChecks": {
+      "selected": 0,
+      "pass": 0,
+      "fail": 0,
+      "notRun": 0
+    }
+  },
+  "results": [
+    {
+      "id": "A12.native.build-cl",
+      "assertion": "A12",
+      "slice": "S7",
+      "group": "native",
+      "build": "host",
+      "referee": "cl.exe and a live run",
+      "status": "PASS",
+      "reason": "",
+      "detail": "cl.exe builds the DLL as C++ and the same file as C, warnings as errors; 103424 bytes",
+      "ms": 4490
+    },
+    {
+      "id": "A12.native.load-direct.cf",
+      "assertion": "A12",
+      "slice": "S7",
+      "group": "native",
+      "build": "cf",
+      "referee": "cl.exe and a live run",
+      "status": "PASS",
+      "reason": "",
+      "detail": "6 of 6 vectors",
+      "ms": 4284
+    },
+    {
+      "id": "A12.native.load-direct.net10",
+      "assertion": "A12",
+      "slice": "S7",
+      "group": "native",
+      "build": "net10",
+      "referee": "cl.exe and a live run",
+      "status": "PASS",
+      "reason": "",
+      "detail": "6 of 6 vectors",
+      "ms": 4
+    },
+    {
+      "id": "A12.product.native-compare-loads.cf",
+      "assertion": "A12",
+      "slice": "S7",
+      "group": "nativeprod",
+      "build": "cf",
+      "referee": "cl.exe and a live run",
+      "status": "PASS",
+      "reason": "",
+      "detail": "NativeCompare loaded netsec_ct.dll and both compares agree on equal and unequal buffers",
+      "ms": 8
+    },
+    {
+      "id": "A12.product.native-compare-loads.net10",
+      "assertion": "A12",
+      "slice": "S7",
+      "group": "nativeprod",
+      "build": "net10",
+      "referee": "cl.exe and a live run",
+      "status": "PASS",
+      "reason": "",
+      "detail": "NativeCompare loaded netsec_ct.dll and both compares agree on equal and unequal buffers",
+      "ms": 6
+    },
+    {
+      "id": "A12.product.timing-judge-agrees",
+      "assertion": "A12",
+      "slice": "S7",
+      "group": "nativeprod",
+      "build": "host",
+      "referee": "cl.exe and a live run",
+      "status": "PASS",
+      "reason": "",
+      "detail": "product judge: leaky |t| 998.7 vs constant time |t| 53.30",
+      "ms": 436
+    },
+    {
+      "id": "A12.timing.leaky-separates-from-constant-time",
+      "assertion": "A12",
+      "slice": "S7",
+      "group": "native",
+      "build": "host",
+      "referee": "cl.exe and a live run",
+      "status": "PASS",
+      "reason": "",
+      "detail": "attempt 1: samples 100000 per case in 100 interleaved rounds, buffer 4096 bytes. which=0 (leaky) |t|=817.3, which=1 (constant time) |t|=15.08, identical-case control |t|=0.48. Thresholds: leaky |t| > 4.5, above 3 x constant-time |t|, and above 3 x the control. Optimizer-dependent (accuracy rule 5).",
+      "ms": 893
+    },
+    {
+      "id": "A12.tour.states-no-constant-time-guarantee",
+      "assertion": "A12",
+      "slice": "S7",
+      "group": "docs",
+      "build": "host",
+      "referee": "cl.exe and a live run",
+      "status": "PASS",
+      "reason": "",
+      "detail": "that managed code has no constant-time guarantee stated in step L11-S05",
+      "ms": 0
+    },
+    {
+      "id": "A9.cf.binaries-reference-cf-mscorlib",
+      "assertion": "A9",
+      "slice": "All",
+      "group": "binproof",
+      "build": "host",
+      "referee": "CF references and System.Reflection.Metadata",
+      "status": "PASS",
+      "reason": "",
+      "detail": "4 of 4 vectors",
+      "ms": 17
+    },
+    {
+      "id": "A9.cf.compiles-against-reference-assemblies-with-langversion-3",
+      "assertion": "A9",
+      "slice": "All",
+      "group": "binproof",
+      "build": "host",
+      "referee": "CF references and System.Reflection.Metadata",
+      "status": "PASS",
+      "reason": "",
+      "detail": "src/NetSec.Core and src/NetSec.Core.NetCF use LangVersion 3; the CF project builds against E:\\dev\\tools\\netcf35-ref",
+      "ms": 2109
+    },
+    {
+      "id": "A9.cf.same-suite-passes-on-net48-skips-pinned",
+      "assertion": "A9",
+      "slice": "All",
+      "group": "binproof",
+      "build": "host",
+      "referee": "CF references and System.Reflection.Metadata",
+      "status": "PASS",
+      "reason": "",
+      "detail": "2 of 2 vectors; net10.0 302 passed, net48 302 passed, 0 skipped (all pinned)",
+      "ms": 43229
+    },
+    {
+      "id": "A9.git-ls-files.no-cf-binary",
+      "assertion": "A9",
+      "slice": "All",
+      "group": "binproof",
+      "build": "host",
+      "referee": "CF references and System.Reflection.Metadata",
+      "status": "PASS",
+      "reason": "",
+      "detail": "367 tracked files checked against 42 CF reference files and the CF mscorlib token; none match",
+      "ms": 456
+    }
+  ]
+}

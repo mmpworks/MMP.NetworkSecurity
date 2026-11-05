@@ -44,7 +44,7 @@ namespace NetSec.Host.Tests
             }
         }
 
-        static string HostDll()
+        public static string HostDll()
         {
             for (DirectoryInfo dir = new DirectoryInfo(AppContext.BaseDirectory); dir != null; dir = dir.Parent)
             {
@@ -172,6 +172,15 @@ namespace NetSec.Host.Tests
             JsonElement stored = await GetJson($"/api/sessions/{id}/events?after=2");
             Assert.True(stored.GetArrayLength() > 0);
             Assert.All(stored.EnumerateArray(), e => Assert.True(e.GetProperty("seq").GetInt64() > 2));
+        }
+
+        [Fact]
+        public async Task Lesson_11_is_refused_until_its_tour_lands_and_the_host_already_carries_its_library()
+        {
+            using Socket s = await Socket.Open(host);
+            await s.Send("{\"type\":\"session.start\",\"requestId\":\"r1\",\"lesson\":11,\"mode\":\"run\"}");
+            Assert.Equal("LESSON_NOT_BUILT", (await s.Until("error")).GetProperty("code").GetString());
+            Assert.True(File.Exists(Path.Combine(Path.GetDirectoryName(HostFixture.HostDll()), "netsec_ct.dll")));
         }
 
         [Fact]
