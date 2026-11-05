@@ -17,8 +17,8 @@ const good = computed(() => block('what-good-looks-like'))
 const title = computed(() => words(`wizard.flow.${step.value.flowId}.title`, step.value.flowId))
 
 const can = (e: string) => step.value.allowed.includes(e)
-const forward = computed(() => ['continue', 'next', 'finish', 'done'].find(can) ?? '')
-const sourceEvent = (source: 'make' | 'files') => (can('choose') ? { event: 'choose', data: { source } } : { event: source, data: undefined })
+const forward = computed(() => ['next', 'continue', 'finish'].find(can) ?? '')
+const sourceEvent = (source: 'make' | 'files') => ({ event: source === 'files' && can('use-files') ? 'use-files' : source, data: undefined as Record<string, unknown> | undefined })
 
 const error = computed(() => step.value.errors[0] ?? null)
 const errorWords = computed(() => (error.value ? words(`wizard.error.${error.value.code}`, error.value.message) : ''))
@@ -35,7 +35,6 @@ const reason = computed(() => {
 })
 
 const paths = reactive<Record<string, string>>({})
-const filesReady = computed(() => (flow.value?.types ?? []).every(t => (paths[t] ?? '').trim()))
 const cancelAsk = ref(false)
 const onEsc = (e: KeyboardEvent) => { if (e.key === "Escape") cancelAsk.value = true }
 onMounted(() => window.addEventListener("keydown", onEsc))
@@ -47,7 +46,7 @@ const startLesson = computed(() => sec.returnLesson)
 
 function make() { const { event, data } = sourceEvent('make'); void sendEvent(event, data) }
 function useFiles() { const { event, data } = sourceEvent('files'); void sendEvent(event, data) }
-function sendPaths() { void sendEvent('files', { paths: { ...paths } }) }
+function sendPaths() { void sendEvent('files', { paths: Object.fromEntries(Object.entries(paths).filter(([, v]) => v.trim())) }) }
 // Leaving the Done screen ends the run on the Host, so no "Setup paused" remains for a finished set.
 async function finish() { if (forward.value) await sendEvent(forward.value); await closeSheet(true) }
 async function builtinAgain() { await finish(); for (const t of flow.value?.types ?? []) await setMode(t, 'BuiltIn') }
@@ -80,8 +79,8 @@ async function toLesson() { await finish(); backToLesson() }
               <ul class="wiz-parts">
                 <li v-for="t in flow?.types ?? []" :key="t" :data-testid="`flow-part-${t}`"><b>{{ words(`wizard.type.${t}.title`, t) }}</b> <span class="muted">{{ words(`wizard.type.${t}.why`) }}</span></li>
               </ul>
-              <v-btn color="primary" :disabled="sec.busy || !(can('make') || can('choose'))" data-testid="flow-make-button" @click="make">Make it for me <v-chip size="x-small" class="ml-2">Recommended</v-chip></v-btn>
-              <a v-if="can('files') || can('choose')" href="#" class="wiz-link" data-testid="flow-files-link" @click.prevent="useFiles">{{ words(`${prefix}.link`, 'Use my own files') }}</a>
+              <v-btn color="primary" :disabled="sec.busy || !can('make')" data-testid="flow-make-button" @click="make">Make it for me <v-chip size="x-small" class="ml-2">Recommended</v-chip></v-btn>
+              <a v-if="can('use-files') || can('files')" href="#" class="wiz-link" data-testid="flow-files-link" @click.prevent="useFiles">{{ words(`${prefix}.link`, 'Use my own files') }}</a>
             </template>
 
             <template v-else-if="screen === 'files'">
@@ -94,7 +93,7 @@ async function toLesson() { await finish(); backToLesson() }
                 <span>{{ words(`wizard.type.${t}.title`, t) }}</span>
                 <input v-model="paths[t]" class="ns-input" type="text" spellcheck="false" :aria-label="`File for ${words(`wizard.type.${t}.title`, t)}`" :data-testid="`flow-file-path-${t}`" />
               </label>
-              <v-btn color="primary" :disabled="sec.busy || !filesReady || !can('files')" data-testid="flow-files-send" @click="sendPaths">Use these files</v-btn>
+              <v-btn color="primary" :disabled="sec.busy || !can('files')" data-testid="flow-files-send" @click="sendPaths">Use these files</v-btn>
             </template>
 
             <template v-else-if="screen === 'review'">
