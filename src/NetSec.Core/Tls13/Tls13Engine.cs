@@ -51,6 +51,7 @@ namespace NetSec.Tls13
         /// <summary>The alert number the peer sent, or -1.</summary>
         public int AlertReceived { get; private set; }
         public bool ReachedOpen { get; private set; }
+        public NetSecError LastError { get { return _machine.Error; } }
         public string VersionName { get { return "TLSv1.3"; } }
         public string[] KeyLogLines { get { return _session.KeyLogLines.ToArray(); } }
         public string SuiteName { get { return _session.Suite == null ? null : _session.Suite.Name; } }
@@ -96,11 +97,12 @@ namespace NetSec.Tls13
         {
             if (_machine.IsEnded) return;
             _noAlertOwed = true;
-            if (_machine.Status == EngineStatus.Open) _machine.CloseCleanly();
+            if (_machine.Status == EngineStatus.Open)
+                _machine.Fail(Tls13Codes.Truncated, Tls13Codes.CheckName(Tls13Codes.Truncated), "the transport closed with no close_notify, so the data may be cut short (RFC 8446 section 6.1)", null);
             else _machine.Fail(ErrorCodes.PeerClosedEarly, "peer stayed until the end", "the peer closed in state " + _machine.State, null);
         }
 
-        /// <summary>Every parse failure inside the engine stops here and becomes a named check. Feed never throws for bad input.</summary>
+        /// <summary>Each reader turns bad input into a ParseFailure, and it stops here as a named check. Tls13FlipSweepTests holds Feed to this.</summary>
         void Guarded(Action work)
         {
             try { work(); }
@@ -118,27 +120,41 @@ namespace NetSec.Tls13
 
         void ReadRecord(RawRecord record)
         {
-            int type = record.Type;
-            byte[] content = record.Payload;
-            if (type == ContentType.ChangeCipherSpec)
+            if (record.Type == ContentType.ChangeCipherSpec) ReadChangeCipherSpec(record.Payload);
+            else if (record.Type == ContentType.ApplicationData) ReadProtected(record);
+            else if (_session.Inbound != null) Unexpected("a clear record of type " + record.Type + " arrived after keys exist");
+            else Dispatch(record.Type, record.Payload);
+        }
+
+        /// <summary>RFC 8446 section 5: one clear byte of value 1, after the first ClientHello and before the peer's Finished. Anything else is refused.</summary>
+        void ReadChangeCipherSpec(byte[] payload)
+        {
+            if (payload.Length != 1 || payload[0] != 1) Unexpected("a change_cipher_spec must be one byte of value 1");
+            else if (_session.Transcript.Length == 0) Unexpected("a change_cipher_spec arrived before the first ClientHello");
+            else if (_machine.Status != EngineStatus.Handshaking) Unexpected("a change_cipher_spec arrived after the peer's Finished");
+            else _machine.Perform(null, Effect.Note("tls.ccs.ignored", "a dummy change_cipher_spec for old middleboxes. TLS 1.3 reads it and drops it"));
+        }
+
+        void ReadProtected(RawRecord record)
+        {
+            if (_session.Inbound == null)
             {
-                _machine.Perform(null, Effect.Note("tls.ccs.ignored", "a dummy change_cipher_spec for old middleboxes. TLS 1.3 reads it and drops it"));
+                Unexpected("a protected record arrived before any keys exist");
                 return;
             }
-            if (type == ContentType.ApplicationData)
+            int type;
+            byte[] content;
+            if (!_session.Inbound.TryOpen(record.Header, record.Payload, out type, out content))
             {
-                if (_session.Inbound == null)
-                {
-                    _machine.Fail(ErrorCodes.UnexpectedMessage, Tls13Codes.CheckName(ErrorCodes.UnexpectedMessage), "a protected record arrived before any keys exist", null);
-                    return;
-                }
-                if (!_session.Inbound.TryOpen(record.Header, record.Payload, out type, out content))
-                {
-                    _machine.Fail(Tls13Codes.AeadTag, Tls13Codes.CheckName(Tls13Codes.AeadTag), "record " + (_session.Inbound.Count - 1) + " failed its tag, so its bytes changed or the two sides hold different keys", null);
-                    return;
-                }
+                _machine.Fail(Tls13Codes.AeadTag, Tls13Codes.CheckName(Tls13Codes.AeadTag), "record " + (_session.Inbound.Count - 1) + " failed its tag, so its bytes changed or the two sides hold different keys", null);
+                return;
             }
             Dispatch(type, content);
+        }
+
+        void Unexpected(string detail)
+        {
+            _machine.Fail(ErrorCodes.UnexpectedMessage, Tls13Codes.CheckName(ErrorCodes.UnexpectedMessage), detail, null);
         }
 
         void Dispatch(int type, byte[] content)
@@ -147,9 +163,7 @@ namespace NetSec.Tls13
             switch (type)
             {
                 case ContentType.Handshake:
-                    _handshake.Append(content);
-                    byte[] message;
-                    while (!_machine.IsEnded && (message = _handshake.Next()) != null) DispatchHandshake(message, visible);
+                    ReadHandshake(content, visible);
                     break;
                 case ContentType.Alert:
                     ReadAlert(content);
@@ -158,8 +172,27 @@ namespace NetSec.Tls13
                     _machine.Dispatch(new InboundMessage(HandshakeType.ApplicationData, Tls13Session.ApplicationMessage, content, content, DataField(content.Length), "tls.record.received"));
                     break;
                 default:
-                    _machine.Fail(ErrorCodes.UnexpectedMessage, Tls13Codes.CheckName(ErrorCodes.UnexpectedMessage), "a record has content type " + type, null);
+                    Unexpected("a record has content type " + type);
                     break;
+            }
+        }
+
+        /// <summary>RFC 8446 sections 5.1 and 5.4: no empty handshake fragment, and a message must end where the keys change, so no byte of it sits under two keys.</summary>
+        void ReadHandshake(byte[] content, bool visible)
+        {
+            if (content.Length == 0)
+            {
+                Unexpected("a handshake record is empty");
+                return;
+            }
+            _handshake.Append(content);
+            byte[] message;
+            while (!_machine.IsEnded && (message = _handshake.Next()) != null)
+            {
+                RecordProtection before = _session.Inbound;
+                DispatchHandshake(message, visible);
+                if (_machine.IsEnded || _session.Inbound == before || _handshake.IsEmpty) continue;
+                _machine.Fail(Tls13Codes.KeyChangeBoundary, Tls13Codes.CheckName(Tls13Codes.KeyChangeBoundary), "bytes followed " + HandshakeType.Name(message[0]) + " in the record where the keys change", null);
             }
         }
 
@@ -178,7 +211,12 @@ namespace NetSec.Tls13
             AlertReceived = content[1];
             _noAlertOwed = true;
             _machine.Perform(null, Effect.Note("tls.alert.received", "alert level " + content[0] + ", number " + content[1]));
-            if (content[1] == CloseNotify) { _machine.CloseCleanly(); return; }
+            if (content[1] == CloseNotify)
+            {
+                if (_machine.Status == EngineStatus.Open) _machine.CloseCleanly();
+                else _machine.Fail(ErrorCodes.PeerClosedEarly, "peer stayed until the end", "the peer sent close_notify in state " + _machine.State, null);
+                return;
+            }
             _machine.Fail(Tls13Codes.AlertReceived, "peer sent no alert", "the peer sent alert " + content[1], null);
         }
 

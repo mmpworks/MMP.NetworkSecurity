@@ -53,6 +53,7 @@ namespace NetSec.Tls13
             int end = inner.Length - 1;
             while (end >= 0 && inner[end] == 0) end--;
             if (end < 0) throw new ParseFailure(ErrorCodes.UnexpectedMessage, "a protected record holds only padding");
+            if (end > MaxPlain) throw new ParseFailure(Tls13Codes.RecordOverflow, "a sealed record holds " + end + " bytes, and the limit is " + MaxPlain);
             contentType = inner[end];
             content = new byte[end];
             Buffer.BlockCopy(inner, 0, content, 0, end);
@@ -103,7 +104,8 @@ namespace NetSec.Tls13
         {
             if (_pending.Length < HeaderSize) return null;
             int length = (_pending[3] << 8) | _pending[4];
-            if (length > MaxPayload) throw new ParseFailure(Tls13Codes.RecordOverflow, "a record claims " + length + " bytes, and the limit is " + MaxPayload);
+            int limit = _pending[0] == ContentType.ApplicationData ? MaxPayload : RecordProtection.MaxPlain;
+            if (length > limit) throw new ParseFailure(Tls13Codes.RecordOverflow, "a record claims " + length + " bytes, and the limit is " + limit);
             if (_pending.Length < HeaderSize + length) return null;
 
             byte[] header = new byte[HeaderSize];
@@ -121,6 +123,8 @@ namespace NetSec.Tls13
     public sealed class HandshakeBuffer
     {
         const int HeaderSize = 4;
+        /// <summary>No message this engine reads comes near this. A length past it fails now and never waits for bytes.</summary>
+        const int MaxMessage = 65536;
         byte[] _pending = new byte[0];
 
         public bool IsEmpty { get { return _pending.Length == 0; } }
@@ -138,6 +142,7 @@ namespace NetSec.Tls13
         {
             if (_pending.Length < HeaderSize) return null;
             int length = (_pending[1] << 16) | (_pending[2] << 8) | _pending[3];
+            if (length > MaxMessage) throw new ParseFailure(Tls13Codes.MessageTooLong, "a handshake message claims " + length + " bytes, and the limit is " + MaxMessage);
             if (_pending.Length < HeaderSize + length) return null;
             byte[] message = new byte[HeaderSize + length];
             byte[] rest = new byte[_pending.Length - message.Length];

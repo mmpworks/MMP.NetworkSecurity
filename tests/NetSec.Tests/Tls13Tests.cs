@@ -489,7 +489,7 @@ namespace NetSec.Tests
             string[] expected =
             {
                 "L4-flip-cert-byte", "L4-flip-cert-verify", "L4-expired-cert", "L4-wrong-name", "L4-unknown-ca",
-                "L5-flip-finished", "L5-flip-record-byte", "L5-replace-key-share", "L5-flip-mlkem-ciphertext", "L5-flip-record-length",
+                "L5-flip-finished", "L5-flip-record-byte", "L5-replace-key-share", "L5-flip-mlkem-ciphertext", "L5-flip-record-length", "L5-clear-close-notify",
             };
             Assert.Equal(expected, AttackCatalog.All.Where(a => a.Lesson == 4 || a.Lesson == 5).Select(a => a.AttackId).ToArray());
         }

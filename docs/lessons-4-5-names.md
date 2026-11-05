@@ -49,6 +49,15 @@ The order is the emit order: `mlkem_shared` (hybrid only), `x25519_shared`, `hyb
 | `Finished verify_data` | `TLS13_FINISHED_MISMATCH` | Finished |
 | `AEAD tag` | `TLS13_AEAD_TAG` | Fails only. A record that opens emits no check event |
 | `read deadline` | `LINK_DEADLINE` | Fails only |
+| `critical extension` | `CERT_UNKNOWN_CRITICAL` | Fails only |
+| `certificate parse` | `CERT_PARSE` | Fails only |
+| `message parse` | `PARSE_TRUNCATED` | Fails only |
+| `message allowed in this state` | `UNEXPECTED_MESSAGE` | Fails only |
+| `record ends at the key change` | `TLS13_KEY_CHANGE_BOUNDARY` | Fails only |
+| `record length` | `TLS13_RECORD_OVERFLOW` | Fails only |
+| `message length` | `TLS13_MESSAGE_TOO_LONG` | Fails only |
+| `ServerHello matches the offer` | `TLS13_ILLEGAL_PARAMETER` | Fails only |
+| `close_notify before the close` | `TLS13_TRUNCATED` | Fails only |
 
 ## Attacks and try-its
 
@@ -66,12 +75,21 @@ Each row is an `AttackCatalog` row. The expected check is what the engine does, 
 | `L5-replace-key-share` | 5 | The client's X25519 share on the way out | `AEAD tag` | `TLS13_AEAD_TAG` |
 | `L5-flip-mlkem-ciphertext` | 5 | One byte of the ML-KEM ciphertext in ServerHello | `AEAD tag` | `TLS13_AEAD_TAG` |
 | `L5-flip-record-length` | 5 | The length byte of the server Finished record grows by 256 | `read deadline` | `LINK_DEADLINE` |
+| `L5-clear-close-notify` | 5 | A clear `close_notify` takes the place of the first data record | `message allowed in this state` | `UNEXPECTED_MESSAGE` |
 
 ## Three corrections to `ux-design.md` section 8
 
 1. **Replace the key share and tamper the ML-KEM ciphertext are caught by `AEAD tag`.** The UX table says `transcript hash` and `Finished verify_data`. The two sides hold different keys, so the first sealed record fails before any Finished arrives. ML-KEM itself reports no error (implicit rejection).
 2. **The chain has two certificates, root and leaf, and the third card is the CertificateVerify proof.** The referees read `root.pem` and a leaf signed directly by the root. So the three linked cards are: root signs leaf, leaf key signs the transcript.
 3. **`L5-flip-record-length` waits.** The receiver waits for 256 bytes that never come, up to 30 seconds, and then ends with `LINK_DEADLINE`. In step mode the clock restarts while the gate holds an event, so a learner can read for an hour.
+
+## What the lessons must state (from the verdict on PR 28)
+
+1. **`L5-replace-key-share` does not show that the key share alone caused the failure.** A flip in any byte of either hello gives the same `AEAD tag`, because each hello is in the transcript the keys come from. Only the shared secret tells them apart: `x25519_shared` differs between the sides after a key share flip, and it matches after a flip of the hello's random. A test pins both.
+2. **The certificate check is partial.** It reads the chain, the signatures, the dates, the name, and `basicConstraints` CA. It refuses a critical extension it does not read. It does not read `pathLen`, `keyUsage`, or name constraint values, and it does not date the trust anchor. A real verifier does more (RFC 5280 section 6).
+3. **A clean end needs a sealed `close_notify`.** After keys exist, a clear alert is refused, because anyone on the path can forge one. A transport close with no `close_notify` is `TLS13_TRUNCATED`: the data may be cut short (RFC 8446 section 6.1).
+4. **A flipped length field can wait instead of fail.** Each other byte of a handshake gets a named check, at once. `Tls13FlipSweepTests` holds this.
+5. **This engine has no `KeyUpdate` and no record count limit.** A long run stops by name at a peer's `KeyUpdate`. RFC 8446 section 5.5 limits records per key, and no lab reaches that limit.
 
 ## Field names (`fields[].gloss`)
 
