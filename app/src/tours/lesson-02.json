@@ -1,0 +1,204 @@
+{
+  "steps": [
+    {
+      "id": "L2-S01",
+      "lesson": 2,
+      "title": "Why a message needs a seal",
+      "text": [
+        "A lock hides a message, but a listener can still change it. A seal lets the receiver see that a message changed.",
+        "This lesson builds four seals, from weak to strong. Each one adds an idea that the last one lacked.",
+        "A seal can also show who sent a message, when only two people hold the key. You will see where that proof stops.",
+        "Built to show the parts. Do not copy."
+      ],
+      "glossary": [],
+      "bind": { "kind": "concept" },
+      "highlight": ["diagram:lane=client", "diagram:lane=server"],
+      "unlock": { "mode": "ack" }
+    },
+    {
+      "id": "L2-S02",
+      "lesson": 2,
+      "title": "A fingerprint for data",
+      "text": [
+        "A {{term:hash}} turns any message into a fixed-size fingerprint. SHA-256 gives 32 bytes, which is 256 bits.",
+        "The diagram shows the fingerprint of a message beside the fingerprint after one bit flip. Each cell is one bit, and it lights up when the two differ.",
+        "About half the cells light up. One tiny edit scrambles the whole fingerprint, so even a small edit is easy to spot."
+      ],
+      "glossary": ["hash"],
+      "bind": { "kind": "event", "eventType": "measure.result", "match": { "actor": "client", "message": "SHA-256 avalanche" } },
+      "claims": [
+        {
+          "id": "L2-C01",
+          "text": "SHA-256 produces a 256-bit (32-byte) digest.",
+          "source": "FIPS 180-4, section 1 (introduction) and section 6.2"
+        }
+      ],
+      "unlock": { "mode": "event" }
+    },
+    {
+      "id": "L2-S03",
+      "lesson": 2,
+      "title": "A hash alone proves little",
+      "text": [
+        "The first seal is a plain hash of the message. The receiver hashes the message again and compares the two fingerprints.",
+        "Try it: flip a bit in the message. The old seal no longer fits, and the compare fails.",
+        "A real attacker would also recompute the hash, because no secret is involved. A plain hash catches accidents only."
+      ],
+      "glossary": [],
+      "bind": { "kind": "event", "eventType": "wire.sent", "match": { "actor": "client", "message": "PlainHashSealed" } },
+      "highlight": ["inspector:field=seal", "inspector:field=message"],
+      "tryIt": {
+        "id": "L2-S03-T1",
+        "label": "Flip a bit in the message",
+        "action": { "type": "run-attack", "attackId": "L2-flip-hash-message" },
+        "expect": { "type": "check", "name": "hash compare", "result": "fail" }
+      },
+      "unlock": { "mode": "action", "ref": "L2-S03-T1" }
+    },
+    {
+      "id": "L2-S04",
+      "lesson": 2,
+      "title": "Add a secret key",
+      "text": [
+        "The second seal puts a secret {{term:key}} in front of the message before hashing. Only the two sides know the key.",
+        "A plain edit now fails, because the attacker cannot rebuild the seal without the key. The next step shows a trick that still gets through."
+      ],
+      "glossary": ["key"],
+      "bind": { "kind": "event", "eventType": "wire.sent", "match": { "actor": "client", "message": "KeyedHashSealed" } },
+      "highlight": ["secrets:row=client.seal.key", "inspector:field=seal"],
+      "unlock": { "mode": "event" }
+    },
+    {
+      "id": "L2-S05",
+      "lesson": 2,
+      "title": "The trick that forges a seal",
+      "text": [
+        "Try it: add text to the end of the message and forge a new seal with no key. Press the button.",
+        "The server accepts it. The check passed, and that pass is the lesson.",
+        "SHA-256 reads a message in chunks, and its output shows where it stopped. An attacker can restart from that point and add more text. This is a length extension attack."
+      ],
+      "glossary": [],
+      "bind": { "kind": "event", "eventType": "check.result", "match": { "message": "keyed hash compare" } },
+      "highlight": ["check:name=keyed hash compare"],
+      "tryIt": {
+        "id": "L2-S05-T1",
+        "label": "Extend the message and forge the seal",
+        "action": { "type": "run-attack", "attackId": "L2-extend-keyed-hash" },
+        "expect": { "type": "ran" }
+      },
+      "claims": [
+        {
+          "id": "L2-C02",
+          "text": "A seal built as SHA-256(key + message) allows length extension: someone who sees the seal can compute a valid seal for the message plus extra data, with no key.",
+          "source": "RFC 2104, section 1 (introduction); FIPS 180-4, section 5 (padding and chaining of SHA-256); docs/lessons-1-3-names.md, Lesson 2 attacks, L2-extend-keyed-hash"
+        }
+      ],
+      "unlock": { "mode": "action", "ref": "L2-S05-T1" }
+    },
+    {
+      "id": "L2-S06",
+      "lesson": 2,
+      "title": "HMAC closes the gap",
+      "text": [
+        "{{term:hmac}} hashes twice and mixes the key in at both ends. The inner result sits inside the outer hash, so the restart trick fails.",
+        "Try it: run the same forgery against the HMAC message. The check named HMAC compare fails."
+      ],
+      "glossary": ["hmac"],
+      "bind": { "kind": "event", "eventType": "wire.sent", "match": { "actor": "client", "message": "HmacSealed" } },
+      "highlight": ["inspector:field=seal"],
+      "tryIt": {
+        "id": "L2-S06-T1",
+        "label": "Run the forgery against HMAC",
+        "action": { "type": "run-attack", "attackId": "L2-extend-hmac" },
+        "expect": { "type": "check", "name": "HMAC compare", "result": "fail" }
+      },
+      "claims": [
+        {
+          "id": "L2-C03",
+          "text": "HMAC is H((K xor opad) || H((K xor ipad) || message)), a nested hash that blocks length extension.",
+          "source": "RFC 2104, section 2 (definition of HMAC)"
+        }
+      ],
+      "unlock": { "mode": "action", "ref": "L2-S06-T1" }
+    },
+    {
+      "id": "L2-S07",
+      "lesson": 2,
+      "title": "Any flip breaks the seal",
+      "text": [
+        "A flipped bit in the message breaks the HMAC. A flipped bit in the seal breaks it too.",
+        "Try it: flip a bit in the seal field. The compare fails, and the server drops the message."
+      ],
+      "glossary": [],
+      "bind": { "kind": "event", "eventType": "check.result", "match": { "message": "HMAC compare" } },
+      "highlight": ["check:name=HMAC compare"],
+      "tryIt": {
+        "id": "L2-S07-T1",
+        "label": "Flip a bit in the HMAC seal",
+        "action": { "type": "run-attack", "attackId": "L2-flip-hmac-tag" },
+        "expect": { "type": "check", "name": "HMAC compare", "result": "fail" }
+      },
+      "unlock": { "mode": "action", "ref": "L2-S07-T1" }
+    },
+    {
+      "id": "L2-S08",
+      "lesson": 2,
+      "title": "CMAC does the same job with AES",
+      "text": [
+        "{{term:cmac}} makes a seal from a block cipher such as AES instead of a hash. It suits a device that already has AES and little room for more code.",
+        "Try it: flip a bit in the message. The check named CMAC compare fails."
+      ],
+      "glossary": ["cmac"],
+      "bind": { "kind": "event", "eventType": "wire.sent", "match": { "actor": "client", "message": "CmacSealed" } },
+      "highlight": ["inspector:field=seal"],
+      "tryIt": {
+        "id": "L2-S08-T1",
+        "label": "Flip a bit in the CMAC message",
+        "action": { "type": "run-attack", "attackId": "L2-flip-cmac-message" },
+        "expect": { "type": "check", "name": "CMAC compare", "result": "fail" }
+      },
+      "claims": [
+        {
+          "id": "L2-C04",
+          "text": "CMAC is a message authentication code built from a block cipher such as AES.",
+          "source": "NIST SP 800-38B, section 1 (purpose) and section 6.2"
+        }
+      ],
+      "unlock": { "mode": "action", "ref": "L2-S08-T1" }
+    },
+    {
+      "id": "L2-S09",
+      "lesson": 2,
+      "title": "Who made the seal?",
+      "text": [
+        "All four seals passed on the normal run. A passing seal tells the receiver two things: the message is unchanged, and the sender held the key.",
+        "It cannot tell which key holder sent it. The client and the server share one key, so either one could have made the seal.",
+        "To prove to a third party who signed something, you need a signature. Lesson 4 covers signatures and certificates."
+      ],
+      "glossary": [],
+      "bind": { "kind": "event", "eventType": "check.result", "match": { "message": "CMAC compare" } },
+      "highlight": ["check:name=CMAC compare"],
+      "claims": [
+        {
+          "id": "L2-C05",
+          "text": "A MAC made with a shared key shows that the sender held the key, and gives no proof to a third party of which key holder made it.",
+          "source": "NIST SP 800-175B Rev. 1, section on message authentication (a MAC offers no non-repudiation)"
+        }
+      ],
+      "unlock": { "mode": "event" }
+    },
+    {
+      "id": "L2-S10",
+      "lesson": 2,
+      "title": "What to take away",
+      "text": [
+        "A plain hash catches accidents. A keyed hash stops simple edits but falls to length extension.",
+        "HMAC and CMAC are the sound seals. Use a real library for them in any real program.",
+        "Built to show the parts. Do not copy."
+      ],
+      "glossary": [],
+      "bind": { "kind": "concept" },
+      "unlock": { "mode": "ack" }
+    }
+  ]
+}
