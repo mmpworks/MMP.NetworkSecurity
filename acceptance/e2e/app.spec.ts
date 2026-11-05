@@ -48,6 +48,11 @@ for (let n = 1; n <= 11; n++) {
       return;
     }
     const ids: string[] = tourSteps(n).map((s: any) => s.id);
+    // Time budget, from measured walks (e759e8a, live Host): lessons 1 to 4 take about 15 s; lesson 5 takes 43 s, of which 30 s is the lab's own
+    // read deadline in step L5-S12 (a wall-clock timer, so machine load does not stretch it). Under load the other steps ran about 5 times slower.
+    // A hang is found per step: Next must enable within 45 s of its step (30 s deadline plus slack), and the failure names the step.
+    // The whole walk gets 60 s plus 20 s for each step, so slow machines do not fail a walk that moves, and a stalled step still ends the walk at 45 s.
+    test.setTimeout(60_000 + 20_000 * ids.length);
     expect(ids.length, `tour steps in app/src/tours/lesson-${String(n).padStart(2, '0')}.json`).toBeGreaterThan(0);
     await openApp(page);
     await page.getByTestId(`lesson-item-${n}`).click();
