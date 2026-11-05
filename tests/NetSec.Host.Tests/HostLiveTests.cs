@@ -31,6 +31,7 @@ namespace NetSec.Host.Tests
             info.Environment["NETSEC_PORT"] = Port.ToString();
             info.Environment["NETSEC_TOKEN"] = Token;
             info.Environment["LOCALAPPDATA"] = AppData;
+            info.Environment["NETSEC_SECURITY_DIR"] = Path.Combine(AppData, "security");      // Never the learner's own .security/ folder
             TaskCompletionSource<string> ready = new TaskCompletionSource<string>(TaskCreationOptions.RunContinuationsAsynchronously);
             _process = new Process { StartInfo = info };
             _process.OutputDataReceived += (_, e) => { if (e.Data != null && e.Data.StartsWith("HOST-READY")) ready.TrySetResult(e.Data); };
@@ -208,6 +209,25 @@ namespace NetSec.Host.Tests
             Assert.Equal("caught", finished.GetProperty("outcome").GetString());
             Assert.Equal("ECHO_MISMATCH", finished.GetProperty("code").GetString());
             Assert.Equal("echo compare", finished.GetProperty("check").GetString());
+        }
+
+        /// <summary>The contract's order is started, forked, then the fork's own frames. Lesson 0 can finish in the time the Host takes to send a frame, so one try proves little.</summary>
+        [Fact]
+        public async Task A_fork_says_forked_before_it_finishes_every_time()
+        {
+            using Socket s = await Socket.Open(host);
+            await s.Send("{\"type\":\"session.start\",\"requestId\":\"r1\",\"lesson\":0,\"seed\":11,\"mode\":\"run\"}");
+            string parent = (await s.Until("session.started")).GetProperty("sessionId").GetString();
+            await s.UntilFinished(parent);
+
+            for (int i = 0; i < 40; i++)
+            {
+                await s.Send("{\"type\":\"session.attack\",\"requestId\":\"a" + i + "\",\"sessionId\":\"" + parent + "\",\"attackId\":\"L0-flip-wire-byte\"}");
+                string fork = (await s.Until("session.started")).GetProperty("sessionId").GetString();
+                List<JsonElement> frames = await s.UntilFinished(fork);
+                Assert.Equal("session.forked", frames[0].GetProperty("type").GetString());
+                parent = fork;      // The Host keeps the last 20 sessions, so the next attack forks this one.
+            }
         }
 
         [Fact]

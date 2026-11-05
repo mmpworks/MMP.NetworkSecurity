@@ -12,6 +12,7 @@
 
   <ItemGroup>
     <ProjectReference Include="..\NetSec.Core\NetSec.Core.csproj" />
+    <None Include="wizard-flows.json" CopyToOutputDirectory="PreserveNewest" />
   </ItemGroup>
 
   <!-- Lesson 11 loads netsec_ct.dll by name, so it must sit beside NetSec.Host.dll. Every route to the Host builds this project: the gate, acceptance/run.ps1

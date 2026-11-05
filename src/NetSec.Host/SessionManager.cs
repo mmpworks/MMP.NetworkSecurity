@@ -4,6 +4,7 @@ using System.Threading.Channels;
 using MMP.AsyncProxy;
 using NetSec.Errors;
 using NetSec.Io;
+using NetSec.Keys;
 using NetSec.Labs;
 using NetSec.Machine;
 using NetSec.Platform;
@@ -29,8 +30,12 @@ public sealed class LabSession : ITraceSink
     public IStepGate Gate { get; }
     public bool Finished { get; private set; }
 
-    public LabSession(string sessionId, int lesson, int seed, string mode, string sessionsDir, Action<string> broadcast)
+    /// <summary>The keys this run reads, fixed at the start. A fork reuses them.</summary>
+    public CredentialSet Credentials { get; }
+
+    public LabSession(string sessionId, int lesson, int seed, string mode, string sessionsDir, CredentialSet credentials, Action<string> broadcast)
     {
+        Credentials = credentials;
         SessionId = sessionId;
         Lesson = lesson;
         Seed = seed;
@@ -143,7 +148,7 @@ public sealed class SessionManager
     /// Starts a session and returns it, or a named error when the lesson has no lab. announce runs before the lab does,
     /// so session.started always goes out ahead of the session's first trace frame.
     /// </summary>
-    public LabSession? Start(int lesson, int seed, string mode, AttackDefinition? attack, string? sessionId, Action<LabSession> announce, out NetSecError? error)
+    public LabSession? Start(int lesson, int seed, string mode, AttackDefinition? attack, string? sessionId, CredentialSet credentials, Action<LabSession> announce, out NetSecError? error)
     {
         ILab? lab = LabCatalog.Find(lesson);
         if (lab is null)
@@ -153,9 +158,10 @@ public sealed class SessionManager
         }
         error = null;
         string id = sessionId ?? NewId();
-        LabSession session = new(id, lesson, seed, mode, SessionsDir, Broadcast);
+        LabSession session = new(id, lesson, seed, mode, SessionsDir, credentials, Broadcast);
         Keep(session);
         announce(session);
+        WriteKeyFacts(session, credentials);
         LabContext context = new()
         {
             Seed = seed,
@@ -166,10 +172,23 @@ public sealed class SessionManager
             Clock = new MonotonicClock(),
             Random = new SeededRandom(seed),
             Attack = attack,
+            Credentials = credentials,
         };
         IFuture<LabResult> run = lab.Run(context);
         run.GetAwaiter().OnCompleted(() => Finish(session, run));
         return session;
+    }
+
+    /// <summary>A verifier holds the issuer public key without any message that shows it, so the Host states it on its own stream. The engine streams do not change.</summary>
+    static void WriteKeyFacts(LabSession session, CredentialSet credentials)
+    {
+        if (Array.IndexOf(LabCatalog.Needs(session.Lesson), SecurityTypes.TokenIssuer) < 0) return;
+        TraceStream keys = new(session.SessionId + "/keys", session.SessionId, session.SessionId, null, "issuer", new MonotonicClock());
+        session.Write(keys.Stamp(new TraceEventDraft
+        {
+            Type = "key.public",
+            Secrets = [new TraceSecret { Holder = "issuer", Name = "auth.issuer-public", Bytes = credentials.Find(KeyIds.TokenIssuer).CopyPublic() }],
+        }));
     }
 
     public static string NewId() => "s" + Guid.NewGuid().ToString("N")[..12];

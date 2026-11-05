@@ -38,7 +38,7 @@ namespace NetSec.Labs
         static IEnumerable<IFuture> Body(LabContext c, Return<LabResult> ret)
         {
             string traceId = c.TraceId ?? c.SessionId ?? DefaultTraceId;
-            ITrainingKeySource keys = new TrainingKeySource();
+            ITrainingKeySource keys = LabCredentials.Of(c);
             ITamperHook plan = LabPair.Plan(c);
             FailureWatch watch = new FailureWatch(c.Sink);
 

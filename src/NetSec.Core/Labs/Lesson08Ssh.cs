@@ -95,7 +95,7 @@ namespace NetSec.Labs
 
         static SshClientOptions ClientOptions(LabContext c, SshSuite suite, IRandomSource random)
         {
-            TrainingKeySource keys = new TrainingKeySource();
+            ITrainingKeySource keys = LabCredentials.Of(c);
             SshClientOptions options = SshSetup.Client(keys, suite, random, HostName, HostPort, PinnedLine(keys, suite), false);
             if (LabPair.Option(c, OptionWrongUserKey) != null) options.SignWith = keys.Find(KeyIds.AttackerEd25519);
             return options;
@@ -111,7 +111,7 @@ namespace NetSec.Labs
 
         static SshServerOptions ServerOptions(LabContext c, SshSuite suite, IRandomSource random)
         {
-            TrainingKeySource keys = new TrainingKeySource();
+            ITrainingKeySource keys = LabCredentials.Of(c);
             SshServerOptions options = SshSetup.Server(keys, suite, random, IsAllowed);
             if (LabPair.Option(c, OptionHostKey) != null) options.HostKey = keys.Find(KeyIds.AttackerEd25519);
             if (LabPair.Option(c, OptionZeroShare) != null) options.SendZeroShare = true;

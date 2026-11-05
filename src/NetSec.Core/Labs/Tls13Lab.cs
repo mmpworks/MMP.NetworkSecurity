@@ -64,7 +64,7 @@ namespace NetSec.Labs
 
         IEnumerable<IFuture> Body(LabContext c, Return<LabResult> ret)
         {
-            ITrainingKeySource keys = new TrainingKeySource();
+            ITrainingKeySource keys = LabCredentials.Of(c);
             TrainingCa ca = new TrainingCa(keys);
             byte[] leaf = LeafFor(LabPair.Option(c, OptionServerCert), ca, keys);
             if (_showIssuing)
@@ -125,7 +125,7 @@ namespace NetSec.Labs
         /// <summary>A client for a lab that pairs TLS 1.3 with another engine (lesson 7).</summary>
         public Tls13Engine Client(LabContext c, ITamperHook plan, bool offerOnlyTls11)
         {
-            Tls13Options o = ClientOptions(c, plan, new TrainingCa(new TrainingKeySource()));
+            Tls13Options o = ClientOptions(c, plan, new TrainingCa(LabCredentials.Of(c)));
             o.OfferOnlyTls11 = offerOnlyTls11;
             return Tls13Engine.CreateClient(o);
         }
@@ -133,7 +133,7 @@ namespace NetSec.Labs
         /// <summary>A server for a lab that pairs TLS 1.3 with another engine (lesson 7).</summary>
         public Tls13Engine Server(LabContext c, ITamperHook plan)
         {
-            ITrainingKeySource keys = new TrainingKeySource();
+            ITrainingKeySource keys = LabCredentials.Of(c);
             return Tls13Engine.CreateServer(ServerOptions(c, plan, LeafFor(null, new TrainingCa(keys), keys), keys));
         }
 

@@ -45,11 +45,11 @@ namespace NetSec.Labs
         /// </summary>
         static IEnumerable<IFuture> Race(LabContext c, Return<LabResult> ret)
         {
-            ITrainingKeySource keys = new TrainingKeySource();
+            ITrainingKeySource keys = LabCredentials.Of(c);
             ITamperHook plan = LabPair.Plan(c);
             LabContext modern = new LabContext();
             modern.Seed = c.Seed; modern.SessionId = c.SessionId; modern.TraceId = c.TraceId; modern.Transports = c.Transports; modern.Gate = c.Gate;
-            modern.Sink = c.Sink; modern.Clock = c.Clock; modern.DeadlineMs = c.DeadlineMs;
+            modern.Sink = c.Sink; modern.Clock = c.Clock; modern.DeadlineMs = c.DeadlineMs; modern.Credentials = c.Credentials;
             modern.Random = LabPair.Fork(c);
 
             Tls11Engine client = Tls11Client(c, keys, plan);
@@ -65,7 +65,7 @@ namespace NetSec.Labs
         /// <summary>The attacker's rewrite is modelled by a client that offers only TLS 1.1. The server speaks TLS 1.3 too, so it writes DOWNGRD into its random when it agrees.</summary>
         static IFuture<LabResult> Downgrade(LabContext c)
         {
-            ITrainingKeySource keys = new TrainingKeySource();
+            ITrainingKeySource keys = LabCredentials.Of(c);
             ITamperHook plan = LabPair.Plan(c);
             return LabPair.Run(c, Tls13Lab.Lesson5().Client(c, plan, true), Tls11Server(c, keys, plan, true), plan);
         }
@@ -74,7 +74,7 @@ namespace NetSec.Labs
         static IEnumerable<IFuture> ModernServer(LabContext c, Return<LabResult> ret)
         {
             ITamperHook plan = LabPair.Plan(c);
-            Tls11Engine client = Tls11Client(c, new TrainingKeySource(), plan);
+            Tls11Engine client = Tls11Client(c, LabCredentials.Of(c), plan);
             IFuture<LabResult> run = LabPair.Run(c, client, Tls13Lab.Lesson5().Server(c, plan), plan);
             yield return run;
             LabResult result = run.Result;

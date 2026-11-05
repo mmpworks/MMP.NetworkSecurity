@@ -100,7 +100,7 @@ namespace NetSec.Labs
         {
             if (c == null) throw new ArgumentNullException("c");
             ITamperHook plan = LabPair.Plan(c);
-            byte[] bdk = new TrainingKeySource().Find(KeyIds.DukptBdk128).CopyMaterial();
+            byte[] bdk = LabCredentials.Of(c).Find(KeyIds.DukptBdk128).CopyMaterial();
             byte[] traceCopy;
             DukptPinPad pad = LoadReader(DukptBank.DeriveInitialKey(bdk, InitialKeyId), out traceCopy);
             ReaderSession readerSession = new ReaderSession(LabPair.Fork(c), pad, traceCopy, LabPair.Option(c, OptionScenario));

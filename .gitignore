@@ -9,3 +9,7 @@ docs/_runs/trx/
 app/dist/
 app/test-results/
 docs/_runs/lessons.json
+.security/
+*.pfx
+*.p12
+*.db

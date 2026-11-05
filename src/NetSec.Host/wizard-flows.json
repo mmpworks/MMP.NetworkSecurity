@@ -1,0 +1,35 @@
+{
+  "flows": [
+    { "flowId": "my-certificates", "types": ["pki.root-ca", "tls.trust", "tls13.server", "tls13.client", "tls11.server"] },
+    { "flowId": "my-ssh", "types": ["ssh.host-ed25519", "ssh.host-rsa", "ssh.known-hosts", "ssh.client"] },
+    { "flowId": "my-payment", "types": ["dukpt.bdk", "dukpt.pad"] },
+    { "flowId": "my-login", "types": ["token.issuer", "device.enrolment"] },
+    { "flowId": "my-lesson-keys", "types": ["lab.aes-key", "lab.seal-key"] }
+  ],
+  "states": [
+    { "state": "Intro", "kind": "explain" },
+    { "state": "Make", "kind": "choose" },
+    { "state": "PickFiles", "kind": "file" },
+    { "state": "Review", "kind": "review" },
+    { "state": "Check", "kind": "prove" },
+    { "state": "Done", "kind": "done" },
+    { "state": "Cancelled", "kind": "done" }
+  ],
+  "spine": [
+    { "from": "Intro", "event": "next", "to": "Make" },
+    { "from": "Intro", "event": "cancel", "to": "Cancelled" },
+    { "from": "Make", "event": "make", "to": "Review", "effect": "makeAll" },
+    { "from": "Make", "event": "use-files", "to": "PickFiles" },
+    { "from": "Make", "event": "back", "to": "Intro" },
+    { "from": "Make", "event": "cancel", "to": "Cancelled" },
+    { "from": "PickFiles", "event": "files", "to": "Review", "effect": "importFiles" },
+    { "from": "PickFiles", "event": "back", "to": "Make" },
+    { "from": "PickFiles", "event": "cancel", "to": "Cancelled" },
+    { "from": "Review", "event": "next", "to": "Check" },
+    { "from": "Review", "event": "back", "to": "Make" },
+    { "from": "Review", "event": "cancel", "to": "Cancelled" },
+    { "from": "Check", "event": "check", "to": "Check", "effect": "runCheck" },
+    { "from": "Check", "event": "next", "to": "Done", "guard": "checkPassed" },
+    { "from": "Check", "event": "cancel", "to": "Cancelled" }
+  ]
+}
