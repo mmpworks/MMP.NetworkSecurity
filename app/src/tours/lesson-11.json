@@ -90,8 +90,8 @@
       "claims": [
         {
           "id": "L11-C04",
-          "text": "Managed code has no constant-time guarantee, and C++ results depend on the optimizer.",
-          "source": "docs/prd.md, Teaching accuracy rules, rule 5; docs/lesson-11-names.md, section 5 Statements, rows 1 and 2 (branch feat/s7)"
+          "text": "Only CryptographicOperations.FixedTimeEquals is documented as fixed-time in .NET. Managed code in general has no constant-time guarantee. C++ results depend on the optimizer.",
+          "source": "docs/prd.md, Teaching accuracy rules, rule 5; docs/lesson-11-names.md, section 5 Statements, rows 1 and 2 (branch feat/s7); dotnet/runtime, CryptographicOperations.cs: FixedTimeEquals is marked NoInlining and NoOptimization (read 2026-11-05)"
         },
         {
           "id": "L11-C05",
@@ -154,7 +154,7 @@
       "claims": [
         {
           "id": "L11-C08",
-          "text": "A passing timing test does not show that code is constant time; it is the simplest form of leakage detection.",
+          "text": "A passing timing test does not show that code is constant time; the dudect authors call their test perhaps the simplest form of leakage detection.",
           "source": "dudect README (github.com/oreparaz/dudect), section 'Questions', answer to 'My code passes this tests. Does it mean it is really time constant?' (read 2026-11-05)"
         }
       ],

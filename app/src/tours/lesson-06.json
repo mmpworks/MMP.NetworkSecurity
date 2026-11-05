@@ -158,7 +158,7 @@
       "text": [
         "Look at the held count after each sale. In this run it goes 32, then 31, 31, 30, 31. It does not fall at every sale, because a sale erases one register and can fill lower ones with new keys.",
         "Erasing a key in code does not prove the bytes left memory. A {{term:managed-heap}} can keep copies of an erased key, because the garbage collector moves live objects by copying them.",
-        "A real PIN pad keeps its keys in tamper-resistant hardware for this reason. This lab shows the idea, and the hardware does the real work."
+        "In real systems the base key usually sits inside tamper-resistant hardware. This lab shows the idea on the desktop and protects no key that way."
       ],
       "glossary": ["managed-heap"],
       "bind": { "kind": "event", "eventType": "measure.result", "match": { "actor": "reader", "message": "Reader registers" } },
@@ -167,12 +167,12 @@
         {
           "id": "L6-C06",
           "text": "The .NET garbage collector compacts the managed heap by copying reachable objects to new locations.",
-          "source": "Microsoft Learn, Fundamentals of garbage collection, section 'What happens during a garbage collection' (read 2026-11-05)"
+          "source": "Microsoft Learn, Fundamentals of garbage collection, section 'Memory release' (read 2026-11-05)"
         },
         {
           "id": "L6-C07",
-          "text": "X9.24-3 places the keys in secure devices at each end.",
-          "source": "docs/prd.md, Decisions, D13 (the PRD's reading of ANSI X9.24-3-2017; the standard text was not read)"
+          "text": "The base derivation key (BDK) is usually stored inside a tamper-resistant security module (TRSM) or hardware security module (HSM).",
+          "source": "Wikipedia, Derived unique key per transaction, Keys section (secondary source, read 2026-11-05; ANSI X9.24-3-2017 is paid and was not read)"
         },
         {
           "id": "L6-C08",
@@ -245,7 +245,7 @@
       "title": "What to take away",
       "text": [
         "DUKPT gives every sale its own key. The reader erases each key after use, and the bank rebuilds keys from one base key and the KSN.",
-        "All keys in this lab are made up, and anyone can read the base key in the source. A real base key never leaves secure hardware.",
+        "All keys in this lab are made up, and anyone can read the base key in the source. A real base key is usually kept inside secure hardware.",
         "Built to show the parts. Do not copy."
       ],
       "glossary": [],
