@@ -147,6 +147,14 @@ namespace NetSec.Host.Tests
             return lab;
         }
 
+        /// <summary>The process still holds its trace file open for writing, as it does when the suite reads it.</summary>
+        static string ReadShared(string path)
+        {
+            using FileStream file = new FileStream(path, FileMode.Open, FileAccess.Read, FileShare.ReadWrite);
+            using StreamReader reader = new StreamReader(file);
+            return reader.ReadToEnd();
+        }
+
         static JsonElement Json(string line) => JsonDocument.Parse(line.Substring(line.IndexOf(' ') + 1)).RootElement.Clone();
 
         [Fact]
@@ -167,10 +175,10 @@ namespace NetSec.Host.Tests
             Assert.DoesNotContain(clear, Convert.ToHexStringLower(seen));
             Assert.True(seen.Length > 0);
 
-            string ceTrace = File.ReadAllText(lab.CeTrace);
+            string ceTrace = ReadShared(lab.CeTrace);
             Assert.DoesNotContain(clear, ceTrace);
             string traceId = ce.GetProperty("traceId").GetString();
-            Assert.Contains(traceId, File.ReadAllText(lab.BankTrace));
+            Assert.Contains(traceId, ReadShared(lab.BankTrace));
             Assert.Contains("\"traceId\":\"" + traceId + "\"", ceTrace);
         }
 

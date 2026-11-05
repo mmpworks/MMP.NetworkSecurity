@@ -60,7 +60,7 @@ int PinPad()
     PadSale sale = PinPadCore.Sell(pad, traceId, pin, pan, random);
     TraceStream stream = new(traceId + "/reader/bridge", traceId, traceId, null, "reader", new MonotonicClock());
     sink.Write(stream.Stamp(new TraceEventDraft { Type = "pin.block.locked", Message = "PinEnvelope", Plain = sale.Envelope.Bytes }));
-    Take(FrameIo.WriteFrame(ce, sale.Envelope.Bytes));
+    Finish(FrameIo.WriteFrame(ce, sale.Envelope.Bytes));
     Console.WriteLine("RESULT " + JsonSerializer.Serialize(new { ksn = Hex.Encode(sale.Envelope.Ksn), pinBlockHex = Hex.Encode(sale.ClearField) }));
 
     // The reply is advice for the pad's screen. The sale's result line is out already.
@@ -101,7 +101,7 @@ void Serve(SocketLink peer, byte[] bdk, KsnLedger ledger, ITraceSink sink)
                 code = decision.Ok ? "OK" : decision.Code,
                 check = decision.Check ?? "",
             }));
-            Take(FrameIo.WriteFrame(peer, BankReply.Build(decision)));
+            Finish(FrameIo.WriteFrame(peer, BankReply.Build(decision)));
         }
     }
     catch (Exception e) when (e is IOException or System.Net.Sockets.SocketException or ObjectDisposedException or ParseFailure)
@@ -141,7 +141,7 @@ static T Take<T>(IFuture<T> future)
     return future.Result;
 }
 
-static void Take(IFuture future)
+static void Finish(IFuture future)
 {
     future.Wait();
     if (future.IsFaulted) throw future.Exception;
