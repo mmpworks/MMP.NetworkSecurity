@@ -22,6 +22,12 @@ namespace NetSec.Tls13
         public bool OfferOnlyTls11;
         public byte[][] CertificateChain;
         public byte[] SigningSeed;
+        /// <summary>A client's answer to a CertificateRequest. Null chain: the client answers with an empty Certificate.</summary>
+        public byte[][] ClientCertificateChain;
+        public byte[] ClientSigningSeed;
+        /// <summary>A server with these anchors asks for a client certificate and requires one, under the name ClientName.</summary>
+        public byte[][] ClientTrustAnchors;
+        public string ClientName;
     }
 
     /// <summary>

@@ -169,15 +169,21 @@ namespace NetSec.Bytes
             return Convert.ToBase64String(bytes).TrimEnd('=').Replace('+', '-').Replace('/', '_');
         }
 
-        /// <summary>Refuses padding and the standard alphabet, so one token has one spelling.</summary>
+        /// <summary>
+        /// One value has one spelling here. The BCL decoder ignores white space and spare low bits, so the method encodes the
+        /// result again and refuses any text that differs from it.
+        /// </summary>
         public static byte[] Decode(string text)
         {
             if (text == null) throw new ArgumentNullException("text");
             if (text.IndexOfAny(new char[] { '=', '+', '/' }) >= 0 || text.Length % 4 == 1)
                 throw new ParseFailure(MiniJsonReader.Malformed, "not base64url");
             string standard = text.Replace('-', '+').Replace('_', '/') + new string('=', (4 - text.Length % 4) % 4);
-            try { return Convert.FromBase64String(standard); }
+            byte[] bytes;
+            try { bytes = Convert.FromBase64String(standard); }
             catch (FormatException) { throw new ParseFailure(MiniJsonReader.Malformed, "not base64url"); }
+            if (Encode(bytes) != text) throw new ParseFailure(MiniJsonReader.Malformed, "not the one base64url spelling of this value");
+            return bytes;
         }
     }
 }

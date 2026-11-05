@@ -7,15 +7,19 @@ using NetSec.Bytes;
 using NetSec.Crypto;
 using NetSec.Errors;
 using NetSec.Keys;
+using NetSec.Io;
 using NetSec.Machine;
+using NetSec.Pki;
+using NetSec.Tls13;
 using NetSec.Trace;
 
 namespace NetSec.Labs
 {
     /// <summary>
-    /// Lesson 10. A device answers a challenge and gets a signed token bound to its key. It then calls a server, with a fresh DPoP proof on
-    /// each call, and the token's role or capability decides what it may do. This lab has no TLS, so the token shows on the wire.
-    /// A passkey-shaped challenge is not WebAuthn. Built to show the parts. Do not copy.
+    /// Lesson 10. Three phases, each proving who calls a different way. First a mutual TLS handshake, where the device shows a certificate.
+    /// Then a registered device answers a challenge and gets a signed token bound to its key. Then it calls a server, with a fresh DPoP proof on
+    /// each call, and the token's role or capability decides what it may do. The login and calls run in the clear so the token shows on the wire.
+    /// A real system sends them inside TLS. A passkey-shaped challenge is not WebAuthn. Built to show the parts. Do not copy.
     /// </summary>
     public sealed class Lesson10Auth : ILab
     {
@@ -25,6 +29,12 @@ namespace NetSec.Labs
         public const string OptionReplayProof = "replay-proof";
         public const string OptionStolenToken = "stolen-token";
         public const string OptionCallRefund = "call-refund";
+        public const string OptionAnswerUnissued = "answer-unissued";
+        public const string OptionDeviceKey = "device-key";
+        public const string DeviceKeyOther = "other";
+        public const string DeviceKeySmallOrder = "small-order";
+        public const string OptionClientCert = "client-cert";
+        public const string ClientCertNone = "none";
 
         // A fixed lab time, so a same-seed run gives the same bytes.
         const long LabNow = 1793836800;
@@ -38,6 +48,7 @@ namespace NetSec.Labs
         const string BaseUrl = "https://pump.training/api/";
         const string Method = "POST";
         const string Start0 = "Start";
+        const string Subject = "pump-reader-4";
         const string DeviceKeyName = "auth.device-key";
         const string TokenName = "auth.token";
         const string ChallengeName = "auth.challenge";
@@ -53,6 +64,10 @@ namespace NetSec.Labs
             "ReadTotals", "VoidSale", "Refund", "CallOk", "CallsDone",
         };
 
+        // A client with no private key. Under the neutral point y = 1, the signature R = B, S = 1 verifies for any message (RFC 8032 allows this key).
+        static readonly byte[] SmallOrderPublic = Hex.Decode("0100000000000000000000000000000000000000000000000000000000000000");
+        static readonly byte[] AnySmallOrderSignature = Hex.Decode("5866666666666666666666666666666666666666666666666666666666666666" + "0100000000000000000000000000000000000000000000000000000000000000");
+
         /// <summary>Where the token's claims start in a ReadTotals frame, for a tamper plan.</summary>
         public static int ClaimsOffset { get { return Frame.HeaderSize + LengthPrefix + Token.HeaderPartLength + 1; } }
 
@@ -60,9 +75,13 @@ namespace NetSec.Labs
         sealed class Session : FrameSession
         {
             readonly Dictionary<string, bool> _seen = new Dictionary<string, bool>();
+            readonly Dictionary<string, byte[]> _registered = new Dictionary<string, byte[]>();
             public ITrainingKey Issuer;
             public string TokenRole = "cashier";
-            public bool TokenExpired, ReplayChallenge, ReplayProof, StolenToken, CallRefund;
+            public bool TokenExpired, ReplayChallenge, ReplayProof, StolenToken, CallRefund, AnswerUnissued, SmallOrderDevice;
+            public byte[] DeviceSeed;
+            public string LoginSubject;
+            public byte[] IssuedChallenge;
 
             public Session(IRandomSource random) : base(random) { }
             public override string Protocol { get { return "auth"; } }
@@ -70,6 +89,15 @@ namespace NetSec.Labs
 
             public override void Absorb(byte[] seen) { _seen[Hex.Encode(seen)] = true; }
             public bool Seen(byte[] value) { return _seen.ContainsKey(Hex.Encode(value)); }
+
+            public void Register(string subject, byte[] publicKey) { _registered[subject] = publicKey; }
+
+            /// <summary>True when this exact key is on record for this subject.</summary>
+            public bool IsRegistered(string subject, byte[] publicKey)
+            {
+                byte[] held;
+                return _registered.TryGetValue(subject, out held) && held.Length == publicKey.Length && ConstantTime.Equal(held, 0, publicKey, 0, held.Length);
+            }
         }
 
         public string LabId { get { return "lab-10-auth"; } }
@@ -82,7 +110,8 @@ namespace NetSec.Labs
 
         static IEnumerable<IFuture> Body(LabContext c, Return<LabResult> ret)
         {
-            ITrainingKey issuerKey = new TrainingKeySource().Find(KeyIds.TokenIssuer);
+            ITrainingKeySource keys = new TrainingKeySource();
+            ITrainingKey issuerKey = keys.Find(KeyIds.TokenIssuer);
             ITamperHook plan = LabPair.Plan(c);
 
             Session client = new Session(LabPair.Fork(c));
@@ -90,12 +119,27 @@ namespace NetSec.Labs
             client.ReplayProof = LabPair.Option(c, OptionReplayProof) == "yes";
             client.StolenToken = LabPair.Option(c, OptionStolenToken) == "yes";
             client.CallRefund = LabPair.Option(c, OptionCallRefund) == "yes";
+            client.AnswerUnissued = LabPair.Option(c, OptionAnswerUnissued) == "yes";
+            client.SmallOrderDevice = LabPair.Option(c, OptionDeviceKey) == DeviceKeySmallOrder;
 
             Session issuer = new Session(LabPair.Fork(c));
             issuer.Issuer = issuerKey;
             string role = LabPair.Option(c, OptionTokenRole);
             if (role != null) issuer.TokenRole = role;
             issuer.TokenExpired = LabPair.Option(c, OptionTokenExpired) == "yes";
+
+            // Enrolment, before this lab starts: the device made a key, and the issuer filed its public half under the device's name.
+            byte[] enrolledSeed = client.Draw(SeedSize);
+            issuer.Register(Subject, Ed25519.PublicFrom(enrolledSeed));
+            client.DeviceSeed = LabPair.Option(c, OptionDeviceKey) == DeviceKeyOther ? client.Draw(SeedSize) : enrolledSeed;
+
+            IFuture<LabResult> handshake = RunMutualTls(c, plan, keys, enrolledSeed);
+            yield return handshake;
+            if (!handshake.Result.Completed)
+            {
+                ret.Value = handshake.Result;
+                yield break;
+            }
 
             IFuture<LabResult> login = LabPair.Run(c,
                 new FrameEngine<Session>(ClientLoginTable, client, Start0, LabPair.Stream(c, "client", "auth-login"), "issuer", plan),
@@ -118,6 +162,55 @@ namespace NetSec.Labs
             ret.Value = calls.Result;
         }
 
+        // ---------------------------------------------------------------- mutual TLS
+
+        /// <summary>The server asks for a certificate and requires one. The client sends one line, the server sends it back, and the client closes.</summary>
+        static IFuture<LabResult> RunMutualTls(LabContext c, ITamperHook plan, ITrainingKeySource keys, byte[] deviceSeed)
+        {
+            TrainingCa ca = new TrainingCa(keys);
+            DateTime now = AuthTime.FromUnix(LabNow);
+            byte[] root = ca.RootCertificateDer;
+
+            Tls13Options client = MutualTlsOptions(c, plan, "client", "server", now);
+            client.TrustAnchors = new byte[][] { root };
+            if (LabPair.Option(c, OptionClientCert) != ClientCertNone)
+            {
+                byte[] spki = TrainingCa.Ed25519Spki(Ed25519.PublicFrom(deviceSeed));
+                client.ClientCertificateChain = new byte[][] { ca.IssueClientCertificate(Subject, spki, TrainingCa.DefaultNotBefore, TrainingCa.DefaultNotAfter) };
+                client.ClientSigningSeed = deviceSeed;
+            }
+
+            Tls13Options server = MutualTlsOptions(c, plan, "server", "client", now);
+            ITrainingKey serverKey = keys.Find(KeyIds.ServerTlsEd25519);
+            server.CertificateChain = new byte[][] { ca.IssueServerCertificate(TrainingPki.ServerName, TrainingCa.Ed25519Spki(serverKey.CopyPublic()), TrainingCa.DefaultNotBefore, TrainingCa.DefaultNotAfter) };
+            server.SigningSeed = serverKey.CopyMaterial();
+            server.ClientTrustAnchors = new byte[][] { root };
+            server.ClientName = Subject;
+
+            Tls13Engine clientEngine = Tls13Engine.CreateClient(client);
+            clientEngine.Command(new EngineCommand(EngineCommandKind.Send, 0, Encoding.UTF8.GetBytes("hello from the device\n"), null));
+            return LabPair.Run(c, clientEngine, Tls13Engine.CreateServer(server), plan, EchoThenClose);
+        }
+
+        static Tls13Options MutualTlsOptions(LabContext c, ITamperHook plan, string actor, string peer, DateTime now)
+        {
+            Tls13Options o = new Tls13Options();
+            o.Stream = LabPair.Stream(c, actor, "tls13");
+            o.Peer = peer;
+            o.Random = LabPair.Fork(c);
+            o.Tamper = plan;
+            o.Group = Tls13Group.X25519;
+            o.ServerName = TrainingPki.ServerName;
+            o.Now = now;
+            return o;
+        }
+
+        static void EchoThenClose(EnginePump client, EnginePump server)
+        {
+            server.OnApp = delegate(AppChunk chunk) { server.Enqueue(new EngineCommand(EngineCommandKind.Send, 0, chunk.Bytes, null)); };
+            client.OnApp = delegate(AppChunk chunk) { client.Enqueue(EngineCommand.Close); };
+        }
+
         // ---------------------------------------------------------------- login, client side
 
         static readonly StepTable<Session> ClientLoginTable = new StepTable<Session>(
@@ -127,15 +220,22 @@ namespace NetSec.Labs
 
         static StepDecision ClientLogin(Session s, InboundMessage m)
         {
-            byte[] seed = s.Draw(SeedSize);
+            byte[] publicKey = s.SmallOrderDevice ? SmallOrderPublic : Ed25519.PublicFrom(s.DeviceSeed);
+            byte[] subject = Encoding.UTF8.GetBytes(Subject);
+            byte[] request = new ByteWriter().U8(subject.Length).Put(subject).Put(publicKey).ToArray();
             return StepDecision.Advance(
-                Effect.Secret("client", DeviceKeyName, seed),
-                Send(LoginRequest, Ed25519.PublicFrom(seed), new FieldSpan("devicePublicKey", "key", -1, 0, true)));
+                Effect.Secret("client", DeviceKeyName, s.DeviceSeed),
+                Send(LoginRequest, request,
+                    new FieldSpan("subjectLength", "length", 1, 0, true),
+                    new FieldSpan("subject", "data", subject.Length, 0, true),
+                    new FieldSpan("devicePublicKey", "key", -1, 0, true)));
         }
 
         static StepDecision ClientAnswer(Session s, InboundMessage m)
         {
-            byte[] response = new ByteWriter().Put(m.Body).Put(Challenge.Sign(s.Secret(DeviceKeyName), m.Body, Origin)).ToArray();
+            byte[] challenge = s.AnswerUnissued ? new byte[ChallengeSize] : m.Body;
+            byte[] signature = s.SmallOrderDevice ? AnySmallOrderSignature : Challenge.Sign(s.Secret(DeviceKeyName), challenge, Origin);
+            byte[] response = new ByteWriter().Put(challenge).Put(signature).ToArray();
             return StepDecision.Advance(
                 Effect.Secret("client", ChallengeName, response),
                 Send(ChallengeResponse, response, new FieldSpan("challenge", "random", ChallengeSize, 0, true), new FieldSpan("signature", "mac", -1, 0, true)));
@@ -163,11 +263,24 @@ namespace NetSec.Labs
             return StepDecision.Advance();
         }
 
+        /// <summary>
+        /// The issuer trusts its own record and never the key in the request. An unknown key gets no challenge. A small-order key is valid under
+        /// RFC 8032 and verifies a forged signature, so this record is what stops a client with no private key.
+        /// </summary>
         static StepDecision IssuerChallenge(Session s, InboundMessage m)
         {
+            ByteReader reader = new ByteReader(m.Body, 0, m.Body.Length, true);
+            byte[] subjectBytes = reader.Take("subject", "data", reader.U8("subjectLength", "length"));
+            byte[] publicKey = reader.Take("devicePublicKey", "key", reader.Remaining);
+            string subject = Encoding.UTF8.GetString(subjectBytes, 0, subjectBytes.Length);
+            if (!s.IsRegistered(subject, publicKey)) return StepDecision.Fail(ErrorCodes.DeviceUnknown, Challenge.DeviceCheck, "no device with this key is registered under the name " + subject);
+
+            byte[] challenge = s.Draw(ChallengeSize);
             return StepDecision.Advance(
-                Effect.Secret("issuer", DevicePublicName, m.Body),
-                Send(ChallengeMessage, s.Draw(ChallengeSize), new FieldSpan("challenge", "random", -1, 0, true)));
+                Effect.Check(Challenge.DeviceCheck, ErrorCodes.DeviceUnknown),
+                Effect.Secret("issuer", DevicePublicName, publicKey),
+                Effect.Store(delegate { s.LoginSubject = subject; s.IssuedChallenge = challenge; }),
+                Send(ChallengeMessage, challenge, new FieldSpan("challenge", "random", -1, 0, true)));
         }
 
         static StepDecision IssuerToken(Session s, InboundMessage m)
@@ -176,6 +289,8 @@ namespace NetSec.Labs
             byte[] challenge = new byte[ChallengeSize], signature = new byte[SignatureSize];
             Buffer.BlockCopy(m.Body, 0, challenge, 0, ChallengeSize);
             Buffer.BlockCopy(m.Body, ChallengeSize, signature, 0, SignatureSize);
+            // The issued value is the freshness: a recorded answer from an earlier login names a challenge this login never issued.
+            if (!ConstantTime.Equal(challenge, 0, s.IssuedChallenge, 0, ChallengeSize)) return StepDecision.Fail(ErrorCodes.ChallengeNotIssued, Challenge.IssuedCheck, "this login issued a different challenge");
             if (s.Seen(challenge)) return StepDecision.Fail(ErrorCodes.ChallengeReplay, Challenge.ReplayCheck, "this challenge has been answered before");
             AuthDecision signed = Challenge.Verify(s.Secret(DevicePublicName), challenge, Origin, signature);
             if (!signed.Allowed) return StepDecision.Fail(signed.Code, signed.CheckName, signed.Detail);
@@ -183,8 +298,9 @@ namespace NetSec.Labs
             string claims = ClaimsFor(s);
             string token = Token.Issue(s.Issuer, claims);
             return StepDecision.Advance(
-                Effect.Check(Challenge.SignatureCheck, ErrorCodes.ChallengeBadSignature),
+                Effect.Check(Challenge.IssuedCheck, ErrorCodes.ChallengeNotIssued),
                 Effect.Check(Challenge.ReplayCheck, ErrorCodes.ChallengeReplay),
+                Effect.Check(Challenge.SignatureCheck, ErrorCodes.ChallengeBadSignature),
                 Effect.Absorb(challenge),
                 Effect.Measure("token claims", null, Encoding.UTF8.GetBytes(claims)),
                 SendToken(token));
@@ -193,7 +309,7 @@ namespace NetSec.Labs
         static string ClaimsFor(Session s)
         {
             long exp = s.TokenExpired ? LabNow - 1 : LabNow + TokenLifeSeconds;
-            return "{\"sub\":\"pump-reader-4\",\"roles\":[" + MiniJson.Quote(s.TokenRole) + "],\"cap\":[\"void-sale\"],\"iat\":" + LabNow + ",\"exp\":" + exp
+            return "{\"sub\":" + MiniJson.Quote(s.LoginSubject) + ",\"roles\":[" + MiniJson.Quote(s.TokenRole) + "],\"cap\":[\"void-sale\"],\"iat\":" + LabNow + ",\"exp\":" + exp
                 + ",\"cnf\":{\"jkt\":\"" + DpopProof.Thumbprint(s.Secret(DevicePublicName)) + "\"}}";
         }
 

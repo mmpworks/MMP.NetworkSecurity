@@ -153,6 +153,14 @@ namespace NetSec.Tls13
             return Message(HandshakeType.EncryptedExtensions, new byte[] { 0, 0 });
         }
 
+        /// <summary>RFC 8446 section 4.3.2: an empty context, and signature_algorithms (extension 13), the one extension it requires. This engine asks for ed25519.</summary>
+        public static byte[] CertificateRequest()
+        {
+            byte[] schemes = new ByteWriter().U16(2).U16(Ed25519Scheme).ToArray();
+            byte[] extensions = new ByteWriter().U16(13).U16(schemes.Length).Put(schemes).ToArray();
+            return Message(HandshakeType.CertificateRequest, new ByteWriter().U8(0).U16(extensions.Length).Put(extensions).ToArray());
+        }
+
         public static byte[] CertificateMessage(byte[][] chain)
         {
             ByteWriter list = new ByteWriter();
@@ -184,6 +192,7 @@ namespace NetSec.Tls13
         }
 
         public const string ServerVerifyContext = "TLS 1.3, server CertificateVerify";
+        public const string ClientVerifyContext = "TLS 1.3, client CertificateVerify";
 
         // ---------------------------------------------------------------- readers
 

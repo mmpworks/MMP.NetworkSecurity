@@ -2,6 +2,7 @@ using System.Collections.Generic;
 using NetSec.Bytes;
 using NetSec.Crypto;
 using NetSec.Machine;
+using NetSec.Pki;
 
 namespace NetSec.Tls13
 {
@@ -9,11 +10,13 @@ namespace NetSec.Tls13
     static class Tls13ServerTable
     {
         public const string Start = "Start";
-        const string WaitClientHello = "WaitClientHello", WaitClientFinished = "WaitClientFinished", Open = MachineStates.Open;
+        const string WaitClientHello = "WaitClientHello", WaitClientFinished = "WaitClientFinished", WaitClientCertVerify = "WaitClientCertVerify", Open = MachineStates.Open;
 
         public static readonly StepTable<Tls13Session> Table = new StepTable<Tls13Session>(
             new StepRow<Tls13Session>("tls13.s.start", Start, InboundMessage.StartType, ServerStart, WaitClientHello),
             new StepRow<Tls13Session>("tls13.s.ch", WaitClientHello, HandshakeType.ClientHello, ClientHello, WaitClientFinished),
+            new StepRow<Tls13Session>("tls13.s.ccert", WaitClientFinished, HandshakeType.Certificate, ClientCertificate, WaitClientCertVerify),
+            new StepRow<Tls13Session>("tls13.s.ccv", WaitClientCertVerify, HandshakeType.CertificateVerify, ClientCertificateVerify, WaitClientFinished),
             new StepRow<Tls13Session>("tls13.s.fin", WaitClientFinished, HandshakeType.Finished, ClientFinished, Open),
             new StepRow<Tls13Session>("tls13.s.app", Open, HandshakeType.ApplicationData, Tls13Rules.OpenData, Open),
             new StepRow<Tls13Session>("tls13.s.keyupdate", Open, HandshakeType.KeyUpdate, Tls13Rules.OpenKeyUpdate, Open));
@@ -39,8 +42,11 @@ namespace NetSec.Tls13
             Tls13Secrets s = Tls13KeySchedule.Derive(suite.Hash, kex.Shared, helloHash, null);
 
             byte[] extensions = Tls13Messages.EncryptedExtensions();
+            byte[] request = o.ClientTrustAnchors != null ? Tls13Messages.CertificateRequest() : null;
             byte[] certificate = Tls13Messages.CertificateMessage(o.CertificateChain);
-            transcript.Put(extensions).Put(certificate);
+            transcript.Put(extensions);
+            if (request != null) transcript.Put(request);
+            transcript.Put(certificate);
             byte[] signed = Tls13Messages.SignedContent(Tls13Messages.ServerVerifyContext, Tls13KeySchedule.HashOf(suite.Hash, transcript.ToArray()));
             byte[] verify = Tls13Messages.CertificateVerify(Ed25519.Sign(o.SigningSeed, signed));
             transcript.Put(verify);
@@ -59,6 +65,7 @@ namespace NetSec.Tls13
             effects.Add(Tls13Rules.Install(Direction.Outbound, suite, s.ServerHandshakeTrafficSecret, "handshake"));
             effects.Add(Tls13Rules.Install(Direction.Inbound, suite, s.ClientHandshakeTrafficSecret, "handshake"));
             AddFlight(effects, "EncryptedExtensions", HandshakeType.EncryptedExtensions, extensions);
+            if (request != null) AddFlight(effects, "CertificateRequest", HandshakeType.CertificateRequest, request);
             AddFlight(effects, "Certificate", HandshakeType.Certificate, certificate);
             AddFlight(effects, "CertificateVerify", HandshakeType.CertificateVerify, verify);
             AddFlight(effects, "Finished", HandshakeType.Finished, finished);
@@ -96,8 +103,39 @@ namespace NetSec.Tls13
             return null;
         }
 
+        /// <summary>
+        /// The client's proof of who it is, in three steps: a chain to the anchors, a signature by the leaf's key, then Finished.
+        /// An empty Certificate stops here. RFC 8446 section 4.4.2.4 lets a server go on or refuse, and this server requires one.
+        /// </summary>
+        static StepDecision ClientCertificate(Tls13Session session, InboundMessage message)
+        {
+            Tls13Options o = session.Options;
+            if (o.ClientTrustAnchors == null) return Tls13Rules.Refuse(NetSec.Errors.ErrorCodes.UnexpectedMessage, "a client Certificate arrived, and this server did not ask for one");
+            CertificateInfo info = Tls13Messages.ReadCertificate(message.Bytes, false);
+            if (info.Chain.Length == 0) return Tls13Rules.Refuse(Tls13Codes.ClientCertRequired, "the client sent an empty Certificate, and this server requires one. The alert is certificate_required, 116");
+            Certificate[] chain = Tls13ClientTable.ParseAll(info.Chain);
+            ChainVerdict verdict = ChainCheck.Run(chain, Tls13ClientTable.ParseAll(o.ClientTrustAnchors), o.ClientName, o.Now);
+            if (!verdict.Passed) return Tls13Rules.Refuse(verdict.Code, verdict.Detail);
+            Certificate leaf = chain[0];
+            return StepDecision.Advance(
+                Effect.Absorb(message.Bytes),
+                Effect.Store(delegate { session.Leaf = leaf; }),
+                Tls13Rules.Pass(Tls13Codes.ClientCertRequired),
+                Tls13Rules.Pass(ChainCheck.NoAnchor),
+                Tls13Rules.Pass(ChainCheck.BadSignature),
+                Tls13Rules.Pass(ChainCheck.Validity),
+                Tls13Rules.Pass(ChainCheck.Name));
+        }
+
+        static StepDecision ClientCertificateVerify(Tls13Session session, InboundMessage message)
+        {
+            return Tls13Rules.CheckCertificateVerify(session, message, Tls13Messages.ClientVerifyContext);
+        }
+
         static StepDecision ClientFinished(Tls13Session session, InboundMessage message)
         {
+            if (session.Options.ClientTrustAnchors != null && session.Leaf == null)
+                return Tls13Rules.Refuse(Tls13Codes.ClientCertRequired, "the client skipped the Certificate this server asked for");
             Tls13Suite suite = session.Suite;
             byte[] expected = Tls13KeySchedule.VerifyData(suite.Hash, session.Secrets.ClientHandshakeTrafficSecret, session.HashWith());
             if (message.Body.Length != expected.Length || !ConstantTime.Equal(message.Body, 0, expected, 0, expected.Length))

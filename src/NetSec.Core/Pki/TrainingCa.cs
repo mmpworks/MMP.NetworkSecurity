@@ -24,6 +24,7 @@ namespace NetSec.Pki
         const string SubjectKeyIdOid = "551d0e";
         const string AuthorityKeyIdOid = "551d23";
         const string ServerAuthOid = "2b06010505070301";
+        const string ClientAuthOid = "2b06010505070302";
         const int DnsNameTag = 0x82;
         const int KeyIdTag = 0x80;
 
@@ -48,10 +49,21 @@ namespace NetSec.Pki
         /// <summary>The leaf carries dnsName as its CN and as a dNSName SAN. The caller gives the subject key as a SubjectPublicKeyInfo, so an RSA key fits too.</summary>
         public byte[] IssueServerCertificate(string dnsName, byte[] subjectPublicKeyInfoDer, DateTime notBefore, DateTime notAfter)
         {
+            return IssueLeaf(ServerAuthOid, dnsName, subjectPublicKeyInfoDer, notBefore, notAfter);
+        }
+
+        /// <summary>The same leaf shape, marked for client authentication, for mutual TLS.</summary>
+        public byte[] IssueClientCertificate(string name, byte[] subjectPublicKeyInfoDer, DateTime notBefore, DateTime notAfter)
+        {
+            return IssueLeaf(ClientAuthOid, name, subjectPublicKeyInfoDer, notBefore, notAfter);
+        }
+
+        byte[] IssueLeaf(string extendedKeyUsageOid, string dnsName, byte[] subjectPublicKeyInfoDer, DateTime notBefore, DateTime notAfter)
+        {
             byte[] san = Der.Sequence(Der.Tlv(DnsNameTag, System.Text.Encoding.UTF8.GetBytes(dnsName)));
             byte[] extensions = Der.Sequence(
                 Extension(BasicConstraintsOid, true, Der.Sequence()),
-                Extension(ExtendedKeyUsageOid, false, Der.Sequence(Der.Oid(ServerAuthOid))),
+                Extension(ExtendedKeyUsageOid, false, Der.Sequence(Der.Oid(extendedKeyUsageOid))),
                 Extension(SubjectAltNameOid, false, san),
                 Extension(AuthorityKeyIdOid, false, Der.Sequence(Der.Tlv(KeyIdTag, KeyId(_public)))));
             return Sign(Serial(dnsName), _name, dnsName, notBefore, notAfter, subjectPublicKeyInfoDer, extensions);

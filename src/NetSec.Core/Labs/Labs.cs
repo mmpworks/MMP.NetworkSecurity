@@ -182,6 +182,9 @@ namespace NetSec.Labs
             WithOption("L10-ungranted-capability", 10, Lesson10Auth.OptionCallRefund, "yes", AttackOutcome.Rejected, ErrorCodes.CapabilityDenied, NetSec.Auth.AccessRules.PermissionCheck),
             WithOption("L10-wrong-role", 10, Lesson10Auth.OptionTokenRole, "guest", AttackOutcome.Rejected, ErrorCodes.RoleDenied, NetSec.Auth.AccessRules.PermissionCheck),
             WithOption("L10-replay-challenge", 10, Lesson10Auth.OptionReplayChallenge, "yes", AttackOutcome.Rejected, ErrorCodes.ChallengeReplay, NetSec.Auth.Challenge.ReplayCheck),
+            WithOption("L10-unissued-challenge", 10, Lesson10Auth.OptionAnswerUnissued, "yes", AttackOutcome.Rejected, ErrorCodes.ChallengeNotIssued, NetSec.Auth.Challenge.IssuedCheck),
+            WithOption("L10-unknown-device", 10, Lesson10Auth.OptionDeviceKey, Lesson10Auth.DeviceKeyOther, AttackOutcome.Rejected, ErrorCodes.DeviceUnknown, NetSec.Auth.Challenge.DeviceCheck),
+            WithOption("L10-remove-client-cert", 10, Lesson10Auth.OptionClientCert, Lesson10Auth.ClientCertNone, AttackOutcome.Rejected, Tls13Codes.ClientCertRequired, Tls13Codes.CheckName(Tls13Codes.ClientCertRequired)),
         };
 
         static AttackDefinition Flip(string id, int lesson, string message, int offset, string code, string check)

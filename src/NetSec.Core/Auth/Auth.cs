@@ -39,6 +39,9 @@ namespace NetSec.Auth
     /// <summary>One compact JWS split into its three parts, with its header read. Only an EdDSA signature counts here.</summary>
     internal sealed class CompactJws
     {
+        /// <summary>RFC 7515 section 4.1.11: a verifier that does not understand a named extension must refuse. These verifiers understand none.</summary>
+        public const string Critical = "crit";
+
         public readonly string HeaderPart, ClaimsPart, SignaturePart;
         public readonly Dictionary<string, object> Header;
         public readonly byte[] Signature;
@@ -87,6 +90,7 @@ namespace NetSec.Auth
     {
         public const string SignatureCheck = "token signature";
         public const string ExpiryCheck = "token expiry";
+        public const string FormatCheck = "token format";
         const string Header = "{\"alg\":\"EdDSA\",\"typ\":\"JWT\"}";
 
         /// <summary>How many characters the token's first part holds, so a tamper plan can aim past it.</summary>
@@ -100,33 +104,40 @@ namespace NetSec.Auth
             return CompactJws.Sign(k.CopyMaterial(), Header, claimsJson);
         }
 
-        /// <summary>Checks the signature before it reads a claim. A rule: the same input gives the same answer.</summary>
+        /// <summary>
+        /// Checks the signature before it reads a claim. A rule: the same input gives the same answer. Text that is no token gets
+        /// TOKEN_MALFORMED under the check "token format", because no signature check ran. A time with no kind throws, because
+        /// that is a mistake in the caller and the token is not at fault.
+        /// </summary>
         public static AuthDecision Verify(byte[] pub, string jws, DateTime now)
         {
             if (pub == null) throw new ArgumentNullException("pub");
+            long unixNow = AuthTime.ToUnix(now);
             try
             {
                 CompactJws parts = CompactJws.Split(jws);
                 object alg;
                 if (!parts.Header.TryGetValue("alg", out alg) || !"EdDSA".Equals(alg))
                     return AuthDecision.Refuse(ErrorCodes.TokenBadAlg, SignatureCheck, "the header must name EdDSA");
+                if (parts.Header.ContainsKey(CompactJws.Critical))
+                    return AuthDecision.Refuse(ErrorCodes.TokenBadHeader, FormatCheck, "the header names a critical extension, and this verifier knows none");
                 if (!Ed25519.Verify(pub, parts.SigningInput, parts.Signature))
                     return AuthDecision.Refuse(ErrorCodes.TokenBadSignature, SignatureCheck, "the signature does not fit this key and these claims");
                 Dictionary<string, object> claims = parts.ReadClaims();
                 object exp;
                 if (!claims.TryGetValue("exp", out exp) || !(exp is long))
                     return AuthDecision.Refuse(ErrorCodes.TokenMalformed, ExpiryCheck, "the claims have no whole-number exp");
-                if (AuthTime.ToUnix(now) >= (long)exp)
+                if (unixNow >= (long)exp)
                     return AuthDecision.Refuse(ErrorCodes.TokenExpired, ExpiryCheck, "exp has passed");
                 return AuthDecision.Allow(claims, null);
             }
             catch (ParseFailure failure)
             {
-                return AuthDecision.Refuse(ErrorCodes.TokenBadSignature, SignatureCheck, failure.Message);
+                return AuthDecision.Refuse(ErrorCodes.TokenMalformed, FormatCheck, failure.Message);
             }
             catch (ArgumentException failure)
             {
-                return AuthDecision.Refuse(ErrorCodes.TokenBadSignature, SignatureCheck, failure.Message);
+                return AuthDecision.Refuse(ErrorCodes.TokenMalformed, FormatCheck, failure.Message);
             }
         }
     }
@@ -135,7 +146,13 @@ namespace NetSec.Auth
     {
         static readonly DateTime Epoch = new DateTime(1970, 1, 1, 0, 0, 0, DateTimeKind.Utc);
 
-        public static long ToUnix(DateTime utc) { return (utc - Epoch).Ticks / TimeSpan.TicksPerSecond; }
+        /// <summary>Seconds since 1970 in UTC. A local time converts. A time with no kind throws, because its zone is unknown and a guess can pass an expired token.</summary>
+        public static long ToUnix(DateTime time)
+        {
+            if (time.Kind == DateTimeKind.Unspecified) throw new ArgumentException("this time has no kind, so its zone is unknown", "time");
+            return (time.ToUniversalTime() - Epoch).Ticks / TimeSpan.TicksPerSecond;
+        }
+
         public static DateTime FromUnix(long seconds) { return Epoch.AddSeconds(seconds); }
     }
 
@@ -168,7 +185,12 @@ namespace NetSec.Auth
             return CompactJws.Sign(seed, header, claims);
         }
 
-        /// <summary>The checks of RFC 9449 section 4.3, in its order. Replay stays with the caller, which holds the seen ids. A pass returns the jti.</summary>
+        /// <summary>
+        /// Runs RFC 9449 section 4.3 steps 2 to 9, 11 and 12, which the RFC allows in any order. A pass returns the jti.
+        /// Not here: step 1, because the caller holds the request. Step 10 (nonce), because this lab issues no nonce. The RFC makes a nonce optional.
+        /// Replay stays with the caller, which holds the seen ids. Step 5 accepts EdDSA only.
+        /// Stricter than step 9: htu must equal the whole address, where the RFC ignores a query and a fragment.
+        /// </summary>
         public static AuthDecision Check(string proof, string htm, string htu, long now, string accessToken, string expectedJkt)
         {
             try
@@ -189,7 +211,12 @@ namespace NetSec.Auth
         {
             if (!"dpop+jwt".Equals(Member(parts.Header, "typ")) || !"EdDSA".Equals(Member(parts.Header, "alg")))
                 return AuthDecision.Refuse(ErrorCodes.DpopMalformed, SignatureCheck, "the header must say dpop+jwt and EdDSA");
-            byte[] pub = PublicFrom(Member(parts.Header, "jwk") as Dictionary<string, object>);
+            if (parts.Header.ContainsKey(CompactJws.Critical))
+                return AuthDecision.Refuse(ErrorCodes.DpopMalformed, SignatureCheck, "the header names a critical extension, and this check knows none");
+            Dictionary<string, object> jwk = Member(parts.Header, "jwk") as Dictionary<string, object>;
+            string privateMember = PrivateMember(jwk);
+            if (privateMember != null) return AuthDecision.Refuse(ErrorCodes.DpopBadKey, SignatureCheck, "the jwk holds the private key member " + privateMember + ", so this key is no longer secret");
+            byte[] pub = PublicFrom(jwk);
             if (pub == null) return AuthDecision.Refuse(ErrorCodes.DpopBadKey, SignatureCheck, "the header holds no Ed25519 key");
             if (!Ed25519.Verify(pub, parts.SigningInput, parts.Signature))
                 return AuthDecision.Refuse(ErrorCodes.DpopBadSignature, SignatureCheck, "the key in the header did not sign this proof");
@@ -205,6 +232,18 @@ namespace NetSec.Auth
             if (!ath.Equals(Member(claims, "ath"))) return AuthDecision.Refuse(ErrorCodes.DpopAthMismatch, BindingCheck, "the proof names another token");
             if (Thumbprint(pub) != expectedJkt) return AuthDecision.Refuse(ErrorCodes.DpopJktMismatch, BindingCheck, "the token is bound to another key");
             return AuthDecision.Allow(claims, jti);
+        }
+
+        // The JWK members that hold private key material: OKP and EC d, RSA d to oth, and the symmetric k (RFC 7517, RFC 7518 section 6).
+        static readonly string[] PrivateMembers = { "d", "p", "q", "dp", "dq", "qi", "oth", "k" };
+
+        /// <summary>RFC 9449 section 4.3 step 7. The name of the first private member, or null.</summary>
+        static string PrivateMember(Dictionary<string, object> jwk)
+        {
+            if (jwk == null) return null;
+            for (int i = 0; i < PrivateMembers.Length; i++)
+                if (jwk.ContainsKey(PrivateMembers[i])) return PrivateMembers[i];
+            return null;
         }
 
         static byte[] PublicFrom(Dictionary<string, object> jwk)
@@ -235,6 +274,8 @@ namespace NetSec.Auth
     {
         public const string SignatureCheck = "challenge signature";
         public const string ReplayCheck = "challenge already used";
+        public const string IssuedCheck = "challenge issued";
+        public const string DeviceCheck = "device registered";
 
         static byte[] Input(byte[] challenge, string origin)
         {

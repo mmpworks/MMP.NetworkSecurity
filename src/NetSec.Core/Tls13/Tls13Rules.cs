@@ -71,6 +71,17 @@ namespace NetSec.Tls13
             });
         }
 
+        /// <summary>One side's CertificateVerify under the leaf it has already checked. The context string differs by role.</summary>
+        public static StepDecision CheckCertificateVerify(Tls13Session session, InboundMessage message, string context)
+        {
+            CertificateVerifyInfo info = Tls13Messages.ReadCertificateVerify(message.Bytes, false);
+            byte[] signed = Tls13Messages.SignedContent(context, session.HashWith());
+            bool good = info.Scheme == Tls13Messages.Ed25519Scheme && session.Leaf.KeyIsEd25519 && info.Signature.Length == 64
+                && Ed25519.Verify(session.Leaf.PublicKey, signed, info.Signature);
+            if (!good) return Refuse(Tls13Codes.CertVerifyBad, "the signature over the transcript does not verify under the leaf key");
+            return StepDecision.Advance(Effect.Absorb(message.Bytes), Pass(Tls13Codes.CertVerifyBad));
+        }
+
         public static StepDecision OpenData(Tls13Session session, InboundMessage message)
         {
             return StepDecision.Stay(Effect.Deliver(0, message.Body));

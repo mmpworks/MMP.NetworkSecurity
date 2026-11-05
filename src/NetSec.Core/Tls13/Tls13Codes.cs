@@ -20,6 +20,7 @@ namespace NetSec.Tls13
         public const string NoCommonSuite = "TLS13_NO_COMMON_SUITE";
         public const string NoCommonSignature = "TLS13_NO_COMMON_SIGNATURE";
         public const string AlertReceived = "TLS13_ALERT_RECEIVED";
+        public const string ClientCertRequired = "TLS13_CLIENT_CERT_REQUIRED";
 
         sealed class Row
         {
@@ -44,6 +45,8 @@ namespace NetSec.Tls13
             new Row(NoCommonGroup, "common group", 40),
             new Row(NoCommonSuite, "common cipher suite", 40),
             new Row(NoCommonSignature, "common signature scheme", 40),
+            // The check name is the one in ux-design.md section 7 and acceptance/CONTRACT.md. The wire alert follows RFC 8446 section 6: certificate_required, 116.
+            new Row(ClientCertRequired, "bad_certificate alert", 116),
             new Row("CHAIN_NO_ANCHOR", "chain to trust anchor", 48),
             new Row("CERT_VALIDITY", "validity window", 45),
             new Row("CERT_NAME", "name match", 42),

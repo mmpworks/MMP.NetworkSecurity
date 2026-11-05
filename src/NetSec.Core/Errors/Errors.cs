@@ -47,6 +47,7 @@ namespace NetSec.Errors
         public const string TokenBadSignature = "TOKEN_BAD_SIGNATURE";
         public const string TokenMalformed = "TOKEN_MALFORMED";
         public const string TokenExpired = "TOKEN_EXPIRED";
+        public const string TokenBadHeader = "TOKEN_BAD_HEADER";
         public const string DpopMalformed = "DPOP_MALFORMED";
         public const string DpopBadKey = "DPOP_BAD_JWK";
         public const string DpopBadSignature = "DPOP_BAD_SIGNATURE";
@@ -58,6 +59,8 @@ namespace NetSec.Errors
         public const string DpopReplay = "DPOP_REPLAY";
         public const string ChallengeBadSignature = "CHALLENGE_BAD_SIGNATURE";
         public const string ChallengeReplay = "CHALLENGE_REPLAY";
+        public const string ChallengeNotIssued = "CHALLENGE_NOT_ISSUED";
+        public const string DeviceUnknown = "DEVICE_UNKNOWN";
         public const string RoleDenied = "ROLE_DENIED";
         public const string CapabilityDenied = "CAPABILITY_DENIED";
         public const string CeTransportUnavailable = "CE_TRANSPORT_UNAVAILABLE";
