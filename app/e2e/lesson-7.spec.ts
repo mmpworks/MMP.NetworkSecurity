@@ -16,8 +16,9 @@ test('lesson 7 races TLS 1.1 against TLS 1.3 with counters read from the trace',
   const modern = await n('race-count-messages-right')
   expect(old, 'TLS 1.1 messages').toBeGreaterThan(0)
   expect(modern, 'TLS 1.3 messages').toBeGreaterThan(0)
-  expect(await n('race-count-roundtrips-left'), 'TLS 1.1 round trips before data').toBe(2)
-  expect(await n('race-count-roundtrips-right'), 'TLS 1.3 round trips before data').toBe(1)
+  // The counters follow the trace, so they wait for the last events instead of reading once.
+  await expect(page.getByTestId('race-count-roundtrips-left'), 'TLS 1.1 round trips before data').toHaveText('2')
+  await expect(page.getByTestId('race-count-roundtrips-right'), 'TLS 1.3 round trips before data').toHaveText('1')
 })
 
 test('lesson 7 flipped record is caught by the record HMAC', async ({ page }) => {
