@@ -1,4 +1,4 @@
-import { computed, reactive, ref } from 'vue'
+import { computed, reactive, ref, watchEffect } from 'vue'
 import { hostGet, normalizeError, normalizeEvent, openSocket, resolveHostAddress, type HostSocket } from './host'
 import { evaluateUnlock, findBound, parseHighlight, TOURS, type Unlock } from './tour'
 import type { AppMode, HostError, LessonRow, TourStep, TraceEvent, Transport, ViewMode } from './types'
@@ -92,7 +92,7 @@ export const step = computed<TourStep | null>(() => steps.value[tour.stepIndex] 
 export const isReal = computed(() => (active.value ? active.value.transportKind === 'real' : ui.transport === 'real'))
 export const trainingChip = computed(() => (isReal.value ? 'OS TRANSPORT' : 'TRAINING ONLY'))
 
-export const unlock = computed<Unlock>(() => {
+const rawUnlock = computed<Unlock>(() => {
   const s = step.value
   if (!s) return { open: false, reason: '' }
   if (tour.unreachable) return { open: false, reason: tour.unreachable }
@@ -102,6 +102,12 @@ export const unlock = computed<Unlock>(() => {
     boundIndex: tour.bound[tour.stepIndex] ?? -1, events, view: ui.view, selectedSeq: ui.selectedSeq, actionDone: tour.actionDone, outcome: active.value?.parentId ? active.value.finished?.outcome ?? '' : '', caughtCheck: active.value?.parentId && active.value.finished?.outcome === 'caught' ? active.value.finished.check : '', eventsSinceTryIt: sinceTryIt,
   })
 })
+
+// Once a step's unlock opens it stays open. A late frame from an attack fork can change the events under it, and a learner who already did the try-it
+// must not find Next disabled again a moment later.
+const opened = reactive<Record<string, boolean>>({})
+watchEffect(() => { const s = step.value; if (s && rawUnlock.value.open) opened[s.id] = true }, { flush: 'sync' })
+export const unlock = computed<Unlock>(() => (step.value && opened[step.value.id] ? { open: true, reason: '' } : rawUnlock.value))
 
 function nextReq(): string { const id = `r${++reqCounter}`; myRequests.add(id); return id }
 function fail(code: string, message: string, retryable = false) { ui.error = { code, message, retryable, requestId: '' } }
@@ -267,6 +273,7 @@ export function startSession(mode: AppMode) {
   tour.unreachable = ''
   tour.actionDone = false
   tour.tryItStart = 0
+  for (const k of Object.keys(opened)) delete opened[k]
   ui.activeId = ''
   ui.viewUpTo = null
   ui.selectedSeq = null
