@@ -1925,6 +1925,17 @@
    "counts": true
   },
   {
+   "id": "A17.vault.audit-check-names-limits",
+   "base": "A17.vault.audit-check-names-limits",
+   "assertion": "A17",
+   "group": "a17",
+   "build": "host",
+   "slice": "V0",
+   "referee": "test over HTTP and WebSocket, OpenSSL, ssh.exe, Go referees; known-answer where no outside referee exists",
+   "roles": [],
+   "counts": true
+  },
+  {
    "id": "A17.vault.audit-failure-refuses",
    "base": "A17.vault.audit-failure-refuses",
    "assertion": "A17",

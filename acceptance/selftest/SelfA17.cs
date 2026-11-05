@@ -34,6 +34,7 @@ namespace Acceptance
             new Case("A17.vault.export-refused-and-audited", V1Clauses.ExportRefusedAndAudited, "export-not-audited", "export-allowed"),
             new Case("A17.vault.exercise-sign-judged-by-openssl", V1Clauses.ExerciseSignJudgedByOpenssl, "sign-bad-signature"),
             new Case("A17.vault.exercise-walk", V1Clauses.ExerciseWalk, "derive-random", "audit-check-blind", "export-allowed"),
+            new Case("A17.vault.audit-check-names-limits", V1Clauses.AuditLimits, "limits-missing", "limits-names-two", "limits-only-on-pass"),
             new Case("A17.vault.export-audited-with-caller", V1Clauses.ExportAuditedWithCaller, "export-caller-missing", "export-as-course-read", "course-read-unaudited"),
             new Case("A17.vault.tampered-row-refused", V1Clauses.TamperedRowRefused, "tamper-ignored"),
             new Case("A17.vault.audit-failure-refuses", V1Clauses.AuditFailureRefuses, "audit-failure-ignored"),

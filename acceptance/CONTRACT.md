@@ -96,7 +96,7 @@ The suite wrote the name it needs. A live Host that differs fails the clause at 
 | `POST /api/security/vault/exercise/sign` `{ text }` | `{ keyName, version, inputHex, signatureHex, publicKeyHex, command, output, code }` | Design 4.3. The suite verifies with its own OpenSSL |
 | `POST .../exercise/derive` `{ label }` | `{ keyName, version, label, outputHex, code }` | HKDF-SHA256 over the label. The same label gives the same output |
 | `POST .../exercise/export` | HTTP 409, `code: VAULT_EXPORT_REFUSED` | Audited as a refused export |
-| `POST .../exercise/audit-check` | `{ rows, firstBadSeq, code }` | `firstBadSeq` is 0 or absent while the chain is whole |
+| `POST .../exercise/audit-check` | `{ rows, firstBadSeq, code, limits }` | `firstBadSeq` is 0 or absent while the chain is whole. `limits` is the course text under every result, pass or fail. It names 3 changes the unkeyed chain cannot see: an edit to the newest row, rows cut from the end, and a full rewrite of every row (clause `A17.vault.audit-check-names-limits`) |
 | `GET /api/sessions/{id}/events` | One JSON array of events (as the Host answers today) | |
 | `GET /api/sessions/{id}/keylog` | | `KEYS_HIDDEN` while Show keys is OFF |
 | `GET /api/lessons` | `attacks[]` with `attackId`, `kind`, `expectCode`, `available`, `whyNot`, and `field` for a `flip-byte` row | `available` and `whyNot` are in design 8.3. `field` is ASSUMED (design 3.4 says `TamperPlan.Field`) |

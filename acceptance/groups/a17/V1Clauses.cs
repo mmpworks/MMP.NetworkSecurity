@@ -167,6 +167,61 @@ namespace Acceptance
             }
         }
 
+        // The chain has no secret, so it cannot see three changes. The course text under its result says which, because a tamper lesson that overclaims teaches the wrong rule.
+        static readonly string[] LimitNames = new string[] { "an edit to the newest row", "rows cut from the end", "a full rewrite of every row" };
+
+        /// <summary>Which of the three limits a text names. A limit counts when its key words are all there, in any order and any case.</summary>
+        public static List<string> NamedLimits(string text)
+        {
+            string t = (text ?? "").ToLowerInvariant();
+            List<string> named = new List<string>();
+            if ((t.Contains("newest") || t.Contains("latest") || t.Contains("last row")) && (t.Contains("edit") || t.Contains("change") || t.Contains("alter") || t.Contains("modif"))) named.Add(LimitNames[0]);
+            if ((t.Contains("cut") || t.Contains("truncat") || t.Contains("remov") || t.Contains("delet") || t.Contains("drop") || t.Contains("trim")) && t.Contains("end")) named.Add(LimitNames[1]);
+            if (t.Contains("rewrit") && (t.Contains("every") || t.Contains("all"))) named.Add(LimitNames[2]);
+            return named;
+        }
+
+        static string LimitsOf(Reply r)
+        {
+            object v = r.Json != null && r.Json.ContainsKey("limits") ? r.Json["limits"] : null;
+            List<object> list = v as List<object>;
+            if (list == null) return v as string ?? "";
+            StringBuilder sb = new StringBuilder();
+            foreach (object o in list) sb.Append(o as string).Append(' ');
+            return sb.ToString();
+        }
+
+        [Clause("A17.vault.audit-check-names-limits")]
+        public static string AuditLimits(Ctx c)
+        {
+            using (HostProc h = A17.Host(c, "a17-vault-limits"))
+            {
+                Check.True(Post(h, "sign", A17.Obj("text", "limits")).Ok, "sign did not run, so the audit has no rows");
+                Reply intact = Post(h, "audit-check", "{}");
+                Check.True(intact.Ok && CodeOk(intact), "audit-check got " + intact);
+                Check.True(MiniJson.Num(intact.Json, "firstBadSeq", 0) <= 0, "audit-check reports a bad row before any row changed");
+                Expect(intact, "a whole chain");
+                // The text sits under every result, pass or fail: a learner who sees a broken chain reads the same limits.
+                Dictionary<string, object> edited = MiniJson.AsObject(A17.VaultDb(c, h, "edit-audit"));
+                Check.True(MiniJson.Num(edited, "seq", 0) > 0, "the suite changed no audit row");
+                Reply found = Post(h, "audit-check", "{}");
+                Check.True(MiniJson.Num(found.Json, "firstBadSeq", 0) > 0, "audit-check does not find the changed row, so its result is no broken chain to read the limits under");
+                Expect(found, "a broken chain");
+                return "audit-check returns limits under a whole chain and under a broken one, and the text names all 3: " + string.Join("; ", LimitNames);
+            }
+        }
+
+        static void Expect(Reply r, string when)
+        {
+            string text = LimitsOf(r);
+            Check.True(text.Trim().Length > 0, "audit-check returns no limits under " + when + ": " + ((r.Body ?? "").Length > 200 ? r.Body.Substring(0, 200) + "..." : r.Body));
+            List<string> named = NamedLimits(text);
+            if (named.Count == 3) return;
+            List<string> missing = new List<string>();
+            foreach (string name in LimitNames) if (!named.Contains(name)) missing.Add(name);
+            throw new FailException("audit-check limits under " + when + " name " + named.Count + " of 3 limits; missing: " + string.Join("; ", missing.ToArray()) + ". The text: " + text.Trim());
+        }
+
         // ---------------------------------------------------------------- labs read through Export, and the audit shows the caller
 
         [Clause("A17.vault.export-audited-with-caller")]

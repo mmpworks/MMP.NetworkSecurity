@@ -196,7 +196,12 @@ namespace Acceptance
                         string joined = string.Join("|", new string[] { MiniJson.Num(p, "seq", 0).ToString("0"), MiniJson.Str(p, "at"), MiniJson.Str(p, "caller"), MiniJson.Str(p, "op"), MiniJson.Str(p, "name"), MiniJson.Str(p, "version"), MiniJson.Str(p, "result"), MiniJson.Str(p, "detail"), MiniJson.Str(p, "prev_hash") });
                         if (Sha256Hex(Encoding.UTF8.GetBytes(joined)) != MiniJson.Str(rows[i], "prev_hash")) firstBad = MiniJson.Num(rows[i], "seq", 0);
                     }
-                    Write(ctx, 200, D("rows", new List<object>(rows.ToArray()), "firstBadSeq", firstBad, "code", null));
+                    Dictionary<string, object> checkedChain = D("rows", new List<object>(rows.ToArray()), "firstBadSeq", firstBad, "code", null);
+                    string limits = "This check has no secret, so it misses three changes: an edit to the newest row, rows cut from the end, and a full rewrite of every row.";
+                    if (M("limits-names-two")) limits = "This check has no secret, so it misses two changes: an edit to the newest row, and rows cut from the end.";
+                    if (M("limits-only-on-pass") && firstBad != 0) limits = null;
+                    if (!M("limits-missing") && limits != null) checkedChain["limits"] = limits;
+                    Write(ctx, 200, checkedChain);
                     return;
                 }
             }
