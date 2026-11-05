@@ -63,6 +63,33 @@ namespace Acceptance
 
         public static byte[] X25519(byte[] scalar, byte[] u) { return NetSec.Crypto.X25519.Mult(scalar, u); }
 
+        /// <summary>
+        /// ASSUMED seam: public static Tls13Resumption Resume(Func&lt;IHash&gt; h, byte[] masterSecret, byte[] clientFinishedHash, byte[] ticketNonce)
+        /// with byte[] fields or properties ResumptionMasterSecret and ResumptionSecret. Found by reflection, so a missing seam NOT RUNs
+        /// this one clause and does not stop the group from compiling.
+        /// </summary>
+        public static void Resume(byte[] master, byte[] hashToClientFinished, byte[] nonce, out byte[] resMaster, out byte[] resumption)
+        {
+            System.Reflection.MethodInfo m = typeof(Tls13KeySchedule).GetMethod("Resume", BindingFlags.Public | BindingFlags.Static);
+            if (m == null) throw new NotRunException("DERIVE_LACKS_RESUMPTION", "Tls13KeySchedule has no static Resume(hash, masterSecret, clientFinishedHash, ticketNonce); the resumption secrets cannot be checked (CONTRACT.md)");
+            Func<IHash> h = Hashes.Sha256;
+            object res = m.Invoke(null, new object[] { h, master, hashToClientFinished, nonce });
+            resMaster = Member(res, "resumptionmastersecret");
+            resumption = Member(res, "resumptionsecret");
+        }
+
+        static byte[] Member(object o, string normName)
+        {
+            foreach (MemberInfo mi in o.GetType().GetMembers(BindingFlags.Public | BindingFlags.Instance))
+            {
+                if (mi.MemberType != MemberTypes.Field && mi.MemberType != MemberTypes.Property) continue;
+                if (Norm(mi.Name) != normName) continue;
+                FieldInfo f = mi as FieldInfo; PropertyInfo p = mi as PropertyInfo;
+                return (byte[])(f != null ? f.GetValue(o) : p.GetValue(o, null));
+            }
+            throw new NotRunException("DERIVE_LACKS_RESUMPTION", "the Resume result has no member " + normName);
+        }
+
         public static byte[] HmacSha256(byte[] key, byte[] data) { return Hmac.Compute(Hashes.Sha256, key, data); }
 
         /// <summary>HKDF-Expand-Label (RFC 8446 section 7.1) built on the product's Hkdf.Expand.</summary>

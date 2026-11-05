@@ -320,6 +320,122 @@ namespace Acceptance
             finally { l.Stop(); }
         }
 
+        // ---------------------------------------------------------------- sshpeer and gogateway, through the wrappers
+
+        static string Keygen(Ctx c, string dir, string type, string name)
+        {
+            string path = Path.Combine(dir, name);
+            if (File.Exists(path)) File.Delete(path);
+            if (File.Exists(path + ".pub")) File.Delete(path + ".pub");
+            string o;
+            string bits = type == "rsa" ? "-b 2048 " : "";
+            int code = Proc.Run(Referees.SshKeygen(c), "-q -t " + type + " " + bits + "-N \"\" -f \"" + path + "\"", dir, 60000, out o);
+            if (code != 0) throw new FailException("ssh-keygen -t " + type + " exited " + code + ": " + o);
+            OpenSshKey.RestrictToCurrentUser(path);
+            return path;
+        }
+
+        /// <summary>Runs ssh.exe with the given arguments and returns its exit code and output.</summary>
+        static int SshExe(Ctx c, string args, out string output)
+        {
+            return Proc.Run(Referees.SshExe(c), "-F NUL -o BatchMode=yes -o StrictHostKeyChecking=no -o UserKnownHostsFile=NUL -o ConnectTimeout=20 " + args, null, 60000, out output);
+        }
+
+        [Clause("SELF.referee-sshpeer-gogateway")]
+        public static string RefereeSshpeerGogateway(Ctx c)
+        {
+            string dir = Path.Combine(c.WorkDir, "refproto-ssh");
+            Directory.CreateDirectory(dir);
+            string host = Keygen(c, dir, "ed25519", "host"), user = Keygen(c, dir, "ed25519", "user"), other = Keygen(c, dir, "ed25519", "other");
+            string rsa = Keygen(c, dir, "rsa", "rsahost");
+            string authorized = user + ".pub";
+
+            // sshpeer, modern suite: ssh.exe runs echo hello. The handshake event names the algorithms.
+            using (GoPeer peer = GoPeer.StartListening(c, "sshpeer", "-listen 127.0.0.1:0 -naccept 1 -host-key \"" + host + "\" -authorized \"" + authorized + "\" -kex curve25519-sha256 -cipher aes128-ctr -mac hmac-sha2-256"))
+            {
+                string output;
+                int code = SshExe(c, "-i \"" + user + "\" -p " + peer.Port + " training@127.0.0.1 echo hello", out output);
+                Check.True(code == 0 && output.Contains("hello"), "ssh.exe against sshpeer exited " + code + ": " + output.Trim());
+                Dictionary<string, object> hs = peer.WaitEvent("handshake", 15000);
+                Check.True(hs != null, "sshpeer printed no handshake event: " + peer.Output);
+                Check.Equal("sshpeer kex", "curve25519-sha256", MiniJson.Str(hs, "kex"));
+                Check.Equal("sshpeer cipher", "aes128-ctr", MiniJson.Str(hs, "cipherC2S"));
+                Check.Equal("sshpeer host key", "ssh-ed25519", MiniJson.Str(hs, "hostKey"));
+            }
+            // Control: a key the server does not list gets no echo.
+            using (GoPeer peer = GoPeer.StartListening(c, "sshpeer", "-listen 127.0.0.1:0 -naccept 1 -host-key \"" + host + "\" -authorized \"" + authorized + "\""))
+            {
+                string output;
+                int code = SshExe(c, "-i \"" + other + "\" -p " + peer.Port + " training@127.0.0.1 echo hello", out output);
+                Check.True(code != 0 && !output.Contains("hello"), "ssh.exe with an unlisted key got through: exit " + code + " " + output.Trim());
+            }
+            // sshpeer, legacy suite flags from the README: the RSA host key and the old algorithms.
+            using (GoPeer peer = GoPeer.StartListening(c, "sshpeer", "-listen 127.0.0.1:0 -naccept 1 -host-key \"" + rsa + "\" -authorized \"" + authorized + "\" -kex diffie-hellman-group14-sha1 -cipher aes128-cbc -mac hmac-sha1 -host-key-alg ssh-rsa"))
+            {
+                string output;
+                int code = SshExe(c, "-o KexAlgorithms=+diffie-hellman-group14-sha1 -o HostKeyAlgorithms=+ssh-rsa -o Ciphers=+aes128-cbc -o MACs=+hmac-sha1 -i \"" + user + "\" -p " + peer.Port + " training@127.0.0.1 echo hello", out output);
+                Check.True(code == 0 && output.Contains("hello"), "ssh.exe against the legacy sshpeer exited " + code + ": " + output.Trim());
+                Dictionary<string, object> hs = peer.WaitEvent("handshake", 15000);
+                Check.True(hs != null, "legacy sshpeer printed no handshake event");
+                Check.Equal("legacy kex", "diffie-hellman-group14-sha1", MiniJson.Str(hs, "kex"));
+                Check.Equal("legacy host key", "ssh-rsa", MiniJson.Str(hs, "hostKey"));
+            }
+
+            // gogateway: ssh.exe -L reaches a direct-tcpip channel, the gateway opens TLS 1.3 to tlspeer, which echoes.
+            string openssl = Referees.OpenSsl(c), o2;
+            string cert = Path.Combine(dir, "c.pem"), tkey = Path.Combine(dir, "k.pem");
+            if (Proc.Run(openssl, "genpkey -algorithm ed25519 -out \"" + tkey + "\"", dir, 30000, out o2) != 0) throw new FailException(o2);
+            if (Proc.Run(openssl, "req -new -x509 -key \"" + tkey + "\" -subj \"/CN=localhost\" -days 2 -addext \"subjectAltName=DNS:localhost\" -out \"" + cert + "\"", dir, 30000, out o2) != 0) throw new FailException(o2);
+            string rogue = Path.Combine(dir, "rogue.pem"), rkey = Path.Combine(dir, "rogue.key");
+            if (Proc.Run(openssl, "genpkey -algorithm ed25519 -out \"" + rkey + "\"", dir, 30000, out o2) != 0) throw new FailException(o2);
+            if (Proc.Run(openssl, "req -new -x509 -key \"" + rkey + "\" -subj \"/CN=localhost\" -days 2 -addext \"subjectAltName=DNS:localhost\" -out \"" + rogue + "\"", dir, 30000, out o2) != 0) throw new FailException(o2);
+
+            string good = GatewayEcho(c, dir, host, authorized, user, cert, tkey, cert, "good");
+            Check.Equal("echo through gogateway", "hello", good);
+            // Control: the gateway trusts a different root than the TLS server's certificate, so nothing comes back.
+            string bad = GatewayEcho(c, dir, host, authorized, user, cert, tkey, rogue, "bad");
+            Check.True(bad != "hello", "gogateway echoed although it does not trust the server certificate");
+            return "sshpeer (modern and legacy suites, wrong-key control) and gogateway (echo through TLS 1.3, untrusted-root control), driven by ssh.exe through the wrappers";
+        }
+
+        /// <summary>Starts tlspeer (server) and gogateway, opens ssh.exe -L, sends hello, and returns what comes back (empty if nothing).</summary>
+        static string GatewayEcho(Ctx c, string dir, string host, string authorized, string user, string serverCert, string serverKey, string gatewayCa, string stem)
+        {
+            using (GoPeer srv = GoPeer.StartListening(c, "tlspeer", "-mode server -listen 127.0.0.1:0 -groups x25519mlkem768 -cert \"" + serverCert + "\" -key \"" + serverKey + "\""))
+            using (GoPeer gw = GoPeer.StartListening(c, "gogateway", "-listen 127.0.0.1:0 -host-key \"" + host + "\" -authorized \"" + authorized + "\" -next 127.0.0.1:" + srv.Port + " -ca \"" + gatewayCa + "\" -server-name localhost -groups x25519mlkem768"))
+            {
+                int fwd = Proc.FreePort();
+                using (Proc ssh = Proc.Start(Referees.SshExe(c), "-F NUL -o BatchMode=yes -o StrictHostKeyChecking=no -o UserKnownHostsFile=NUL -o ExitOnForwardFailure=yes -i \"" + user + "\" -L " + fwd + ":127.0.0.1:1 -N -p " + gw.Port + " training@127.0.0.1"))
+                {
+                    if (!Net.WaitPort(fwd, 30000)) throw new FailException("ssh.exe did not open the forward on " + fwd + ": " + ssh.AllOutput);
+                    string got = "";
+                    try
+                    {
+                        using (System.Net.Sockets.TcpClient cl = new System.Net.Sockets.TcpClient("127.0.0.1", fwd))
+                        {
+                            System.Net.Sockets.NetworkStream ns = cl.GetStream();
+                            byte[] msg = Encoding.ASCII.GetBytes("hello\n");
+                            ns.Write(msg, 0, msg.Length);
+                            ns.ReadTimeout = 8000;
+                            byte[] buf = new byte[64];
+                            int n = ns.Read(buf, 0, buf.Length);
+                            if (n > 0) got = Encoding.ASCII.GetString(buf, 0, n).Trim();
+                        }
+                    }
+                    catch (IOException) { }
+                    catch (System.Net.Sockets.SocketException) { }
+                    if (stem == "good")
+                    {
+                        if (got != "hello") throw new FailException("nothing echoed through gogateway. gogateway output: " + gw.Output + " | tlspeer output: " + srv.Output + " | ssh.exe output: " + ssh.AllOutput);
+                        Check.True(gw.WaitEvent("channel", 10000) != null, "gogateway printed no channel event: " + gw.Output);
+                        Dictionary<string, object> hs = srv.WaitEvent("handshake", 10000);
+                        Check.True(hs != null && MiniJson.Str(hs, "curveID") == "X25519MLKEM768", "tlspeer behind the gateway did not report X25519MLKEM768: " + srv.Output);
+                    }
+                    return got;
+                }
+            }
+        }
+
         [Clause("SELF.binproof-detector")]
         public static string BinProofDetector(Ctx c)
         {
@@ -404,6 +520,47 @@ namespace Acceptance
             foreach (string id in new string[] { "A3.tour.states-managed-heap-can-keep-copies", "A14.tours.static-schema-and-concept-cap", "A15.tours.reading-grade", "A15.tours.tic-gate" })
                 Check.True(b.ContainsKey(id) && b[id].StartsWith("FAIL:"), "bad root: " + id + " should FAIL, gave " + (b.ContainsKey(id) ? b[id] : "nothing"));
             return "empty root: all NOT RUN. good tour: 4 text clauses PASS, reader verdict NOT RUN by name. bad tour: heap statement, concept cap, reading grade and tic-gate all FAIL";
+        }
+
+        [Clause("SELF.ce-claim-scan-reads-claims-not-non-goals")]
+        public static string CeClaimScan(Ctx c)
+        {
+            const string id = "A16.wording.cf-compiled-never-run-on-ce";
+            const string wording = "CF-compiled, run on the desktop CLR, never run on CE";
+            string tmp = Path.Combine(c.WorkDir, "ce-claim");
+            // Control 1: a plan that lists the real-CE run as a non-goal passes.
+            string ok = Path.Combine(tmp, "ok");
+            WriteText(Path.Combine(ok, "app", "src", "ce.json"), "{\"label\":\"" + wording + "\"}");
+            WriteText(Path.Combine(ok, "docs", "prd.md"), "# PRD\n\n## Goals\n\nShow the parts.\n\n## Non-goals\n\n1. Production use.\n4. A run on a real CE device or emulator in this overnight run.\n\n## Notes\n\nThe label says " + wording + ".\n");
+            // A committed run report quotes the banned phrase when this very clause failed once. A report is a record, not a claim.
+            WriteText(Path.Combine(ok, "docs", "_runs", "acceptance-20260101-000000.md"), "| A16.wording | FAIL | claims of a CE run: 'run on a real CE device' |\n");
+            Dictionary<string, string> r1 = RunDocs(c, ok, id);
+            Check.True(r1[id].StartsWith("PASS:"), "a non-goal line must not count as a claim, got " + r1[id]);
+            // Control 2: the same sentence outside a non-goal section is a claim and FAILs.
+            string bad1 = Path.Combine(tmp, "bad-report");
+            WriteText(Path.Combine(bad1, "app", "src", "ce.json"), "{\"label\":\"" + wording + "\"}");
+            WriteText(Path.Combine(bad1, "docs", "closing.md"), "# Closing report\n\n## Results\n\nThe lab was run on a real CE device and passed.\n");
+            Dictionary<string, string> r2 = RunDocs(c, bad1, id);
+            Check.True(r2[id].StartsWith("FAIL:"), "a claim in a closing report must FAIL, got " + r2[id]);
+            // Control 3: a claim in the UI source FAILs.
+            string bad2 = Path.Combine(tmp, "bad-ui");
+            WriteText(Path.Combine(bad2, "app", "src", "ce.json"), "{\"label\":\"" + wording + "\"}");
+            WriteText(Path.Combine(bad2, "app", "src", "About.vue"), "<template><p>This build was tested on a real CE device.</p></template>");
+            Dictionary<string, string> r3 = RunDocs(c, bad2, id);
+            Check.True(r3[id].StartsWith("FAIL:"), "a claim in the UI source must FAIL, got " + r3[id]);
+            // Control 4: a claim under a heading that is not a non-goal heading, in the same file as a non-goal list, FAILs.
+            string bad3 = Path.Combine(tmp, "bad-after-non-goals");
+            WriteText(Path.Combine(bad3, "app", "src", "ce.json"), "{\"label\":\"" + wording + "\"}");
+            WriteText(Path.Combine(bad3, "docs", "prd.md"), "# PRD\n\n## Non-goals\n\n1. A run on a real CE device.\n\n## Results\n\nThe lab was run on a real CE device and passed.\n");
+            Dictionary<string, string> r4 = RunDocs(c, bad3, id);
+            Check.True(r4[id].StartsWith("FAIL:"), "a claim after the non-goal section must FAIL, got " + r4[id]);
+            return "a non-goal line passes; a claim in a closing report, in the UI source, and after the non-goal section each FAIL";
+        }
+
+        static void WriteText(string path, string text)
+        {
+            Directory.CreateDirectory(Path.GetDirectoryName(path));
+            File.WriteAllText(path, text);
         }
 
         [Clause("SELF.type-clause-bites")]

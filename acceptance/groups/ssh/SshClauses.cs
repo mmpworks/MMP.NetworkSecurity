@@ -116,6 +116,7 @@ namespace Acceptance
             PkiDir p = PkiDir.Export(c, "a8-hostkey");
             // The rogue key comes from ssh-keygen, so the attacker's key has no product code in it.
             string rogue = Path.Combine(p.Dir, "rogue_ed25519");
+            foreach (string old in new string[] { rogue, rogue + ".pub" }) if (File.Exists(old)) File.Delete(old);      // ssh-keygen asks before it overwrites
             string output;
             int code = Proc.Run(Referees.SshKeygen(c), "-q -t ed25519 -N \"\" -f \"" + rogue + "\"", p.Dir, 30000, out output);
             Check.True(code == 0, "ssh-keygen could not make the rogue key: " + output.Trim());

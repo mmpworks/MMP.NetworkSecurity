@@ -92,16 +92,6 @@
    ],
    "needsCore": true
   },
-  "nativeprod": {
-   "kind": "csharp",
-   "project": "groups/nativeprod/nativeprod.csproj",
-   "assembly": "Acceptance.NativeProd",
-   "builds": [
-    "net10",
-    "cf"
-   ],
-   "needsCore": true
-  },
   "native": {
    "kind": "csharp",
    "project": "groups/native/native.csproj",
@@ -111,6 +101,16 @@
     "cf"
    ],
    "needsCore": false
+  },
+  "nativeprod": {
+   "kind": "csharp",
+   "project": "groups/nativeprod/nativeprod.csproj",
+   "assembly": "Acceptance.NativeProd",
+   "builds": [
+    "net10",
+    "cf"
+   ],
+   "needsCore": true
   },
   "bridge": {
    "kind": "csharp",
@@ -2466,6 +2466,17 @@
    "counts": false
   },
   {
+   "id": "SELF.ce-claim-scan-reads-claims-not-non-goals",
+   "base": "SELF.ce-claim-scan-reads-claims-not-non-goals",
+   "assertion": "SELF",
+   "group": "selftest",
+   "build": "host",
+   "slice": "S0",
+   "referee": "stand-ins built on the BCL, python cryptography and real OpenSSL runs",
+   "roles": [],
+   "counts": false
+  },
+  {
    "id": "SELF.clauses-json-matches-code",
    "base": "SELF.clauses-json-matches-code",
    "assertion": "SELF",
@@ -2543,6 +2554,17 @@
    "counts": false
   },
   {
+   "id": "SELF.referee-sshpeer-gogateway",
+   "base": "SELF.referee-sshpeer-gogateway",
+   "assertion": "SELF",
+   "group": "selftest",
+   "build": "host",
+   "slice": "S0",
+   "referee": "stand-ins built on the BCL, python cryptography and real OpenSSL runs",
+   "roles": [],
+   "counts": false
+  },
+  {
    "id": "SELF.reference-passes",
    "base": "SELF.reference-passes",
    "assertion": "SELF",
@@ -2558,6 +2580,17 @@
    "base": "SELF.text-checks-bite",
    "assertion": "SELF",
    "group": "selftest",
+   "build": "host",
+   "slice": "S0",
+   "referee": "stand-ins built on the BCL, python cryptography and real OpenSSL runs",
+   "roles": [],
+   "counts": false
+  },
+  {
+   "id": "SELF.tool-cannot-start-still-reports",
+   "base": "SELF.tool-cannot-start-still-reports",
+   "assertion": "SELF",
+   "group": "driver",
    "build": "host",
    "slice": "S0",
    "referee": "stand-ins built on the BCL, python cryptography and real OpenSSL runs",
