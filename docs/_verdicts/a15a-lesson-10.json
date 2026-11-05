@@ -8,169 +8,197 @@
       "id": "L10-C01",
       "verdict": "accurate",
       "note": "Tours read at origin/fix/tour-10-enrolment head 8e77f1f (PR 34); names doc at main 279e9a1. Tours read at origin/fix/tour-10-enrolment commit ef3bf00 (PR 34). Claim text unchanged; verdict stands. Claim text unchanged from the first read; verdict stands. Tier: primary. The W3C Web Authentication Level 2 abstract: an API for 'the creation and use of strong, attested, scoped, public key-based credentials', 'each scoped to a given WebAuthn Relying Party', created by authenticators, with a user agent mediating access. The lab-scope sentence matches lesson-10-names.md (no browser, no authenticator).",
-      "checkedAgainst": "W3C Web Authentication Level 2, Abstract (page fetched this session); docs/lesson-10-names.md on origin/feat/s6 (read)"
+      "checkedAgainst": "W3C Web Authentication Level 2, Abstract (page fetched this session); docs/lesson-10-names.md on origin/feat/s6 (read)",
+      "textHash": "5cd35614965706ad9d5b77a2b274e1419573e02319e214a005577d4443dec80b"
     },
     {
       "id": "L10-C02",
       "verdict": "accurate",
       "note": "Tours read at origin/fix/tour-10-enrolment head 8e77f1f (PR 34); names doc at main 279e9a1. Claim text unchanged; source now cites f72acef, whose row still matches. Attacks: L10-replay-challenge, 'Sends the same ChallengeResponse a second time, after it earned a token', Rejected, CHALLENGE_REPLAY. Step S11 text matches ('after it has earned a token').",
-      "checkedAgainst": "docs/lesson-10-names.md on main 279e9a1 (read)"
+      "checkedAgainst": "docs/lesson-10-names.md on main 279e9a1 (read)",
+      "textHash": "8155815d3a4fa040b9de6ad7000bd2d741a837ac8efbc8d8bf2a288d96dea5bb"
     },
     {
       "id": "L10-C03",
       "verdict": "accurate",
       "note": "Tours read at origin/fix/tour-10-enrolment head 8e77f1f (PR 34); names doc at main 279e9a1. Tours read at origin/fix/tour-10-enrolment commit ef3bf00 (PR 34). Claim text unchanged; verdict stands. Claim text unchanged from the first read; verdict stands. RFC 7515 section 7.1: compact form is three BASE64URL parts joined by '.'. RFC 7519 section 4.1.4: exp is the time on or after which the JWT MUST NOT be accepted. The first sentence (a JWT is a set of claims carried in a JWS) is in RFC 7519 sections 2 and 3, which the source does not name. Suggest adding RFC 7519 section 3.",
-      "checkedAgainst": "RFC 7515 section 7.1; RFC 7519 sections 3, 4.1.4 (RFC text fetched from rfc-editor.org this session)"
+      "checkedAgainst": "RFC 7515 section 7.1; RFC 7519 sections 3, 4.1.4 (RFC text fetched from rfc-editor.org this session)",
+      "textHash": "b82006f01b3a73a23c47022c2863c94655d584f1472d2f12e9aed8f826bcf8d5"
     },
     {
       "id": "L10-C04",
       "verdict": "accurate",
       "note": "Tours read at origin/fix/tour-10-enrolment head 8e77f1f (PR 34); names doc at main 279e9a1. Tours read at origin/fix/tour-10-enrolment commit ef3bf00 (PR 34). Claim text unchanged; verdict stands. Claim text unchanged from the first read; verdict stands. RFC 9449 section 4.2: a DPoP proof is a JWT signed with a private key chosen by the client; the header carries typ, alg, jwk (public key); the payload carries jti, htm, htu, iat, and ath when used with an access token.",
-      "checkedAgainst": "RFC 9449 section 4.2 (RFC text fetched from rfc-editor.org this session)"
+      "checkedAgainst": "RFC 9449 section 4.2 (RFC text fetched from rfc-editor.org this session)",
+      "textHash": "0b47090b0e5d7e541ca77a33dafce194cd2e33f67ee8963300fabe095136e06e"
     },
     {
       "id": "L10-C05",
       "verdict": "accurate",
       "note": "Tours read at origin/fix/tour-10-enrolment head 8e77f1f (PR 34); names doc at main 279e9a1. Claim text unchanged; source now cites f72acef, whose row still matches. Claim text unchanged; verdict stands. Claim text unchanged from the first read; verdict stands. RFC 9449 Abstract: 'a mechanism for sender-constraining OAuth 2.0 tokens via a proof-of-possession mechanism on the application level'. Lab: the names doc check 'proof binding' and code DPOP_JKT_MISMATCH apply the idea to the lab's own token.",
-      "checkedAgainst": "RFC 9449 Abstract; docs/lesson-10-names.md (read)"
+      "checkedAgainst": "RFC 9449 Abstract; docs/lesson-10-names.md (read)",
+      "textHash": "b0ce11d4655a7b4d123da3f7367c8bff0104c83af371ca7a70143798c2f78420"
     },
     {
       "id": "L10-C06",
       "verdict": "accurate",
       "note": "Tours read at origin/fix/tour-10-enrolment head 8e77f1f (PR 34); names doc at main 279e9a1. Tours read at origin/fix/tour-10-enrolment commit ef3bf00 (PR 34). Claim text unchanged; verdict stands. Claim text unchanged from the first read; verdict stands. Section 11.1: servers 'MUST only accept DPoP proofs for a limited time after their creation'; they 'can store the jti value'; a single-use check 'may not always be feasible in practice, e.g., when multiple servers behind a single endpoint have no shared state'.",
-      "checkedAgainst": "RFC 9449 section 11.1 (RFC text fetched from rfc-editor.org this session)"
+      "checkedAgainst": "RFC 9449 section 11.1 (RFC text fetched from rfc-editor.org this session)",
+      "textHash": "e12c7f338a678726a97dd525d097dd274dd87c7d4de7af4cab9ca494816d141a"
     },
     {
       "id": "L10-C07",
       "verdict": "accurate",
       "note": "Tours read at origin/fix/tour-10-enrolment head 8e77f1f (PR 34); names doc at main 279e9a1. Claim text unchanged; source now cites f72acef, whose row still matches. Claim text unchanged; verdict stands. Claim text unchanged from the first read; verdict stands. lesson-10-names.md Roles and capabilities: read-totals needs role cashier or manager; void-sale and refund each need a capability of that name; the normal token holds roles [cashier] and cap [void-sale].",
-      "checkedAgainst": "docs/lesson-10-names.md (read)"
+      "checkedAgainst": "docs/lesson-10-names.md (read)",
+      "textHash": "68ad71ebf3ab2870ff441b60c73dfb9d1def06b4fb027ff458717b7068cd2052"
     },
     {
       "id": "L10-C08",
       "verdict": "accurate",
       "note": "Tours read at origin/fix/tour-10-enrolment head 8e77f1f (PR 34); names doc at main 279e9a1. Tours read at origin/fix/tour-10-enrolment commit ef3bf00 (PR 34). Claim now reads 'A TLS server that authenticates with a certificate may optionally request a certificate from the client.' RFC 8446 section 4.3.2: 'A server which is authenticating with a certificate MAY optionally request a certificate from the client.' The second half (client then sends Certificate and CertificateVerify) moved to C17.",
-      "checkedAgainst": "RFC 8446 section 4.3.2 (RFC text fetched this session)"
+      "checkedAgainst": "RFC 8446 section 4.3.2 (RFC text fetched this session)",
+      "textHash": "0ded083a9a5cf4e5000f1ff79071c2cc201f345b8c4a85b7ff685dc59b826660"
     },
     {
       "id": "L10-C09",
       "verdict": "accurate",
       "note": "Tours read at origin/fix/tour-10-keys-and-names commit 61d3265 (PR 59, open); lab run at main 5440eeb (PR 69 merged). Source line changed; claim re-read. Tours read at origin/fix/tour-10-enrolment head 8e77f1f (PR 34); names doc at main 279e9a1. Names doc: Roles and capabilities, last paragraph: 'A signature shows who calls only because the key was enrolled ahead of time. The lab enrols one device for one subject before the login starts.' Check table: 'device enrolled'. Order mutual TLS, login, calls: the Mutual TLS section. 'In the clear': the opening paragraph says a token shows on the wire and a real system sends it inside TLS. That paragraph still says 'The lab has no TLS yet', which contradicts the Mutual TLS section; the claim uses the reading that fits both. Richard should fix that sentence.",
-      "checkedAgainst": "docs/lesson-10-names.md on main 279e9a1 (read)"
+      "checkedAgainst": "docs/lesson-10-names.md on main 279e9a1 (read)",
+      "textHash": "a0244991fd1c753601ff6e28f0938cff3194aa7628fbc155590d04137ac8a62a"
     },
     {
       "id": "L10-C10",
       "verdict": "accurate",
       "note": "Tours read at origin/fix/tour-10-enrolment head 8e77f1f (PR 34); names doc at main 279e9a1. Tours read at origin/fix/tour-10-enrolment commit ef3bf00 (PR 34). Claim text unchanged; verdict stands. RFC 4252 section 7: 'The server MUST check that the key is a valid authenticator for the user, and MUST check that the signature is valid.' It is an SSH rule used here as outside support for the enrolment idea; the tour step is about the lab.",
-      "checkedAgainst": "RFC 4252 section 7 (fetched)"
+      "checkedAgainst": "RFC 4252 section 7 (fetched)",
+      "textHash": "723a85534a7581e6b6e3f7264c50a49512fd596937de89605f2c8af7037c9570"
     },
     {
       "id": "L10-C11",
       "verdict": "accurate",
       "note": "Tours read at origin/fix/tour-10-enrolment head 8e77f1f (PR 34); names doc at main 279e9a1. Attacks: L10-unknown-device, 'Logs in with a key nobody enrolled', Rejected, DEVICE_NOT_ENROLLED, check 'device enrolled'. The claim no longer says 'before any challenge', which this names version does not state.",
-      "checkedAgainst": "docs/lesson-10-names.md on main 279e9a1 (read)"
+      "checkedAgainst": "docs/lesson-10-names.md on main 279e9a1 (read)",
+      "textHash": "372bce7b42fa60ede12f5535e977a3eedb192321ade8eb1393e29a9ec619e7be"
     },
     {
       "id": "L10-C12",
       "verdict": "accurate",
       "note": "Tours read at origin/fix/tour-10-keys-and-names commit 61d3265 (PR 59, open); lab run at main 5440eeb (PR 69 merged). Source line changed; claim re-read. Tours read at origin/fix/tour-10-enrolment head 8e77f1f (PR 34); names doc at main 279e9a1. Claim text unchanged; source now cites f72acef, whose row still matches. Check table: 'challenge issued ... The answered challenge is the one this login issued'; Attacks: L10-unissued-challenge, CHALLENGE_NOT_ISSUED. PR 20 review not read.",
-      "checkedAgainst": "docs/lesson-10-names.md on main 279e9a1 (read)"
+      "checkedAgainst": "docs/lesson-10-names.md on main 279e9a1 (read)",
+      "textHash": "49dfa3d067897b835c189f1ce563ea18e6339dcb3a369702958989b5fff316d3"
     },
     {
       "id": "L10-C13",
       "verdict": "accurate",
       "note": "Tours read at origin/fix/tour-10-enrolment head 8e77f1f (PR 34); names doc at main 279e9a1. RFC 7519 4.1.1 iss, 4.1.2 sub, 4.1.3 aud definitions match. Names doc: the normal token holds iss, aud, sub, roles, cap, iat, exp and cnf.jkt.",
-      "checkedAgainst": "RFC 7519 sections 4.1.1 to 4.1.3 (RFC text fetched this session); docs/lesson-10-names.md on main 279e9a1 (read)"
+      "checkedAgainst": "RFC 7519 sections 4.1.1 to 4.1.3 (RFC text fetched this session); docs/lesson-10-names.md on main 279e9a1 (read)",
+      "textHash": "f0ec194863ab9c5818312aef2092f01b89c9dd90c977b52594f3877a194d3928"
     },
     {
       "id": "L10-C14",
       "verdict": "accurate",
       "note": "Tours read at origin/fix/tour-10-enrolment head 8e77f1f (PR 34); names doc at main 279e9a1. The audience step is back. RFC 7519 4.1.3: 'Each principal intended to process the JWT MUST identify itself with a value in the audience claim. If the principal processing the claim does not identify itself with a value in the aud claim when this claim is present, then the JWT MUST be rejected.' The claim leaves out 'when this claim is present', which the lab token always satisfies.",
-      "checkedAgainst": "RFC 7519 section 4.1.3 (RFC text fetched this session)"
+      "checkedAgainst": "RFC 7519 section 4.1.3 (RFC text fetched this session)",
+      "textHash": "3a77c06ad15746cb028a56df699d89af4752b5966f0ddbfedfaa21b676da7cfc"
     },
     {
       "id": "L10-C15",
       "verdict": "accurate",
       "note": "Tours read at origin/fix/tour-10-enrolment head 8e77f1f (PR 34); names doc at main 279e9a1. Attacks: L10-wrong-audience, 'The issuer writes the token for another server', Rejected, TOKEN_BAD_AUDIENCE, check 'token audience'.",
-      "checkedAgainst": "docs/lesson-10-names.md on main 279e9a1 (read)"
+      "checkedAgainst": "docs/lesson-10-names.md on main 279e9a1 (read)",
+      "textHash": "879c65a49e2e390a93004880b308331755a00400063091b65e036c00d7ff3457"
     },
     {
       "id": "L10-C16",
       "verdict": "accurate",
       "note": "Tours read at origin/fix/tour-10-keys-and-names commit 61d3265 (PR 59, open); lab run at main 5440eeb (PR 69 merged). Source line changed; claim re-read. Tours read at origin/fix/tour-10-enrolment head 8e77f1f (PR 34); names doc at main 279e9a1. Check table: proof age, iat within 60 seconds. 'No DPoP nonce': the check table lists none, and Auth.cs line 191 says 'this lab supplies no nonce, which sections 8 and 9 make optional'. 'One run only': Lesson10Auth.cs Session._seen is a per-session dictionary (line 79).",
-      "checkedAgainst": "docs/lesson-10-names.md on main 279e9a1 (read); src/NetSec.Core/Auth/Auth.cs, src/NetSec.Core/Labs/Lesson10Auth.cs at f72acef (read)"
+      "checkedAgainst": "docs/lesson-10-names.md on main 279e9a1 (read); src/NetSec.Core/Auth/Auth.cs, src/NetSec.Core/Labs/Lesson10Auth.cs at f72acef (read)",
+      "textHash": "d0b92fd067884116f059d9753981f6b263d52b6f59d612f35326e0ac40405f4a"
     },
     {
       "id": "L10-C17",
       "verdict": "accurate",
       "note": "Tours read at origin/fix/tour-10-enrolment head 8e77f1f (PR 34); names doc at main 279e9a1. Tours read at origin/fix/tour-10-enrolment commit ef3bf00 (PR 34). RFC 8446 section 4.4.3: CertificateVerify 'is used to provide explicit proof that an endpoint possesses the private key corresponding to its certificate ... Clients MUST send this message whenever authenticating via a certificate'.",
-      "checkedAgainst": "RFC 8446 section 4.4.3 (RFC text fetched this session)"
+      "checkedAgainst": "RFC 8446 section 4.4.3 (RFC text fetched this session)",
+      "textHash": "9516a93e26f9e29038af83777db04409525dc99916559bc66451430f11a51a96"
     },
     {
       "id": "L10-C18",
       "verdict": "accurate",
       "note": "Tours read at origin/fix/tour-10-enrolment head 8e77f1f (PR 34); names doc at main 279e9a1. Text now reads 'desired but none was provided by the client'. RFC 8446 section 6.2: 'certificate_required: Sent by servers when a client certificate is desired but none was provided by the client.' Section 4.4.2.4: on an empty Certificate the server MAY continue without client authentication or abort with certificate_required. Number 116 is in the AlertDescription list.",
-      "checkedAgainst": "RFC 8446 sections 4.4.2.4, 6.2 (RFC text fetched this session)"
+      "checkedAgainst": "RFC 8446 sections 4.4.2.4, 6.2 (RFC text fetched this session)",
+      "textHash": "d315ee2356371f782fe9688f895489bd8d04b8c3939f99b2bacc50197a5e4044"
     },
     {
       "id": "L10-C19",
       "verdict": "accurate",
       "note": "Tours read at origin/fix/tour-10-enrolment head 8e77f1f (PR 34); names doc at main 279e9a1. Text now reads: the removed-certificate row ends with TLS13_CERT_REQUIRED and alert 116, and the UX design lesson 10 row lists the certificate_required alert for this try-it. Names doc, Mutual TLS attack table: L10-remove-client-cert, TLS13_CERT_REQUIRED, check 'certificate_required alert', 116. docs/ux-design.md on main, section 8, lesson 10 row, now lists 'certificate_required alert'. Small stale item in the names doc, not in the claim: its last Mutual TLS paragraph still says 'ux-design.md section 7'; the row is in section 8.",
-      "checkedAgainst": "docs/lesson-10-names.md on main 279e9a1 (read); docs/ux-design.md section 8 at main a016c16 (read)"
+      "checkedAgainst": "docs/lesson-10-names.md on main 279e9a1 (read); docs/ux-design.md section 8 at main a016c16 (read)",
+      "textHash": "bb392f0a2538afbf79a1f34458a7aa0b65ba4afa0f1443901c89b70fd663ee8f"
     },
     {
       "id": "L10-C20",
       "verdict": "accurate",
       "note": "Tours read at origin/fix/tour-10-enrolment head 8e77f1f (PR 34); names doc at main 279e9a1. Tours read at origin/fix/tour-10-enrolment commit ef3bf00 (PR 34). RFC 8446 section 6.2: 'bad_certificate: A certificate was corrupt, contained signatures that did not verify correctly, etc.' Number 42 in the AlertDescription list. Names doc: L10-corrupt-client-cert, TLS13_BAD_CERTIFICATE.",
-      "checkedAgainst": "RFC 8446 section 6.2 (alert list, bad_certificate(42)) (RFC text fetched this session)"
+      "checkedAgainst": "RFC 8446 section 6.2 (alert list, bad_certificate(42)) (RFC text fetched this session)",
+      "textHash": "26ec0251ff9e07727185593b6bfc916e01d32433924835c245f4456c85d1067e"
     },
     {
       "id": "L10-C21",
       "verdict": "accurate",
       "note": "Tours read at origin/fix/tour-10-enrolment head 8e77f1f (PR 34); names doc at main 279e9a1. Tours read at origin/fix/tour-10-enrolment commit ef3bf00 (PR 34). RFC 9449 section 8: 'An authorization server MAY supply a nonce value to be included by the client in DPoP proofs'; the nonce is used 'to limit the lifetime of DPoP proofs'. 'MAY' makes it optional.",
-      "checkedAgainst": "RFC 9449 section 8 (RFC text fetched this session)"
+      "checkedAgainst": "RFC 9449 section 8 (RFC text fetched this session)",
+      "textHash": "3e26e2c52f8226f5dec53f053e556cb2691dc9c3e012b29a5c687144635421de"
     },
     {
       "id": "L10-C22",
       "verdict": "accurate",
       "note": "Tour re-read at origin/fix/tour-10-keys-and-names commit cf7712c (PR 59, open). Claim now reads 'The login key is drawn from the run's seed (the same seed gives the same key)', which matches my runs (seeds 1, 2, 3 differ; seed 1 repeats). Tours read at origin/fix/tour-10-keys-and-names commit 61d3265 (PR 59, open); lab run at main 5440eeb (PR 69 merged). Lesson10Auth.cs: the certificate uses KeyIds.ClientTlsEd25519 (fixed); the login key is a seed drawn from the run seed. Lab run, device-key secret for seeds 1, 2, 3, 1: f5f2384c..., 9482cece..., c362923a..., f5f2384c...; so it differs per seed and repeats for the same seed. The claim says 'a different seed drawn for each run'; precise wording is 'drawn from the run's seed'. The call phase streams are auth-call, with no certificate event.",
-      "checkedAgainst": "src/NetSec.Core/Labs/Lesson10Auth.cs (read); lab run on main 5440eeb"
+      "checkedAgainst": "src/NetSec.Core/Labs/Lesson10Auth.cs (read); lab run on main 5440eeb",
+      "textHash": "769c6a41a537884d073e817d8492e69cb60339a61a6e92f7723c216529cccc8b"
     },
     {
       "id": "L10-C23",
       "verdict": "accurate",
       "note": "Tours read at origin/fix/tour-10-keys-and-names commit 61d3265 (PR 59, open); lab run at main 5440eeb (PR 69 merged). Jared's re-check of PR 20 (comment 6658016121) says 'Name matching is the application's job'. RFC 5280 binds name and key in the certificate; RFC 9525 section 6 puts name verification with the client application. The lab does it in Tls13ServerTable.cs: ExpectedClientName compared with leaf.SubjectIs after the chain check.",
-      "checkedAgainst": "Jared's comment (read); RFC 9525 section 6 (fetched earlier); src/NetSec.Core/Tls13/Tls13ServerTable.cs (read)"
+      "checkedAgainst": "Jared's comment (read); RFC 9525 section 6 (fetched earlier); src/NetSec.Core/Tls13/Tls13ServerTable.cs (read)",
+      "textHash": "d3d1f4a00a1c9cd0ba23c059786499ef3ce345bdcfebbe0914e1a72ba544001b"
     },
     {
       "id": "L10-C24",
       "verdict": "accurate",
       "note": "Tours read at origin/fix/tour-10-keys-and-names commit 61d3265 (PR 59, open); lab run at main 5440eeb (PR 69 merged). Lab run L10-wrong-client-name: failedCode TLS13_CLIENT_NAME_REFUSED, failedCheck 'client name' (actor server); the client receives alert level 2, number 49. Lesson10Auth.cs line 171 issues a certificate named bank-hsm-admin to the attacker key under the training CA.",
-      "checkedAgainst": "lab run on main 5440eeb"
+      "checkedAgainst": "lab run on main 5440eeb",
+      "textHash": "5106d276ad24bd04224f4b4e1077a38142f2a2ba971d56a31dd313c63c964d98"
     },
     {
       "id": "L10-C25",
       "verdict": "accurate",
       "note": "Tours read at origin/fix/tour-10-keys-and-names commit 61d3265 (PR 59, open); lab run at main 5440eeb (PR 69 merged). RFC 8446 section 6.2: 'access_denied: A valid certificate or PSK was received, but when access control was applied, the sender decided not to proceed with negotiation.' The claim drops 'or PSK', which does not matter here.",
-      "checkedAgainst": "RFC 8446 section 6.2 (fetched this session)"
+      "checkedAgainst": "RFC 8446 section 6.2 (fetched this session)",
+      "textHash": "a42085b5c112ec4037d15ccc102527ac290535f2d14bcb0339e46184435c9b2b"
     },
     {
       "id": "L10-C26",
       "verdict": "accurate",
       "note": "Tours read at origin/fix/tour-10-keys-and-names commit 61d3265 (PR 59, open); lab run at main 5440eeb (PR 69 merged). Code: the check is leaf.SubjectIs(ExpectedClientName) and nothing else; a certificate that carries the allowed name passes whichever key it names, as long as the chain is good and CertificateVerify then proves that key. Read, not run.",
-      "checkedAgainst": "src/NetSec.Core/Tls13/Tls13ServerTable.cs lines 121 to 122 (read)"
+      "checkedAgainst": "src/NetSec.Core/Tls13/Tls13ServerTable.cs lines 121 to 122 (read)",
+      "textHash": "18b042a828e9428113dc771cf8460df52b4a47cd758d1d9cd4e22fce998f0786"
     },
     {
       "id": "L10-C27",
       "verdict": "accurate",
       "note": "Tours read at origin/fix/tour-10-keys-and-names commit 61d3265 (PR 59, open); lab run at main 5440eeb (PR 69 merged). Lesson10Auth.cs Body: RunMutualTls runs first on streams auth-mtls and stops the lab if it does not complete; the login runs on auth-login with a separate Session that holds no certificate. Lab run confirms the streams.",
-      "checkedAgainst": "lab run on main 5440eeb; src/NetSec.Core/Labs/Lesson10Auth.cs (read)"
+      "checkedAgainst": "lab run on main 5440eeb; src/NetSec.Core/Labs/Lesson10Auth.cs (read)",
+      "textHash": "9ca23fdbb5695ef88aab99c0306dffe585b4d60a8b2fba5740e46674e08f6b25"
     },
     {
       "id": "L10-C28",
       "verdict": "accurate",
       "note": "Tours read at origin/fix/tour-10-keys-and-names commit 61d3265 (PR 59, open); lab run at main 5440eeb (PR 69 merged). Lab run: the call stream (auth-call) has token, proof and permission checks and no certificate event.",
-      "checkedAgainst": "lab run on main 5440eeb"
+      "checkedAgainst": "lab run on main 5440eeb",
+      "textHash": "d70d961c19db4d4b1d793653d74859bed6f5d04c2f1bf707384ec7ce5a4aefeb"
     }
   ],
   "textRead": {
@@ -226,6 +254,8 @@
       "New sentences read and run: S03 (TLS key, name check pointer), S07 (client name check, alert 49, name-only limit), S08 (issuer reads no certificate, separate connections), S13 (signature would verify), S19 (60 seconds either way), S20 (calls read no certificate), S21.",
       "S07 sentence fixed: 'The chain is fine, but the name is wrong, so the server refuses before it reads the signature.' In the L10-wrong-client-name run the server fails client name and CertificateVerify never runs, so the sentence is accurate. Re-run on main 5440eeb: control and all 13 attack rows behave as the steps say; all event binds hit; device-key secret differs for seeds 1, 2, 3 and repeats for seed 1."
     ],
-    "problemsOpen": 0
+    "problemsOpen": 0,
+    "textHash": "bace3a42424a1bb74149f286be97be55afd4dd604f0cf913a49c8661b32475a5",
+    "boundAt": "main f43b560: the tour text and claims on main equal the versions I judged (compared step by step and claim by claim); hashes stamped by acceptance/checks/docs_checks.py --hashes logic"
   }
 }

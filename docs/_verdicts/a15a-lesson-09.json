@@ -8,43 +8,50 @@
       "id": "L9-C01",
       "verdict": "accurate",
       "note": "Tour re-read at origin/feat/tour-9 commit 7ade295 (PR 63, open). Claim now reads 'a trace id, the card number and the KSN in the clear, the PIN block locked, and a 16-byte CMAC over every byte before it'. PinEnvelope.cs: version, traceId, pan, ksn, lockedPinBlock, mac (16 bytes); Covered is every byte before the MAC. Matches. Tour read at origin/feat/tour-9 commit dd08db0 (PR 63, open); lab run at origin/feat/lesson-9 56dd320 (PR 71, open). Lab run: pin.block.locked plain is the envelope. PinEnvelope.cs: version, trace id, card number, KSN, locked PIN block, CMAC. The claim says what it carries and does not say 'only'. PinPadCore.InjectedInitialKey exists (line 83). The pad reads no base key (names doc item 4; test pinned there).",
-      "checkedAgainst": "src/NetSec.Core/Bridge/PinEnvelope.cs (read); lab run, lesson 9"
+      "checkedAgainst": "src/NetSec.Core/Bridge/PinEnvelope.cs (read); lab run, lesson 9",
+      "textHash": "e64a8dd12af5999385847ef40041da7bc82b4523d7f129ef0d2257c6fc7232c1"
     },
     {
       "id": "L9-C02",
       "verdict": "accurate",
       "note": "Tour read at origin/feat/tour-9 commit dd08db0 (PR 63, open); lab run at origin/feat/lesson-9 56dd320 (PR 71, open). Names doc section 5 item 3 states it; CeDeviceFlow reads the card number and KSN only (names doc). Not run beyond the lab trace: ce.envelope.taken shows the envelope and no CE secret event exists.",
-      "checkedAgainst": "docs/lesson-9-names.md on feat/lesson-9 (read); lab run"
+      "checkedAgainst": "docs/lesson-9-names.md on feat/lesson-9 (read); lab run",
+      "textHash": "914a715689db3400b7a7bbfaeab5c2b3cb6ae035eb4b4f803cb2635d79d6a218"
     },
     {
       "id": "L9-C03",
       "verdict": "accurate",
       "note": "Tour read at origin/feat/tour-9 commit dd08db0 (PR 63, open); lab run at origin/feat/lesson-9 56dd320 (PR 71, open). Lab run: ce/ssh check 'known_hosts match' passes before any data. Lesson 8 behaviour reproduced earlier: no line gives SSH_HOST_KEY_UNKNOWN. RFC 4251 section 4.1 describes the local database model.",
-      "checkedAgainst": "lab run; RFC 4251 section 4.1 (fetched this session)"
+      "checkedAgainst": "lab run; RFC 4251 section 4.1 (fetched this session)",
+      "textHash": "7d61b68c1fb7d16bb890995d714ae66ad930175e835a5a207b5b59a93607e9d4"
     },
     {
       "id": "L9-C04",
       "verdict": "accurate",
       "note": "Tour read at origin/feat/tour-9 commit dd08db0 (PR 63, open); lab run at origin/feat/lesson-9 56dd320 (PR 71, open). Lab run: gateway.envelope.relayed detail 'PIN block: gateway cannot open this'; the gateway stream holds no DUKPT secret. The envelope includes the trace id in clear (PinEnvelope.cs).",
-      "checkedAgainst": "lab run; src/NetSec.Core/Bridge/PinEnvelope.cs (read)"
+      "checkedAgainst": "lab run; src/NetSec.Core/Bridge/PinEnvelope.cs (read)",
+      "textHash": "a80d60fc7a9e1900dae0e44e8f4c3231f47b74389cd2b10042fa23bede44c1b6"
     },
     {
       "id": "L9-C05",
       "verdict": "accurate",
       "note": "Tour read at origin/feat/tour-9 commit dd08db0 (PR 63, open); lab run at origin/feat/lesson-9 56dd320 (PR 71, open). Lab run L9-flip-pin-block: failedCode DUKPT_MAC_MISMATCH, failedCheck 'PIN block MAC at bank'; hop 1 shows passing packet MAC checks and hop 2 shows no AEAD failure before the bank check fails. The CE then relays the reply code DUKPT_MAC_MISMATCH.",
-      "checkedAgainst": "lab run, lesson 9"
+      "checkedAgainst": "lab run, lesson 9",
+      "textHash": "ad818dc2addc0315bfa49da6b3dcc0c67f50903a65a4b7d35e0424853d849ae9"
     },
     {
       "id": "L9-C06",
       "verdict": "accurate",
       "note": "Tour read at origin/feat/tour-9 commit dd08db0 (PR 63, open); lab run at origin/feat/lesson-9 56dd320 (PR 71, open). PinEnvelope.cs BankReply.Build: one byte for the result, then the code as text; no MAC in the reply. Note for the step text: the reply rides inside the sealed hops, so 'no seal' means no end-to-end seal.",
-      "checkedAgainst": "src/NetSec.Core/Bridge/PinEnvelope.cs lines 242 to 254 (read)"
+      "checkedAgainst": "src/NetSec.Core/Bridge/PinEnvelope.cs lines 242 to 254 (read)",
+      "textHash": "95e025004c7134a9fc0041e0e56070f5efe4e3fd4079f5086af8f6cbd872865b"
     },
     {
       "id": "L9-C07",
       "verdict": "accurate",
       "note": "Tour read at origin/feat/tour-9 commit dd08db0 (PR 63, open); lab run at origin/feat/lesson-9 56dd320 (PR 71, open). Same PRD spike row as L7-C14: nothing can run on real CE in this run; engines are CF-compiled binaries run on the desktop CLR.",
-      "checkedAgainst": "docs/prd.md Spike results (read)"
+      "checkedAgainst": "docs/prd.md Spike results (read)",
+      "textHash": "c993d65409707f780f47cbe73b0d88c3d82940ae26e2410fcb934d868bbf904d"
     }
   ],
   "textRead": {
@@ -84,6 +91,8 @@
       "Every try-it behaves as written: L9-tamper-hop1 fails packet MAC at the gateway, L9-tamper-hop2 fails AEAD tag at the server, L9-flip-pin-block passes both hop checks and fails at the bank.",
       "S06 says hop 2 uses the hybrid exchange from lesson 5: the gateway ClientHello is 1,316 bytes, the same as lesson 5.",
       "Fixes read: S01 'five parts' with the bank; S02 'five things: a trace id, the card number, the KSN, the locked PIN block, and a seal (a CMAC over all the rest)'; S11 'no end-to-end seal ... rides inside the sealed hops, but the CE cannot check where it came from'. All three match PinEnvelope.cs and BankReply."
-    ]
+    ],
+    "textHash": "17a0053f33ba40ef4f4c7a5c94778b0b6d1485351ae11586b5fb40947b33581f",
+    "boundAt": "main f43b560: the tour text and claims on main equal the versions I judged (compared step by step and claim by claim); hashes stamped by acceptance/checks/docs_checks.py --hashes logic"
   }
 }

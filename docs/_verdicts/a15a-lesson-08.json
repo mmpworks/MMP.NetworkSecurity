@@ -8,145 +8,169 @@
       "id": "L8-C01",
       "verdict": "accurate",
       "note": "Tours read at origin/feat/tours-7-8-10 (PR 25, commit 150b732). RFC 4253 section 4.2: 'both sides MUST send an identification string', before the binary packet protocol.",
-      "checkedAgainst": "RFC 4253 section 4.2 (RFC text fetched from rfc-editor.org this session)"
+      "checkedAgainst": "RFC 4253 section 4.2 (RFC text fetched from rfc-editor.org this session)",
+      "textHash": "40eb652ef291674e3bbae8f4918140ff8caec9a192ae82d48c5ae775b1fc4fb8"
     },
     {
       "id": "L8-C02",
       "verdict": "accurate",
       "note": "Tours read at origin/feat/tours-7-8-10 (PR 25, commit 150b732). RFC 4253 section 7.1: each side sends SSH_MSG_KEXINIT with name-lists; the algorithm is chosen by the client-ordered iteration rule ('Choose the first algorithm that satisfies the following conditions').",
-      "checkedAgainst": "RFC 4253 section 7.1 (RFC text fetched from rfc-editor.org this session)"
+      "checkedAgainst": "RFC 4253 section 7.1 (RFC text fetched from rfc-editor.org this session)",
+      "textHash": "00b74936322078ab8eeb467062a1f90c161049d48f698804b97008009748e5b7"
     },
     {
       "id": "L8-C03",
       "verdict": "accurate",
       "note": "Tours read at origin/feat/tours-7-8-10 (PR 25, commit 150b732). RFC 8731 section 3: 'The protocol flow, the SSH_MSG_KEX_ECDH_INIT and SSH_MSG_KEX_ECDH_REPLY messages, and the structure of the exchange hash are identical to Section 4 of [RFC5656]'; the methods use Curve25519 per RFC 7748.",
-      "checkedAgainst": "RFC 8731 section 3 (RFC text fetched from rfc-editor.org this session)"
+      "checkedAgainst": "RFC 8731 section 3 (RFC text fetched from rfc-editor.org this session)",
+      "textHash": "52b32db74ddcf8d36161501f6c323adedac6c74ab349d43e28266a90834e7d55"
     },
     {
       "id": "L8-C04",
       "verdict": "accurate",
       "note": "Tours read at origin/feat/tours-7-8-10 (PR 25, commit 150b732). RFC 7748 section 6.1: both parties MAY check for the all-zero value and abort. RFC 8731 section 3: implementations 'MUST check whether the computed Diffie-Hellman shared secret is the all-zero value and abort if so'.",
-      "checkedAgainst": "RFC 7748 section 6.1; RFC 8731 section 3 (RFC text fetched from rfc-editor.org this session)"
+      "checkedAgainst": "RFC 7748 section 6.1; RFC 8731 section 3 (RFC text fetched from rfc-editor.org this session)",
+      "textHash": "5ead68387cd1fdc37a29a253a7d51dedf0ca8ae6a1a5feb15d9ebff79c7138de"
     },
     {
       "id": "L8-C05",
       "verdict": "accurate",
       "note": "Tours read at origin/feat/tours-7-8-10 (PR 25, commit 150b732). RFC 4251 section 9.3.4: 'This protocol makes no assumptions or provisions for an infrastructure or means for distributing the public keys of hosts' and such use 'is vulnerable to man-in-the-middle attacks'. Section 4.1 gives the strategy of accepting the key the first time, saving it, and comparing on later connections.",
-      "checkedAgainst": "RFC 4251 sections 4.1, 9.3.4 (RFC text fetched from rfc-editor.org this session)"
+      "checkedAgainst": "RFC 4251 sections 4.1, 9.3.4 (RFC text fetched from rfc-editor.org this session)",
+      "textHash": "a8af72ee2d671e39c234bea808b511ad61d5e39d979a330e1ef12e3f68a4026b"
     },
     {
       "id": "L8-C06",
       "verdict": "accurate",
       "note": "Tours read at origin/feat/tours-7-8-10 (PR 25, commit 150b732). RFC 4252 section 7: 'the possession of a private key serves as authentication'; the server MUST check the key is valid for the user and the signature is valid. The signed data starts with 'string session identifier'.",
-      "checkedAgainst": "RFC 4252 section 7 (RFC text fetched from rfc-editor.org this session)"
+      "checkedAgainst": "RFC 4252 section 7 (RFC text fetched from rfc-editor.org this session)",
+      "textHash": "81014f66651d0db523826131aed6423183a3468dfac06658ef26e75fb6a94744"
     },
     {
       "id": "L8-C07",
       "verdict": "accurate",
       "note": "Tours read at origin/feat/tours-7-8-10 (PR 25, commit 150b732). RFC 4254 section 6.5: 'a program is started at the remote end. The program can be a shell, an application program, or a subsystem'.",
-      "checkedAgainst": "RFC 4254 section 6.5 (RFC text fetched from rfc-editor.org this session)"
+      "checkedAgainst": "RFC 4254 section 6.5 (RFC text fetched from rfc-editor.org this session)",
+      "textHash": "c12a34473dfadd07cdc7485f636072eb1c154d3b836b808fa746b28ea6abf221"
     },
     {
       "id": "L8-C08",
       "verdict": "accurate",
       "note": "Tours read at origin/feat/tours-7-8-10 (PR 25, commit 150b732). lesson-ssh-names.md 'What the tour must state' item 5 and docs/program-design.md section 2.6: 'Our SSH server starts no process. Exec dispatches to a fixed table (echo, whoami).'",
-      "checkedAgainst": "docs/lesson-ssh-names.md on local branch feat/s4-ssh (read); docs/program-design.md section 2.6 (read)"
+      "checkedAgainst": "docs/lesson-ssh-names.md on local branch feat/s4-ssh (read); docs/program-design.md section 2.6 (read)",
+      "textHash": "c6daf43e794b33db51d4c781546debe686980e2ceb32499ef3f7d78ce94c2498"
     },
     {
       "id": "L8-C09",
       "verdict": "accurate",
       "note": "Tours read at main 32f6219 (PR 54 merged); lab run at main 32f6219. Re-read: the source line named an uncommitted names change. PR 51 merged it, and the control run shows 'tunnel allow list' on the server lane. Re-checked against tours at origin/feat/tours-7-8-10 commit cadcff7. Claim text is now: direct-tcpip opens a connection to a host and port, and the receiving side must decide whether to allow the forwarding. RFC 4254 section 7.2: 'The receiving side must decide whether to allow the forwarding.' and the direct-tcpip message carries 'host to connect' and 'port to connect'. Lab fact behind step L8-S11 ('The server checks the target against it'): true in committed code. SshServerRules.cs line 181 calls s.Server.AllowTunnel(host, port) and sends an open failure when the target is off the list.",
-      "checkedAgainst": "RFC 4254 section 7.2 (fetched); src/NetSec.Core/Ssh/SshServerRules.cs and SshClientRules.cs at fix/ssh-followups 9b81e42 (read); docs/lesson-ssh-names.md at 9b81e42 (actor client) and in the uncommitted working tree of E:/dev/ns-s4ssh (actor server)"
+      "checkedAgainst": "RFC 4254 section 7.2 (fetched); src/NetSec.Core/Ssh/SshServerRules.cs and SshClientRules.cs at fix/ssh-followups 9b81e42 (read); docs/lesson-ssh-names.md at 9b81e42 (actor client) and in the uncommitted working tree of E:/dev/ns-s4ssh (actor server)",
+      "textHash": "fee9ada36f274a439de8d3322127516050f341094a68321906f3dbeecb970a0e"
     },
     {
       "id": "L8-C10",
       "verdict": "accurate",
       "note": "Re-checked against tours at origin/feat/tours-7-8-10 commit f648cab (PR 25). Text now reads 'In 2022 NIST announced that SHA-1 should be phased out by Dec. 31, 2030, and recommended SHA-2 or SHA-3.' It matches the page body. The collision sentence is on the page.",
-      "checkedAgainst": "NIST news 2022-12-15 (fetched)"
+      "checkedAgainst": "NIST news 2022-12-15 (fetched)",
+      "textHash": "8073a6d7954adcf594e78e50575fd0fa3695a442988e54f4706ff2adfac1b6a7"
     },
     {
       "id": "L8-C11",
       "verdict": "accurate",
       "note": "Tours read at origin/feat/tours-7-8-10 (PR 25, commit 150b732). RFC 4253 section 6.6: for ssh-rsa, 'Signing and verifying using this key format is performed according to the RSASSA-PKCS1-v1_5 scheme in [RFC3447] using the SHA-1 hash.'",
-      "checkedAgainst": "RFC 4253 section 6.6 (RFC text fetched from rfc-editor.org this session)"
+      "checkedAgainst": "RFC 4253 section 6.6 (RFC text fetched from rfc-editor.org this session)",
+      "textHash": "397b4a0446241f6d12bc005a21c5e377f0ab03efdb62392959a2a090cb4cd889"
     },
     {
       "id": "L8-C12",
       "verdict": "accurate",
       "note": "Re-checked against tours at origin/feat/tours-7-8-10 commit f648cab (PR 25). Text now carries the NVD scope: SSH Tectia products and OpenSSH 4.7p1, and possibly other versions, with the CBC condition. Matches the NVD description. Paper unread, as the source line says.",
-      "checkedAgainst": "NVD CVE-2008-5161 (API response fetched)"
+      "checkedAgainst": "NVD CVE-2008-5161 (API response fetched)",
+      "textHash": "d15a8341bc49e6af85e5bef09fff8f94c0dc4f2d845580bcd90ce556f8d062b7"
     },
     {
       "id": "L8-C13",
       "verdict": "accurate",
       "note": "Tours read at origin/feat/tours-7-8-10 (PR 25, commit 150b732). RFC 6194 section 3.3: 'As of today, there is no indication that attacks on SHA-1 can be extended to HMAC-SHA-1.' The claim carries the date (2011).",
-      "checkedAgainst": "RFC 6194 section 3.3 (RFC text fetched from rfc-editor.org this session)"
+      "checkedAgainst": "RFC 6194 section 3.3 (RFC text fetched from rfc-editor.org this session)",
+      "textHash": "891cde50e8da21ce9ece354aa6714d43a7b9a4108dd1e5fbaa6af463fd349983"
     },
     {
       "id": "L8-C14",
       "verdict": "accurate",
       "note": "Re-checked against tours at origin/feat/tours-7-8-10 commit f648cab (PR 25). Text now starts 'In this run', matching the PRD spike row scope.",
-      "checkedAgainst": "docs/prd.md Spike results (read)"
+      "checkedAgainst": "docs/prd.md Spike results (read)",
+      "textHash": "c993d65409707f780f47cbe73b0d88c3d82940ae26e2410fcb934d868bbf904d"
     },
     {
       "id": "L8-C15",
       "verdict": "accurate",
       "note": "Re-read at main 5440eeb. The claim now reads 'some packets from the start of the protected stream are omitted (NVD names the extension negotiation message)', which matches the NVD description of CVE-2023-48795 ('some packets are omitted (from the extension negotiation message)', 'security features have been downgraded or disabled'). Earlier wording problem closed. Tours read at main 32f6219 (PR 54 merged); lab run at main 32f6219. The NVD description of CVE-2023-48795 (fetched from the NVD API) says an attacker can 'bypass integrity checks such that some packets are omitted (from the extension negotiation message), and a client and server may consequently end up with a connection for which some security features have been downgraded or disabled'. The claim says the packets are 'from the start of the handshake'. NVD names the extension negotiation message, and the tour step says 'the start of the protected stream'. Fix: 'some packets from the start of the protected stream are omitted (NVD names the extension negotiation message)'. The rest of the claim matches NVD.",
-      "checkedAgainst": "NVD CVE-2023-48795 description (fetched this session)"
+      "checkedAgainst": "NVD CVE-2023-48795 description (fetched this session)",
+      "textHash": "6220cda19d3f9949885989d4cae64ed4fce0df3ed5bea8e6cf07bdc9cfeef85e"
     },
     {
       "id": "L8-C16",
       "verdict": "accurate",
       "note": "Re-read at main 5440eeb: source line now cites the reproduced sweep and matches my numbers (Modern 0 of 4,000, Legacy 0 of 1,000, Ignore alone 30 of 30 and 10 of 10). Tours read at main 32f6219 (PR 54 merged); lab run at main 32f6219. Run on main 32f6219: both rounds emit ssh.kex.strict 'on' for client and server. Unit test A_peer_with_no_strict_marker_leaves_it_off passes (event says 'off'). I reproduced the sweep with a throwaway program (strict KEX switched off in a scratch copy): clear Ignore injected before the server KexInit, then the server's first encrypted packet dropped, then one more encrypted packet sent. Modern suite: 0 of 4,000 accepted (4,000 refused). Legacy suite: 0 of 1,000 accepted (1,000 refused); I stopped at 1,000 for time, so Jared's 4,000 is confirmed for Modern and Legacy is 1,000. Positive control, no attack: 200 of 200 accepted on each suite. Ignore injected and nothing deleted: refused 30 of 30 (Modern) and 10 of 10 (Legacy), so an injected Ignore does kill such a session. One nuance: every refusal came from the packet length check (SSH_PACKET_LENGTH), because the moved cipher stream garbles the encrypted length field before the MAC runs. The claim's reason, 'the MAC covers the plain text and a deleted packet moves the cipher stream', is right in its second half; suggest 'the length field is encrypted'. NVD names ChaCha20-Poly1305 and CBC with encrypt-then-MAC as the exposed modes; neither is in the lab. The names doc dates Jared's sweep 'before strict KEX', which the claim does not say.",
-      "checkedAgainst": "docs/lesson-ssh-names.md at main 32f6219 (read); throwaway sweep program against NetSec.Core with strict KEX off in a scratch copy; unit test run (6 tests passed)"
+      "checkedAgainst": "docs/lesson-ssh-names.md at main 32f6219 (read); throwaway sweep program against NetSec.Core with strict KEX off in a scratch copy; unit test run (6 tests passed)",
+      "textHash": "8743f710b19383346dbbbd718bbdc563e9327871514090eb63b3dc0e9247bad5"
     },
     {
       "id": "L8-C17",
       "verdict": "accurate",
       "note": "Tours read at main 32f6219 (PR 54 merged); lab run at main 32f6219. Names doc item 6: 'The name Modern means newer than the legacy suite. The suite has no encrypt-then-MAC mode.' Lab run: keys.installed shows aes128-ctr,hmac-sha2-256, which is not an -etm MAC.",
-      "checkedAgainst": "docs/lesson-ssh-names.md at main 32f6219 (read); lab run"
+      "checkedAgainst": "docs/lesson-ssh-names.md at main 32f6219 (read); lab run",
+      "textHash": "02c7289d44ae339f0e5c2e511c5d5d7f077262cd7f7f24cf5016b3d8c55ffb6a"
     },
     {
       "id": "L8-C18",
       "verdict": "accurate",
       "note": "Tours read at main 32f6219 (PR 54 merged); lab run at main 32f6219. RFC 4253 section 6.3: 'the packet length, padding length, payload, and padding fields of each packet MUST be encrypted'; section 6: 'the packet_length field is also encrypted'. Section 6 also says random padding 'may help thwart traffic analysis', which supports that sizes can still show. The source line cites section 6; the encryption sentence is in 6.3. The size-visibility sentence is an inference from the RFC and the TCP stream, and not run.",
-      "checkedAgainst": "RFC 4253 sections 6, 6.3 (fetched this session); docs/lesson-ssh-names.md at main 32f6219 (read)"
+      "checkedAgainst": "RFC 4253 sections 6, 6.3 (fetched this session); docs/lesson-ssh-names.md at main 32f6219 (read)",
+      "textHash": "18ffd3b5557b58d9a635ffd5aae43f8bb6562de7c2c0e5b6b78016fa7e041ce6"
     },
     {
       "id": "L8-C19",
       "verdict": "accurate",
       "note": "Tours read at main 32f6219 (PR 54 merged); lab run at main 32f6219. Run with a throwaway program: client with no pin and TrustFirstUse false fails with SSH_HOST_KEY_UNKNOWN on check 'known_hosts match'. The same client with TrustFirstUse true opens and emits ssh.hostkey.seen then ssh.hostkey.first-use with the fingerprint, which is the key the caller must store. Unit tests Trust_on_first_use_returns_the_key_to_store and A_factory_client_with_no_pin_refuses_by_name read.",
-      "checkedAgainst": "docs/lesson-ssh-names.md at main 32f6219 (read); throwaway program run"
+      "checkedAgainst": "docs/lesson-ssh-names.md at main 32f6219 (read); throwaway program run",
+      "textHash": "c193275317d709ff864d5740c113ac6cb26846b93bab6ee3f953f03389cc3807"
     },
     {
       "id": "L8-C20",
       "verdict": "accurate",
       "note": "Tours read at main 32f6219 (PR 54 merged); lab run at main 32f6219. RFC 4254 section 5.2: 'The window size specifies how many bytes the other party can send before it must wait for the window to be adjusted.' Unit test A_stalled_reader_stops_the_sender_at_the_window_and_a_read_resumes_it ran and passed: the server sent 3 MiB, the client received exactly the 2,097,152-byte window and sent no WindowAdjust; after the client reported consumption, all 3 MiB arrived.",
-      "checkedAgainst": "RFC 4254 section 5.2 (fetched this session); unit tests run on main 32f6219 (6 passed)"
+      "checkedAgainst": "RFC 4254 section 5.2 (fetched this session); unit tests run on main 32f6219 (6 passed)",
+      "textHash": "2e8a9a8ea0768b2f0fd777c50e0985525bc0a3669f02611797456c509421ee87"
     },
     {
       "id": "L8-C21",
       "verdict": "accurate",
       "note": "Tours read at main 6e0c1e5 (PR 60 merged); lab run at main 6e0c1e5. RFC 4251 section 4.1 gives two trust models: a local host-key database, and a host name-to-key association certified by a trusted CA. The lab pins the host key (check known_hosts match) and the control run shows no CA step.",
-      "checkedAgainst": "RFC 4251 section 4.1 (fetched this session); lab run, lesson 8"
+      "checkedAgainst": "RFC 4251 section 4.1 (fetched this session); lab run, lesson 8",
+      "textHash": "05db17aab1da4ebfaabb7c4070af151c2dbef3359d769065205cce9eb2f7e2e9"
     },
     {
       "id": "L8-C22",
       "verdict": "accurate",
       "checkedAgainst": "docs/lesson-ssh-names.md on fix/ssh-relay-room d801e49 (read); lab run, lesson 8; unit test Each_direction_shows_one_passing_mac_check_on_its_first_protected_packet (both suites) passed",
-      "note": "Tour read at origin/fix/tour-8-limits commit b1a6a2f (PR 83, open); lab run at origin/fix/ssh-relay-room d801e49 (PR 77, open). Lab run at PR 77: the control run holds exactly one passing 'packet MAC' event per direction per round (server#30 and client#34 in the modern round, the same in the legacy round), each placed before the first protected ssh.message.received of that direction; 4 events in all against 40 before. The check runs on every packet (names doc); later passes stay quiet. L8-flip-packet still fails packet MAC. The tour sentence says 'on the first protected packet'; the claim says 'before the first protected packet is received'; both match the trace."
+      "note": "Tour read at origin/fix/tour-8-limits commit b1a6a2f (PR 83, open); lab run at origin/fix/ssh-relay-room d801e49 (PR 77, open). Lab run at PR 77: the control run holds exactly one passing 'packet MAC' event per direction per round (server#30 and client#34 in the modern round, the same in the legacy round), each placed before the first protected ssh.message.received of that direction; 4 events in all against 40 before. The check runs on every packet (names doc); later passes stay quiet. L8-flip-packet still fails packet MAC. The tour sentence says 'on the first protected packet'; the claim says 'before the first protected packet is received'; both match the trace.",
+      "textHash": "d065c949ac0ec453cbd666bc4a55fab7a097277d8a72df43bd4382bab841312e"
     },
     {
       "id": "L8-C23",
       "verdict": "accurate",
       "checkedAgainst": "docs/lesson-ssh-names.md on fix/ssh-relay-room d801e49 (read); unit test A_ninth_channel_faults_only_its_own_open... passed; throwaway tests against NetSec.Core (scratch copy of PR 77), run this session",
-      "note": "Tour read at origin/fix/tour-8-limits commit b1a6a2f (PR 83, open); lab run at origin/fix/ssh-relay-room d801e49 (PR 77, open). Reproduced with a read deadline of 3,000 ms in place of 30,000: (1) a client sends 6 MiB into a tunnel whose target never takes a byte: the session ends after 3,065 ms with LINK_DEADLINE, and the send never completes; (2) an idle tunnel with no traffic: the session ends after 3,000 ms with LINK_DEADLINE. The 30 second figure is the default deadline (SshProbe.ReadDeadlineMs = 30000, the lab's LabPair.DeadlineMs). Ninth channel: the unit test opens 8 channels, the ninth open faults with SshCodes.ChannelLimit, the session stays up and the first channel still delivers its byte."
+      "note": "Tour read at origin/fix/tour-8-limits commit b1a6a2f (PR 83, open); lab run at origin/fix/ssh-relay-room d801e49 (PR 77, open). Reproduced with a read deadline of 3,000 ms in place of 30,000: (1) a client sends 6 MiB into a tunnel whose target never takes a byte: the session ends after 3,065 ms with LINK_DEADLINE, and the send never completes; (2) an idle tunnel with no traffic: the session ends after 3,000 ms with LINK_DEADLINE. The 30 second figure is the default deadline (SshProbe.ReadDeadlineMs = 30000, the lab's LabPair.DeadlineMs). Ninth channel: the unit test opens 8 channels, the ninth open faults with SshCodes.ChannelLimit, the session stays up and the first channel still delivers its byte.",
+      "textHash": "16fe62c701781f7b6f90c9f9683b8ebc836887c79c0b177cbbbc7f86d988b39c"
     },
     {
       "id": "L8-C24",
       "verdict": "accurate",
       "checkedAgainst": "docs/lesson-ssh-names.md on fix/ssh-relay-room d801e49 (read); capture of the KexInit of ssh.exe 9.5p2, Git ssh 10.3p1 and PuTTY plink 0.80 against a listening socket; unit tests A_peer_with_no_strict_marker_completes_a_session_under_the_old_rules (4 cases) and Ssh_exe_runs_a_command_on_our_server_with_strict_kex_off (2 suites) passed",
-      "note": "Tour read at origin/fix/tour-8-limits commit b1a6a2f (PR 83, open); lab run at origin/fix/ssh-relay-room d801e49 (PR 77, open). Run this session: all three outside clients on this machine offer kex-strict-c-v00@openssh.com (Windows ssh.exe 9.5p2, Git ssh 10.3p1, PuTTY plink 0.80), so no peer without the marker exists here, as the claim says. Our code with the marker off against our code: 4 cases passed, both suites, both directions, event 'off' on both sides, exec echo works. ssh.exe against our server with the marker off: passed on Modern and Legacy, exit 0, output 'hello', event 'off'. Not re-run: 'our client against Go' with the marker off; no committed test covers it. It follows from the code (StrictKex = OffersStrictKex && peer offers), so a marker-off client runs the old rules whatever Go offers. The limit statement (a real old peer stays unproved; nothing ran on CE) is conservative and correct. Small correction to the names doc, not the tour: it says Git ssh 10.3p1 and plink 0.80 'neither ran here'; I ran their KexInit and both offer the marker."
+      "note": "Tour read at origin/fix/tour-8-limits commit b1a6a2f (PR 83, open); lab run at origin/fix/ssh-relay-room d801e49 (PR 77, open). Run this session: all three outside clients on this machine offer kex-strict-c-v00@openssh.com (Windows ssh.exe 9.5p2, Git ssh 10.3p1, PuTTY plink 0.80), so no peer without the marker exists here, as the claim says. Our code with the marker off against our code: 4 cases passed, both suites, both directions, event 'off' on both sides, exec echo works. ssh.exe against our server with the marker off: passed on Modern and Legacy, exit 0, output 'hello', event 'off'. Not re-run: 'our client against Go' with the marker off; no committed test covers it. It follows from the code (StrictKex = OffersStrictKex && peer offers), so a marker-off client runs the old rules whatever Go offers. The limit statement (a real old peer stays unproved; nothing ran on CE) is conservative and correct. Small correction to the names doc, not the tour: it says Git ssh 10.3p1 and plink 0.80 'neither ran here'; I ran their KexInit and both offer the marker.",
+      "textHash": "4bcfbbc733cd44ce51489396c1df1269b6f7034392f175f89b56fabefacf8d3f"
     }
   ],
   "textRead": {
@@ -179,6 +203,8 @@
       "Bind defect closed: check.result packet MAC now fires on the normal run (PR 66).",
       "Re-read at PR 83 (b1a6a2f) against the lab at PR 77 (d801e49): S09 (packet MAC once per direction, bind hits 4 events), S11 (30 second deadline ends a parked sender and an idle tunnel; ninth channel refused by name), S14 (old-device limit; outside clients all offer the marker). No new problems; 14 steps."
     ],
-    "problemsOpen": 0
+    "problemsOpen": 0,
+    "textHash": "a23e17735d306a232385429f40bf6d72f852bacf67620dac1df9c1cae179c975",
+    "boundAt": "main f43b560: the tour text and claims on main equal the versions I judged (compared step by step and claim by claim); hashes stamped by acceptance/checks/docs_checks.py --hashes logic"
   }
 }

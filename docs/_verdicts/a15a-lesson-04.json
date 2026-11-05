@@ -8,37 +8,43 @@
       "id": "L4-C01",
       "verdict": "accurate",
       "note": "Tours read at origin/feat/tours-4-5-10 (PR 23, commit 1b2fc21). RFC 5280 section 3.2: 'certification paths, are required because a public key user is only initialized with a limited number of assured CA public keys'. The path runs from the end-entity certificate through CA certificates.",
-      "checkedAgainst": "RFC 5280 section 3.2 (RFC text fetched from rfc-editor.org this session)"
+      "checkedAgainst": "RFC 5280 section 3.2 (RFC text fetched from rfc-editor.org this session)",
+      "textHash": "7ed988f534d60b6149969e92c2d888680a3121d95f49557e9e365140a0c64151"
     },
     {
       "id": "L4-C02",
       "verdict": "accurate",
       "note": "Tours read at origin/feat/tours-4-5-10 (PR 23, commit 1b2fc21). Section 4.1 TBSCertificate lists serialNumber, issuer, validity, subject, subjectPublicKeyInfo; signatureValue signs it. Section 4.1.2.5: validity is notBefore and notAfter.",
-      "checkedAgainst": "RFC 5280 sections 4.1, 4.1.2.5 (RFC text fetched from rfc-editor.org this session)"
+      "checkedAgainst": "RFC 5280 sections 4.1, 4.1.2.5 (RFC text fetched from rfc-editor.org this session)",
+      "textHash": "988e3f58295ff74fefd97e5a88dc6f0cb2a4944116221015a4171a4a4cedb9e8"
     },
     {
       "id": "L4-C03",
       "verdict": "accurate",
       "note": "Re-checked against tours at origin/feat/tours-4-5-10 commit 78e0192 (PR 23). Source now cites RFC 8446 section 1.2 (Major Differences from TLS 1.2) and 4.4.2. Section 1.2 holds 'All handshake messages after the ServerHello are now encrypted.'",
-      "checkedAgainst": "RFC 8446 sections 1.2, 4.4.2 (fetched)"
+      "checkedAgainst": "RFC 8446 sections 1.2, 4.4.2 (fetched)",
+      "textHash": "eacec570f3c5ccb5ad9d5b690f04f94450596fd3886521ae78fcbed0b8e060b6"
     },
     {
       "id": "L4-C04",
       "verdict": "accurate",
       "note": "Tours read at origin/feat/tours-4-5-10 (PR 23, commit 1b2fc21). RFC 9525 section 6 is 'Verifying Service Identity' and 6.3 is 'Matching the DNS Domain Name Portion'; it says the client determines whether the presented DNS name matches the reference DNS name.",
-      "checkedAgainst": "RFC 9525 sections 6, 6.3 (RFC text fetched from rfc-editor.org this session)"
+      "checkedAgainst": "RFC 9525 sections 6, 6.3 (RFC text fetched from rfc-editor.org this session)",
+      "textHash": "7e28fa3fff08bd752331a12ca0c38101f2ab91df37cf8661b82a3254d87b311b"
     },
     {
       "id": "L4-C05",
       "verdict": "accurate",
       "note": "Tours read at origin/feat/tours-4-5-10 (PR 23, commit 1b2fc21). Section 4.4.3: CertificateVerify 'is used to provide explicit proof that an endpoint possesses the private key corresponding to its certificate'; the signature covers Transcript-Hash(Handshake Context, Certificate).",
-      "checkedAgainst": "RFC 8446 section 4.4.3 (RFC text fetched from rfc-editor.org this session)"
+      "checkedAgainst": "RFC 8446 section 4.4.3 (RFC text fetched from rfc-editor.org this session)",
+      "textHash": "d441568b1fb4b69340c5fec6c1d5c280a35d6bbb21ab2d20af3e201592ef3790"
     },
     {
       "id": "L4-C06",
       "verdict": "accurate",
       "checkedAgainst": "src/NetSec.Core/Pki/Certificate.cs ChainCheck.Trusted and RunForClient (read); RFC 5280 section 4.2 (earlier); unit test An_unknown_critical_extension_is_refused_and_a_non_critical_one_is_read_past passed; docs/lessons-4-5-names.md on fix/s3-tls-blockers b5d6641 (read)",
-      "note": "Tour read at origin/fix/tour-4-5-limits commit 14af058 (PR 87, open); lab run at origin/fix/s3-tls-blockers b5d6641. Code read: Trusted() checks that each issuer is a CA (IsCa from basicConstraints), every signature, any critical extension it does not know (HasUnknownCritical), and validity for chain[i] only. The anchors are never dated, so 'does not date the trust anchor' holds. keyUsage is listed as known (so a critical keyUsage is not refused) but never read; pathLen and name constraint values are never read (comment at line 288). The step text and claim leave out one thing the check also reads: extendedKeyUsage, which RunForClient uses to require clientAuth. That omission is harmless. All five attack rows of lesson 4 still fail by their named checks."
+      "note": "Tour read at origin/fix/tour-4-5-limits commit 14af058 (PR 87, open); lab run at origin/fix/s3-tls-blockers b5d6641. Code read: Trusted() checks that each issuer is a CA (IsCa from basicConstraints), every signature, any critical extension it does not know (HasUnknownCritical), and validity for chain[i] only. The anchors are never dated, so 'does not date the trust anchor' holds. keyUsage is listed as known (so a critical keyUsage is not refused) but never read; pathLen and name constraint values are never read (comment at line 288). The step text and claim leave out one thing the check also reads: extendedKeyUsage, which RunForClient uses to require clientAuth. That omission is harmless. All five attack rows of lesson 4 still fail by their named checks.",
+      "textHash": "b182744f178941e82c7ec3e15e185b279a2740278e0f89188f92cf40b459fc42"
     }
   ],
   "textRead": {
@@ -50,6 +56,8 @@
     "problems": [],
     "notes": [
       "Re-read at PR 87 (14af058): S10 adds the partial-check sentence, which matches Certificate.cs. 10 steps, no problems."
-    ]
+    ],
+    "textHash": "0d3e7a803d8662a30d280236bbb0bf54a62117b7bd4200cbbcb36d9502a88c4b",
+    "boundAt": "main f43b560: the tour text and claims on main equal the versions I judged (compared step by step and claim by claim); hashes stamped by acceptance/checks/docs_checks.py --hashes logic"
   }
 }

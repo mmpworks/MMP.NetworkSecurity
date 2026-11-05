@@ -8,91 +8,106 @@
       "id": "L7-C01",
       "verdict": "accurate",
       "note": "Tours read at origin/feat/tours-7-8-10 (PR 25, commit 150b732). RFC 8996 Abstract: 'This document formally deprecates Transport Layer Security (TLS) versions 1.0 (RFC 2246) and 1.1 (RFC 4346).'",
-      "checkedAgainst": "RFC 8996 Abstract (RFC text fetched from rfc-editor.org this session)"
+      "checkedAgainst": "RFC 8996 Abstract (RFC text fetched from rfc-editor.org this session)",
+      "textHash": "81c2a48b1add445ee61eebb5d3f7d28a7230281d291f3025487c76d114126aa9"
     },
     {
       "id": "L7-C02",
       "verdict": "accurate",
       "note": "Tours read at origin/feat/tours-7-8-10 (PR 25, commit 150b732). lesson-tls11-names.md Lanes and streams, Forced suite row: TLS_RSA_WITH_AES_128_CBC_SHA, 'because a default run picks the best case (accuracy rule 3)'.",
-      "checkedAgainst": "docs/lesson-tls11-names.md on local branch feat/s4-tls11 (read); docs/prd.md rule 3 (read)"
+      "checkedAgainst": "docs/lesson-tls11-names.md on local branch feat/s4-tls11 (read); docs/prd.md rule 3 (read)",
+      "textHash": "9b40d9dd4f432ebb30e24eb5542a564b7e73c416a1db0e9e0462404ec0597636"
     },
     {
       "id": "L7-C03",
       "verdict": "accurate",
       "note": "Tours read at origin/feat/tours-7-8-10 (PR 25, commit 150b732). Names doc: 'Round trips before the client can send data: 2 in TLS 1.1. The UI counts them from the trace.'",
-      "checkedAgainst": "docs/lesson-tls11-names.md (read)"
+      "checkedAgainst": "docs/lesson-tls11-names.md (read)",
+      "textHash": "945909dfe8bec5477ae4764b0c993a892e876e5e867f9b04c1af1abb874c4536"
     },
     {
       "id": "L7-C04",
       "verdict": "accurate",
       "note": "Re-checked against tours at origin/feat/tours-7-8-10 commit f648cab (PR 25). Source now cites RFC 8446 section 1.2. Correct. TLS 1.1 half unchanged and accurate.",
-      "checkedAgainst": "RFC 8446 section 1.2 (fetched); docs/lesson-tls11-names.md (read)"
+      "checkedAgainst": "RFC 8446 section 1.2 (fetched); docs/lesson-tls11-names.md (read)",
+      "textHash": "c1d20d82c9150baf66b8f51288a58caf531bd345152b183e1f9d157778f5f4f0"
     },
     {
       "id": "L7-C05",
       "verdict": "accurate",
       "note": "Tours read at origin/feat/tours-7-8-10 (PR 25, commit 150b732). RFC 7457 section 2.8: 'When TLS is used with most non-Diffie-Hellman cipher suites, it is sufficient to obtain the server's private key in order to decrypt any sessions (past and future)'; forward secrecy avoids it.",
-      "checkedAgainst": "RFC 7457 section 2.8 (RFC text fetched from rfc-editor.org this session)"
+      "checkedAgainst": "RFC 7457 section 2.8 (RFC text fetched from rfc-editor.org this session)",
+      "textHash": "b19a4c698fbfb3dfb6fa8542b6d07d2a56ae0bc5b46973d9b2d1b478df1659b4"
     },
     {
       "id": "L7-C06",
       "verdict": "accurate",
       "note": "Tours read at origin/feat/tours-7-8-10 (PR 25, commit 150b732). RFC 4346 section 7.4.7.1: the client generates a 48-byte premaster secret, encrypts it with the server's RSA key, and sends it in an encrypted premaster secret message, which is the body of ClientKeyExchange.",
-      "checkedAgainst": "RFC 4346 section 7.4.7.1 (RFC text fetched from rfc-editor.org this session)"
+      "checkedAgainst": "RFC 4346 section 7.4.7.1 (RFC text fetched from rfc-editor.org this session)",
+      "textHash": "a1c52a072b5fdaa1104aa4928acf90ef6593e640a8e5db717c3c3309b09b677e"
     },
     {
       "id": "L7-C07",
       "verdict": "accurate",
       "note": "Tours read at origin/feat/tours-7-8-10 (PR 25, commit 150b732). RFC 4346 section 1.1: 'The implicit Initialization Vector (IV) is replaced with an explicit IV to protect against CBC attacks'. Appendix F.3 'Explicit IVs' says the same and names the chosen plaintext attack that depends on knowing the IV.",
-      "checkedAgainst": "RFC 4346 sections 1.1, F.3 (RFC text fetched from rfc-editor.org this session)"
+      "checkedAgainst": "RFC 4346 sections 1.1, F.3 (RFC text fetched from rfc-editor.org this session)",
+      "textHash": "4284f016e791eb098f681dcfbccb351a6d26b2c6cefd1bd17dcb85b153007217"
     },
     {
       "id": "L7-C08",
       "verdict": "accurate",
       "note": "Tours read at origin/feat/tours-7-8-10 (PR 25, commit 150b732). RFC 7457 section 2.3: 'The BEAST attack uses issues with the TLS 1.0 implementation of CBC (that is, the predictable initialization vector)'.",
-      "checkedAgainst": "RFC 7457 section 2.3 (RFC text fetched from rfc-editor.org this session)"
+      "checkedAgainst": "RFC 7457 section 2.3 (RFC text fetched from rfc-editor.org this session)",
+      "textHash": "a3066b66320b82c8a9f2c07452b8dad63d14c585a831b28a641b59239639b4e6"
     },
     {
       "id": "L7-C09",
       "verdict": "accurate",
       "note": "Re-checked against tours at origin/feat/tours-7-8-10 commit f648cab (PR 25). Text now reads 'MAC-then-encrypt in TLS 1.0 to 1.2 ... TLS 1.3 uses AEAD only.' RFC 7457 section 2.4 is cited as a 2015 text that meant TLS 1.0 to 1.2. RFC 8446 section 5.2: 'all ciphers are modeled as AEAD'. Lucky Thirteen and mitigation wording match section 2.4.",
-      "checkedAgainst": "RFC 7457 section 2.4; RFC 8446 section 5.2 (fetched)"
+      "checkedAgainst": "RFC 7457 section 2.4; RFC 8446 section 5.2 (fetched)",
+      "textHash": "abf95540db81a33b05d2d3817de8057a6931813b1ad2747e7385f4830ffde514"
     },
     {
       "id": "L7-C10",
       "verdict": "accurate",
       "note": "Tours read at origin/feat/tours-7-8-10 (PR 25, commit 150b732). Tls11Records.cs on feat/s4-tls11: TryOpen computes the MAC on bad padding too and returns one result for both faults, 'It does not equalize time, and managed code gives no timing guarantee'. RFC 4346 section 1.1: padding errors use bad_record_mac. Tier note for the managed-code half: see the L11-C04 verdict (indirect support).",
-      "checkedAgainst": "src/NetSec.Core/Tls11/Tls11Records.cs on feat/s4-tls11 (read); RFC 4346 section 1.1 (RFC text fetched from rfc-editor.org this session)"
+      "checkedAgainst": "src/NetSec.Core/Tls11/Tls11Records.cs on feat/s4-tls11 (read); RFC 4346 section 1.1 (RFC text fetched from rfc-editor.org this session)",
+      "textHash": "3b065fb4f69f0fda2d35e31a33e69d5ef9399c8b88ba86a9f0c65f81d3cc698f"
     },
     {
       "id": "L7-C11",
       "verdict": "accurate",
       "note": "Tours read at origin/feat/tours-7-8-10 (PR 25, commit 150b732). RFC 8446 section 4.1.3: servers negotiating TLS 1.2 or below MUST set the last 8 bytes of Random to 44 4F 57 4E 47 52 44 01 (TLS 1.2) or 44 4F 57 4E 47 52 44 00 (TLS 1.1 or below); the bytes spell DOWNGRD. TLS 1.3 clients MUST check.",
-      "checkedAgainst": "RFC 8446 section 4.1.3 (RFC text fetched from rfc-editor.org this session)"
+      "checkedAgainst": "RFC 8446 section 4.1.3 (RFC text fetched from rfc-editor.org this session)",
+      "textHash": "a91644eb8fff1a0168122356f16d9edda9498aa4ae995e77f8fa452166770217"
     },
     {
       "id": "L7-C12",
       "verdict": "accurate",
       "note": "Tours read at origin/feat/tours-7-8-10 (PR 25, commit 150b732). lesson-tls11-names.md Attacks, closing paragraph: 'The sentinel helps only a client that speaks TLS 1.3. A TLS 1.1 client has nothing to check (accuracy rule 2). A builder test pins this: the TLS 1.1 client completes against a server that writes DOWNGRD.'",
-      "checkedAgainst": "docs/lesson-tls11-names.md; docs/prd.md rule 2 (read)"
+      "checkedAgainst": "docs/lesson-tls11-names.md; docs/prd.md rule 2 (read)",
+      "textHash": "9a834c651d1f8ff5083955136886ab7248649f6659ff262845c0138313ad6874"
     },
     {
       "id": "L7-C13",
       "verdict": "accurate",
       "note": "Tours read at origin/feat/tours-7-8-10 (PR 25, commit 150b732). RFC 7465 Abstract: the document 'requires that TLS clients and servers never negotiate the use of RC4 cipher suites ... This applies to all TLS versions.'",
-      "checkedAgainst": "RFC 7465 Abstract (RFC text fetched from rfc-editor.org this session)"
+      "checkedAgainst": "RFC 7465 Abstract (RFC text fetched from rfc-editor.org this session)",
+      "textHash": "346a8bdc53c459e83bb52697082e26207738da6d48204bfd73f1d9ff9dc8f7c8"
     },
     {
       "id": "L7-C14",
       "verdict": "accurate",
       "note": "Re-checked against tours at origin/feat/tours-7-8-10 commit f648cab (PR 25). Text now starts 'In this run', matching the PRD spike row scope.",
-      "checkedAgainst": "docs/prd.md Spike results (read)"
+      "checkedAgainst": "docs/prd.md Spike results (read)",
+      "textHash": "c993d65409707f780f47cbe73b0d88c3d82940ae26e2410fcb934d868bbf904d"
     },
     {
       "id": "L7-C15",
       "verdict": "accurate",
       "note": "Re-read at origin/fix/tour-follow-ups ab519ec (PR 78, open). The source line now says 'Timing runs on one machine did not settle the direction. The claim rests on the code, since the MAC runs over a length the padding sets (Tls11Records.cs, ContentLength), and on RFC 7457 section 2.4', which matches my five Release runs (4 slower, 1 faster) and the Debug run (no gap), and Jared's withdrawal. Code fact re-confirmed earlier: MAC over 299 bytes with padding 0, over 44 with padding 255. Claim text unchanged and sound. Tours read at main 6e0c1e5 (PR 56 merged). The claim text is sound: one failure code hides the fault in the message, the time can still differ, and that is the Lucky Thirteen class (RFC 7457 section 2.4); no timing number is used. The source line overstates my result. It says reader-a15a 'reproduced the direction ... padding 0 slower by about 6 percent'. My runs did not settle the direction: in 5 Release runs on one machine, padding 0 was slower in 4 (by 0.7 to 1.5 microseconds of about 12) and faster in 1 (12.2 against 12.5); a Debug build showed no gap (40.4 against 39.8). Jared withdrew his pair for the same reason (PR 62 comment 6658985567). Fix: replace the clause with 'Timing runs on one machine did not settle the direction, and Jared withdrew his pair (PR 62 comment 6658985567). The claim rests on the code read, where the MAC runs over a length the padding sets (Tls11Records.cs ContentLength), and on RFC 7457 section 2.4.' Code fact confirmed: with padding 0 the MAC covers 299 bytes of a 320-byte inner part; with padding 255 it covers 44.",
-      "checkedAgainst": "RFC 7457 section 2.4; src/NetSec.Core/Tls11/Tls11Records.cs ContentLength (read); throwaway timing program, 5 Release runs and 2 Debug runs; PR 62 comment 6658985567 (read)"
+      "checkedAgainst": "RFC 7457 section 2.4; src/NetSec.Core/Tls11/Tls11Records.cs ContentLength (read); throwaway timing program, 5 Release runs and 2 Debug runs; PR 62 comment 6658985567 (read)",
+      "textHash": "9f1b3af35c33c2b8ff99d16503b19124f0537ac2c7d2a51d238e58485e55e494"
     }
   ],
   "textRead": {
@@ -106,6 +121,8 @@
       "L7-S09 says 'Lesson 9 builds that bridge'. Lesson 9 has no tour yet; plan statement.",
       "PR 56 version (beaa3f2) adds two sentences to L7-S07: 'The time can still differ, and that is the Lucky Thirteen class of attack' (RFC 7457 2.4 calls Lucky Thirteen a timing side-channel attack; accurate) and the 49.7/40.2 measurement (see L7-C15). Steps read: 10. No new problems.",
       "Re-read at main 6e0c1e5: L7-S07 now gives no timing number; the Lucky Thirteen sentence matches RFC 7457 2.4. No problems."
-    ]
+    ],
+    "textHash": "eb933a68ab5e89b0da75966cf26cd1faa5e9debf37a83871ee6ce5dccc05b97d",
+    "boundAt": "main f43b560: the tour text and claims on main equal the versions I judged (compared step by step and claim by claim); hashes stamped by acceptance/checks/docs_checks.py --hashes logic"
   }
 }
