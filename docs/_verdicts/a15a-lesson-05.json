@@ -82,5 +82,36 @@
       "note": "Tours read at origin/feat/tours-4-5-10 (PR 23, commit 1b2fc21). docs/prd.md Teaching accuracy rules, rule 4: 'The hybrid protects key exchange only. Certificates stay classical.'",
       "checkedAgainst": "docs/prd.md rule 4 (read)"
     }
-  ]
+  ],
+  "textRead": {
+    "readAt": "main c0a105b; tour text identical to main 562047e (lessons 0 to 8, 10, 11)",
+    "method": "Every sentence of every step text read against the lab. The lab ran in-process (NetSec.Core: LabCatalog, Lesson10Auth, TimingAttackLab), once as a control and once for every try-it attack row; trace events, secrets, field lists and check names were compared with the words. Code was read where the trace did not show the fact. Statements about the UI (colours, panels) and about lesson 9 (not built) were not run.",
+    "stepsRead": 13,
+    "stepsWithProblems": 2,
+    "problemsFound": 3,
+    "problems": [
+      {
+        "step": "L5-S02",
+        "severity": "low",
+        "wrong": "The ClientHello lists the lock suites it can use, the groups it can use for key exchange, and a key share for the group it expects to win.",
+        "right": "The ClientHello lists the lock suites it can use, the one group it offers for key exchange (the hybrid), and a key share for that group.",
+        "evidence": "Lab run: supported_groups extension holds one group, 0x11ec (X25519MLKEM768); two cipher suites (1301, 1302)."
+      },
+      {
+        "step": "L5-S04",
+        "severity": "medium",
+        "wrong": "The rungs come in order: the handshake secret first, then the traffic secrets for the handshake, then the master secret and the traffic secrets for the real data.",
+        "right": "The rungs come in order: the early secret, the handshake secret, the traffic secrets for the handshake, the master secret, and then the traffic secrets for the real data, which appear after the server Finished.",
+        "evidence": "Lab run, secret.derived order: early_secret, handshake_secret, c_hs_traffic, s_hs_traffic, master_secret, then c_ap_traffic, s_ap_traffic, exp_master."
+      },
+      {
+        "step": "L5-S04",
+        "severity": "medium",
+        "wrong": "Each rung comes from the one above it plus a hash of the messages so far. Change an earlier message and every rung below it changes too.",
+        "right": "Each rung comes from the one above it. The traffic secrets also mix in a hash of the messages so far, so changing an earlier message changes those traffic secrets.",
+        "evidence": "RFC 8446 section 7.1: early, handshake and master secrets use no transcript hash; only the traffic secrets and the exporter secret do."
+      }
+    ],
+    "notes": []
+  }
 }

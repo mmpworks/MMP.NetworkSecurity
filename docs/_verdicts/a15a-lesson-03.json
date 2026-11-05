@@ -34,5 +34,14 @@
       "note": "docs/prd.md Teaching accuracy rules, rule 4: 'The hybrid protects key exchange only. Certificates stay classical.'",
       "checkedAgainst": "docs/prd.md Teaching accuracy rules, rule 4 (read)"
     }
-  ]
+  ],
+  "textRead": {
+    "readAt": "main c0a105b; tour text identical to main 562047e (lessons 0 to 8, 10, 11)",
+    "method": "Every sentence of every step text read against the lab. The lab ran in-process (NetSec.Core: LabCatalog, Lesson10Auth, TimingAttackLab), once as a control and once for every try-it attack row; trace events, secrets, field lists and check names were compared with the words. Code was read where the trace did not show the fact. Statements about the UI (colours, panels) and about lesson 9 (not built) were not run.",
+    "stepsRead": 9,
+    "stepsWithProblems": 0,
+    "problemsFound": 0,
+    "problems": [],
+    "notes": []
+  }
 }

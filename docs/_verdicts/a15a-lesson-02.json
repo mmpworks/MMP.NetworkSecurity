@@ -40,5 +40,29 @@
       "note": "SP 800-175B Rev. 1 section 4.2.2: when several parties know the key, 'assurance of the source cannot be obtained (e.g., from entity B's perspective as a receiver, either entity A or entity B could be the source, since both know the key)'. The front matter (before section 1) defines non-repudiation as assurance of source provided to a third party; section 4.2.3 says signatures support it. The cited section is 4.2.2.",
       "checkedAgainst": "NIST SP 800-175B Rev. 1 front matter, sections 4.2.2, 4.2.3, PDF fetched this session"
     }
-  ]
+  ],
+  "textRead": {
+    "readAt": "main c0a105b; tour text identical to main 562047e (lessons 0 to 8, 10, 11)",
+    "method": "Every sentence of every step text read against the lab. The lab ran in-process (NetSec.Core: LabCatalog, Lesson10Auth, TimingAttackLab), once as a control and once for every try-it attack row; trace events, secrets, field lists and check names were compared with the words. Code was read where the trace did not show the fact. Statements about the UI (colours, panels) and about lesson 9 (not built) were not run.",
+    "stepsRead": 10,
+    "stepsWithProblems": 2,
+    "problemsFound": 2,
+    "problems": [
+      {
+        "step": "L2-S09",
+        "severity": "high",
+        "wrong": "All four seals passed on the normal run. A passing seal tells the receiver two things: the message is unchanged, and the sender held the key.",
+        "right": "All four seals passed on the normal run. A passing HMAC or CMAC seal tells the receiver two things: the message is unchanged, and the sender held the key. The plain hash proves neither, and the keyed hash can be forged by length extension (steps 3 to 5).",
+        "evidence": "Lab run: L2-extend-keyed-hash completes with no failed check; the plain hash has no key. Step S10 of the same lesson says so."
+      },
+      {
+        "step": "L2-S02",
+        "severity": "low",
+        "wrong": "About half the cells light up.",
+        "right": "Many cells light up: 106 of 256 in the default run, close to half.",
+        "evidence": "Lab run: measure.result SHA-256 avalanche detail bits=106;of=256."
+      }
+    ],
+    "notes": []
+  }
 }

@@ -88,5 +88,16 @@
       "note": "Re-checked against tours at origin/feat/tours-7-8-10 commit f648cab (PR 25). Text now starts 'In this run', matching the PRD spike row scope.",
       "checkedAgainst": "docs/prd.md Spike results (read)"
     }
-  ]
+  ],
+  "textRead": {
+    "readAt": "main c0a105b; tour text identical to main 562047e (lessons 0 to 8, 10, 11)",
+    "method": "Every sentence of every step text read against the lab. The lab ran in-process (NetSec.Core: LabCatalog, Lesson10Auth, TimingAttackLab), once as a control and once for every try-it attack row; trace events, secrets, field lists and check names were compared with the words. Code was read where the trace did not show the fact. Statements about the UI (colours, panels) and about lesson 9 (not built) were not run.",
+    "stepsRead": 10,
+    "stepsWithProblems": 0,
+    "problemsFound": 0,
+    "problems": [],
+    "notes": [
+      "L7-S09 says 'Lesson 9 builds that bridge'. Lesson 9 has no tour yet; plan statement."
+    ]
+  }
 }
