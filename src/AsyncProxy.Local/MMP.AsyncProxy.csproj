@@ -1,0 +1,27 @@
+<Project Sdk="Microsoft.NET.Sdk">
+
+  <!-- Compiles the sibling MMP.AsyncProxy source into this worktree's own bin and obj. The sibling is only read.
+       A ProjectReference into the sibling makes every worktree write one output folder, and lanes that build at once
+       fail on file locks (CS2012, MSB3501, CS0006). tools/layer_check.py refuses that reference. -->
+
+  <PropertyGroup>
+    <TargetFramework>netstandard2.0</TargetFramework>
+    <LangVersion>3</LangVersion>
+    <AssemblyName>MMP.AsyncProxy</AssemblyName>
+    <RootNamespace>MMP.AsyncProxy</RootNamespace>
+    <EnableDefaultCompileItems>false</EnableDefaultCompileItems>
+    <IsPackable>false</IsPackable>
+    <AsyncProxySource>$(AsyncProxyRoot)\src\MMP.AsyncProxy</AsyncProxySource>
+    <!-- The same assembly version as the sibling's own build, so a program can load either DLL. -->
+    <Version Condition="Exists('$(AsyncProxySource)\MMP.AsyncProxy.csproj')">$([System.Text.RegularExpressions.Regex]::Match($([System.IO.File]::ReadAllText('$(AsyncProxySource)\MMP.AsyncProxy.csproj')), '(?&lt;=&lt;Version&gt;)[^&lt;]+').Value)</Version>
+  </PropertyGroup>
+
+  <ItemGroup>
+    <Compile Include="$(AsyncProxySource)\**\*.cs" Exclude="$(AsyncProxySource)\bin\**;$(AsyncProxySource)\obj\**" />
+  </ItemGroup>
+
+  <Target Name="CheckAsyncProxyRoot" BeforeTargets="BeforeBuild">
+    <Error Condition="!Exists('$(AsyncProxySource)\MMP.AsyncProxy.csproj')" Text="MMP.AsyncProxy not found at $(AsyncProxyRoot). Clone it beside this repo, or pass -p:AsyncProxyRoot=&lt;dir&gt;." />
+  </Target>
+
+</Project>

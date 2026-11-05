@@ -13,6 +13,8 @@ namespace NetSec.Ssh
     /// </summary>
     public sealed class SshEngine : IProtocolEngine
     {
+        const string PacketStep = "ssh.packet";
+
         readonly Interpreter<SshSession> _machine;
         readonly SshSession _session;
         readonly TraceStream _stream;
@@ -108,6 +110,8 @@ namespace NetSec.Ssh
             if (!_session.PeerVersionSeen) return DispatchVersion();
             SshPacket packet = _session.Reader.TryNext();
             if (packet == null) return false;
+            // The reader throws on a bad MAC, so a packet that reaches this line passed. The tour shows that pass.
+            if (_session.ReaderArmed) _machine.Perform(PacketStep, Effect.Check(SshChecks.PacketMac, SshCodes.PacketMac));
             TraceField[] fields = _session.ReaderArmed
                 ? SshFields.OfCipher(packet.Wire.Length - _session.Algorithms.MacSize, _session.Algorithms.MacSize)
                 : SshFields.Clear(packet.Payload, packet.PaddingLength, _session.Algorithms.IsLegacy);
