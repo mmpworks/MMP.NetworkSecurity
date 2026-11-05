@@ -171,10 +171,11 @@ test('a Host on a damaged master.key refuses the vault by name, and the page sho
   await expect(page.getByTestId('host-chip')).toContainText(/connected/i)
   await page.getByTestId('security-setup-button').click()
   await page.getByTestId('sec-vault-exercise').click()
-  await expect(page.getByTestId('vault-fault-code')).toHaveText('VAULT_MASTER_KEY_BAD')
-  await expect(page.getByTestId('vault-fault')).toContainText("The vault's master key file is damaged, so the vault cannot open any key.")
   await page.getByTestId('vault-sign-run').click()
   await expect(page.getByTestId('vault-fault-code')).toHaveText('VAULT_MASTER_KEY_BAD')
+  await expect(page.getByTestId('vault-fault')).toContainText("The vault's master key file is damaged, so the vault cannot open any key.")
+  await expect(page.getByTestId('vault-fault')).not.toContainText('master.key holds')
+  await expect(page.getByTestId('vault-fault-retry')).toHaveCount(0)
   for (const theme of ['light', 'dark'] as const) { await setTheme(page, theme); await contrast(page, theme, 'master key refusal') }
   await shot(page, '09-master-key-bad')
 })
