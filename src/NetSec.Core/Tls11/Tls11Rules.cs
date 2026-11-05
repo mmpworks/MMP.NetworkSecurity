@@ -95,6 +95,8 @@ namespace NetSec.Tls11
 
         static StepDecision OnData(Tls11Session s, InboundMessage m)
         {
+            // An empty chunk means a clean close to a channel reader, so an empty record delivers nothing.
+            if (m.Body.Length == 0) return StepDecision.Stay(Effect.Check(Tls11Checks.RecordHmac, Tls11Codes.RecordMac));
             return StepDecision.Stay(Effect.Check(Tls11Checks.RecordHmac, Tls11Codes.RecordMac), Effect.Deliver(0, m.Body));
         }
 
@@ -102,6 +104,13 @@ namespace NetSec.Tls11
         static bool SameFinished(byte[] expected, byte[] received)
         {
             return expected.Length == received.Length && ConstantTime.Equal(expected, 0, received, 0, expected.Length);
+        }
+
+        /// <summary>RFC 4346 section 7.1: the body is one byte of value 1. Nothing else binds this byte, because the record is not in the transcript.</summary>
+        static StepDecision RefuseCcsBody(InboundMessage m)
+        {
+            if (m.Body.Length == 1 && m.Body[0] == 1) return null;
+            return StepDecision.Fail(Tls11Codes.CcsBody, Tls11Checks.MessageShape, "a ChangeCipherSpec body is not the one byte of value 1");
         }
 
         static StepEffect[] KeyEffects(string holder, byte[] premaster, byte[] master, Tls11KeyBlock keys)
@@ -154,6 +163,8 @@ namespace NetSec.Tls11
                 return StepDecision.Fail(Tls11Codes.VersionRefused, Tls11Checks.VersionOffered, "the client offered TLS 1.1 and the server answered with version " + hello.Version);
             if (hello.Suites[0] != s.Options.Suite.Code)
                 return StepDecision.Fail(Tls11Codes.SuiteRefused, Tls11Checks.SuiteOffered, "the server chose suite " + hello.Suites[0] + ", and the client did not offer it");
+            if (hello.Compression[0] != 0)
+                return StepDecision.Fail(Tls11Codes.CompressionRefused, Tls11Checks.CompressionOffered, "the server chose compression " + hello.Compression[0] + ", and the client offered only null");
             return StepDecision.Advance(Effect.Absorb(m.Bytes));
         }
 
@@ -234,7 +245,7 @@ namespace NetSec.Tls11
 
         static StepDecision ClientCcs(Tls11Session s, InboundMessage m)
         {
-            return StepDecision.Advance(InstallFromSecrets(s, Direction.Inbound, Tls11Session.ServerWriteKey, Tls11Session.ServerWriteMac));
+            return RefuseCcsBody(m) ?? StepDecision.Advance(InstallFromSecrets(s, Direction.Inbound, Tls11Session.ServerWriteKey, Tls11Session.ServerWriteMac));
         }
 
         static StepDecision ClientFinished(Tls11Session s, InboundMessage m)
@@ -270,10 +281,12 @@ namespace NetSec.Tls11
                 return StepDecision.Fail(Tls11Codes.VersionRefused, Tls11Checks.VersionOffered, "the client offered version " + hello.Version + ", below TLS 1.1");
             if (Array.IndexOf(hello.Suites, s.Options.Suite.Code) < 0)
                 return StepDecision.Fail(Tls11Codes.SuiteRefused, Tls11Checks.SuiteOffered, "the client did not offer " + s.Options.Suite.Name);
+            if (Array.IndexOf(hello.Compression, (byte)0) < 0)
+                return StepDecision.Fail(Tls11Codes.CompressionRefused, Tls11Checks.CompressionOffered, "the client did not offer null compression");
 
             byte[] random = s.Draw(Tls11Messages.RandomSize);
             if (s.Options.WriteDowngradeTail) Tls11Messages.WriteDowngradeTail(random);
-            byte[] serverHello = Tls11Messages.BuildServerHello(random, s.Options.Suite);
+            byte[] serverHello = Tls11Messages.BuildServerHello(random, s.Options.Suite, hello.SignalsSecureRenegotiation);
             byte[] certificate = Tls11Messages.BuildCertificate(s.Options.Chain);
             byte[] done = Tls11Messages.BuildServerHelloDone();
             List<StepEffect> effects = new List<StepEffect>();
@@ -300,7 +313,7 @@ namespace NetSec.Tls11
         }
 
         /// <summary>
-        /// On a bad RSA block the server goes on with a random premaster, so the failure shows only at Finished. RFC 4346 section 7.4.7.1 asks for this,
+        /// On a bad RSA block the server goes on with a random premaster, so the keys differ and the client's sealed Finished fails TLS11_RECORD_MAC. RFC 4346 section 7.4.7.1 asks for this,
         /// because an answer that differs on bad padding gives Bleichenbacher's attack its oracle. The first two bytes must repeat the version the client offered,
         /// which stops a rewrite of that version in the clear hello.
         /// </summary>
@@ -332,7 +345,7 @@ namespace NetSec.Tls11
 
         static StepDecision ServerCcs(Tls11Session s, InboundMessage m)
         {
-            return StepDecision.Advance(InstallFromSecrets(s, Direction.Inbound, Tls11Session.ClientWriteKey, Tls11Session.ClientWriteMac));
+            return RefuseCcsBody(m) ?? StepDecision.Advance(InstallFromSecrets(s, Direction.Inbound, Tls11Session.ClientWriteKey, Tls11Session.ClientWriteMac));
         }
 
         static StepDecision ServerFinished(Tls11Session s, InboundMessage m)

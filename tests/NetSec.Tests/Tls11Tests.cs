@@ -254,8 +254,10 @@ namespace NetSec.Tests
 
         public static TheoryData<string, string> BadKeys => new TheoryData<string, string>
         {
-            // A modulus that is too short for the premaster, one that is even, an exponent that is even.
+            // A modulus that is too short for the premaster, one of 512 and one of 1024 bits, one that is even, an exponent that is even.
             { "c1" + new string('1', 60), "010001" },
+            { "c1" + new string('1', 126), "010001" },
+            { "c1" + new string('1', 254), "010001" },
             { "c1" + new string('1', 508) + "10", "010001" },
             { "c1" + new string('1', 510), "0100" },
         };
@@ -305,6 +307,242 @@ namespace NetSec.Tests
             byte[] header = Hex.Decode("1603027fff");
             EngineOutput output = client.Feed(header, 0, header.Length);
             Assert.Equal(Tls11Codes.RecordOverflow, output.Error.Code);
+        }
+
+        // ---------------------------------------------------------------- review findings, PR 49
+
+        const string OpenSsl = @"C:\Program Files\Git\mingw64\bin\openssl.exe";
+
+        [Theory]
+        [InlineData("TLS_RSA_WITH_AES_128_CBC_SHA", "AES128-SHA")]
+        [InlineData("TLS_ECDHE_RSA_WITH_AES_128_CBC_SHA", "ECDHE-RSA-AES128-SHA")]
+        public void OpenSsl_default_client_verifies_the_glass_server_and_sends_data(string suite, string openSslName)
+        {
+            string dir = System.IO.Path.Combine(System.IO.Path.GetTempPath(), "tls11-sclient-" + Guid.NewGuid().ToString("N"));
+            TrainingPki.Export(dir);
+            ProbeListener listener = Probe.Listen(new ProbeRequest { Protocol = WireProtocol.Tls11, Suite = suite, Seed = 9 });
+            using (System.Diagnostics.Process client = new System.Diagnostics.Process())
+            {
+                client.StartInfo.FileName = OpenSsl;
+                client.StartInfo.Arguments = "s_client -tls1_1 -cipher " + openSslName + ":@SECLEVEL=0 -CAfile \"" + System.IO.Path.Combine(dir, "root.pem") + "\" -verify_return_error -verify_hostname localhost -connect 127.0.0.1:" + listener.Port;
+                client.StartInfo.UseShellExecute = false;
+                client.StartInfo.RedirectStandardInput = true;
+                client.StartInfo.RedirectStandardOutput = true;
+                client.StartInfo.RedirectStandardError = true;
+                StringBuilder lines = new StringBuilder();
+                client.OutputDataReceived += (s, e) => { lock (lines) lines.AppendLine(e.Data); };
+                client.ErrorDataReceived += (s, e) => { };
+                client.Start();
+                client.BeginOutputReadLine();
+                client.BeginErrorReadLine();
+                client.StandardInput.Write("hello\n");
+                client.StandardInput.Flush();
+                Assert.True(listener.Result.Wait(30000), "the glass server did not finish in 30 s");
+                client.StandardInput.Close();
+                Assert.True(client.WaitForExit(15000), "s_client did not exit in 15 s");
+                client.WaitForExit();
+                string text;
+                lock (lines) text = lines.ToString();
+                ProbeResult result = listener.Result.Result;
+                Assert.True(result.Completed, result.Code + " " + result.CheckName);
+                Assert.Equal("hello\n", Encoding.UTF8.GetString(result.Received));
+                Assert.Contains("Protocol  : TLSv1.1", text);
+                Assert.Contains("Cipher    : " + openSslName, text);
+                Assert.Contains("Verify return code: 0 (ok)", text);
+            }
+        }
+
+        [Fact]
+        public void A_hello_with_no_renegotiation_signal_gets_no_extension_back()
+        {
+            byte[] random = new byte[32];
+            byte[] bare = Tls11Messages.BuildServerHello(random, Tls11CipherSuite.RsaAes128CbcSha, false);
+            byte[] answered = Tls11Messages.BuildServerHello(random, Tls11CipherSuite.RsaAes128CbcSha, true);
+            Assert.Equal("0005ff01000100", Hex.Encode(answered.Skip(bare.Length).ToArray()));
+            byte[] hello = Tls11Messages.BuildClientHello(random, Tls11CipherSuite.RsaAes128CbcSha);
+            Assert.True(Tls11Messages.ReadClientHello(new ByteReader(hello, 0, hello.Length, true)).SignalsSecureRenegotiation);
+        }
+
+        /// <summary>Runs the handshake and hands the first server output after the client's flight.</summary>
+        static EngineOutput ClientFlightAtServer(ITamperHook clientTamper)
+        {
+            Tls11Engine client = Client(Tls11CipherSuite.RsaAes128CbcSha, clientTamper);
+            Tls11Engine server = Server(Tls11CipherSuite.RsaAes128CbcSha);
+            server.Start();
+            client.Command(new EngineCommand(EngineCommandKind.Send, 0, Encoding.UTF8.GetBytes("ping"), null));
+            byte[] hello = client.Start().Wire;
+            byte[] flight = server.Feed(hello, 0, hello.Length).Wire;
+            EngineOutput fromClient = client.Feed(flight, 0, flight.Length);
+            EngineOutput fromServer = server.Feed(fromClient.Wire, 0, fromClient.Wire.Length);
+            if (server.Status == EngineStatus.Failed) return fromServer;
+            EngineOutput data = client.Feed(fromServer.Wire, 0, fromServer.Wire.Length);
+            return server.Feed(data.Wire, 0, data.Wire.Length);
+        }
+
+        [Fact]
+        public void A_sealed_empty_record_delivers_nothing_and_the_session_stays_open()
+        {
+            EngineOutput control = ClientFlightAtServer(null);
+            Assert.Single(control.App);
+            EngineOutput output = ClientFlightAtServer(new TamperPlan { Point = TamperPoint.Plain, Message = Tls11Messages.ApplicationDataName, Replacement = new byte[0] });
+            Assert.Empty(output.App);
+            Assert.Equal(EngineStatus.Open, output.Status);
+        }
+
+        [Fact]
+        public void A_sealed_record_above_the_limit_fails_by_name()
+        {
+            EngineOutput output = ClientFlightAtServer(new TamperPlan { Point = TamperPoint.Plain, Message = Tls11Messages.ApplicationDataName, Replacement = new byte[17000] });
+            Assert.Equal(Tls11Codes.RecordOverflow, output.Error.Code);
+        }
+
+        [Theory]
+        [InlineData(new byte[] { 2 })]
+        [InlineData(new byte[] { 1, 1 })]
+        public void A_bad_change_cipher_spec_body_fails_by_name(byte[] body)
+        {
+            EngineOutput output = ClientFlightAtServer(new TamperPlan { Point = TamperPoint.Plain, Message = Tls11Messages.ChangeCipherSpecName, Replacement = body });
+            Assert.Equal(Tls11Codes.CcsBody, output.Error.Code);
+        }
+
+        [Fact]
+        public void A_client_refuses_a_compression_it_did_not_offer()
+        {
+            // Handshake header 4, version 2, random 32, session id length 1, suite 2, then compression.
+            ITamperHook plan = new TamperPlan { Point = TamperPoint.Plain, Message = Tls11Messages.ServerHelloName, Offset = 41 };
+            NetSecError error = ErrorAfterDuel(Client(Tls11CipherSuite.RsaAes128CbcSha), Server(Tls11CipherSuite.RsaAes128CbcSha, false, plan));
+            Assert.Equal(Tls11Codes.CompressionRefused, error.Code);
+        }
+
+        [Fact]
+        public void A_server_refuses_a_hello_with_no_null_compression()
+        {
+            // Handshake header 4, version 2, random 32, session id length 1, suites length 2, suites 4, compression length 1, then compression.
+            ITamperHook plan = new TamperPlan { Point = TamperPoint.Plain, Message = Tls11Messages.ClientHelloName, Offset = 46 };
+            Tls11Engine client = Client(Tls11CipherSuite.RsaAes128CbcSha, plan);
+            Tls11Engine server = Server(Tls11CipherSuite.RsaAes128CbcSha);
+            server.Start();
+            byte[] hello = client.Start().Wire;
+            Assert.Equal(Tls11Codes.CompressionRefused, server.Feed(hello, 0, hello.Length).Error.Code);
+        }
+
+        [Fact]
+        public void Half_a_handshake_message_before_the_change_cipher_spec_fails_now()
+        {
+            Tls11Engine client = Client(Tls11CipherSuite.RsaAes128CbcSha);
+            Tls11Engine server = Server(Tls11CipherSuite.RsaAes128CbcSha);
+            server.Start();
+            byte[] hello = client.Start().Wire;
+            byte[] flight = server.Feed(hello, 0, hello.Length).Wire;
+            byte[] answer = client.Feed(flight, 0, flight.Length).Wire;
+            int keyExchangeRecord = 5 + ((answer[3] << 8) | answer[4]);
+            server.Feed(answer, 0, keyExchangeRecord);
+            byte[] half = Hex.Decode("16030200021400");
+            Assert.Null(server.Feed(half, 0, half.Length).Error);
+            byte[] ccs = Hex.Decode("140302000101");
+            Assert.Equal(ErrorCodes.UnexpectedMessage, server.Feed(ccs, 0, ccs.Length).Error.Code);
+        }
+
+        [Fact]
+        public void A_failure_sends_one_fatal_alert_and_a_received_alert_sends_none()
+        {
+            Tls11Engine client = Client(Tls11CipherSuite.RsaAes128CbcSha);
+            client.Start();
+            byte[] huge = Hex.Decode("1603027fff");
+            Assert.Equal("15030200020216", Hex.Encode(client.Feed(huge, 0, huge.Length).Wire));
+
+            Tls11Engine second = Client(Tls11CipherSuite.RsaAes128CbcSha);
+            second.Start();
+            byte[] alert = Hex.Decode("15030300020246");
+            Assert.Empty(second.Feed(alert, 0, alert.Length).Wire);
+        }
+
+        [Fact]
+        public void A_clear_warning_alert_does_not_cancel_a_later_alert()
+        {
+            Tls11Engine client = Client(Tls11CipherSuite.RsaAes128CbcSha);
+            client.Start();
+            byte[] warning = Hex.Decode("15030200020164");
+            Assert.Empty(client.Feed(warning, 0, warning.Length).Wire);
+            byte[] huge = Hex.Decode("1603027fff");
+            Assert.Equal("15030200020216", Hex.Encode(client.Feed(huge, 0, huge.Length).Wire));
+        }
+
+        [Fact]
+        public void A_client_refuses_a_renegotiation_info_answer_that_is_not_empty()
+        {
+            // Header 4, version 2, random 32, session id length 1, suite 2, compression 1, then extensions holding two bytes of renegotiated_connection.
+            byte[] hello = Hex.Decode("0200002f" + "0302" + new string('a', 64) + "00" + "002f" + "00" + "0006" + "ff01" + "0002" + "0100");
+            ITamperHook plan = new TamperPlan { Point = TamperPoint.Plain, Message = Tls11Messages.ServerHelloName, Replacement = hello };
+            NetSecError error = ErrorAfterDuel(Client(Tls11CipherSuite.RsaAes128CbcSha), Server(Tls11CipherSuite.RsaAes128CbcSha, false, plan));
+            Assert.Equal(Tls11Codes.RenegotiationInfo, error.Code);
+        }
+
+        [Fact]
+        public void An_abort_fails_the_engine_by_name_and_sends_a_fatal_alert_with_no_close_notify()
+        {
+            Tls11Engine client = Client(Tls11CipherSuite.RsaAes128CbcSha);
+            client.Start();
+            EngineOutput output = client.Command(EngineCommand.Abort(ErrorCodes.ChannelBufferFull, "the reader left too many bytes unread"));
+            Assert.Equal(EngineStatus.Failed, output.Status);
+            Assert.Equal(ErrorCodes.ChannelBufferFull, output.Error.Code);
+            Assert.Equal("15030200020250", Hex.Encode(output.Wire));
+        }
+
+        [Fact]
+        public void An_abort_fails_the_tls13_engine_by_name_with_a_fatal_alert()
+        {
+            LabContext c = new LabContext { SessionId = "s", TraceId = "s", Clock = new FixedClock(0), Random = new SeededRandom(3) };
+            IProtocolEngine client = Tls13Lab.Lesson5().Client(c, null, false);
+            client.Start();
+            EngineOutput output = client.Command(EngineCommand.Abort(ErrorCodes.ChannelBufferFull, "the reader left too many bytes unread"));
+            Assert.Equal(ErrorCodes.ChannelBufferFull, output.Error.Code);
+            Assert.Equal("0250", Hex.Encode(output.Wire.Skip(output.Wire.Length - 2).ToArray()));
+        }
+
+        sealed class WriteFailsLink : IByteLink
+        {
+            readonly byte[] _toRead;
+            int _writes;
+            public WriteFailsLink(byte[] toRead) { _toRead = toRead; }
+            public IFuture<int> Read(byte[] b, int off, int n) { Buffer.BlockCopy(_toRead, 0, b, off, _toRead.Length); return Futures.FromResult(_toRead.Length); }
+            public IFuture Write(byte[] b, int off, int n) => ++_writes == 1 ? Futures.Completed : Futures.FromException(new InvalidOperationException("the peer is gone"));
+            public void Close() { }
+        }
+
+        [Fact]
+        public void A_lost_alert_write_leaves_the_engines_named_failure()
+        {
+            IFuture<PumpResult> run = new EnginePump(Client(Tls11CipherSuite.RsaAes128CbcSha), new WriteFailsLink(Hex.Decode("1603027fff")), new NullSink(), new FreeRunGate(), null, 5000).Run();
+            Assert.True(run.Wait(10000), "the pump did not end");
+            Assert.Equal(Tls11Codes.RecordOverflow, run.Result.Error.Code);
+        }
+
+        [Fact]
+        public void A_reader_that_stops_reading_gets_a_named_error_past_the_queue_cap()
+        {
+            MemoryLink[] links = MemoryLink.Pair();
+            GlassTransportFactory factory = new GlassTransportFactory(Keys);
+            ISecureChannel server = factory.Open(new TransportRequest { Protocol = WireProtocol.Tls11, Role = EngineRole.Server, Link = links[1], Random = new SeededRandom(2), Sink = new NullSink(), Gate = new FreeRunGate() }).Result;
+            ISecureChannel client = factory.Open(new TransportRequest { Protocol = WireProtocol.Tls11, Role = EngineRole.Client, Link = links[0], Random = new SeededRandom(1), Sink = new NullSink(), Gate = new FreeRunGate() }).Result;
+            byte[] chunk = new byte[1 << 20];
+            NetSecException caught = null;
+            for (int i = 0; i < 40 && caught == null; i++)
+            {
+                IFuture sent = client.Send(0, chunk);
+                Assert.True(sent.Wait(60000), "a send did not drain in 60 s");
+                System.Threading.Thread.Sleep(i > 16 ? 200 : 0);
+                if (i > 16) caught = Receive(server);
+            }
+            Assert.NotNull(caught);
+            Assert.Equal(ErrorCodes.ChannelBufferFull, caught.Error.Code);
+        }
+
+        static NetSecException Receive(ISecureChannel channel)
+        {
+            IFuture<AppChunk> received = channel.Receive();
+            if (!received.Wait(5000) || !received.IsFaulted) return null;
+            return received.Exception as NetSecException ?? received.Exception.InnerException as NetSecException;
         }
 
         [Fact]
