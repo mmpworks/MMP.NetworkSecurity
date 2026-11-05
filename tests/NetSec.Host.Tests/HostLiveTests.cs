@@ -260,6 +260,27 @@ namespace NetSec.Host.Tests
             Assert.Equal("REAL_MODE_NOT_BUILT", (await s.Until("error")).GetProperty("code").GetString());
         }
 
+        /// <summary>A lab can do slow work before its first event. A step sent right after session.started must still release that event, with no resend.</summary>
+        [Theory]
+        [InlineData(0)]
+        [InlineData(1)]
+        [InlineData(3)]
+        [InlineData(4)]
+        [InlineData(6)]
+        [InlineData(7)]
+        [InlineData(8)]
+        public async Task A_step_right_after_session_started_releases_the_first_event(int lesson)
+        {
+            using Socket s = await Socket.Open(host);
+            await s.Send("{\"type\":\"session.start\",\"requestId\":\"r1\",\"lesson\":" + lesson + ",\"seed\":7,\"mode\":\"step\"}");
+            JsonElement started = await s.Until("session.started");
+            string id = started.GetProperty("sessionId").GetString();
+            await s.Send("{\"type\":\"session.step\",\"sessionId\":\"" + id + "\"}");
+            await s.Until("trace").WaitAsync(TimeSpan.FromSeconds(20));
+            await s.Send("{\"type\":\"session.run\",\"sessionId\":\"" + id + "\"}");
+            await s.UntilFinished(id);
+        }
+
         [Fact]
         public async Task Lesson_10_runs_through_the_host_to_the_end_with_its_rows_listed()
         {
