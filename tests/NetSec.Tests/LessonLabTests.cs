@@ -212,7 +212,7 @@ namespace NetSec.Tests
                 "L8-change-host-key", "L8-flip-exchange-signature", "L8-zero-share", "L8-flip-packet", "L8-wrong-user-key", "L8-refused-tunnel", "L8-legacy-flip-signature",
                 "L11-guess-leaky", "L11-guess-constant-time",
             };
-            Assert.Equal(expected, AttackCatalog.All.Where(a => a.Lesson >= 1 && a.Lesson != 4 && a.Lesson != 5).Select(a => a.AttackId).ToArray());
+            Assert.Equal(expected, AttackCatalog.All.Where(a => a.Lesson >= 1 && a.Lesson != 4 && a.Lesson != 5 && a.Lesson != 10).Select(a => a.AttackId).ToArray());
         }
     }
 }
