@@ -41,7 +41,7 @@ namespace NetSec.Tls13
 
         public static Tls13Engine CreateServer(Tls13Options options)
         {
-            return new Tls13Engine(Tls13ServerTable.Table, Tls13ServerTable.Start, options);
+            return new Tls13Engine(options.RequireClientCertificate ? Tls13ServerTable.MutualTable : Tls13ServerTable.Table, Tls13ServerTable.Start, options);
         }
 
         public EngineStatus Status { get { return _machine.Status; } }

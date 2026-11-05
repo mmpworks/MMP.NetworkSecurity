@@ -1,0 +1,164 @@
+{
+  "summary": {
+    "schema": 1,
+    "timestamp": "2026-11-05T05:40:16.3236201-06:00",
+    "machine": "BEAST",
+    "command": "run.ps1 -Clauses A9,A11",
+    "productRoot": "E:\\dev\\ns-s6",
+    "productCommit": "a3a12ad",
+    "acceptanceCommit": "b2d1951",
+    "freshClone": false,
+    "productPresent": true,
+    "M": 202,
+    "selected": 11,
+    "pass": 6,
+    "fail": 5,
+    "notRun": 0,
+    "reasons": [
+      {
+        "key": "FAIL ASSERTION",
+        "count": 5
+      }
+    ],
+    "selfChecks": {
+      "selected": 0,
+      "pass": 0,
+      "fail": 0,
+      "notRun": 0
+    }
+  },
+  "results": [
+    {
+      "id": "A11.catalog.every-row-beside-control",
+      "assertion": "A11",
+      "slice": "S6",
+      "group": "auth",
+      "build": "host",
+      "referee": "Go tokenverify",
+      "status": "PASS",
+      "reason": "",
+      "detail": "27 of 27 vectors",
+      "ms": 31573
+    },
+    {
+      "id": "A11.dpop.replay-beside-control",
+      "assertion": "A11",
+      "slice": "S6",
+      "group": "auth",
+      "build": "host",
+      "referee": "Go tokenverify",
+      "status": "FAIL",
+      "reason": "ASSERTION",
+      "detail": "no attack in lesson 10 expects the check 'jti already used' (ux-design.md section 7 names it)",
+      "ms": 1
+    },
+    {
+      "id": "A11.mtls.missing-client-cert-beside-control",
+      "assertion": "A11",
+      "slice": "S6",
+      "group": "auth",
+      "build": "host",
+      "referee": "Go tokenverify",
+      "status": "FAIL",
+      "reason": "ASSERTION",
+      "detail": "no attack in lesson 10 expects the check 'bad_certificate alert' (ux-design.md section 7 names it)",
+      "ms": 0
+    },
+    {
+      "id": "A11.passkey.challenge-replay-beside-control",
+      "assertion": "A11",
+      "slice": "S6",
+      "group": "auth",
+      "build": "host",
+      "referee": "Go tokenverify",
+      "status": "FAIL",
+      "reason": "ASSERTION",
+      "detail": "no attack in lesson 10 expects the check 'challenge already used' (ux-design.md section 7 names it)",
+      "ms": 0
+    },
+    {
+      "id": "A11.roles.capability-not-granted-beside-control",
+      "assertion": "A11",
+      "slice": "S6",
+      "group": "auth",
+      "build": "host",
+      "referee": "Go tokenverify",
+      "status": "FAIL",
+      "reason": "ASSERTION",
+      "detail": "no attack in lesson 10 expects the check 'permission check' (ux-design.md section 7 names it)",
+      "ms": 1
+    },
+    {
+      "id": "A11.token.claim-changed-beside-control",
+      "assertion": "A11",
+      "slice": "S6",
+      "group": "auth",
+      "build": "host",
+      "referee": "Go tokenverify",
+      "status": "FAIL",
+      "reason": "ASSERTION",
+      "detail": "no attack in lesson 10 expects the check 'token signature' (ux-design.md section 7 names it)",
+      "ms": 3
+    },
+    {
+      "id": "A11.token.verifies-under-go-tokenverify",
+      "assertion": "A11",
+      "slice": "S6",
+      "group": "auth",
+      "build": "host",
+      "referee": "Go tokenverify",
+      "status": "PASS",
+      "reason": "",
+      "detail": "tokenverify and the product agree on a good token, a changed claim, and an attacker-signed token",
+      "ms": 793
+    },
+    {
+      "id": "A9.cf.binaries-reference-cf-mscorlib",
+      "assertion": "A9",
+      "slice": "All",
+      "group": "binproof",
+      "build": "host",
+      "referee": "CF references and System.Reflection.Metadata",
+      "status": "PASS",
+      "reason": "",
+      "detail": "4 of 4 vectors",
+      "ms": 18
+    },
+    {
+      "id": "A9.cf.compiles-against-reference-assemblies-with-langversion-3",
+      "assertion": "A9",
+      "slice": "All",
+      "group": "binproof",
+      "build": "host",
+      "referee": "CF references and System.Reflection.Metadata",
+      "status": "PASS",
+      "reason": "",
+      "detail": "src/NetSec.Core and src/NetSec.Core.NetCF use LangVersion 3; the CF project builds against E:\\dev\\tools\\netcf35-ref",
+      "ms": 1920
+    },
+    {
+      "id": "A9.cf.same-suite-passes-on-net48-skips-pinned",
+      "assertion": "A9",
+      "slice": "All",
+      "group": "binproof",
+      "build": "host",
+      "referee": "CF references and System.Reflection.Metadata",
+      "status": "PASS",
+      "reason": "",
+      "detail": "2 of 2 vectors; net10.0 364 passed, net48 364 passed, 0 skipped (all pinned)",
+      "ms": 27109
+    },
+    {
+      "id": "A9.git-ls-files.no-cf-binary",
+      "assertion": "A9",
+      "slice": "All",
+      "group": "binproof",
+      "build": "host",
+      "referee": "CF references and System.Reflection.Metadata",
+      "status": "PASS",
+      "reason": "",
+      "detail": "364 tracked files checked against 42 CF reference files and the CF mscorlib token; none match",
+      "ms": 418
+    }
+  ]
+}

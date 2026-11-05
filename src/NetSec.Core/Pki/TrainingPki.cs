@@ -11,6 +11,7 @@ namespace NetSec.Pki
     public static class TrainingPki
     {
         public const string ServerName = "localhost";
+        public const string ClientName = "pump-reader-4";
         const string UserComment = "training";
 
         public static void Export(string directory)
@@ -24,6 +25,10 @@ namespace NetSec.Pki
             Write(directory, "root.pem", Pem("CERTIFICATE", ca.RootCertificateDer));
             Write(directory, "srv.pem", Pem("CERTIFICATE", ServerCertificate(ca, tls)));
             Write(directory, "srv.key", Pem("PRIVATE KEY", TrainingCa.Ed25519Pkcs8(tls.CopyMaterial())));
+
+            ITrainingKey client = keys.Find(KeyIds.ClientTlsEd25519);
+            Write(directory, "client.pem", Pem("CERTIFICATE", ClientCertificate(ca, client)));
+            Write(directory, "client.key", Pem("PRIVATE KEY", TrainingCa.Ed25519Pkcs8(client.CopyMaterial())));
 
             ITrainingKey rsa = keys.Find(KeyIds.ServerTls11Rsa);
             byte[] rsaCert = ca.IssueServerCertificate(ServerName, rsa.CopyPublic(), TrainingCa.DefaultNotBefore, TrainingCa.DefaultNotAfter);
@@ -42,6 +47,12 @@ namespace NetSec.Pki
         public static byte[] ServerCertificate(TrainingCa ca, ITrainingKey key)
         {
             return ca.IssueServerCertificate(ServerName, TrainingCa.Ed25519Spki(key.CopyPublic()), TrainingCa.DefaultNotBefore, TrainingCa.DefaultNotAfter);
+        }
+
+        /// <summary>The leaf the glass client and the referees present when a server asks for one.</summary>
+        public static byte[] ClientCertificate(TrainingCa ca, ITrainingKey key)
+        {
+            return ca.IssueClientCertificate(ClientName, TrainingCa.Ed25519Spki(key.CopyPublic()), TrainingCa.DefaultNotBefore, TrainingCa.DefaultNotAfter);
         }
 
         public static string Pem(string label, byte[] der)
