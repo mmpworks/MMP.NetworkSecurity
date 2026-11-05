@@ -55,15 +55,43 @@ namespace Acceptance
                 int s = string.CompareOrdinal(Tail(MiniJson.Str(a, "streamId")), Tail(MiniJson.Str(b, "streamId")));
                 return s != 0 ? s : MiniJson.Num(a, "streamSeq", 0).CompareTo(MiniJson.Num(b, "streamSeq", 0));
             });
-            List<string> shape = new List<string>();
+            // TCP may deliver the same bytes as one read or as two (1232 bytes, or 1214 then 18), so the wire.* events that follow each other in one stream
+            // with the same type and parties are one entry whose byte counts add up. What moved is compared, not how the network cut it.
+            List<string> heads = new List<string>();
+            List<string> streams = new List<string>();
+            List<int> wires = new List<int>();
+            List<int> plains = new List<int>();
             foreach (Dictionary<string, object> ev in evs)
             {
                 Dictionary<string, object> chk = MiniJson.Obj(ev, "check");
-                shape.Add(string.Join("|", new string[] {
-                    MiniJson.Str(ev, "type"), MiniJson.Str(ev, "actor"), MiniJson.Str(ev, "from"), MiniJson.Str(ev, "to"), MiniJson.Str(ev, "step"),
-                    MiniJson.Str(chk, "name"), MiniJson.Str(chk, "result"), MiniJson.Str(chk, "code"), "wire=" + Len(ev, "wire"), "plain=" + Len(ev, "plain") }));
+                string type = MiniJson.Str(ev, "type") ?? "";
+                string head = string.Join("|", new string[] {
+                    type, MiniJson.Str(ev, "actor"), MiniJson.Str(ev, "from"), MiniJson.Str(ev, "to"), MiniJson.Str(ev, "step"),
+                    MiniJson.Str(chk, "name"), MiniJson.Str(chk, "result"), MiniJson.Str(chk, "code") });
+                string stream = Tail(MiniJson.Str(ev, "streamId"));
+                int last = heads.Count - 1;
+                if (last >= 0 && type.StartsWith("wire.", StringComparison.Ordinal) && heads[last] == head && streams[last] == stream)
+                {
+                    wires[last] += Len(ev, "wire"); plains[last] += Len(ev, "plain");
+                    continue;
+                }
+                heads.Add(head); streams.Add(stream); wires.Add(Len(ev, "wire")); plains.Add(Len(ev, "plain"));
             }
+            List<string> shape = new List<string>();
+            for (int i = 0; i < heads.Count; i++) shape.Add(heads[i] + "|wire=" + wires[i] + "|plain=" + plains[i]);
             return shape;
+        }
+
+        /// <summary>The event lines that one run has more of than the other (a multiset difference), so a count mismatch names the events and not only the totals.</summary>
+        static string Unmatched(List<string> builtIn, List<string> own)
+        {
+            List<string> onlyOwn = new List<string>(own);
+            List<string> onlyBuiltIn = new List<string>();
+            foreach (string line in builtIn) if (!onlyOwn.Remove(line)) onlyBuiltIn.Add(line);
+            StringBuilder sb = new StringBuilder();
+            foreach (string line in onlyBuiltIn) sb.Append("  only on built-in keys: ").Append(line).Append('\n');
+            foreach (string line in onlyOwn) sb.Append("  only on own keys: ").Append(line).Append('\n');
+            return sb.ToString().TrimEnd();
         }
 
         static string Tail(string streamId) { int i = (streamId ?? "").IndexOf('/'); return i < 0 ? streamId : streamId.Substring(i + 1); }
@@ -89,7 +117,8 @@ namespace Acceptance
                 Check.True(mine.Error == null && mine.Finished != null, "lesson " + lesson + " on own keys did not finish: " + (mine.Frames.Count == 0 ? "no frames" : mine.Frames[mine.Frames.Count - 1]));
                 Check.Equal("ending of lesson " + lesson, Ending(baseline), Ending(mine));
                 List<string> shape1 = Shape(mine);
-                Check.Equal("events of lesson " + lesson + " on own keys against built-in keys", shape0.Count, shape1.Count);
+                if (shape0.Count != shape1.Count)
+                    throw new FailException("events of lesson " + lesson + " on own keys against built-in keys: expected " + shape0.Count + " got " + shape1.Count + ".\n" + Unmatched(shape0, shape1));
                 for (int i = 0; i < shape0.Count; i++)
                     Check.True(shape0[i] == shape1[i], "lesson " + lesson + ", event " + (i + 1) + " differs on own keys.\n  built-in: " + shape0[i] + "\n  own keys: " + shape1[i]);
 
