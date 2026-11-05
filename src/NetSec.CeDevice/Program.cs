@@ -6,8 +6,10 @@ using System.Threading;
 using MMP.AsyncProxy;
 using NetSec.Bridge;
 using NetSec.Bytes;
+using NetSec.Crypto;
 using NetSec.Errors;
 using NetSec.Io;
+using NetSec.Keys;
 using NetSec.Machine;
 using NetSec.Platform;
 using NetSec.Trace;
@@ -44,6 +46,10 @@ namespace NetSec.CeDevice
             options.Gateway = new IPEndPoint(IPAddress.Loopback, int.Parse(gateway));
             options.LinkKind = Option(args, "--link") ?? CeDeviceFlow.LinkExternalForward;
             options.Clock = new MonotonicClock();
+            options.Suite = Option(args, "--suite") == "legacy" ? SshSuite.Legacy : SshSuite.Modern;
+            string seed = Option(args, "--seed");
+            options.Random = seed != null ? (IRandomSource)new SeededRandom((int)long.Parse(seed)) : new OsRandom();
+            options.Keys = new TrainingKeySource();
             string traceFile = Option(args, "--trace-file");
             options.Sink = traceFile != null ? (ITraceSink)new NdjsonFileSink(traceFile) : new NullSink();
 

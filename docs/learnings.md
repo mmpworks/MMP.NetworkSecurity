@@ -127,6 +127,13 @@ Each correction goes here, newest slice last. Later slices read this file first.
 18. **The sequence number stops by name at 2^32.** RFC 4253 section 6.4 lets it wrap. RFC 4344 section 3.1 says not to send 2^32 packets under one key, and this engine has no rekey. The check runs in the writer and the reader, so a command path needs the same failure guard as a feed.
 19. **A test can pass for the wrong reason on a closed channel.** The first second-confirmation test ran the exec to its end, so the channel had gone and the failure came from that. A rule-breaking test must assert the state it attacks is still live.
 
+## S5, the bridge
+
+1. **The gateway opens hop 2 at the first byte.** `ssh.exe -L` opens a tunnel for any local connection, and the suite's port check is one. An eager open started a TLS handshake that the check then cut, and that named `PEER_CLOSED_EARLY` in a good run. `FirstWriteOpensLink` opens nothing for an empty tunnel.
+2. **A hop server starts before it knows the trace id.** The PIN pad makes the id and the envelope carries it, so the gateway's SSH handshake and the server's TLS handshake come first. `LateTraceSink` holds those events and writes them under the id when the first frame crosses. A session that ends first writes them with no id, so a tamper at the handshake still shows its check.
+3. **A hop reads the trace id without proof, so it only labels with it.** The bank refuses before the MAC passes under no trace id, and names the claimed id in the detail.
+4. **The pad holds a loaded key.** `PinPadCore.InjectedInitialKey` stands for a key loader's work, and a test pins it to what the bank derives. The base key is in `NetSec.Core.dll` on every process, because `TrainingKeySource` derives it from public text. So the boundary is what each role's code reads, and no binary hides anything.
+5. **Open a live `tap` log with `FileShare.ReadWrite`.** The tap still holds it open.
 ## Pump deadline test
 
 1. **The side whose deadline fires reports `LINK_DEADLINE`. The side that then reads the close reports `PEER_CLOSED_EARLY`, and that is its true outcome.** A test that names one side's code must fix the order with two deadlines. `LabPair.Named` drops the second code, so a lab reports the real failure in either order.
