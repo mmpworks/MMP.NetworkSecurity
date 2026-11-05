@@ -28,7 +28,7 @@
       "title": "Phase 1: the server asks for a certificate",
       "text": [
         "The first phase is mutual TLS. In lesson 4 only the server showed a certificate. Here the server also asks the client for one.",
-        "Watch the server's CertificateRequest. It means: show me who you are before we go on. A server may ask for this, and it does not have to."
+        "Watch the server's CertificateRequest. It means: show me a certificate before we go on. A server may ask for this, and it does not have to."
       ],
       "glossary": [],
       "bind": { "kind": "event", "eventType": "tls.handshake.sent", "match": { "actor": "server", "message": "CertificateRequest" } },
@@ -47,13 +47,20 @@
       "lesson": 10,
       "title": "The client shows its certificate",
       "text": [
-        "The client answers with its own certificate. It carries the name pump-reader-4 and the client's device key.",
+        "The client answers with its own certificate. It carries the name pump-reader-4 and the client's TLS key. This is not the login key of phase 2.",
         "The server checks it the way the client checked the server's in lesson 4: does it lead to a trusted root, is it in date, and does its signature verify.",
-        "Anyone can copy a certificate, so the card alone proves nothing. The next step shows what does."
+        "A chain shows only that a trusted CA vouched for this key. The server must still compare the name with the one it allows. Anyone can also copy a certificate, so the card alone proves nothing."
       ],
       "glossary": [],
       "bind": { "kind": "event", "eventType": "tls.handshake.sent", "match": { "actor": "client", "message": "Certificate" } },
       "highlight": ["inspector:field=cert.subject", "inspector:field=cert.public_key"],
+      "claims": [
+        {
+          "id": "L10-C23",
+          "text": "A certificate chain shows that a trusted CA vouched for the key and the name. Name matching is the application's job, and the server must still compare the name with the one it allows.",
+          "source": "Jared's re-check of PR #20, Blocker 2 (comment 6658016121); richard-s1b, lab owner, message of 2026-11-05 on the client name check (docs/lesson-10-names.md, row L10-wrong-client-name, main commit 21533cc)"
+        }
+      ],
       "unlock": { "mode": "event" }
     },
     {
@@ -136,32 +143,82 @@
     {
       "id": "L10-S07",
       "lesson": 10,
-      "title": "Phase 2: a key that stays on the device",
+      "title": "Is it the right client?",
       "text": [
-        "Mutual TLS proved the client holds a key. Now the client logs in to get a token for its calls. The login uses the same device key.",
-        "The device key is a pair: a private key that stays on the device, and a public key that anyone may see. Find the private key in the secrets panel under the client lane.",
-        "A signature with this key shows the signer holds it. It says nothing about who the signer is until someone has linked the public key to a person or a device."
+        "A trusted CA can vouch for many keys. A chain that leads to the root shows that the CA vouched for this key under some name. It does not show that the name is the one this server allows.",
+        "So the server compares the certificate's name with the name it allows. The check is named client name.",
+        "Try it: connect with an attacker key whose certificate, issued under the same training root, names bank-hsm-admin. The chain is fine, but the name is wrong, so the server refuses before it reads the signature. It sends alert 49, access_denied.",
+        "The check compares a name only. If the CA issues that name to the wrong key, the check passes. That is why the choice of CA matters."
       ],
       "glossary": [],
-      "bind": { "kind": "event", "eventType": "secret.derived", "match": { "actor": "client" } },
-      "highlight": ["secrets:row=client.auth.device-key"],
-      "unlock": { "mode": "event" }
+      "bind": { "kind": "event", "eventType": "check.result", "match": { "actor": "server", "message": "client name" } },
+      "highlight": ["check:name=client name", "inspector:field=cert.subject"],
+      "tryIt": {
+        "id": "L10-S07-T1",
+        "label": "Connect with a certificate for another name",
+        "action": { "type": "run-attack", "attackId": "L10-wrong-client-name" },
+        "expect": { "type": "check", "name": "client name", "result": "fail" }
+      },
+      "claims": [
+        {
+          "id": "L10-C24",
+          "text": "In the lab the server compares the client certificate's name with the one it allows, and refuses a certificate for bank-hsm-admin that was issued under the training root, with code TLS13_CLIENT_NAME_REFUSED and alert 49.",
+          "source": "richard-s1b, lab owner, message of 2026-11-05: row L10-wrong-client-name, check client name (actor server), code TLS13_CLIENT_NAME_REFUSED, alert 49; docs/lesson-10-names.md, main commit 21533cc"
+        },
+        {
+          "id": "L10-C25",
+          "text": "Alert access_denied (49) means a valid certificate was received, but when access control was applied, the sender decided not to proceed with negotiation.",
+          "source": "RFC 8446, section 6.2 (Error Alerts)"
+        },
+        {
+          "id": "L10-C26",
+          "text": "The client name check compares a name only. If the CA issues that name to the wrong key, the check passes.",
+          "source": "richard-s1b, lab owner, message of 2026-11-05 (stated limit of the check)"
+        }
+      ],
+      "unlock": { "mode": "action", "ref": "L10-S07-T1" }
     },
     {
       "id": "L10-S08",
       "lesson": 10,
-      "title": "Login names a subject and a key",
+      "title": "Phase 2: a key that stays on the device",
       "text": [
-        "To log in, the client tells the issuer two things: the subject it claims to be, and the public key it will sign with. The issuer is the part of the system that hands out tokens.",
-        "Nothing secret travels here. Anyone can claim any subject name, so the claim proves nothing yet."
+        "Mutual TLS proved the client holds its TLS key. Now the client logs in to get a token for its calls. The login uses a different key, a device key made for the login. The lab does not link it to the certificate key.",
+        "The device key is a pair: a private key that stays on the device, and a public key that anyone may see.",
+        "The issuer does not read the client certificate. Mutual TLS and the login run on separate connections. This lab stops if the handshake fails, but that is only the lab's order, and a real system must tie the two together.",
+        "A signature with this key shows the signer holds it. It says nothing about who the signer is until someone has linked the public key to a person or a device."
       ],
       "glossary": [],
-      "bind": { "kind": "event", "eventType": "wire.sent", "match": { "actor": "client", "message": "LoginRequest" } },
-      "highlight": ["inspector:field=subject", "inspector:field=devicePublicKey"],
-      "unlock": { "mode": "event" }
+      "bind": { "kind": "concept" },
+      "claims": [
+        {
+          "id": "L10-C22",
+          "text": "The client certificate holds a fixed key (KeyIds.ClientTlsEd25519). The login key is drawn from the run's seed (the same seed gives the same key) and enrolled by the lab. The call phase runs on another connection and reads no certificate.",
+          "source": "Jared's re-check of PR #20 (comment 6658016121): three seeds gave tlsKey 0a1626172713245c and three different loginKey values; src/NetSec.Core/Labs/Lesson10Auth.cs, lines 185-186 and 201"
+        },
+        {
+          "id": "L10-C27",
+          "text": "In the lab the issuer does not read the client certificate: mutual TLS and the login run on separate connections, and the lab stops if the handshake fails. A real system must tie the two together.",
+          "source": "richard-s1b, lab owner, message of 2026-11-05 (sentence 4); Jared's re-check of PR #20, Blocker 2 (comment 6658016121)"
+        }
+      ],
+      "unlock": { "mode": "ack" }
     },
     {
       "id": "L10-S09",
+      "lesson": 10,
+      "title": "Login names a subject and a key",
+      "text": [
+        "To log in, the client tells the issuer two things: the subject it claims to be, and the public key it will sign with. The issuer is the part of the system that hands out tokens.",
+        "Nothing secret travels here. Anyone can claim any subject name, so the claim proves nothing yet. Find the device key's private half in the secrets panel under the client lane."
+      ],
+      "glossary": [],
+      "bind": { "kind": "event", "eventType": "wire.sent", "match": { "actor": "client", "message": "LoginRequest" } },
+      "highlight": ["inspector:field=subject", "inspector:field=devicePublicKey", "secrets:row=client.auth.device-key"],
+      "unlock": { "mode": "event" }
+    },
+    {
+      "id": "L10-S10",
       "lesson": 10,
       "title": "Is this key on record?",
       "text": [
@@ -173,7 +230,7 @@
       "bind": { "kind": "event", "eventType": "check.result", "match": { "message": "device enrolled" } },
       "highlight": ["check:name=device enrolled"],
       "tryIt": {
-        "id": "L10-S09-T1",
+        "id": "L10-S10-T1",
         "label": "Log in with a key nobody enrolled",
         "action": { "type": "run-attack", "attackId": "L10-unknown-device" },
         "expect": { "type": "check", "name": "device enrolled", "result": "fail" }
@@ -190,10 +247,10 @@
           "source": "docs/lesson-10-names.md, check table and Attacks, L10-unknown-device (main, commit 279e9a1)"
         }
       ],
-      "unlock": { "mode": "action", "ref": "L10-S09-T1" }
+      "unlock": { "mode": "action", "ref": "L10-S10-T1" }
     },
     {
-      "id": "L10-S10",
+      "id": "L10-S11",
       "lesson": 10,
       "title": "The issuer sets a challenge",
       "text": [
@@ -206,7 +263,7 @@
       "unlock": { "mode": "event" }
     },
     {
-      "id": "L10-S11",
+      "id": "L10-S12",
       "lesson": 10,
       "title": "Sign the challenge",
       "text": [
@@ -218,7 +275,7 @@
       "bind": { "kind": "event", "eventType": "wire.sent", "match": { "actor": "client", "message": "ChallengeResponse" } },
       "highlight": ["inspector:field=signature", "check:name=challenge signature"],
       "tryIt": {
-        "id": "L10-S11-T1",
+        "id": "L10-S12-T1",
         "label": "Send the signed response a second time",
         "action": { "type": "run-attack", "attackId": "L10-replay-challenge" },
         "expect": { "type": "check", "name": "challenge already used", "result": "fail" }
@@ -235,22 +292,22 @@
           "source": "docs/lesson-10-names.md, Attacks, L10-replay-challenge (main, commit 279e9a1)"
         }
       ],
-      "unlock": { "mode": "action", "ref": "L10-S11-T1" }
+      "unlock": { "mode": "action", "ref": "L10-S12-T1" }
     },
     {
-      "id": "L10-S12",
+      "id": "L10-S13",
       "lesson": 10,
       "title": "The answer must match the question",
       "text": [
         "A fresh signature is still not enough. The issuer also checks that the answer names the challenge it sent in this login. The check is named challenge issued.",
         "Without that check, an attacker could sign a challenge of their own choosing, or one recorded from an earlier login, and the issuer would accept it.",
-        "Try it: sign a challenge the issuer never sent. The signature is fine, the check fails, and no token is issued."
+        "Try it: sign a challenge the issuer never sent. The signature would verify, but the issuer fails the challenge issued check first, and no token is issued."
       ],
       "glossary": [],
       "bind": { "kind": "event", "eventType": "check.result", "match": { "message": "challenge issued" } },
       "highlight": ["check:name=challenge issued"],
       "tryIt": {
-        "id": "L10-S12-T1",
+        "id": "L10-S13-T1",
         "label": "Sign a challenge the issuer never sent",
         "action": { "type": "run-attack", "attackId": "L10-unissued-challenge" },
         "expect": { "type": "check", "name": "challenge issued", "result": "fail" }
@@ -259,13 +316,13 @@
         {
           "id": "L10-C12",
           "text": "The issuer compares the answered challenge with the one this login issued and refuses an unissued one with code CHALLENGE_NOT_ISSUED.",
-          "source": "docs/lesson-10-names.md, check table and Attacks, L10-unissued-challenge (main, commit 279e9a1); review of PR #20, Blocker 1"
+          "source": "docs/lesson-10-names.md, check table and Attacks, L10-unissued-challenge (main, commit 279e9a1); review of PR #20, Blocker 1; reader-a15a's run of the try-it: no signature check appears in that run, and challenge issued fails first"
         }
       ],
-      "unlock": { "mode": "action", "ref": "L10-S12-T1" }
+      "unlock": { "mode": "action", "ref": "L10-S13-T1" }
     },
     {
-      "id": "L10-S13",
+      "id": "L10-S14",
       "lesson": 10,
       "title": "A token in three parts",
       "text": [
@@ -291,7 +348,7 @@
       "unlock": { "mode": "event" }
     },
     {
-      "id": "L10-S14",
+      "id": "L10-S15",
       "lesson": 10,
       "title": "Phase 3: the server checks the token's signature",
       "text": [
@@ -302,15 +359,15 @@
       "bind": { "kind": "event", "eventType": "check.result", "match": { "message": "token signature" } },
       "highlight": ["check:name=token signature"],
       "tryIt": {
-        "id": "L10-S14-T1",
+        "id": "L10-S15-T1",
         "label": "Change one byte of the token claims",
         "action": { "type": "run-attack", "attackId": "L10-change-token-claim" },
         "expect": { "type": "check", "name": "token signature", "result": "fail" }
       },
-      "unlock": { "mode": "action", "ref": "L10-S14-T1" }
+      "unlock": { "mode": "action", "ref": "L10-S15-T1" }
     },
     {
-      "id": "L10-S15",
+      "id": "L10-S16",
       "lesson": 10,
       "title": "A token ends",
       "text": [
@@ -322,15 +379,15 @@
       "bind": { "kind": "event", "eventType": "check.result", "match": { "message": "token expiry" } },
       "highlight": ["check:name=token expiry"],
       "tryIt": {
-        "id": "L10-S15-T1",
+        "id": "L10-S16-T1",
         "label": "Use an expired token",
         "action": { "type": "run-attack", "attackId": "L10-expired-token" },
         "expect": { "type": "check", "name": "token expiry", "result": "fail" }
       },
-      "unlock": { "mode": "action", "ref": "L10-S15-T1" }
+      "unlock": { "mode": "action", "ref": "L10-S16-T1" }
     },
     {
-      "id": "L10-S16",
+      "id": "L10-S17",
       "lesson": 10,
       "title": "A token is for one server",
       "text": [
@@ -342,7 +399,7 @@
       "bind": { "kind": "event", "eventType": "check.result", "match": { "message": "token audience" } },
       "highlight": ["check:name=token audience", "inspector:field=tokenClaims"],
       "tryIt": {
-        "id": "L10-S16-T1",
+        "id": "L10-S17-T1",
         "label": "Use a token written for another server",
         "action": { "type": "run-attack", "attackId": "L10-wrong-audience" },
         "expect": { "type": "check", "name": "token audience", "result": "fail" }
@@ -359,10 +416,10 @@
           "source": "docs/lesson-10-names.md, Attacks, L10-wrong-audience (main, commit 279e9a1)"
         }
       ],
-      "unlock": { "mode": "action", "ref": "L10-S16-T1" }
+      "unlock": { "mode": "action", "ref": "L10-S17-T1" }
     },
     {
-      "id": "L10-S17",
+      "id": "L10-S18",
       "lesson": 10,
       "title": "A stolen token is not enough",
       "text": [
@@ -374,7 +431,7 @@
       "bind": { "kind": "event", "eventType": "measure.result", "match": { "actor": "client", "message": "proof claims" } },
       "highlight": ["inspector:field=proofClaims", "check:name=proof binding"],
       "tryIt": {
-        "id": "L10-S17-T1",
+        "id": "L10-S18-T1",
         "label": "Use the token with another key's proof",
         "action": { "type": "run-attack", "attackId": "L10-stolen-token" },
         "expect": { "type": "check", "name": "proof binding", "result": "fail" }
@@ -391,14 +448,14 @@
           "source": "RFC 9449, Abstract; docs/lesson-10-names.md, check table, proof binding row (main, commit 279e9a1)"
         }
       ],
-      "unlock": { "mode": "action", "ref": "L10-S17-T1" }
+      "unlock": { "mode": "action", "ref": "L10-S18-T1" }
     },
     {
-      "id": "L10-S18",
+      "id": "L10-S19",
       "lesson": 10,
       "title": "Each proof works once",
       "text": [
-        "A thief who records one call could send the same proof again. The server defends in two ways. It rejects proofs older than 60 seconds, which is the check named proof age. It also remembers each proof's one-time id.",
+        "A thief who records one call could send the same proof again. The server defends in two ways. It rejects proofs dated more than 60 seconds from now, in either direction, which is the check named proof age. It also remembers each proof's one-time id.",
         "A real server must keep those used ids for the whole 60-second window, or an old proof could slip back in. This lab keeps them for one run only.",
         "The lab also issues no DPoP nonce. A server may add a nonce to shorten a proof's life, and RFC 9449 makes it optional.",
         "Try it: send ReadTotals again with the same proof. The server has seen that id, so the check named jti already used fails."
@@ -407,7 +464,7 @@
       "bind": { "kind": "event", "eventType": "check.result", "match": { "message": "jti already used" } },
       "highlight": ["check:name=jti already used", "check:name=proof age"],
       "tryIt": {
-        "id": "L10-S18-T1",
+        "id": "L10-S19-T1",
         "label": "Send the same proof twice",
         "action": { "type": "run-attack", "attackId": "L10-replay-proof" },
         "expect": { "type": "check", "name": "jti already used", "result": "fail" }
@@ -420,7 +477,7 @@
         },
         {
           "id": "L10-C16",
-          "text": "The lab accepts a proof whose iat is within 60 seconds, and it keeps the used proof ids for one run only. It issues no DPoP nonce.",
+          "text": "The lab accepts a proof whose iat is within 60 seconds of now, in either direction, and it keeps the used proof ids for one run only. It issues no DPoP nonce.",
           "source": "docs/lesson-10-names.md, check table (proof age; no nonce check is listed) (main, commit 279e9a1); src/NetSec.Core/Labs/Lesson10Auth.cs, Session._seen (a per-session dictionary of used challenges and proof ids)"
         },
         {
@@ -429,14 +486,14 @@
           "source": "RFC 9449, section 8 (Authorization Server-Provided Nonce)"
         }
       ],
-      "unlock": { "mode": "action", "ref": "L10-S18-T1" }
+      "unlock": { "mode": "action", "ref": "L10-S19-T1" }
     },
     {
-      "id": "L10-S19",
+      "id": "L10-S20",
       "lesson": 10,
       "title": "Who you are is not what you may do",
       "text": [
-        "By now the server has checked the certificate, the token and the proof. It knows the call came from a holder of an enrolled key and a token the issuer signed. It still must decide whether this caller may do this action. That is the permission check.",
+        "By now the server has checked the token and the proof. The calls run on their own connection, and the server reads no certificate there. It knows the call carries a token the issuer signed and a proof from the key the token names. It still must decide whether this caller may do this action. That is the permission check.",
         "A role is a job title. The role cashier may read totals. A capability is a single right. The capability void-sale lets the holder void a sale, and the token carries it by name.",
         "Try it: call Refund. The token has the role cashier and the capability void-sale, but it has no refund capability. The check named permission check fails."
       ],
@@ -444,7 +501,7 @@
       "bind": { "kind": "event", "eventType": "check.result", "match": { "message": "permission check" } },
       "highlight": ["check:name=permission check", "inspector:field=tokenClaims"],
       "tryIt": {
-        "id": "L10-S19-T1",
+        "id": "L10-S20-T1",
         "label": "Call Refund without the capability",
         "action": { "type": "run-attack", "attackId": "L10-ungranted-capability" },
         "expect": { "type": "check", "name": "permission check", "result": "fail" }
@@ -454,16 +511,21 @@
           "id": "L10-C07",
           "text": "In the lab, read-totals needs the role cashier or manager; void-sale and refund each need a capability of that name. The normal token holds roles [cashier] and cap [void-sale].",
           "source": "docs/lesson-10-names.md, Roles and capabilities (main, commit 279e9a1)"
+        },
+        {
+          "id": "L10-C28",
+          "text": "The call phase runs on another connection and reads no certificate; the server checks the token and the proof there.",
+          "source": "Jared's re-check of PR #20, Blocker 2 (comment 6658016121); richard-s1b, lab owner, message of 2026-11-05 (sentence 5)"
         }
       ],
-      "unlock": { "mode": "action", "ref": "L10-S19-T1" }
+      "unlock": { "mode": "action", "ref": "L10-S20-T1" }
     },
     {
-      "id": "L10-S20",
+      "id": "L10-S21",
       "lesson": 10,
       "title": "Three ways a client proves itself",
       "text": [
-        "You have now seen three ways to prove who a client is: a certificate in TLS (mutual TLS), a signed challenge, and a token with a proof.",
+        "You have now seen three ways a client can prove itself: a certificate in TLS (mutual TLS), a signed challenge, and a token with a proof. A certificate shows who a trusted CA vouched for, and the server then compares the name.",
         "Each one rests on a key or certificate the server trusts ahead of time. A signature on its own proves only that the signer holds a key. The enrolment turns that into who.",
         "Remember the setting. The login and calls here run in the clear so you can read them. A real system sends them inside TLS.",
         "Built to show the parts. Do not copy."
