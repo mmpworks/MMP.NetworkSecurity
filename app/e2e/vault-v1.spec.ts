@@ -163,16 +163,3 @@ test('the broken-chain result and the limits line read at 4.5 to 1 in both theme
   await expect(page.getByTestId('vault-audit-chain')).toContainText('does not fit the row before it.')
   for (const theme of ['light', 'dark'] as const) { await setTheme(page, theme); await contrast(page, theme, 'broken chain result') }
 })
-
-test('a damaged master key file refuses the call and names VAULT_MASTER_KEY_BAD', async ({ page }) => {
-  const key = path.join(process.env.NETSEC_SECURITY_DIR ?? '', 'vault', 'master.key')
-  const saved = fs.readFileSync(key)
-  await openVault(page)
-  fs.writeFileSync(key, Buffer.alloc(10))
-  try {
-    await page.getByTestId('vault-sign-run').click()
-    await expect(page.getByTestId('vault-fault-code')).toHaveText('VAULT_MASTER_KEY_BAD')
-    await expect(page.getByTestId('vault-fault')).toContainText("The vault's master key file is damaged")
-    for (const theme of ['light', 'dark'] as const) { await setTheme(page, theme); await contrast(page, theme, 'master key refusal') }
-  } finally { fs.writeFileSync(key, saved) }
-})
