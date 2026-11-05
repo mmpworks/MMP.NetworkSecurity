@@ -52,8 +52,12 @@ namespace NetSec.Tls13
                       ClientApplicationTrafficSecret0, ServerApplicationTrafficSecret0, ExporterMasterSecret;
     }
 
+    /// <summary>ASSUMED (asked of Richard): the resumption secrets, which need the client Finished hash that Derive does not take.</summary>
+    public sealed class Tls13Resumption { public byte[] ResumptionMasterSecret, ResumptionSecret; }
+
     public static class Tls13KeySchedule
     {
+        public static Tls13Resumption Resume(Func<IHash> h, byte[] masterSecret, byte[] clientFinishedHash, byte[] ticketNonce) { throw new NotImplementedException(); }
         public static Tls13Secrets Derive(Func<IHash> h, byte[] shared, byte[] helloHash, byte[] serverFinishedHash) { throw new NotImplementedException(); }
     }
 }
