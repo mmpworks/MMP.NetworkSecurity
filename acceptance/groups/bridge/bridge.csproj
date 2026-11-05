@@ -1,0 +1,10 @@
+<Project Sdk="Microsoft.NET.Sdk">
+  <Import Project="..\Group.props" />
+  <!-- Process-level group: it starts the lab executables and reads bytes, traces and result lines. It links no product code,
+       so it compiles and runs the same way whether or not NetSec.Core exists. It needs only net10.0: the CE executable that
+       it starts is the CF-compiled one. -->
+  <PropertyGroup>
+    <TargetFramework>net10.0</TargetFramework>
+    <AssemblyName>Acceptance.Bridge</AssemblyName>
+  </PropertyGroup>
+</Project>

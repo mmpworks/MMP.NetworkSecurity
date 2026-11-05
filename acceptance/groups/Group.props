@@ -1,0 +1,42 @@
+<Project>
+  <!--
+    Shared by every clause group. A group is one console program. It runs a set of clauses and prints one
+    "@@CLAUSE {json}" line for each. Groups are separate projects so that an unbuilt slice cannot break a built one.
+
+    Properties that run.ps1 passes:
+      NetSecCoreDll   full path of NetSec.Core.dll for this build (net10.0 build, or the CF build for net48)
+      AsyncProxyDll   full path of MMP.AsyncProxy.dll for this build
+    A group that needs no product code leaves both empty.
+  -->
+  <PropertyGroup>
+    <OutputType>Exe</OutputType>
+    <RootNamespace>Acceptance</RootNamespace>
+    <EnableDefaultCompileItems>false</EnableDefaultCompileItems>
+    <GenerateAssemblyInfo>false</GenerateAssemblyInfo>
+    <AppendTargetFrameworkToOutputPath>true</AppendTargetFrameworkToOutputPath>
+    <SatelliteResourceLanguages>en</SatelliteResourceLanguages>
+  </PropertyGroup>
+
+  <ItemGroup>
+    <Compile Include="$(MSBuildThisFileDirectory)..\lib\Harness\*.cs" Link="Harness\%(Filename)%(Extension)" />
+    <Compile Include="$(MSBuildProjectDirectory)\**\*.cs" Exclude="$(MSBuildProjectDirectory)\obj\**;$(MSBuildProjectDirectory)\bin\**" />
+  </ItemGroup>
+
+  <ItemGroup Condition="'$(TargetFramework)' == 'net48'">
+    <PackageReference Include="Microsoft.NETFramework.ReferenceAssemblies" Version="1.0.3" PrivateAssets="all" />
+    <Reference Include="System.Net.Http" />
+  </ItemGroup>
+
+  <ItemGroup Condition="'$(NetSecCoreDll)' != ''">
+    <Reference Include="NetSec.Core">
+      <HintPath>$(NetSecCoreDll)</HintPath>
+      <Private>true</Private>
+    </Reference>
+  </ItemGroup>
+  <ItemGroup Condition="'$(AsyncProxyDll)' != ''">
+    <Reference Include="MMP.AsyncProxy">
+      <HintPath>$(AsyncProxyDll)</HintPath>
+      <Private>true</Private>
+    </Reference>
+  </ItemGroup>
+</Project>

@@ -1,0 +1,110 @@
+{
+  "fips-197-2001.pdf": {
+    "url": "https://csrc.nist.gov/files/pubs/fips/197/final/docs/fips-197.pdf",
+    "sha256": "89c6da9e6cb81ffb7c115752b789ff3dc205acb2b13d6a36ff55acc79e87f61e",
+    "bytes": 1184869,
+    "fetched": "2026-11-04"
+  },
+  "gcmtestvectors.zip": {
+    "url": "https://csrc.nist.gov/CSRC/media/Projects/Cryptographic-Algorithm-Validation-Program/documents/mac/gcmtestvectors.zip",
+    "sha256": "f9fc479e134cde2980b3bb7cddbcb567b2cd96fd753835243ed067699f26a023",
+    "bytes": 9154174,
+    "fetched": "2026-11-04"
+  },
+  "KAT_TDES.zip": {
+    "url": "https://csrc.nist.gov/CSRC/media/Projects/Cryptographic-Algorithm-Validation-Program/documents/des/KAT_TDES.zip",
+    "sha256": "19d8841f84ae3415350b069a4768bd416c05a0533ee43e905ab099adb8ccb374",
+    "bytes": 118218,
+    "fetched": "2026-11-04"
+  },
+  "rfc1321.txt": {
+    "url": "https://www.rfc-editor.org/rfc/rfc1321.txt",
+    "sha256": "284a79d148400d9cd2a423211d1103b5cef0fb9256a4cbe6d7ebe5197c3149dd",
+    "bytes": 35222,
+    "fetched": "2026-11-04"
+  },
+  "rfc2202.txt": {
+    "url": "https://www.rfc-editor.org/rfc/rfc2202.txt",
+    "sha256": "c19effeca47e801be304460da3b2fb05f595e2309abceb050e40e024868fe483",
+    "bytes": 11942,
+    "fetched": "2026-11-05"
+  },
+  "rfc3526.txt": {
+    "url": "https://www.rfc-editor.org/rfc/rfc3526.txt",
+    "sha256": "6c95b231eb1c2d9ffa480efbe3ae53477231271f3438570a3af370b2aa4a968b",
+    "bytes": 19166,
+    "fetched": "2026-11-04"
+  },
+  "rfc4231.txt": {
+    "url": "https://www.rfc-editor.org/rfc/rfc4231.txt",
+    "sha256": "72178527ce93500e730bc8eb182b857e583096d652b64ece0879c52ba1df973b",
+    "bytes": 17725,
+    "fetched": "2026-11-04"
+  },
+  "rfc4493.txt": {
+    "url": "https://www.rfc-editor.org/rfc/rfc4493.txt",
+    "sha256": "252850ac038a44e931fdce6cb02b444a18ed1da0c9e212bfdd1da0ed3366fc1c",
+    "bytes": 38751,
+    "fetched": "2026-11-04"
+  },
+  "rfc5869.txt": {
+    "url": "https://www.rfc-editor.org/rfc/rfc5869.txt",
+    "sha256": "7a40eb3835b35fc947eb12a2ed614db079d43b26e50dbc537c31fba16397089c",
+    "bytes": 25854,
+    "fetched": "2026-11-04"
+  },
+  "rfc7748.txt": {
+    "url": "https://www.rfc-editor.org/rfc/rfc7748.txt",
+    "sha256": "279ca0ecc5e92e2962e27b846986aeb74729d9dd34bd4a04a362f80dcb596ad3",
+    "bytes": 39298,
+    "fetched": "2026-11-04"
+  },
+  "rfc8032.txt": {
+    "url": "https://www.rfc-editor.org/rfc/rfc8032.txt",
+    "sha256": "ed63657ff389301282b169b0abde9b5dd2c7e4d524fdfa5da6ff3094fc93c4c3",
+    "bytes": 103210,
+    "fetched": "2026-11-04"
+  },
+  "rfc8448.txt": {
+    "url": "https://www.rfc-editor.org/rfc/rfc8448.txt",
+    "sha256": "6564d1376d1ec744fc7a9993da15ebc1b9be361908b166091f47ef605c537fba",
+    "bytes": 159343,
+    "fetched": "2026-11-04"
+  },
+  "sha-3bytetestvectors.zip": {
+    "url": "https://csrc.nist.gov/CSRC/media/Projects/Cryptographic-Algorithm-Validation-Program/documents/sha3/sha-3bytetestvectors.zip",
+    "sha256": "cd07701af2e47f5cc889d642528b4bf11f8b6eb55797c7307a96828ed8d8fc8c",
+    "bytes": 2801880,
+    "fetched": "2026-11-04"
+  },
+  "shabytetestvectors.zip": {
+    "url": "https://csrc.nist.gov/CSRC/media/Projects/Cryptographic-Algorithm-Validation-Program/documents/shs/shabytetestvectors.zip",
+    "sha256": "929ef80b7b3418aca026643f6f248815913b60e01741a44bba9e118067f4c9b8",
+    "bytes": 4909729,
+    "fetched": "2026-11-04"
+  },
+  "shakebytetestvectors.zip": {
+    "url": "https://csrc.nist.gov/CSRC/media/Projects/Cryptographic-Algorithm-Validation-Program/documents/sha3/shakebytetestvectors.zip",
+    "sha256": "debfebc3157b3ceea002b84ca38476420389a3bf7e97dc5f53ea4689a16de4c7",
+    "bytes": 2116268,
+    "fetched": "2026-11-04"
+  },
+  "sp800-38a.pdf": {
+    "url": "https://nvlpubs.nist.gov/nistpubs/Legacy/SP/nistspecialpublication800-38a.pdf",
+    "sha256": "66821162de1e7130c5fb5eedb22140d8d6d013ec51af4550bb095c2a9481a00e",
+    "bytes": 378266,
+    "fetched": "2026-11-04"
+  },
+  "tdesmmt.zip": {
+    "url": "https://csrc.nist.gov/CSRC/media/Projects/Cryptographic-Algorithm-Validation-Program/documents/des/tdesmmt.zip",
+    "sha256": "04db93728ebf994330b0ba4555d397f8f03c29fd8547d9d586219fabe00e8c78",
+    "bytes": 61614,
+    "fetched": "2026-11-04"
+  },
+  "X9.24-3-2017-Test-Vectors-20180129-1.pdf": {
+    "url": "https://x9.org/wp-content/uploads/2018/03/X9.24-3-2017-Test-Vectors-20180129-1.pdf",
+    "sha256": "ae9bb01d76eda32018332f1202a9c2010097abf0d17d753612b7e612ddd9c4cc",
+    "bytes": 531149,
+    "fetched": "2026-11-04"
+  }
+}

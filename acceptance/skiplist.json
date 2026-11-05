@@ -1,0 +1,5 @@
+{
+  "schema": 1,
+  "note": "The tests that tests/NetSec.Tests may skip on net48 (CF binaries) or on net10.0, each with a reason. Clause A9.cf.same-suite-passes-on-net48-skips-pinned fails on any skip that is not listed here, and on any test that passes on net10.0 and does not pass on net48 unless it is listed. A builder may not add an entry: the acceptance author adds one in a pull request that cites the reason. Entry shape: { \"test\": \"<fully qualified test name as the TRX file prints it>\", \"reason\": \"<why the desktop CLR cannot run it>\", \"approvedBy\": \"<name>\", \"date\": \"yyyy-mm-dd\" }.",
+  "skips": []
+}

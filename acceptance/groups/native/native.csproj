@@ -1,0 +1,11 @@
+<Project Sdk="Microsoft.NET.Sdk">
+  <Import Project="..\Group.props" />
+  <!-- Calls the C ABI of native/netsec_ct.c through its own P/Invoke. Links no product code. net48 loads the same DLL from the
+       desktop CLR the CF binaries run on. -->
+  <PropertyGroup>
+    <TargetFrameworks>net10.0;net48</TargetFrameworks>
+    <AssemblyName>Acceptance.Native</AssemblyName>
+    <PlatformTarget>x64</PlatformTarget>
+    <Prefer32Bit>false</Prefer32Bit>
+  </PropertyGroup>
+</Project>

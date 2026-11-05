@@ -1,0 +1,15 @@
+<Project>
+  <!-- The acceptance suite builds on its own settings. The product repo root has its own Directory.Build.props
+       (warnings as errors, nullable on). MSBuild stops at this file, so the product settings never reach the suite. -->
+  <PropertyGroup>
+    <LangVersion>latest</LangVersion>
+    <Nullable>disable</Nullable>
+    <ImplicitUsings>disable</ImplicitUsings>
+    <TreatWarningsAsErrors>false</TreatWarningsAsErrors>
+    <GenerateDocumentationFile>false</GenerateDocumentationFile>
+    <ShouldUnsetParentConfigurationAndPlatform>false</ShouldUnsetParentConfigurationAndPlatform>
+    <NoWarn>$(NoWarn);CS8981;NU1701</NoWarn>
+    <IsPackable>false</IsPackable>
+    <AcceptanceDir>$(MSBuildThisFileDirectory)</AcceptanceDir>
+  </PropertyGroup>
+</Project>

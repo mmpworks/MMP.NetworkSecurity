@@ -1,0 +1,10 @@
+<Project Sdk="Microsoft.NET.Sdk">
+  <Import Project="..\Group.props" />
+  <PropertyGroup>
+    <TargetFramework>net10.0</TargetFramework>
+    <AssemblyName>Acceptance.Auth</AssemblyName>
+  </PropertyGroup>
+  <ItemGroup>
+    <Compile Include="..\..\lib\Live\*.cs" Link="Live\%(Filename)%(Extension)" />
+  </ItemGroup>
+</Project>

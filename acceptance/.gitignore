@@ -1,0 +1,8 @@
+# Downloaded sources and build output stay out of git. CF binaries and CF references never get committed (A9).
+vectors/_cache/
+**/bin/
+**/obj/
+e2e/node_modules/
+e2e/test-results/
+e2e/playwright-report/
+.work/
