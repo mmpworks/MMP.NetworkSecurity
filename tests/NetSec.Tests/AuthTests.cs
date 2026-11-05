@@ -445,7 +445,7 @@ namespace NetSec.Tests
         public void Every_row_stops_at_its_named_check_with_one_thing_changed()
         {
             AttackDefinition[] rows = AttackCatalog.Lesson10Unreleased;
-            Assert.Equal(10, rows.Length);
+            Assert.Equal(11, rows.Length);
             foreach (AttackDefinition a in rows)
             {
                 Assert.Equal(1, (a.Plan != null ? 1 : 0) + a.Options.Length);
@@ -521,6 +521,7 @@ namespace NetSec.Tests
             string[] serverTls = run.Events.Where(e => e.Type == "wire.sent" && e.Actor == "server" && e.StreamId.Contains("/tls13/")).Select(e => e.Message).ToArray();
             Assert.Equal(new[] { "ServerHello", "EncryptedExtensions", "CertificateRequest", "Certificate", "CertificateVerify", "Finished" }, serverTls.Take(6).ToArray());
             string[] serverChecks = run.Events.Where(e => e.Type == "check.result" && e.Actor == "server" && e.Check.Passed && e.StreamId.EndsWith("/tls13")).Select(e => e.Message).ToArray();
+            Assert.Contains("certificate_required alert", serverChecks);
             Assert.Contains("bad_certificate alert", serverChecks);
             Assert.Contains("chain to trust anchor", serverChecks);
             Assert.Contains("CertificateVerify signature", serverChecks);
@@ -528,11 +529,21 @@ namespace NetSec.Tests
         }
 
         [Fact]
+        public void A_corrupt_client_certificate_gets_alert_42_and_no_login_starts()
+        {
+            Run run = Go(Row("L10-corrupt-client-cert"));
+            Assert.Equal(Tls13Codes.BadCertificate, run.Result.FailedCode);
+            Assert.Equal("bad_certificate alert", run.Result.FailedCheck);
+            Assert.Equal(42, Tls13Codes.AlertFor(Tls13Codes.BadCertificate));
+            Assert.DoesNotContain("LoginRequest", run.Sent("client"));
+        }
+
+        [Fact]
         public void With_no_client_certificate_the_server_sends_alert_116_and_no_login_starts()
         {
             Run run = Go(Row("L10-remove-client-cert"));
-            Assert.Equal(Tls13Codes.ClientCertRequired, run.Result.FailedCode);
-            Assert.Equal(116, Tls13Codes.AlertFor(Tls13Codes.ClientCertRequired));
+            Assert.Equal(Tls13Codes.CertRequired, run.Result.FailedCode);
+            Assert.Equal(116, Tls13Codes.AlertFor(Tls13Codes.CertRequired));
             Assert.DoesNotContain("LoginRequest", run.Sent("client"));
             Assert.Contains("Alert", run.Sent("server"));
         }

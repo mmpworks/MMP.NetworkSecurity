@@ -10,6 +10,7 @@ using NetSec.Machine;
 using NetSec.Pki;
 using NetSec.Platform;
 using NetSec.Tls13;
+using NetSec.Ssh;
 using NetSec.Trace;
 
 namespace NetSec.Labs
@@ -118,6 +119,7 @@ namespace NetSec.Labs
                 case 4: return Tls13Lab.Lesson4();
                 case 5: return Tls13Lab.Lesson5();
                 case 6: return new Lesson06Dukpt();
+                case 8: return new Lesson08Ssh();
                 default: return null;
             }
         }
@@ -163,7 +165,24 @@ namespace NetSec.Labs
             WithOption("L6-replay-sale", 6, Lesson06Dukpt.OptionScenario, Lesson06Dukpt.ScenarioReplaySale, AttackOutcome.Rejected, ErrorCodes.DukptKsnReplay, Lesson06Dukpt.ReplayCheck),
             Flip("L6-flip-pin-block", 6, Lesson06Dukpt.SaleName, Lesson06Dukpt.PinBlockOffset + 3, ErrorCodes.DukptPinBlockFormat, Lesson06Dukpt.FormatCheck),
             WithOption("L6-ask-past-key", 6, Lesson06Dukpt.OptionScenario, Lesson06Dukpt.ScenarioAskPastKey, AttackOutcome.Rejected, ErrorCodes.DukptKeyNotHeld, Lesson06Dukpt.NotHeldCheck),
+
+            WithOption("L8-change-host-key", 8, Lesson08Ssh.OptionHostKey, "attacker", AttackOutcome.Rejected, SshCodes.HostKeyChanged, SshChecks.KnownHosts),
+            Flip("L8-flip-exchange-signature", 8, SshNames.KexEcdhReply, SshEd25519SignatureOffset, SshCodes.ExchangeSignature, SshChecks.ExchangeSignature),
+            WithOption("L8-zero-share", 8, Lesson08Ssh.OptionZeroShare, "yes", AttackOutcome.Rejected, SshCodes.KexZeroSecret, SshChecks.ZeroSecret),
+            Flip("L8-flip-packet", 8, SshNames.UserauthSigned, SshProtectedBodyOffset, SshCodes.PacketMac, SshChecks.PacketMac),
+            WithOption("L8-wrong-user-key", 8, Lesson08Ssh.OptionWrongUserKey, "attacker", AttackOutcome.Rejected, SshCodes.AuthRefused, SshChecks.AuthSignature),
+            WithOption("L8-refused-tunnel", 8, Lesson08Ssh.OptionRefusedTunnel, "yes", AttackOutcome.Rejected, SshCodes.TunnelRefused, SshChecks.TunnelAllowList),
+            Flip("L8-legacy-flip-signature", 8, SshNames.KexdhReply, SshRsaSignatureOffset, SshCodes.ExchangeSignature, SshChecks.ExchangeSignature),
         };
+
+        // Packet header 5, type 1, host key 4 + 51, share 4 + 32, signature length 4, name 4 + 11, value length 4, then 10 bytes into the signature value.
+        const int SshEd25519SignatureOffset = 130;
+
+        // Past the first encrypted block, which holds the length. A flip there reaches the MAC check rather than the length check.
+        const int SshProtectedBodyOffset = 20;
+
+        // Header 5, type 1, RSA host key 4 + 279, f 4 + 256 or 257, signature length 4, name 4 + 7, value length 4: the 256-byte value starts near 569. This lands inside it for either size of f.
+        const int SshRsaSignatureOffset = 669;
 
         public static AttackDefinition[] All { get { return (AttackDefinition[])Rows.Clone(); } }
 
@@ -184,7 +203,8 @@ namespace NetSec.Labs
             WithOption("L10-replay-challenge", 10, Lesson10Auth.OptionReplayChallenge, "yes", AttackOutcome.Rejected, ErrorCodes.ChallengeReplay, NetSec.Auth.Challenge.ReplayCheck),
             WithOption("L10-unissued-challenge", 10, Lesson10Auth.OptionAnswerUnissued, "yes", AttackOutcome.Rejected, ErrorCodes.ChallengeNotIssued, NetSec.Auth.Challenge.IssuedCheck),
             WithOption("L10-unknown-device", 10, Lesson10Auth.OptionDeviceKey, Lesson10Auth.DeviceKeyOther, AttackOutcome.Rejected, ErrorCodes.DeviceUnknown, NetSec.Auth.Challenge.DeviceCheck),
-            WithOption("L10-remove-client-cert", 10, Lesson10Auth.OptionClientCert, Lesson10Auth.ClientCertNone, AttackOutcome.Rejected, Tls13Codes.ClientCertRequired, Tls13Codes.CheckName(Tls13Codes.ClientCertRequired)),
+            WithOption("L10-remove-client-cert", 10, Lesson10Auth.OptionClientCert, Lesson10Auth.ClientCertNone, AttackOutcome.Rejected, Tls13Codes.CertRequired, Tls13Codes.CheckName(Tls13Codes.CertRequired)),
+            WithOption("L10-corrupt-client-cert", 10, Lesson10Auth.OptionClientCert, Lesson10Auth.ClientCertCorrupt, AttackOutcome.Rejected, Tls13Codes.BadCertificate, Tls13Codes.CheckName(Tls13Codes.BadCertificate)),
         };
 
         static AttackDefinition Flip(string id, int lesson, string message, int offset, string code, string check)

@@ -206,7 +206,7 @@ namespace NetSec.Labs
         }
 
         /// <summary>The catch is the side that named a check. The other side then only saw its peer close.</summary>
-        static LabResult Result(PumpResult client, PumpResult server)
+        public static LabResult Result(PumpResult client, PumpResult server)
         {
             NetSecError first = Named(server.Error) ?? Named(client.Error) ?? server.Error ?? client.Error;
             LabResult result = new LabResult();

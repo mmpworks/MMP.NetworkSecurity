@@ -112,17 +112,21 @@ namespace NetSec.Tls13
             Tls13Options o = session.Options;
             if (o.ClientTrustAnchors == null) return Tls13Rules.Refuse(NetSec.Errors.ErrorCodes.UnexpectedMessage, "a client Certificate arrived, and this server did not ask for one");
             CertificateInfo info = Tls13Messages.ReadCertificate(message.Bytes, false);
-            if (info.Chain.Length == 0) return Tls13Rules.Refuse(Tls13Codes.ClientCertRequired, "the client sent an empty Certificate, and this server requires one. The alert is certificate_required, 116");
-            Certificate[] chain = Tls13ClientTable.ParseAll(info.Chain);
+            if (info.Chain.Length == 0) return Tls13Rules.Refuse(Tls13Codes.CertRequired, "the client sent an empty Certificate, and this server requires one. The alert is certificate_required, 116");
+            Certificate[] chain;
+            try { chain = Tls13ClientTable.ParseAll(info.Chain); }
+            catch (ParseFailure failure) { return Tls13Rules.Refuse(Tls13Codes.BadCertificate, failure.Message); }
             ChainVerdict verdict = ChainCheck.Run(chain, Tls13ClientTable.ParseAll(o.ClientTrustAnchors), o.ClientName, o.Now);
+            // RFC 8446 section 6: bad_certificate is for a certificate that is corrupt or holds a signature that does not verify.
+            if (verdict.Code == ChainCheck.BadSignature) return Tls13Rules.Refuse(Tls13Codes.BadCertificate, verdict.Detail);
             if (!verdict.Passed) return Tls13Rules.Refuse(verdict.Code, verdict.Detail);
             Certificate leaf = chain[0];
             return StepDecision.Advance(
                 Effect.Absorb(message.Bytes),
                 Effect.Store(delegate { session.Leaf = leaf; }),
-                Tls13Rules.Pass(Tls13Codes.ClientCertRequired),
+                Tls13Rules.Pass(Tls13Codes.CertRequired),
+                Tls13Rules.Pass(Tls13Codes.BadCertificate),
                 Tls13Rules.Pass(ChainCheck.NoAnchor),
-                Tls13Rules.Pass(ChainCheck.BadSignature),
                 Tls13Rules.Pass(ChainCheck.Validity),
                 Tls13Rules.Pass(ChainCheck.Name));
         }
@@ -135,7 +139,7 @@ namespace NetSec.Tls13
         static StepDecision ClientFinished(Tls13Session session, InboundMessage message)
         {
             if (session.Options.ClientTrustAnchors != null && session.Leaf == null)
-                return Tls13Rules.Refuse(Tls13Codes.ClientCertRequired, "the client skipped the Certificate this server asked for");
+                return Tls13Rules.Refuse(Tls13Codes.CertRequired, "the client skipped the Certificate this server asked for");
             Tls13Suite suite = session.Suite;
             byte[] expected = Tls13KeySchedule.VerifyData(suite.Hash, session.Secrets.ClientHandshakeTrafficSecret, session.HashWith());
             if (message.Body.Length != expected.Length || !ConstantTime.Equal(message.Body, 0, expected, 0, expected.Length))

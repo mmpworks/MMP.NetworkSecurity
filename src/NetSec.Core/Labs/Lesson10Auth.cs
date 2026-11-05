@@ -35,6 +35,7 @@ namespace NetSec.Labs
         public const string DeviceKeySmallOrder = "small-order";
         public const string OptionClientCert = "client-cert";
         public const string ClientCertNone = "none";
+        public const string ClientCertCorrupt = "corrupt";
 
         // A fixed lab time, so a same-seed run gives the same bytes.
         const long LabNow = 1793836800;
@@ -44,6 +45,7 @@ namespace NetSec.Labs
         const int PublicSize = 32;
         const int SignatureSize = 64;
         const int LengthPrefix = 2;
+        const int SignatureBytesFromEnd = 10;   // Inside the certificate's Ed25519 signature, the last field of its DER.
         const string Origin = "https://pump.training";
         const string BaseUrl = "https://pump.training/api/";
         const string Method = "POST";
@@ -173,10 +175,13 @@ namespace NetSec.Labs
 
             Tls13Options client = MutualTlsOptions(c, plan, "client", "server", now);
             client.TrustAnchors = new byte[][] { root };
-            if (LabPair.Option(c, OptionClientCert) != ClientCertNone)
+            string certificateChoice = LabPair.Option(c, OptionClientCert);
+            if (certificateChoice != ClientCertNone)
             {
                 byte[] spki = TrainingCa.Ed25519Spki(Ed25519.PublicFrom(deviceSeed));
-                client.ClientCertificateChain = new byte[][] { ca.IssueClientCertificate(Subject, spki, TrainingCa.DefaultNotBefore, TrainingCa.DefaultNotAfter) };
+                byte[] leaf = ca.IssueClientCertificate(Subject, spki, TrainingCa.DefaultNotBefore, TrainingCa.DefaultNotAfter);
+                if (certificateChoice == ClientCertCorrupt) leaf[leaf.Length - SignatureBytesFromEnd] ^= 1;
+                client.ClientCertificateChain = new byte[][] { leaf };
                 client.ClientSigningSeed = deviceSeed;
             }
 

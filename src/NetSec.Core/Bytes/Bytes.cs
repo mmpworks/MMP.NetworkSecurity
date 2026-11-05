@@ -91,6 +91,20 @@ namespace NetSec.Bytes
             return taken;
         }
 
+        /// <summary>A 4-byte length, then that many bytes. One mark covers both, and the result holds only the bytes after the length.</summary>
+        public byte[] Prefixed(string name, string kind)
+        {
+            Need(name, 4);
+            long length = 0;
+            for (int i = 0; i < 4; i++) length = (length << 8) | _bytes[_at + i];
+            if (length > Remaining - 4)
+                throw new ParseFailure("PARSE_TRUNCATED", name + " promises " + length + " bytes and " + (Remaining - 4) + " remain");
+            byte[] taken = new byte[(int)length];
+            Buffer.BlockCopy(_bytes, _at + 4, taken, 0, taken.Length);
+            Mark(name, kind, 4 + taken.Length);
+            return taken;
+        }
+
         long Number(string name, string kind, int size)
         {
             Need(name, size);
@@ -130,6 +144,29 @@ namespace NetSec.Bytes
             Room(bytes.Length);
             Buffer.BlockCopy(bytes, 0, _bytes, _count, bytes.Length);
             _count += bytes.Length;
+            return this;
+        }
+
+        /// <summary>A 4-byte length, then the bytes: the SSH "string" of RFC 4251 section 5.</summary>
+        public ByteWriter Prefixed(byte[] bytes) { U32(bytes.Length); return Put(bytes); }
+
+        public ByteWriter Prefixed(string text) { return Prefixed(Encoding.UTF8.GetBytes(text)); }
+
+        /// <summary>
+        /// An unsigned big-endian value as the SSH "mpint" of RFC 4251 section 5. Leading zeros go, and a 00 comes back when the
+        /// top bit is set, because a set top bit means negative. A fixed-width value needs this: about 1 value in 256 starts with a zero byte.
+        /// </summary>
+        public ByteWriter Mpint(byte[] unsigned)
+        {
+            int start = 0;
+            while (start < unsigned.Length && unsigned[start] == 0) start++;
+            int size = unsigned.Length - start;
+            bool addZero = size > 0 && (unsigned[start] & 0x80) != 0;
+            U32(size + (addZero ? 1 : 0));
+            if (addZero) U8(0);
+            Room(size);
+            Buffer.BlockCopy(unsigned, start, _bytes, _count, size);
+            _count += size;
             return this;
         }
 

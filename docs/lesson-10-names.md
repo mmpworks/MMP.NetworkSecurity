@@ -57,8 +57,9 @@ The token parts and proof parts have dots between them, one byte each. Their fie
 
 | Check name, `check.result` `message` | `actor` | When it passes |
 |---|---|---|
-| `bad_certificate alert` | `server` | The client sent a certificate. See the note below this table |
-| `chain to trust anchor`, `signature verify`, `validity window`, `name match` | `server` | The client certificate passes each check. These are the lesson 4 names |
+| `certificate_required alert` | `server` | The client sent a certificate. A failure sends alert 116 |
+| `bad_certificate alert` | `server` | The client certificate parses and its signature verifies. A failure sends alert 42 |
+| `chain to trust anchor`, `validity window`, `name match` | `server` | The client certificate passes each check. These are the lesson 4 names |
 | `CertificateVerify signature`, `Finished verify_data` | `server` | The client holds the certificate key and saw the same transcript |
 | `device registered` | `issuer` | This key is on record for this subject. Runs before any challenge is sent |
 | `challenge issued` | `issuer` | The answered challenge is the one this login issued |
@@ -73,7 +74,7 @@ The token parts and proof parts have dots between them, one byte each. Their fie
 | `jti already used` | `server` | This proof has not been seen before |
 | `permission check` | `server` | The token's role or capability allows this action |
 
-**Note on `bad_certificate alert`.** That check name comes from `ux-design.md` section 7 and `acceptance/CONTRACT.md`. The alert on the wire is `certificate_required`, number 116, the alert RFC 8446 section 6 names for a missing client certificate. A tour line must name 116 and must never say the wire carries `bad_certificate`.
+**Two alerts.** RFC 8446 section 6 names `certificate_required`, 116, for a missing client certificate, and `bad_certificate`, 42, for one that is corrupt or does not verify. `ux-design.md` section 7 still names only `bad_certificate alert` for the "Remove the client cert" try-it. A tour line for that try-it must say 116.
 
 ## Roles and capabilities
 
@@ -100,7 +101,8 @@ Each row changes one thing from the control run.
 | `L10-replay-challenge` | Sends the same `ChallengeResponse` a second time, after it earned a token | `Rejected` | `CHALLENGE_REPLAY` | `challenge already used` |
 | `L10-unissued-challenge` | Signs a challenge the issuer never sent | `Rejected` | `CHALLENGE_NOT_ISSUED` | `challenge issued` |
 | `L10-unknown-device` | Logs in with a key nobody registered. The device certificate stays valid, so only the login key changes | `Rejected` | `DEVICE_UNKNOWN` | `device registered` |
-| `L10-remove-client-cert` | The client answers `CertificateRequest` with an empty `Certificate` | `Rejected` | `TLS13_CLIENT_CERT_REQUIRED` | `bad_certificate alert` |
+| `L10-remove-client-cert` | The client answers `CertificateRequest` with an empty `Certificate` | `Rejected` | `TLS13_CERT_REQUIRED` | `certificate_required alert` |
+| `L10-corrupt-client-cert` | The client sends a certificate with one signature bit flipped | `Rejected` | `TLS13_BAD_CERTIFICATE` | `bad_certificate alert` |
 
 ## Release
 

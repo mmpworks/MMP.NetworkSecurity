@@ -107,7 +107,7 @@ namespace NetSec.Bridge
         public const string ReplayCheck = "KSN already seen";
         public const string FormatCheck = "PIN block format check";
 
-        /// <summary>MAC first, so a changed envelope stops before the KSN enters the ledger. Then the KSN, then the PIN block's shape.</summary>
+        /// <summary>The MAC, then the KSN, then the PIN block's shape. The KSN enters the ledger only after all three pass, so a refused envelope burns no KSN.</summary>
         public static BankDecision Decide(byte[] bdk, KsnLedger ledger, byte[] envelopeBytes)
         {
             PinEnvelope envelope;
@@ -120,13 +120,14 @@ namespace NetSec.Bridge
             catch (NetSecException failure) { return Refuse(envelope.TraceId, ErrorCodes.DukptMacMismatch, MacCheck, failure.Error.Message); }
             if (!Cmac.Verify(new AesKey(macKey), envelope.Covered, envelope.Mac))
                 return Refuse(envelope.TraceId, ErrorCodes.DukptMacMismatch, MacCheck, "the MAC does not fit this envelope");
-            if (!ledger.TryRecord(envelope.Ksn))
+            if (ledger.Contains(envelope.Ksn))
                 return Refuse(envelope.TraceId, ErrorCodes.DukptKsnReplay, ReplayCheck, "the bank has seen this KSN before");
 
             byte[] pinKey = DukptBank.DeriveWorkingKey(bdk, envelope.Ksn, DukptKeyUsage.PinEncryption, DukptKeyType.Aes128);
             byte[] field;
             if (!PinBlock.TryOpenFieldFormat4(pinKey, envelope.LockedBlock, envelope.Pan, out field))
                 return Refuse(envelope.TraceId, ErrorCodes.DukptPinBlockFormat, FormatCheck, "the opened PIN block has the wrong shape");
+            ledger.Record(envelope.Ksn);
 
             BankDecision ok = new BankDecision();
             ok.Ok = true;

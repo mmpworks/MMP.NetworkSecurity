@@ -76,8 +76,52 @@ namespace Acceptance
         }
 
         // The five checks lesson 10 names in ux-design.md section 7.
+        // RFC 8446 section 4.4.2.4: a client that sends an empty Certificate to a server that requires one gets the fatal alert
+        // certificate_required (116, section 6.2). bad_certificate (42) is for a certificate that is corrupt or does not verify.
+        // Both rows below run beside a control; the first also runs against the Go referee further down.
+        static string RowWithCode(AttackDefinition row, string expectCode)
+        {
+            Check.Equal("ExpectCode of the catalog row '" + row.AttackId + "'", expectCode, row.ExpectCode);
+            return RowBesideControl(row);
+        }
+
         [Clause("A11.mtls.missing-client-cert-beside-control")]
-        public static string Mtls(Ctx c) { return RowBesideControl(FindRow(10, "bad_certificate alert")); }
+        public static string Mtls(Ctx c) { return RowWithCode(FindRow(10, "certificate_required alert"), "TLS13_CERT_REQUIRED"); }
+
+        [Clause("A11.mtls.corrupt-client-cert-beside-control")]
+        public static string MtlsCorrupt(Ctx c) { return RowWithCode(FindRow(10, "bad_certificate alert"), "TLS13_BAD_CERTIFICATE"); }
+
+        /// <summary>
+        /// The alert number comes from Go crypto/tls, not from our own table. The glass client offers no client certificate to a Go server
+        /// that requires one, and must see alert 116. A control: the same server without the requirement lets the same client in.
+        /// </summary>
+        [Clause("A11.mtls.go-referee-requires-client-cert")]
+        public static string MtlsGoReferee(Ctx c)
+        {
+            PkiDir p = PkiDir.Export(c, "a11-mtls");
+            string common = "-mode server -listen 127.0.0.1:0 -naccept 1 -groups x25519 -cert \"" + p.Cert + "\" -key \"" + p.Key + "\"";
+            using (GoPeer open = GoPeer.StartListening(c, "tlspeer", common))
+            {
+                ProbeRequest req = ProbeKit.Request(WireProtocol.Tls13, open.Port, "localhost");
+                req.Group = KexGroup.X25519;
+                req.Send = System.Text.Encoding.ASCII.GetBytes("hello\n");
+                ProbeResult ok = ProbeKit.Connect(req, "control (server does not ask for a client certificate)");
+                Check.True(ok.Completed, "control run stopped: " + ok.CheckName + " [" + ok.Code + "]");
+            }
+            using (GoPeer strict = GoPeer.StartListening(c, "tlspeer", common + " -ca \"" + p.Root + "\" -require-client-cert"))
+            {
+                ProbeRequest req = ProbeKit.Request(WireProtocol.Tls13, strict.Port, "localhost");
+                req.Group = KexGroup.X25519;
+                req.Send = System.Text.Encoding.ASCII.GetBytes("hello\n");
+                ProbeResult r = ProbeKit.Connect(req, "attack (no client certificate)");
+                Check.True(!r.Completed, "the handshake completed although the server requires a client certificate");
+                Check.Equal("alert received from Go", "116", r.AlertReceived.ToString());
+                string code = strict.ErrorCode;
+                if (code == null) { strict.WaitEvent("error", 5000); code = strict.ErrorCode; }
+                Check.Equal("Go's own name for the failure", "TLS_CLIENT_CERT_MISSING", code);
+                return "control opens; a server that requires a client certificate answers an empty Certificate with alert 116 (certificate_required), and Go names it TLS_CLIENT_CERT_MISSING";
+            }
+        }
 
         [Clause("A11.dpop.replay-beside-control")]
         public static string Dpop(Ctx c) { return RowBesideControl(FindRow(10, "jti already used")); }
