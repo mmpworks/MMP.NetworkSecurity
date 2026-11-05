@@ -109,7 +109,7 @@ Format notes: "seed" is 32 bytes, "PKCS#8" is DER, as in `CONTRACT.md` rule 5.
 | 10 Auth | Mutual TLS, JWS, DPoP, challenge | `pki.root-ca`, `tls13.server`, `tls13.client`, `tls.trust`, `token.issuer`, `device.enrolment` |
 | 11 Timing | Native compare | None |
 
-`Probe` and `TrainingPki` stay on training keys in every mode, because `acceptance/` grades with them. Those 9 of the 24 sites do not change.
+`TrainingPki` stays on training keys in every mode. `Probe` and `SshProbe` stay on them unless a request sets `Credentials` (section 3.3), so `acceptance/` can grade a learner's key from outside.
 
 ### 1.8 What the engines accept today
 
@@ -269,7 +269,35 @@ Which code is net10 only: the vault, the flows, RSA key generation (BCL `RSA.Cre
 | `Tls13Lab.cs:149`, `Lesson07Tls11.cs:92`, `Lesson10Auth.cs:114` | Fixed lab date | `LabClock.For(credentials)`, section 3.4 |
 | `SessionManager.cs:159` | No credentials | Sets `Credentials` |
 | Engines, `Tls13Options.SigningSeed`, `SshHostSigner`, `Token.Issue`, `DukptBank`, `BankHsmCore`, `GlassTransportFactory` | | **No change** |
-| `Probe`, `SshProbe`, `TrainingPki`, `Node`, `CeDevice` | Training keys | No change. `acceptance/` grades with them. Node and CE on own keys are cut (section 9.3) |
+| `Probe.cs:169,176,197,200,210`, `SshProbe.cs:150,151,185` | `new TrainingKeySource()` | `r.Credentials`, when set. Null keeps training keys, so every existing clause runs as today |
+| `TrainingPki`, `Node`, `CeDevice` | Training keys | No change. Node and CE on own keys are cut (section 9.3) |
+
+**The suite's route to a glass server on a learner's key.** Without it, OpenSSL, Go, and `ssh.exe` have nothing to judge from `acceptance/`. The suite makes its own keys with OpenSSL or `ssh-keygen`, and tests the product as a black box:
+
+```csharp
+public sealed class ProbeRequest { /* existing fields */ public CredentialSet Credentials; }   // NetSec.Io. Null keeps training keys
+public sealed class CredentialSet { /* section 3.1 */ public static CredentialSet FromFiles(string directory); }
+```
+
+`FromFiles` runs over the file provider, on both builds. A missing file leaves that one type built-in, so a clause can change one type and hold the rest. Labs never use this call: they get their set from `modes.json`, and section 2.3 still refuses there. A file it cannot read throws `NetSecException` with the section 8.5 code.
+
+| File in the folder | Type | Note |
+|---|---|---|
+| `root.pem`, optional `root.key` | `pki.root-ca` | With the key, `CanIssue` is true |
+| `anchors.pem`, else `root.pem` | `tls.trust` | |
+| `srv.pem`, `srv.key` | `tls13.server` | `srv.pem` is leaf first, with any intermediates |
+| `client.pem`, `client.key` | `tls13.client` | Same |
+| `rsa.pem`, `rsa.key` | `tls11.server` | |
+| `host.key` | `ssh.host-ed25519` | OpenSSH format |
+| `rsa-host.key` | `ssh.host-rsa` | OpenSSH format |
+| `known_hosts` | `ssh.known-hosts` | Else derived from the host key |
+| `user.key`, `user.pub` | `ssh.client` | |
+| `issuer.key` | `token.issuer` | |
+| `device.key` | `device.enrolment` | |
+| `bdk.hex` | `dukpt.bdk` | `dukpt.pad` follows it |
+| `aes.hex`, `seal.hex` | `lab.aes-key`, `lab.seal-key` | |
+
+The names match `TrainingPki.Export` wherever that method writes the same item.
 
 Under option C, no engine needs an operations interface. `IKeyHandle` needs no RSA decrypt or derive call, because TLS 1.1 key transport and DUKPT run on bytes as they do today. The exercise calls `IVault` directly.
 
@@ -370,6 +398,8 @@ Three screens, opened from the vault page, on narrow Host routes. It is not a la
 | 2 Derive | `POST /api/security/vault/exercise/derive` `{ label }` | A new key comes from a key that stays in the box: HKDF-SHA256 over the typed label. This is the idea behind a DUKPT base key. It is not DUKPT, because a typed label stands in for a KSN, and the screen says so |
 | 3 Refuse | `POST /api/security/vault/exercise/export` | Asks for the key, and the box says `VAULT_EXPORT_REFUSED` |
 | 4 Audit | `GET /api/security/vault/audit`, `POST /api/security/vault/exercise/audit-check` | All the calls, with the refusal. The check walks the `prev_hash` chain and says whether a row changed |
+
+Responses are data, so a clause can judge them from outside. Sign returns `{ keyName, version, inputHex, signatureHex, publicKeyHex, command, output, code }`. Derive returns `{ keyName, version, label, outputHex, code }`. Export returns HTTP 409 with `code: VAULT_EXPORT_REFUSED`. Audit-check returns `{ rows, firstBadSeq, code }`. `GET /api/security/vault/keys` lists both exercise keys with `fingerprint` and `hidden: "non-exportable"`. `session.start` with lesson 20 gives `LESSON_NOT_BUILT`, because no such lab exists.
 
 It makes its own keys, `exercise/signing` and `exercise/derive`, non-exportable, so it needs no flow first. A signing key refuses `Derive`, so there are two. `Export` refuses both, so nothing has a route to their bytes. **These are the only non-exportable keys in the course, and no glass engine runs on them.**
 
@@ -693,7 +723,7 @@ public static class WizardMachine { public static WizardDecision Decide(WizardTa
 | `CERT_SIGNATURE_ALG_UNSUPPORTED` | **Engine and flow code.** An RSA or P-256 root. Today it reads `CERT_SIGNATURE`, which says tampering. Names the OS transport as the route |
 | `KNOWN_HOSTS_LINE_BAD` | The line does not parse. Wildcards refused, as `SshKnownHosts` does |
 | `DUKPT_KEY_SIZE`, `DUKPT_KCV_MISMATCH` | A test BDK must be 16 bytes this round, since lessons use AES-128. The file's key does not match the check value the learner gave |
-| `VAULT_KEY_UNKNOWN`, `VAULT_OP_REFUSED`, `VAULT_EXPORT_REFUSED`, `VAULT_UNWRAP_FAILED` | Section 4. Jared's doc calls the refusal `KEY_NOT_EXPORTABLE`. The spike printed `VAULT_EXPORT_REFUSED`, and that name stands |
+| `VAULT_KEY_UNKNOWN`, `VAULT_OP_REFUSED`, `VAULT_EXPORT_REFUSED`, `VAULT_UNWRAP_FAILED`, `VAULT_AUDIT_FAILED` | Section 4. The last one is the refusal when an audit row cannot be written. Jared's doc calls the refusal `KEY_NOT_EXPORTABLE`. The spike printed `VAULT_EXPORT_REFUSED`, and that name stands |
 | `KEYS_HIDDEN` | The key log was asked for with Show keys OFF |
 | `REFEREE_MISSING`, `CHECK_FAILED` | Tool absent, or it said no, with its output attached |
 | `WIZARD_EVENT_NOT_ALLOWED`, `WIZARD_STEP_STALE`, `WIZARD_RUN_NOT_FOUND` | Machine |
@@ -706,7 +736,7 @@ Each branch ends in one sentence on what happened and what to do, with detail to
 
 **No self-verify.** `openssl verify -CAfile root.pem root.pem` cannot fail, so it is no check. Each row below has a way to fail, and the root row runs a negative control.
 
-**Each step payload carries `judge`:** `openssl`, `ssh.exe`, or `none`. It belongs to the type. A lab may run on a type with `judge: none`: the state is `Verified`, and the UI chip reads `Saved, no outside check`, in the flow and in the lab. Refusing would mean the payment and passkey keys could never run, and Steve said they stay available.
+**On a `Check` step, each row of `facts[]` carries** `typeId`, `judge`, `says`, `command`, `output`, `passed`. `judge` is `openssl`, `ssh.exe`, or `none`, and it belongs to the type. `says` is a stable id, and the copy file holds its words: `checked-against-root`, `checked-with-openssl`, `checked-signature-only`, `checked-with-ssh-exe`, `no-outside-judge`. A lab may run on a type with `judge: none`: the state is `Verified`, and the UI chip reads `Saved, no outside check`, in the flow and in the lab. Refusing would mean the payment and passkey keys could never run, and Steve said they stay available.
 
 A vault-made `ssh.client` keeps `ssh.exe` as its judge. Under option C every flow key is exportable, so `Check` exports a copy to `proof/`, locks it to one reader, and deletes it after.
 
@@ -832,6 +862,7 @@ Note for Echo: if a clause uses `PerBuild`, M grows. Only the golden pair is cou
 | O11 | Names and dates | **Read-only and fixed this round** (my call, on Iolo's finding). Sections 2.5, 3.4 | A lesson needs a learner's name |
 | O12 | Flow ids and spine | **This doc's ids govern (lead).** Nancy's five-screen default path governs the spine | Closed |
 | O13 | Vault exercise | **Routes, not a lab,** because the learner types. Section 4.3 | A tour step must bind to it |
+| O14 | How the suite reaches a learner's key | **`ProbeRequest.Credentials` and `CredentialSet.FromFiles`** (Echo's option A, lead's pick). Section 3.3 | Closed |
 
 ## 11. Prior art and arithmetic
 
