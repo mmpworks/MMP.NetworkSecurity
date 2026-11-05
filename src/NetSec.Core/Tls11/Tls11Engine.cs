@@ -103,6 +103,8 @@ namespace NetSec.Tls11
                 Close();
             else if (c.Kind == EngineCommandKind.Send)
                 Send(c.Bytes);
+            else if (c.Kind == EngineCommandKind.Abort && !_machine.IsEnded)
+                _machine.Fail(c.AbortCode, c.AbortCode, c.AbortDetail, AppStep);
             return Take();
         }
 
@@ -178,7 +180,8 @@ namespace NetSec.Tls11
         {
             if (content.Length != 2) throw new ParseFailure(ErrorCodes.ParseTruncated, "an alert has " + content.Length + " bytes, and it needs 2");
             AlertReceived = content[1];
-            _noAlertOwed = true;
+            // A warning ends nothing, so a clear one from an on-path party must not cancel the alert a later failure owes.
+            if (content[0] == Tls11Messages.FatalLevel || content[1] == Tls11Messages.CloseNotify) _noAlertOwed = true;
             DispatchWhole(Tls11Messages.AlertKey, content, wasProtected);
         }
 

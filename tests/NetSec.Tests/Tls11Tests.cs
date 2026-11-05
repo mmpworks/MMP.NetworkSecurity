@@ -457,6 +457,49 @@ namespace NetSec.Tests
             Assert.Empty(second.Feed(alert, 0, alert.Length).Wire);
         }
 
+        [Fact]
+        public void A_clear_warning_alert_does_not_cancel_a_later_alert()
+        {
+            Tls11Engine client = Client(Tls11CipherSuite.RsaAes128CbcSha);
+            client.Start();
+            byte[] warning = Hex.Decode("15030200020164");
+            Assert.Empty(client.Feed(warning, 0, warning.Length).Wire);
+            byte[] huge = Hex.Decode("1603027fff");
+            Assert.Equal("15030200020216", Hex.Encode(client.Feed(huge, 0, huge.Length).Wire));
+        }
+
+        [Fact]
+        public void A_client_refuses_a_renegotiation_info_answer_that_is_not_empty()
+        {
+            // Header 4, version 2, random 32, session id length 1, suite 2, compression 1, then extensions holding two bytes of renegotiated_connection.
+            byte[] hello = Hex.Decode("0200002f" + "0302" + new string('a', 64) + "00" + "002f" + "00" + "0006" + "ff01" + "0002" + "0100");
+            ITamperHook plan = new TamperPlan { Point = TamperPoint.Plain, Message = Tls11Messages.ServerHelloName, Replacement = hello };
+            NetSecError error = ErrorAfterDuel(Client(Tls11CipherSuite.RsaAes128CbcSha), Server(Tls11CipherSuite.RsaAes128CbcSha, false, plan));
+            Assert.Equal(Tls11Codes.RenegotiationInfo, error.Code);
+        }
+
+        [Fact]
+        public void An_abort_fails_the_engine_by_name_and_sends_a_fatal_alert_with_no_close_notify()
+        {
+            Tls11Engine client = Client(Tls11CipherSuite.RsaAes128CbcSha);
+            client.Start();
+            EngineOutput output = client.Command(EngineCommand.Abort(ErrorCodes.ChannelBufferFull, "the reader left too many bytes unread"));
+            Assert.Equal(EngineStatus.Failed, output.Status);
+            Assert.Equal(ErrorCodes.ChannelBufferFull, output.Error.Code);
+            Assert.Equal("15030200020250", Hex.Encode(output.Wire));
+        }
+
+        [Fact]
+        public void An_abort_fails_the_tls13_engine_by_name_with_a_fatal_alert()
+        {
+            LabContext c = new LabContext { SessionId = "s", TraceId = "s", Clock = new FixedClock(0), Random = new SeededRandom(3) };
+            IProtocolEngine client = Tls13Lab.Lesson5().Client(c, null, false);
+            client.Start();
+            EngineOutput output = client.Command(EngineCommand.Abort(ErrorCodes.ChannelBufferFull, "the reader left too many bytes unread"));
+            Assert.Equal(ErrorCodes.ChannelBufferFull, output.Error.Code);
+            Assert.Equal("0250", Hex.Encode(output.Wire.Skip(output.Wire.Length - 2).ToArray()));
+        }
+
         sealed class WriteFailsLink : IByteLink
         {
             readonly byte[] _toRead;

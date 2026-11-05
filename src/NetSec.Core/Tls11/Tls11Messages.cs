@@ -108,7 +108,7 @@ namespace NetSec.Tls11
 
         /// <summary>
         /// One suite only: the lab forces its choice, because a default run picks the best case. The X25519 extensions go only with an ECDHE suite.
-        /// The signalling value beside it is no suite. It tells the server this client knows RFC 5746. This engine has no row for a second handshake, so it does not read the answer.
+        /// The signalling value beside it is no suite. It tells the server this client knows RFC 5746. This engine has no row for a second handshake, so it refuses a non-empty answer and needs nothing more.
         /// </summary>
         public static byte[] BuildClientHello(byte[] random, Tls11CipherSuite suite)
         {
@@ -227,7 +227,7 @@ namespace NetSec.Tls11
             r.Take("sessionId", "id", r.U8("sessionIdLength", "length"));
             hello.Suites = new int[] { r.U16("suite", "data") };
             hello.Compression = new byte[] { (byte)r.U8("compression", "data") };
-            r.Take("extensions", "data", r.Remaining);
+            ExtensionsHoldRenegotiationInfo(r.Take("extensions", "data", r.Remaining));
             return hello;
         }
 

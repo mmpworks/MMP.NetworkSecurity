@@ -76,6 +76,7 @@ namespace NetSec.Tls13
                 case EngineCommandKind.Send: Send(c.Bytes); break;
                 case EngineCommandKind.Close: Close(); break;
                 case EngineCommandKind.PeerClosed: PeerClosed(); break;
+                case EngineCommandKind.Abort: if (!_machine.IsEnded) _machine.Fail(c.AbortCode, c.AbortCode, c.AbortDetail, null); break;
             }
             return Take();
         }

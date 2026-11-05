@@ -92,7 +92,7 @@ namespace NetSec.Io
                 if (waiter == null) overflowed = Queue(chunk);
             }
             if (waiter != null) waiter.TrySetResult(chunk);
-            if (overflowed) _pump.Enqueue(EngineCommand.Close);
+            if (overflowed) _pump.Enqueue(EngineCommand.Abort(_overflow.Code, _overflow.Message));
         }
 
         /// <summary>True the first time the queue passes its cap. The queue then empties, and the next Receive gets the named error.</summary>
