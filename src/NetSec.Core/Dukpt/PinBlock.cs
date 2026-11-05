@@ -7,6 +7,7 @@ namespace NetSec.Dukpt
     /// <summary>
     /// ISO 9564 format 4: an AES PIN block tied to the card number. The PIN field goes through AES, the result is XORed with the PAN field,
     /// and that goes through AES again. The same PIN and PAN give a different block each time, because the PIN field ends in 8 random bytes.
+    /// The PIN travels as a string, which cannot be cleared, so the digits stay on the managed heap. The working arrays are cleared after use.
     /// </summary>
     public static class PinBlock
     {
@@ -24,20 +25,30 @@ namespace NetSec.Dukpt
             if (random8 == null) throw new ArgumentNullException("random8");
             if (random8.Length != RandomSize) throw new ArgumentException("The PIN field takes 8 random bytes.", "random8");
             AesKey aes = new AesKey(pinKey);
+            byte[] field = PinField(pin, random8);
             byte[] mixed = new byte[BlockSize];
-            aes.EncryptBlock(PinField(pin, random8), 0, mixed, 0);
+            aes.EncryptBlock(field, 0, mixed, 0);
             Xor(mixed, PanField(pan));
             byte[] block = new byte[BlockSize];
             aes.EncryptBlock(mixed, 0, block, 0);
+            Array.Clear(field, 0, BlockSize);
+            Array.Clear(mixed, 0, BlockSize);
             return block;
         }
 
-        /// <summary>False when the opened field has the wrong shape. A wrong key, a wrong PAN, and a changed block all end here, and the result does not say which.</summary>
+        /// <summary>
+        /// False when the opened field has the wrong shape. A wrong key, a wrong PAN, and a changed block nearly always end here, and the result does not say which.
+        /// This is a shape check and gives no integrity: a random field passes with a chance of about 6e-8, and nothing checks the 8 random bytes.
+        /// A MAC is the real check, and lesson 9 adds one.
+        /// </summary>
         public static bool TryDecryptFormat4(byte[] pinKey, byte[] block, string pan, out string pin)
         {
             pin = null;
             byte[] field = OpenField(pinKey, block, pan);
-            return field != null && TryReadPin(field, out pin);
+            if (field == null) return false;
+            bool opened = TryReadPin(field, out pin);
+            Array.Clear(field, 0, BlockSize);
+            return opened;
         }
 
         /// <summary>The clear 16-byte PIN field that EncryptFormat4 locks for this PIN and fill.</summary>
@@ -52,8 +63,10 @@ namespace NetSec.Dukpt
         public static bool TryOpenFieldFormat4(byte[] pinKey, byte[] block, string pan, out byte[] field)
         {
             field = OpenField(pinKey, block, pan);
+            if (field == null) return false;
             string pin;
-            if (field != null && TryReadPin(field, out pin)) return true;
+            if (TryReadPin(field, out pin)) return true;
+            Array.Clear(field, 0, BlockSize);
             field = null;
             return false;
         }
@@ -68,6 +81,7 @@ namespace NetSec.Dukpt
             Xor(mixed, PanField(pan));
             byte[] field = new byte[BlockSize];
             aes.DecryptBlock(mixed, 0, field, 0);
+            Array.Clear(mixed, 0, BlockSize);
             return field;
         }
 
@@ -85,7 +99,7 @@ namespace NetSec.Dukpt
             return field;
         }
 
-        /// <summary>Nibbles: the count of PAN digits past 12, then the PAN, then zeros. A PAN under 12 digits gets zeros on its left, up to 12.</summary>
+        /// <summary>Nibbles: the count of PAN digits past 12, then the PAN, then zeros. A PAN under 12 digits gets zeros on its left, up to 12, so 12345678901 and 012345678901 share a field.</summary>
         static byte[] PanField(string pan)
         {
             if (pan == null) throw new ArgumentNullException("pan");

@@ -73,7 +73,10 @@ namespace NetSec.Pki
         static void Write(string directory, string name, string text)
         {
             byte[] bytes = Encoding.UTF8.GetBytes(text);
-            using (FileStream file = File.Create(Path.Combine(directory, name)))
+            string path = Path.Combine(directory, name);
+            // ssh.exe needs a key file locked to one reader. A locked file refuses a write and still allows a delete from its folder.
+            if (File.Exists(path)) File.Delete(path);
+            using (FileStream file = File.Create(path))
                 file.Write(bytes, 0, bytes.Length);
         }
     }

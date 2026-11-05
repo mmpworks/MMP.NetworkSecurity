@@ -61,6 +61,7 @@ namespace NetSec.Io
         public static IFuture<ProbeResult> Connect(ProbeRequest r)
         {
             if (r == null) throw new ArgumentNullException("r");
+            if (r.Protocol == WireProtocol.Ssh) return SshProbe.Connect(r);
             NeedBuilt(r);
             return AsyncProxy.Run<ProbeResult>(delegate(Return<ProbeResult> ret) { return ConnectBody(r, ret); });
         }
@@ -69,6 +70,7 @@ namespace NetSec.Io
         public static ProbeListener Listen(ProbeRequest r)
         {
             if (r == null) throw new ArgumentNullException("r");
+            if (r.Protocol == WireProtocol.Ssh) return SshProbe.Listen(r);
             NeedBuilt(r);
             LinkListener listener = new LinkListener(new IPEndPoint(IPAddress.Loopback, r.Port));
             ProbeListener result = new ProbeListener();

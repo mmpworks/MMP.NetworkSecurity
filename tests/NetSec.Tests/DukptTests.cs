@@ -150,9 +150,102 @@ namespace NetSec.Tests
             byte[] first = new byte[12];
             byte[] second = new byte[12];
             second[11] = 1;
-            Assert.True(ledger.TryRecord(first));
-            Assert.True(ledger.TryRecord(second));
-            Assert.False(ledger.TryRecord((byte[])first.Clone()));
+            Assert.False(ledger.Contains(first));
+            ledger.Record(first);
+            Assert.True(ledger.Contains((byte[])first.Clone()));
+            Assert.False(ledger.Contains(second));
+        }
+
+        static byte[] KsnOf(uint counter)
+        {
+            byte[] ksn = new byte[12];
+            Array.Copy(KeyId, ksn, 8);
+            ksn[8] = (byte)(counter >> 24);
+            ksn[9] = (byte)(counter >> 16);
+            ksn[10] = (byte)(counter >> 8);
+            ksn[11] = (byte)counter;
+            return ksn;
+        }
+
+        [Fact]
+        public void A_forged_block_leaves_the_ksn_free_for_the_real_sale()
+        {
+            KsnLedger ledger = new KsnLedger();
+            byte[] ksn = KsnOf(1);
+            byte[] real = PinBlock.EncryptFormat4(WorkingKey(1), "1234", Pan, Random8);
+            byte[] forged = (byte[])real.Clone();
+            forged[3] ^= 1;
+
+            Assert.Equal(ErrorCodes.DukptPinBlockFormat, DukptBank.OpenPinSale(Bdk(), ledger, ksn, forged, Pan, Aes128).Code);
+            PinSale opened = DukptBank.OpenPinSale(Bdk(), ledger, ksn, real, Pan, Aes128);
+            Assert.Null(opened.Code);
+            Assert.Equal("1234", opened.Pin);
+            Assert.Equal(WorkingKey(1), opened.Key);
+            Assert.Equal(1u, opened.Counter);
+
+            Assert.Equal(ErrorCodes.DukptKsnReplay, DukptBank.OpenPinSale(Bdk(), ledger, ksn, real, Pan, Aes128).Code);
+        }
+
+        [Fact]
+        public void Checking_a_sale_records_nothing_and_a_refused_replay_opens_no_pin()
+        {
+            KsnLedger ledger = new KsnLedger();
+            byte[] ksn = KsnOf(1);
+            byte[] real = PinBlock.EncryptFormat4(WorkingKey(1), "1234", Pan, Random8);
+            Assert.Null(DukptBank.CheckPinSale(Bdk(), ledger, ksn, real, Pan, Aes128).Code);
+            Assert.False(ledger.Contains(ksn));
+
+            ledger.Record(ksn);
+            PinSale replay = DukptBank.CheckPinSale(Bdk(), ledger, ksn, real, Pan, Aes128);
+            Assert.Equal(ErrorCodes.DukptKsnReplay, replay.Code);
+            Assert.Null(replay.Pin);
+            Assert.Null(replay.Key);
+        }
+
+        [Fact]
+        public void The_held_count_matches_the_registers()
+        {
+            DukptPinPad pad = NewPad();
+            Assert.Equal(32, pad.HeldCount);
+            for (int i = 0; i < 300; i++)
+            {
+                pad.Next(Pin, Aes128);
+                Assert.Equal(pad.HeldKeys().Length, pad.HeldCount);
+            }
+        }
+
+        /// <summary>The range ends after counter 0xFFFF0000: it has 16 one bits, and adding its lowest bit passes 32 bits. The key from the last register still matches the bank.</summary>
+        [Fact]
+        public void The_counter_ends_with_a_named_error_and_never_wraps()
+        {
+            const uint last = 0xFFFF0000;
+            byte[] initial = DukptBank.DeriveInitialKey(Bdk(), KeyId);
+            byte[] derivationKey = DukptDerivation.WalkDown(initial, KeyId, last, 32);
+            DukptPinPad pad = new DukptPinPad(derivationKey, KeyId, last);
+
+            DukptUse use = pad.Next(Pin, Aes128);
+            Assert.Equal(last, CounterOf(use.Ksn));
+            Assert.Equal(WorkingKey(last), use.Key);
+            Assert.Equal(0x100000000UL, pad.NextCounter);
+            Assert.Equal(0, pad.HeldCount);
+
+            for (int i = 0; i < 2; i++)
+            {
+                NetSecException error = Assert.Throws<NetSecException>(() => pad.Next(Pin, Aes128));
+                Assert.Equal(ErrorCodes.DukptCounterExhausted, error.Error.Code);
+            }
+        }
+
+        [Fact]
+        public void Loading_the_lab_reader_clears_the_initial_key_array()
+        {
+            byte[] initial = DukptBank.DeriveInitialKey(Bdk(), KeyId);
+            byte[] expected = (byte[])initial.Clone();
+            byte[] traceCopy;
+            DukptPinPad pad = NetSec.Labs.Lesson06Dukpt.LoadReader(initial, out traceCopy);
+            Assert.Equal(new byte[expected.Length], initial);
+            Assert.Equal(expected, traceCopy);
+            Assert.Equal(32, pad.HeldCount);
         }
 
         [Theory]
