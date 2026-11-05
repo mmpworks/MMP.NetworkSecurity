@@ -1,0 +1,39 @@
+<Project Sdk="Microsoft.NET.Sdk">
+
+  <!-- The Compact Framework 3.5 build of the sibling MMP.AsyncProxy source, into this worktree's own bin and obj.
+       The sibling is only read. src/AsyncProxy.Local says why. The flags match the sibling's MMP.AsyncProxy.NetCF project. -->
+
+  <PropertyGroup>
+    <TargetFramework>net35</TargetFramework>
+    <LangVersion>3</LangVersion>
+    <AssemblyName>MMP.AsyncProxy</AssemblyName>
+    <RootNamespace>MMP.AsyncProxy</RootNamespace>
+    <DefineConstants>$(DefineConstants);NETCF</DefineConstants>
+    <AutomaticallyUseReferenceAssemblyPackages>false</AutomaticallyUseReferenceAssemblyPackages>
+    <FrameworkPathOverride>$(NetCFRefDir)</FrameworkPathOverride>
+    <GenerateAssemblyFileVersionAttribute>false</GenerateAssemblyFileVersionAttribute>
+    <NoStdLib>true</NoStdLib>
+    <NoCompilerStandardLib>true</NoCompilerStandardLib>
+    <DisableImplicitFrameworkReferences>true</DisableImplicitFrameworkReferences>
+    <GenerateTargetFrameworkAttribute>false</GenerateTargetFrameworkAttribute>
+    <EnableDefaultCompileItems>false</EnableDefaultCompileItems>
+    <IsPackable>false</IsPackable>
+    <NoWarn>$(NoWarn);CS1591;CS1685</NoWarn>
+    <AsyncProxySource>$(AsyncProxyRoot)\src\MMP.AsyncProxy</AsyncProxySource>
+    <!-- The sibling's CF project sets no version, so its DLL is 1.0.0. The same version here lets a program load either DLL. -->
+    <Version>1.0.0</Version>
+  </PropertyGroup>
+
+  <ItemGroup>
+    <Compile Include="$(AsyncProxySource)\**\*.cs" Exclude="$(AsyncProxySource)\bin\**;$(AsyncProxySource)\obj\**" />
+    <Reference Include="mscorlib"><HintPath>$(NetCFRefDir)\mscorlib.dll</HintPath><Private>false</Private></Reference>
+    <Reference Include="System"><HintPath>$(NetCFRefDir)\System.dll</HintPath><Private>false</Private></Reference>
+    <Reference Include="System.Core"><HintPath>$(NetCFRefDir)\System.Core.dll</HintPath><Private>false</Private></Reference>
+  </ItemGroup>
+
+  <Target Name="CheckAsyncProxyRoot" BeforeTargets="BeforeBuild">
+    <Error Condition="!Exists('$(AsyncProxySource)\MMP.AsyncProxy.csproj')" Text="MMP.AsyncProxy not found at $(AsyncProxyRoot). Clone it beside this repo, or pass -p:AsyncProxyRoot=&lt;dir&gt;." />
+    <Error Condition="!Exists('$(NetCFRefDir)\mscorlib.dll')" Text="CF 3.5 reference assemblies missing at $(NetCFRefDir)." />
+  </Target>
+
+</Project>

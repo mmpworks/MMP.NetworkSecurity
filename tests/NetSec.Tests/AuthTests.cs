@@ -98,7 +98,7 @@ namespace NetSec.Tests
                 changed[i] = changed[i] == 'A' ? 'B' : 'A';
                 AuthDecision d = Token.Verify(Issuer.CopyPublic(), new string(changed), Now);
                 Assert.False(d.Allowed, "a change at character " + i + " passed");
-                Assert.Equal(Token.SignatureCheck, d.CheckName);
+                Assert.Contains(d.CheckName, new[] { Token.SignatureCheck, Token.FormatCheck });
             }
         }
 

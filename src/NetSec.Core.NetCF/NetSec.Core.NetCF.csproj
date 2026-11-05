@@ -27,7 +27,7 @@
   </ItemGroup>
 
   <ItemGroup>
-    <ProjectReference Include="$(AsyncProxyRoot)\src\MMP.AsyncProxy.NetCF\MMP.AsyncProxy.NetCF.csproj" />
+    <ProjectReference Include="..\AsyncProxy.Local.NetCF\MMP.AsyncProxy.NetCF.csproj" />
     <Reference Include="mscorlib"><HintPath>$(NetCFRefDir)\mscorlib.dll</HintPath><Private>false</Private></Reference>
     <Reference Include="System"><HintPath>$(NetCFRefDir)\System.dll</HintPath><Private>false</Private></Reference>
     <Reference Include="System.Core"><HintPath>$(NetCFRefDir)\System.Core.dll</HintPath><Private>false</Private></Reference>
