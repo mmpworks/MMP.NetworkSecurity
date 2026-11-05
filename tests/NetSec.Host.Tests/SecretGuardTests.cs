@@ -132,6 +132,30 @@ public class SecretGuardTests
     }
 
     [Fact]
+    public void A_key_after_a_header_named_in_prose_is_caught()
+    {
+        using Repo repo = new();
+        repo.Stage("prose-then-key.md", Encoding.UTF8.GetBytes("A key starts with -----BEGIN " + Marker + "-----, as below.\n\n" + Block()));
+        AssertCaught(repo, "prose-then-key.md");
+    }
+
+    [Fact]
+    public void A_key_after_a_placeholder_block_is_caught()
+    {
+        using Repo repo = new();
+        repo.Stage("placeholder-then-key.txt", Encoding.UTF8.GetBytes($"-----BEGIN {Marker}-----\n...\n-----END {Marker}-----\n" + Block()));
+        AssertCaught(repo, "placeholder-then-key.txt");
+    }
+
+    [Fact]
+    public void A_key_in_a_file_over_eight_mebibytes_is_caught()
+    {
+        using Repo repo = new();
+        repo.Stage("big.txt", Encoding.UTF8.GetBytes(new string('x', 9 * 1024 * 1024) + "\n" + Block()));
+        AssertCaught(repo, "big.txt");
+    }
+
+    [Fact]
     public void A_utf16_key_file_is_caught()
     {
         using Repo repo = new();
