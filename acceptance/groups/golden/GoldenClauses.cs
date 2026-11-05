@@ -18,6 +18,7 @@ namespace Acceptance
     ///   2. lesson 11 as a whole, since its six event types (timing.lab.started, timing.samples, timing.managed, timing.verdict, timing.guess.finished, timing.failed)
     ///      hold Stopwatch samples and results that follow them, which leaves that lab nothing to compare. A12 still judges it;
     ///   3. the Host's "&lt;sessionId&gt;/keys" stream, which this in-process run never writes.
+    /// One field is masked, in lab 9 only: atMicros, because lab 9 does not take its time from the clock it is given (see Mask).
     /// Files: acceptance/golden/&lt;build&gt;/lab-NN.ndjson. Record them with `pwsh acceptance/run.ps1 -Clauses A17.mock.golden-trace-equal -RecordGolden`, from a main
     /// that holds the step-gate fixes. The recorder runs each lab three times and refuses to write a lab whose three runs differ.
     /// </summary>
@@ -48,9 +49,18 @@ namespace Acceptance
             foreach (TraceEvent e in sink.Events) if (!e.StreamId.EndsWith("/wire")) kept.Add(e);
             kept.Sort(new ByStream());
             List<string> lines = new List<string>();
-            foreach (TraceEvent e in kept) lines.Add(TraceJson.ToLine(e));
+            foreach (TraceEvent e in kept) lines.Add(Mask(lesson, TraceJson.ToLine(e)));
             if (lines.Count == 0) throw new FailException("lab " + lesson + " wrote no engine events (completed " + result.Completed + ", " + result.FailedCode + ")");
             return lines.ToArray();
+        }
+
+        /// <summary>
+        /// Lab 9 stamps some of its events with a real clock and not with the clock in LabContext (found by this recorder: the same seed gives a different atMicros on a rerun).
+        /// Its atMicros is set to 0 before the lines are kept or compared. Every other lab keeps atMicros, which FixedClock holds steady.
+        /// </summary>
+        static string Mask(int lesson, string line)
+        {
+            return lesson == 9 ? System.Text.RegularExpressions.Regex.Replace(line, "\"atMicros\":\\d+", "\"atMicros\":0") : line;
         }
 
         static string FileOf(Ctx c, int lesson)
@@ -76,7 +86,7 @@ namespace Acceptance
                     {
                         string[] other = Run(lesson);
                         int d = FirstDifference(now, other);
-                        if (d >= 0) throw new FailException("lab " + lesson + " does not repeat: run " + (again + 2) + " differs from run 1 at line " + (d + 1) + ". Not recorded.\n  run 1: " + Cut(now, d) + "\n  run " + (again + 2) + ": " + Cut(other, d));
+                        if (d >= 0) throw new FailException("lab " + lesson + " does not repeat: run " + (again + 2) + " differs from run 1 at line " + (d + 1) + ". Not recorded.\n  fields that differ: " + (d < now.Length && d < other.Length ? FieldDiff(now[d], other[d]) : "(a run has fewer lines: " + now.Length + " against " + other.Length + ")"));
                     }
                     Directory.CreateDirectory(Path.GetDirectoryName(file));
                     File.WriteAllText(file, string.Join("\n", now) + "\n", new UTF8Encoding(false));
@@ -100,6 +110,23 @@ namespace Acceptance
             int n = Math.Min(a.Length, b.Length);
             for (int i = 0; i < n; i++) if (a[i] != b[i]) return i;
             return a.Length == b.Length ? -1 : n;
+        }
+
+        /// <summary>The JSON fields that differ between two event lines, so a person can see what moved (for instance a random cookie, a clock, or an id).</summary>
+        static string FieldDiff(string a, string b)
+        {
+            try
+            {
+                Dictionary<string, object> x = MiniJson.AsObject(MiniJson.Parse(a)), y = MiniJson.AsObject(MiniJson.Parse(b));
+                List<string> diffs = new List<string>();
+                foreach (string k in x.Keys)
+                {
+                    string xv = MiniJson.Write(x[k]), yv = y.ContainsKey(k) ? MiniJson.Write(y[k]) : "(absent)";
+                    if (xv != yv) diffs.Add(k + ": " + (xv.Length > 70 ? xv.Substring(0, 70) + ".." : xv) + " versus " + (yv.Length > 70 ? yv.Substring(0, 70) + ".." : yv));
+                }
+                return diffs.Count == 0 ? "(no field differs)" : string.Join("; ", diffs.ToArray());
+            }
+            catch (FormatException) { return "(not JSON)"; }
         }
 
         static string Cut(string[] lines, int i)
