@@ -36,6 +36,9 @@ app.MapGet("/api/health", () => Results.Json(new
     droppedEvents = sessions.DroppedEvents,
 }));
 app.MapGet("/api/lessons", () => Results.Json(lessons.All()));
+app.MapGet("/api/lessons/{n:int}", (int n) => lessons.One(n) is { } row
+    ? Results.Json(row)
+    : Results.Json(new { code = "LESSON_NOT_FOUND", message = $"No lesson {n}.", retryable = false, requestId = Guid.NewGuid().ToString("N") }, statusCode: 404));
 // GEM:server-replaces-never-merges: on reconnect the UI replaces its copy of a session from this list.
 app.MapGet("/api/sessions/{id}/events", (string id, long? after) =>
     sessions.Find(id) is { } s
@@ -78,7 +81,12 @@ namespace NetSec.Host
         readonly Dictionary<int, JsonElement> _lastRuns = ReadLastRuns();
 
         /// <summary>built comes from the lab catalog. lastRun comes from docs/_runs/lessons.json when the file exists.</summary>
-        public object[] All() => Enumerable.Range(0, Titles.Length).Select(n => (object)new
+        public object[] All() => Enumerable.Range(1, Titles.Length - 1).Select(Row).ToArray();
+
+        /// <summary>One row by number. The toy, lesson 0, stays out of the list and is reachable here.</summary>
+        public object? One(int n) => n >= 0 && n < Titles.Length ? Row(n) : null;
+
+        object Row(int n) => new
         {
             lesson = n,
             title = Titles[n],
@@ -87,7 +95,7 @@ namespace NetSec.Host
             attacks = AttackCatalog.All.Where(a => a.Lesson == n).Select(a => new { attackId = a.AttackId, kind = a.Kind, expectCode = a.ExpectCode, expectCheck = a.ExpectCheck }),
             built = LabCatalog.Find(n) is not null,
             lastRun = _lastRuns.TryGetValue(n, out JsonElement run) ? run : (JsonElement?)null,
-        }).ToArray();
+        };
 
         static Dictionary<int, JsonElement> ReadLastRuns()
         {

@@ -238,13 +238,14 @@ namespace NetSec.Host.Tests
         }
 
         [Fact]
-        public async Task Lessons_list_rows_0_to_11_and_only_the_toy_is_built()
+        public async Task Lessons_list_holds_1_to_11_and_the_toy_sits_outside_it()
         {
             JsonElement rows = await GetJson("/api/lessons");
-            Assert.Equal(12, rows.GetArrayLength());
-            Assert.True(rows[0].GetProperty("built").GetBoolean());
-            Assert.False(rows[5].GetProperty("built").GetBoolean());
-            Assert.Equal("L0-flip-wire-byte", rows[0].GetProperty("attacks")[0].GetProperty("attackId").GetString());
+            Assert.Equal(Enumerable.Range(1, 11), rows.EnumerateArray().Select(r => r.GetProperty("lesson").GetInt32()));
+            Assert.All(rows.EnumerateArray(), r => Assert.False(r.GetProperty("built").GetBoolean()));
+            JsonElement toy = await GetJson("/api/lessons/0");
+            Assert.True(toy.GetProperty("built").GetBoolean());
+            Assert.Equal("L0-flip-wire-byte", toy.GetProperty("attacks")[0].GetProperty("attackId").GetString());
         }
 
         [Fact]

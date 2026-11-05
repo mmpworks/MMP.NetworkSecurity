@@ -348,6 +348,19 @@ namespace NetSec.Tests
             Assert.Equal(EngineStatus.Failed, run.Result.Status);
         }
 
+        /// <summary>The length then promises more bytes than ever come, so the receiver waits. Only the deadline ends the wait.</summary>
+        [Fact]
+        public void A_flipped_length_byte_ends_in_the_named_deadline_on_both_sides()
+        {
+            MemoryLink[] links = MemoryLink.Pair();
+            TamperPlan plan = new TamperPlan { Point = TamperPoint.Wire, Message = EchoEngine.HelloName, Offset = 1, Xor = 1 };
+            Pair p = Run(links[0], links[1], null, plan, 300);
+            Make.Done(p.Client);
+            Make.Done(p.Server);
+            Assert.Equal(ErrorCodes.LinkDeadline, p.Server.Result.Error.Code);
+            Assert.NotNull(p.Client.Result.Error);
+        }
+
         [Fact]
         public void A_peer_that_hangs_up_early_ends_the_run_by_name()
         {
