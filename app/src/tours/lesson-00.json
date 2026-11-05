@@ -1,0 +1,137 @@
+{
+  "steps": [
+    {
+      "id": "L0-S01",
+      "lesson": 0,
+      "title": "A pipe with two ends",
+      "text": [
+        "This is a toy lesson. It teaches you to read the screen before the real lessons start.",
+        "A {{term:client}} sends bytes. A {{term:server}} sends the same bytes back. Both run on your computer, over {{term:loopback}}.",
+        "This pipe has no lock on it. Later lessons add locks to this same pipe.",
+        "Built to show the parts. Do not copy."
+      ],
+      "glossary": ["client", "server", "loopback"],
+      "bind": { "kind": "concept" },
+      "highlight": ["diagram:lane=client", "diagram:lane=server"],
+      "unlock": { "mode": "ack" }
+    },
+    {
+      "id": "L0-S02",
+      "lesson": 0,
+      "title": "The client sends first",
+      "text": [
+        "Look at the left lane. The client just put some {{term:byte}}s on the {{term:wire}}.",
+        "The arrow shows a name and a byte count. The wire is the path between the two lanes."
+      ],
+      "glossary": ["byte", "wire"],
+      "bind": { "kind": "event", "eventType": "wire.sent", "match": { "actor": "client" } },
+      "highlight": ["diagram:lane=client"],
+      "unlock": { "mode": "event" }
+    },
+    {
+      "id": "L0-S03",
+      "lesson": 0,
+      "title": "Read the bytes",
+      "text": [
+        "The panel under the diagram shows the bytes in {{term:hex}}. Each byte takes two characters.",
+        "Pick an arrow to see its bytes. The Up and Down keys move between arrows."
+      ],
+      "glossary": ["hex"],
+      "bind": { "kind": "event", "eventType": "wire.sent", "match": { "actor": "client" } },
+      "highlight": ["inspector:toggle=wire-plain"],
+      "unlock": { "mode": "ack" }
+    },
+    {
+      "id": "L0-S04",
+      "lesson": 0,
+      "title": "The server sends them back",
+      "text": [
+        "Now the server answers. It sends the bytes it got back to the client.",
+        "Look at the right lane. A new arrow points the other way."
+      ],
+      "glossary": [],
+      "bind": { "kind": "event", "eventType": "wire.sent", "match": { "actor": "server" } },
+      "highlight": ["diagram:lane=server"],
+      "unlock": { "mode": "event" }
+    },
+    {
+      "id": "L0-S05",
+      "lesson": 0,
+      "title": "Same bytes in, same bytes out",
+      "text": [
+        "Compare the two arrows. The byte counts match, and so do the bytes.",
+        "Pick each arrow and read its hex. The two lists are the same."
+      ],
+      "glossary": [],
+      "bind": { "kind": "event", "eventType": "wire.sent", "match": { "actor": "server" } },
+      "highlight": ["diagram:lane=client", "diagram:lane=server"],
+      "claims": [
+        {
+          "id": "L0-C01",
+          "text": "The server returns the same bytes it received, and the engine holds no crypto.",
+          "source": "docs/program-design.md, section 8 (Build order), slice S0: EchoEngine through EnginePump, one live toy lesson"
+        }
+      ],
+      "unlock": { "mode": "ack" }
+    },
+    {
+      "id": "L0-S06",
+      "lesson": 0,
+      "title": "Every arrow is a trace event",
+      "text": [
+        "Each arrow comes from one {{term:event}} in the {{term:trace}}. The screen draws nothing that the engine did not report.",
+        "The status bar shows which event you are on. Free play lists every event in a log."
+      ],
+      "glossary": ["event", "trace"],
+      "bind": { "kind": "event", "eventType": "wire.sent", "match": { "actor": "server" } },
+      "highlight": ["diagram:lane=server"],
+      "claims": [
+        {
+          "id": "L0-C02",
+          "text": "Every engine step emits a trace event, and the screen draws only from trace events.",
+          "source": "docs/prd.md, Decisions, D4; docs/ux-design.md, Conclusion item 2"
+        }
+      ],
+      "unlock": { "mode": "ack" }
+    },
+    {
+      "id": "L0-S07",
+      "lesson": 0,
+      "title": "What Eve sees",
+      "text": [
+        "An {{term:eavesdropper}} named Eve listens on the wire. Switch to the Eavesdropper view.",
+        "Eve can read every byte, because nothing is locked. She sees what the client and server see."
+      ],
+      "glossary": ["eavesdropper"],
+      "bind": { "kind": "event", "eventType": "wire.sent", "match": { "actor": "server" } },
+      "highlight": ["diagram:lane=server"],
+      "tryIt": {
+        "id": "L0-S07-T1",
+        "label": "Switch to the eavesdropper view",
+        "action": { "type": "set-view", "value": "eavesdropper" },
+        "expect": { "type": "view", "value": "eavesdropper" }
+      },
+      "claims": [
+        {
+          "id": "L0-C03",
+          "text": "In the Eavesdropper view, only protected rows turn to noise. Unprotected bytes stay readable.",
+          "source": "docs/ux-design.md, section 2, moment 2 (Two views of one wire)"
+        }
+      ],
+      "unlock": { "mode": "action", "ref": "L0-S07-T1" }
+    },
+    {
+      "id": "L0-S08",
+      "lesson": 0,
+      "title": "Locks come next",
+      "text": [
+        "Later lessons add locks to this same pipe. A {{term:key}} turns {{term:plaintext}} into {{term:ciphertext}}.",
+        "Then Eve sees noise. Pick lesson 1 on the left rail when you are ready."
+      ],
+      "glossary": ["key", "plaintext", "ciphertext"],
+      "bind": { "kind": "concept" },
+      "highlight": ["rail:lesson=1"],
+      "unlock": { "mode": "ack" }
+    }
+  ]
+}
