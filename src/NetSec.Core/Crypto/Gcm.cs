@@ -6,6 +6,8 @@ namespace NetSec.Crypto
     /// AES-GCM, SP 800-38D, with a 12-byte nonce and a 16-byte tag, the shape TLS 1.3 uses.
     /// Counter mode encrypts. GHASH over the additional data and the ciphertext, masked by AES of the first counter, makes the tag.
     /// A byte array cannot reach the 2^36 byte limit, so the 32-bit counter cannot wrap.
+    /// Rule: use one key and nonce pair for one message only. A second message under the same pair exposes the xor of the
+    /// two plaintexts and lets an attacker forge tags. Gcm keeps no state, so it cannot detect reuse. The caller owns this rule.
     /// </summary>
     public static class Gcm
     {

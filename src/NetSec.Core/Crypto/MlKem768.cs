@@ -75,8 +75,9 @@ namespace NetSec.Crypto
 
         /// <summary>
         /// FIPS 203 algorithm 18, with the checks of section 7.3. Decrypt, then encrypt again with the recovered message. A
-        /// ciphertext that does not match gives J(z || c). So a forged ciphertext gets a random-looking secret and no error,
-        /// and an attacker learns nothing from an error (implicit rejection).
+        /// ciphertext that does not match gives J(z || c). So a forged ciphertext gets a random-looking secret and no error
+        /// (implicit rejection). As in the algorithm, J runs before the compare, so accept and reject run the same steps. That
+        /// is the shape of the algorithm and no timing claim: managed code gives no constant-time guarantee.
         /// </summary>
         public static byte[] Decaps(byte[] dk, byte[] c)
         {
@@ -94,8 +95,9 @@ namespace NetSec.Crypto
 
             byte[] m = KPke.Decrypt(p, dkPke, c);
             byte[] kr = MlKemSampling.G(m, h);
+            byte[] rejected = MlKemSampling.J(z, c);
             byte[] expected = KPke.Encrypt(p, ek, m, KPke.Slice(kr, 32, 32));
-            return AreEqual(c, expected) ? KPke.Slice(kr, 0, 32) : MlKemSampling.J(z, c);
+            return AreEqual(c, expected) ? KPke.Slice(kr, 0, 32) : rejected;
         }
 
         /// <summary>Section 7.2: each 12-bit value in ek must be below q, so a decode then an encode gives the same bytes.</summary>

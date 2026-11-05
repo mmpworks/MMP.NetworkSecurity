@@ -97,7 +97,8 @@ namespace NetSec.Crypto
 
         /// <summary>
         /// Decodes a public key and negates it, because verification computes S*B + h*(-A). The square root step follows
-        /// RFC 8032 section 5.1.3. Returns false when no point has this y. The caller checks y &lt; p first.
+        /// RFC 8032 section 5.1.3. Returns false when no point has this y, and when x = 0 with the sign bit set. The caller
+        /// checks y &lt; p first.
         /// </summary>
         public static bool TryUnpackNegated(long[][] r, byte[] packed, int offset)
         {
@@ -128,7 +129,11 @@ namespace NetSec.Crypto
             Fe25519.Mul(check, check, den);
             if (!Fe25519.AreEqual(check, num)) return false;
 
-            if (Fe25519.Parity(r[0]) == (packed[offset + 31] >> 7)) Fe25519.Sub(r[0], Fe25519.New(), r[0]);
+            // Step 4. Zero has no negative, so a set sign bit on x = 0 would be a second encoding of one point.
+            int signBit = packed[offset + 31] >> 7;
+            if (signBit == 1 && Fe25519.AreEqual(r[0], Fe25519.New())) return false;
+
+            if (Fe25519.Parity(r[0]) == signBit) Fe25519.Sub(r[0], Fe25519.New(), r[0]);
             Fe25519.Mul(r[3], r[0], r[1]);
             return true;
         }
