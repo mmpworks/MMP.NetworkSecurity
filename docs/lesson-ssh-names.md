@@ -53,7 +53,7 @@ Offsets index `wire`, as in the other lessons.
 |---|---|
 | `VersionLine` | `versionLine` |
 | Clear packet | `packetLength`, `paddingLength`, `messageType`, then the body fields below, then `padding` |
-| Protected packet | `encryptedPacket` (`visibleToWire` false), `mac` (`visibleToWire` true). SSH encrypts the length too, so an eavesdropper sees no packet boundary |
+| Protected packet | `encryptedPacket` (`visibleToWire` false), `mac` (`visibleToWire` true). SSH encrypts the length field too, so the field is hidden. TCP segments and timing can still show packet sizes |
 
 | Clear message | Body fields |
 |---|---|
@@ -73,7 +73,8 @@ Offsets index `wire`, as in the other lessons.
 | `ssh.message.sent`, `wire.sent` | sender | as above | |
 | `ssh.message.received` | receiver | as above | `plain` after the unlock |
 | `ssh.hostkey.seen` | `client` | `SHA256:<base64>`, the OpenSSH fingerprint form | The host key card |
-| `ssh.hostkey.first-use` | `client` | The same fingerprint | Only when a client trusts on first use. The lab pins its key, so the lab does not emit it |
+| `ssh.hostkey.first-use` | `client` | The same fingerprint | Only when a caller turns on trust on first use. The default is a refusal, `SSH_HOST_KEY_UNKNOWN`. The lab pins its key, so the lab does not emit it |
+| `ssh.kex.strict` | `client`, `server` | `on` or `off` | `on` when both sides offer strict KEX (draft-miller-sshm-strict-kex). Both rounds of the lab show `on` |
 | `ssh.exec.exit` | `client` | The exit status, as text | `0` for `echo hello` |
 | `ssh.weak.exchange-hash`, `ssh.weak.host-signature`, `ssh.weak.cipher-mode` | `client`, `server` | One short sentence that says what is weak | Round 2 only |
 | `secret.derived` | `client`, `server` | none | `secrets[]`, one per event, with the names below |
@@ -94,7 +95,7 @@ Offsets index `wire`, as in the other lessons.
 | Check name | `actor` | Failure code |
 |---|---|---|
 | `algorithm match` | both | `SSH_NO_COMMON_ALG` |
-| `known_hosts match` | `client` | `SSH_HOST_KEY_CHANGED`, `SSH_HOST_KEY_UNKNOWN` |
+| `known_hosts match` | `client` | `SSH_HOST_KEY_CHANGED`, `SSH_HOST_KEY_UNKNOWN`, `SSH_HOST_KEY_REVOKED` |
 | `host key shape` | `client` | `SSH_HOST_KEY_BAD` |
 | `x25519 result not zero` | both | `SSH_KEX_ZERO_SECRET` |
 | `exchange signature` | `client` | `SSH_EXCHANGE_SIGNATURE` |
@@ -102,13 +103,18 @@ Offsets index `wire`, as in the other lessons.
 | `packet length` | receiver | `SSH_PACKET_LENGTH` |
 | `userauth accepted` | `client` | `SSH_AUTH_REFUSED` |
 | `userauth signature verify` | `server` | `SSH_AUTH_REFUSED` |
-| `exec accepted` | `client` | `SSH_EXEC_REFUSED` |
+| `exec accepted` | `client` | `SSH_EXEC_REFUSED`, for a refused command or a refused session channel |
 | `tunnel allow list` | `server`, which decides (RFC 4254 section 7.2) | `SSH_TUNNEL_REFUSED` |
 | `tunnel accepted` | `client`, which only reports the server's answer | `SSH_TUNNEL_REFUSED` |
 | `channel number known` | both | `SSH_CHANNEL_UNKNOWN` |
 | `channel window` | both | `SSH_CHANNEL_WINDOW` |
 | `no rekey in this lab` | both | `SSH_REKEY_UNSUPPORTED` |
 | `version line` | both | `SSH_VERSION` |
+| `strict kex` | both | `SSH_KEX_STRICT` |
+| `channel send queue` | both | `SSH_CHANNEL_QUEUE_FULL` |
+| `channel limit` | both | `SSH_CHANNEL_LIMIT` |
+| `userauth tries` | `server` | `SSH_AUTH_TRIES` |
+| `sequence number` | both | `SSH_SEQUENCE_EXHAUSTED` |
 | `peer stayed until the end` | both | `SSH_PEER_DISCONNECT`, `PEER_CLOSED_EARLY` |
 
 ## Attacks
@@ -132,3 +138,6 @@ Try-it actions are the same as `docs/lessons-1-3-names.md`. Use `run-attack` wit
 3. Nothing here has run on real CE. The wording is "CF-compiled, run on the desktop CLR, never run on CE".
 4. A host key is trusted because the client pinned it earlier. The first connect has no proof at all, so the fingerprint card is the moment to check it another way.
 5. The lab's SSH server has a fixed table of two commands, `echo` and `whoami`. It starts no process.
+6. The name `Modern` means "newer than the legacy suite". The suite has no encrypt-then-MAC mode, and it is no claim of the best SSH can do.
+7. Terrapin (CVE-2023-48795) removes a packet from the start of the protected stream. Both rounds run strict KEX, because the glass client and server both offer it. A peer that does not offer it leaves strict KEX off, and `ssh.kex.strict` says `off`. These two suites still stop the prefix attack then, because the MAC covers the plain text and a deleted packet moves the cipher stream. Jared's sweep on the engine before strict KEX: 0 of 4,000 accepted on each suite. An injected `Ignore` can still kill such a session.
+8. A channel holds no more than its window of unread bytes. The window opens again only when the reader reads, so a stalled reader makes the sender wait.

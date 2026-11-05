@@ -67,6 +67,7 @@ namespace NetSec.Ssh
             s.EphemeralPrivate = SshKex.NewPrivate(s);
             List<StepEffect> effects = new List<StepEffect>();
             effects.Add(Effect.Check(SshChecks.Algorithm, SshCodes.NoCommonAlg));
+            effects.Add(SshKex.StrictNote(s));
             effects.AddRange(SshKex.WeakNotes(s));
             effects.Add(Effect.Secret(s.Holder, SshKex.PrivateName, s.EphemeralPrivate));
             bool legacy = s.Algorithms.IsLegacy;
@@ -127,12 +128,15 @@ namespace NetSec.Ssh
                 case HostKeyMatch.Match:
                     effects.Add(Effect.Check(SshChecks.KnownHosts, SshCodes.HostKeyChanged));
                     return null;
+                case HostKeyMatch.Revoked:
+                    return StepDecision.Fail(SshCodes.HostKeyRevoked, SshChecks.KnownHosts, "known_hosts marks this key as revoked. It offered " + key.Fingerprint());
                 case HostKeyMatch.Changed:
                     return StepDecision.Fail(SshCodes.HostKeyChanged, SshChecks.KnownHosts, "the server's host key is not the one pinned for " + s.Client.Host + ". It offered " + key.Fingerprint());
                 default:
                     if (!s.Client.TrustFirstUse)
                         return StepDecision.Fail(SshCodes.HostKeyUnknown, SshChecks.KnownHosts, "no known_hosts line names " + s.Client.Host + ". It offered " + key.Fingerprint());
                     effects.Add(Effect.Note("ssh.hostkey.first-use", key.Fingerprint()));
+                    effects.Add(Effect.Deliver(SshControl.Channel, SshControl.Encode(SshControl.HostKeyLearned, 0, SshKnownHosts.Line(s.Client.Host, s.Client.Port, key.Algorithm, key.Blob))));
                     return null;
             }
         }
@@ -187,6 +191,8 @@ namespace NetSec.Ssh
             StepDecision refused;
             SshChannel channel = SshRows.Find(s, r.U32("recipient", "id"), out refused);
             if (channel == null) return refused;
+            if (channel.Confirmed)
+                return StepDecision.Fail(SshCodes.ChannelUnknown, SshChecks.ChannelKnown, "the peer confirmed channel " + channel.Local + " a second time");
             channel.Remote = (int)r.U32("sender", "id");
             channel.PeerWindow = r.U32("window", "length");
             channel.PeerMaxPacket = r.U32("maxPacket", "length");
@@ -212,7 +218,9 @@ namespace NetSec.Ssh
             SshChannel channel = SshRows.Find(s, r.U32("recipient", "id"), out refused);
             if (channel == null) return refused;
             string description = "reason " + r.U32("reason", "id") + ": " + SshFields.Text(r.Prefixed("description", "data"));
-            return StepDecision.Fail(SshCodes.TunnelRefused, SshChecks.TunnelAccepted, "the server refused channel " + channel.Local + ", " + description);
+            string detail = "the server refused channel " + channel.Local + ", " + description;
+            if (channel.ExecCommand != null) return StepDecision.Fail(SshCodes.ExecRefused, SshChecks.ExecAccepted, detail);
+            return StepDecision.Fail(SshCodes.TunnelRefused, SshChecks.TunnelAccepted, detail);
         }
 
         static StepDecision ReadExecOk(SshSession s, InboundMessage m)

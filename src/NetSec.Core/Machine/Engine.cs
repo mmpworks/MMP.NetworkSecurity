@@ -5,7 +5,7 @@ using NetSec.Trace;
 namespace NetSec.Machine
 {
     public enum EngineStatus { Handshaking, Open, Closed, Failed }
-    public enum EngineCommandKind { Send, Close, PeerClosed, OpenChannel, Exec }
+    public enum EngineCommandKind { Send, Close, PeerClosed, OpenChannel, Exec, Consumed }
 
     public sealed class EngineCommand
     {

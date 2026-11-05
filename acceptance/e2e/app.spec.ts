@@ -58,6 +58,7 @@ for (let n = 1; n <= 11; n++) {
     const dir = path.join(OUT, `lesson-${n}`);
     fs.mkdirSync(dir, { recursive: true });
     const visited: string[] = [];
+    const stepMs: string[] = [];
     for (let i = 0; i < ids.length + 5; i++) {
       await expect(page.getByTestId('tour-step-id')).not.toHaveText('', { timeout: 30_000 });
       const id = ((await page.getByTestId('tour-step-id').textContent()) ?? '').trim();
@@ -71,11 +72,20 @@ for (let n = 1; n <= 11; n++) {
       }
       // A disabled Next always names its reason (ux-design.md section 3.2). If it never enables, the reason goes into the failure.
       const reason = page.getByTestId('next-reason');
-      await expect(next, `Next never enabled at step ${id}; reason shown: ${(await reason.textContent().catch(() => '')) ?? ''}`).toBeEnabled({ timeout: 45_000 });
+      // The reason text is read AFTER the wait, with a short timeout. The element exists only while Next is disabled, so a read with the
+      // default timeout blocks until the whole test times out when Next is already enabled. That hid the step id behind "Test timeout".
+      const stepStart = Date.now();
+      try { await expect(next).toBeEnabled({ timeout: 45_000 }); }
+      catch {
+        const why = await reason.textContent({ timeout: 1000 }).catch(() => '');
+        throw new Error(`Next never enabled at step ${id}; reason shown: ${why ?? ''}`);
+      }
+      stepMs.push(`${id}=${Date.now() - stepStart}ms`);
       if (id === ids[ids.length - 1]) break;
       await next.click();
     }
     expect(visited, `the steps the app showed against the tour file`).toEqual(ids);
+    test.info().annotations.push({ type: 'walk-time', description: `lesson ${n}: ${ids.length} steps; wait for Next per step: ${stepMs.join(' ')}` });
   });
 }
 

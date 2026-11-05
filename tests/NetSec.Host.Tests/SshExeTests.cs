@@ -1,6 +1,7 @@
 using System;
 using System.Diagnostics;
 using System.IO;
+using System.Linq;
 using System.Net;
 using System.Net.Sockets;
 using System.Text;
@@ -55,6 +56,7 @@ namespace NetSec.Host.Tests
             Assert.Equal("hello\n", output.Replace("\r\n", "\n"));
             Assert.True(listener.Result.Wait(30000), "the server did not finish");
             Assert.True(listener.Result.Result.Completed, listener.Result.Result.Code + " " + listener.Result.Result.CheckName);
+            Assert.Equal("on", listener.Result.Result.Events.Single(e => e.Type == "ssh.kex.strict").Message);
         }
 
         [Fact]

@@ -29,6 +29,7 @@ namespace NetSec.Io
         readonly Queue<Promise<AppChunk>> _readers = new Queue<Promise<AppChunk>>();
         readonly Dictionary<int, Promise<int>> _opening = new Dictionary<int, Promise<int>>();
         readonly Dictionary<int, Relay> _relays = new Dictionary<int, Relay>();
+        string _learnedLine;
         int _nextChannel;
         bool _ended;
 
@@ -36,6 +37,7 @@ namespace NetSec.Io
         {
             public IByteLink Link;
             public IFuture Tail;
+            public Promise Room;
         }
 
         /// <param name="openTarget">Opens the far end of an allowed tunnel. Null when this side never receives one.</param>
@@ -53,6 +55,9 @@ namespace NetSec.Io
         }
 
         public ChannelInfo Info { get { return _info; } }
+
+        /// <summary>Set only after a trust-on-first-use connect: the known_hosts line to store and pass back on each later connect.</summary>
+        public string LearnedKnownHostsLine { get { lock (_lock) return _learnedLine; } }
 
         /// <summary>Completes when the user is authenticated. Faults with the named error when the session ends first.</summary>
         public IFuture Opened { get { return _opened.Future; } }
@@ -93,14 +98,26 @@ namespace NetSec.Io
         /// <summary>The next piece of data. Empty Bytes mean that channel ended. Faults when the session has ended and nothing is left.</summary>
         public IFuture<AppChunk> Receive()
         {
+            AppChunk ready;
             lock (_lock)
             {
-                if (_chunks.Count > 0) return Futures.FromResult<AppChunk>(_chunks.Dequeue());
-                if (_ended) return Futures.FromException<AppChunk>(EndedException(null));
-                Promise<AppChunk> waiter = new Promise<AppChunk>(PromiseOptions.RunContinuationsAsynchronously);
-                _readers.Enqueue(waiter);
-                return waiter.Future;
+                if (_chunks.Count == 0)
+                {
+                    if (_ended) return Futures.FromException<AppChunk>(EndedException(null));
+                    Promise<AppChunk> waiter = new Promise<AppChunk>(PromiseOptions.RunContinuationsAsynchronously);
+                    _readers.Enqueue(waiter);
+                    return waiter.Future;
+                }
+                ready = _chunks.Dequeue();
             }
+            Consumed(ready);
+            return Futures.FromResult<AppChunk>(ready);
+        }
+
+        /// <summary>The read is what grants window back, so a reader that stops makes the peer wait.</summary>
+        void Consumed(AppChunk chunk)
+        {
+            if (chunk.Bytes.Length > 0) _pump.Enqueue(new EngineCommand(EngineCommandKind.Consumed, chunk.Channel, chunk.Bytes, null));
         }
 
         /// <summary>Sends Disconnect when the session is open, then ends. It waits for the pump.</summary>
@@ -124,7 +141,9 @@ namespace NetSec.Io
                 if (_readers.Count > 0) waiter = _readers.Dequeue();
                 else _chunks.Enqueue(chunk);
             }
-            if (waiter != null) waiter.TrySetResult(chunk);
+            if (waiter == null) return;
+            Consumed(chunk);
+            waiter.TrySetResult(chunk);
         }
 
         void OnControl(byte[] note)
@@ -136,7 +155,24 @@ namespace NetSec.Io
                 case SshControl.ChannelReady: ChannelReady(channel); break;
                 case SshControl.TunnelRequested: StartRelay(channel, SshControl.Text(note)); break;
                 case SshControl.PeerEof: PeerFinished(channel); break;
+                case SshControl.HostKeyLearned: lock (_lock) _learnedLine = SshControl.Text(note); break;
+                case SshControl.WindowFull: SetRoom(channel, false); break;
+                case SshControl.WindowOpen: SetRoom(channel, true); break;
             }
+        }
+
+        /// <summary>A relay stops reading its target while the peer's window is full, so a fast target cannot fill this side's memory.</summary>
+        void SetRoom(int channel, bool hasRoom)
+        {
+            Promise wake = null;
+            lock (_lock)
+            {
+                Relay relay;
+                if (!_relays.TryGetValue(channel, out relay)) return;
+                if (!hasRoom) relay.Room = new Promise(PromiseOptions.RunContinuationsAsynchronously);
+                else { wake = relay.Room; relay.Room = null; }
+            }
+            if (wake != null) wake.TrySetResult();
         }
 
         /// <summary>The peer sent all it will send. IByteLink has no half close, so the target closes whole, and its read then ends the channel from this side.</summary>
@@ -218,6 +254,9 @@ namespace NetSec.Io
             byte[] buffer = new byte[RelayBuffer];
             while (true)
             {
+                Promise room;
+                lock (_lock) room = relay.Room;
+                if (room != null) yield return room.Future;
                 IFuture<int> read = relay.Link.Read(buffer, 0, buffer.Length);
                 yield return Futures.Observe(read);
                 if (read.IsFaulted || read.IsCanceled || read.Result == 0)
@@ -227,7 +266,7 @@ namespace NetSec.Io
                 }
                 byte[] chunk = new byte[read.Result];
                 Buffer.BlockCopy(buffer, 0, chunk, 0, chunk.Length);
-                Send(channel, chunk);
+                yield return Futures.Observe(Send(channel, chunk));
             }
         }
 
@@ -236,11 +275,11 @@ namespace NetSec.Io
             lock (_lock)
             {
                 if (bytes.Length == 0) _relays.Remove(channel);
-                relay.Tail = AsyncProxy.Run(RelayWrite(relay, relay.Tail, bytes));
+                relay.Tail = AsyncProxy.Run(RelayWrite(channel, relay, relay.Tail, bytes));
             }
         }
 
-        IEnumerable<IFuture> RelayWrite(Relay relay, IFuture before, byte[] bytes)
+        IEnumerable<IFuture> RelayWrite(int channel, Relay relay, IFuture before, byte[] bytes)
         {
             yield return Futures.Observe(before);
             if (relay.Link == null) yield break;
@@ -250,10 +289,12 @@ namespace NetSec.Io
                 yield break;
             }
             yield return Futures.Observe(relay.Link.Write(bytes, 0, bytes.Length));
+            _pump.Enqueue(new EngineCommand(EngineCommandKind.Consumed, channel, bytes, null));
         }
 
         static void CloseRelay(Relay relay)
         {
+            if (relay.Room != null) relay.Room.TrySetResult();
             if (relay.Link != null) relay.Link.Close();
         }
     }
