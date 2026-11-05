@@ -28,7 +28,7 @@
       "title": "Phase 1: the server asks for a certificate",
       "text": [
         "The first phase is mutual TLS. In lesson 4 only the server showed a certificate. Here the server also asks the client for one.",
-        "Watch the server's CertificateRequest. It means: show me who you are before we go on. A server may ask for this, and it does not have to."
+        "Watch the server's CertificateRequest. It means: show me a certificate before we go on. A server may ask for this, and it does not have to."
       ],
       "glossary": [],
       "bind": { "kind": "event", "eventType": "tls.handshake.sent", "match": { "actor": "server", "message": "CertificateRequest" } },
@@ -47,7 +47,7 @@
       "lesson": 10,
       "title": "The client shows its certificate",
       "text": [
-        "The client answers with its own certificate. It carries the name pump-reader-4 and the client's device key.",
+        "The client answers with its own certificate. It carries the name pump-reader-4 and a certificate key. This key is separate from the login key you meet in phase 2.",
         "The server checks it the way the client checked the server's in lesson 4: does it lead to a trusted root, is it in date, and does its signature verify.",
         "Anyone can copy a certificate, so the card alone proves nothing. The next step shows what does."
       ],
@@ -138,13 +138,20 @@
       "lesson": 10,
       "title": "Phase 2: a key that stays on the device",
       "text": [
-        "Mutual TLS proved the client holds a key. Now the client logs in to get a token for its calls. The login uses the same device key.",
+        "Mutual TLS proved the client holds the certificate key. Now the client logs in to get a token for its calls. The login uses a second key, the device key, enrolled ahead of time. Nothing in this lab ties it to the certificate.",
         "The device key is a pair: a private key that stays on the device, and a public key that anyone may see. Find the private key in the secrets panel under the client lane.",
         "A signature with this key shows the signer holds it. It says nothing about who the signer is until someone has linked the public key to a person or a device."
       ],
       "glossary": [],
       "bind": { "kind": "event", "eventType": "secret.derived", "match": { "actor": "client" } },
       "highlight": ["secrets:row=client.auth.device-key"],
+      "claims": [
+        {
+          "id": "L10-C22",
+          "text": "The client certificate holds a fixed key (KeyIds.ClientTlsEd25519). The login key is a different seed drawn for each run and enrolled by the lab. The call phase runs on another connection and reads no certificate.",
+          "source": "Jared's re-check of PR #20 (comment 6658016121): three seeds gave tlsKey 0a1626172713245c and three different loginKey values; src/NetSec.Core/Labs/Lesson10Auth.cs, lines 185-186 and 201"
+        }
+      ],
       "unlock": { "mode": "event" }
     },
     {
@@ -436,7 +443,7 @@
       "lesson": 10,
       "title": "Who you are is not what you may do",
       "text": [
-        "By now the server has checked the certificate, the token and the proof. It knows the call came from a holder of an enrolled key and a token the issuer signed. It still must decide whether this caller may do this action. That is the permission check.",
+        "By now the server has checked the token and the proof. The calls run on their own connection, and the server reads no certificate there. It knows the call came from a holder of an enrolled key and a token the issuer signed. It still must decide whether this caller may do this action. That is the permission check.",
         "A role is a job title. The role cashier may read totals. A capability is a single right. The capability void-sale lets the holder void a sale, and the token carries it by name.",
         "Try it: call Refund. The token has the role cashier and the capability void-sale, but it has no refund capability. The check named permission check fails."
       ],
