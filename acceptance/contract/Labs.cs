@@ -12,6 +12,8 @@ using NetSec.Trace;
 namespace NetSec.Platform
 {
     public interface IClock { long NowMicros { get; } }
+    public sealed class FixedClock : IClock { public FixedClock(long micros) { throw new NotImplementedException(); } public long NowMicros { get { throw new NotImplementedException(); } } }
+    public sealed class SeededRandom : IRandomSource { public SeededRandom(int seed) { throw new NotImplementedException(); } public void Fill(byte[] b, int off, int n) { throw new NotImplementedException(); } }
     public sealed class MonotonicClock : IClock { public MonotonicClock() { throw new NotImplementedException(); } public long NowMicros { get { throw new NotImplementedException(); } } }   // ASSUMED parameterless
 }
 
@@ -33,7 +35,7 @@ namespace NetSec.Labs
 
     public sealed class LabContext
     {
-        public int Seed; public ITransportFactory Transports; public IStepGate Gate; public ITraceSink Sink; public NetSec.Platform.IClock Clock;
+        public string SessionId, TraceId; public int Seed; public ITransportFactory Transports; public IStepGate Gate; public ITraceSink Sink; public NetSec.Platform.IClock Clock;
         public IRandomSource Random; public AttackDefinition Attack;
     }
 

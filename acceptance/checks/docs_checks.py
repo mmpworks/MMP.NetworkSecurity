@@ -1,4 +1,4 @@
-"""Text clauses of the acceptance suite: A3 tour statement, A12 tour statement, A14 static, A15, A15a, A16 wording.
+"""Text clauses of the acceptance suite: A3 tour statement, A12 tour statement, A14 static, A15, A15a, A16 wording, A17 wording and copy.
 
 Reads app/src/tours/lesson-NN.json (ux-design.md section 3.1), app/src/glossary.json and the app source from a product repo root.
 Prints one "@@CLAUSE {json}" line per clause, the same protocol the C# groups use. Uses the standard library only.
@@ -8,6 +8,7 @@ Run: python -I docs_checks.py --root <repo root> [--ids a,b] [--tic-gate <path>]
 """
 import argparse
 import glob
+import hashlib
 import json
 import os
 import re
@@ -112,7 +113,7 @@ def load_glossary(root):
 
 
 def step_texts(step):
-    parts = [step.get("title", "")] + list(step.get("text", []))
+    parts = [step.get("title", "")] + list(step.get("text", [])) + list(step.get("textMine", []))     # textMine: the variant shown on a learner's own key
     t = step.get("tryIt")
     if isinstance(t, dict):
         parts.append(t.get("label", ""))
@@ -264,9 +265,45 @@ def a15a_claims_cite(root):
     return "%d security claims, each cites a source" % claims
 
 
+def norm(text):
+    return " ".join(str(text).split())
+
+
+def text_hash(text):
+    return hashlib.sha256(norm(text).encode("utf-8")).hexdigest()
+
+
+def current_claims(tour, n):
+    """(id, text) of every claim a tour declares now. A claim without an id gets L<lesson>-C<nn> by order, top claims first."""
+    found = list(tour.get("claims", []))
+    for st in tour["steps"]:
+        found.extend(st.get("claims", []))
+    out = []
+    for i, cl in enumerate(found, 1):
+        if isinstance(cl, dict) and cl.get("text"):
+            out.append((cl.get("id") or "L%d-C%02d" % (n, i), cl["text"]))
+    return out
+
+
+def tour_text_hash(tour):
+    """One hash over every step's text and textMine, in order. A change to any sentence changes it."""
+    parts = []
+    for st in tour["steps"]:
+        parts.append(st.get("id", ""))
+        parts.extend(st.get("text", []))
+        parts.extend(st.get("textMine", []))
+    return text_hash("\n".join(parts))
+
+
 def a15a_reader(root):
+    """
+    A verdict counts only for the text it judged. Each claim verdict carries the claim id and textHash (sha256 of the claim text with spaces
+    collapsed). The step-text result (textRead) carries stepsRead, problemsOpen and textHash over every step text and textMine. A verdict that
+    does not match the tour now is NOT RUN (unbound or stale), because it says nothing about the new words. An inaccurate claim, an open
+    text problem, or a reader who wrote the tour is a FAIL.
+    """
     tours = load_tours(root)
-    missing, bad, ok = [], [], 0
+    missing, bad, unbound, stale, ok = [], [], [], [], 0
     for n in sorted(tours):
         p = os.path.join(root, "docs", "_verdicts", "a15a-lesson-%02d.json" % n)
         if not os.path.exists(p):
@@ -281,12 +318,54 @@ def a15a_reader(root):
                 bad.append("lesson %d: claim %s has verdict %r" % (n, cl.get("id"), cl.get("verdict")))
             elif cl.get("verdict") != "accurate":
                 bad.append("lesson %d: claim %s was judged %s" % (n, cl.get("id"), cl.get("verdict")))
+        # The step-text result.
+        tr = v.get("textRead")
+        if not isinstance(tr, dict):
+            unbound.append("lesson %d has no textRead (the step-text result)" % n)
+        else:
+            problems = tr.get("problems", [])
+            open_problems = [x for x in problems if not str(x.get("status", "")).lower().startswith("fixed")]
+            if int(tr.get("problemsOpen", 0) or 0) > 0 or open_problems:
+                bad.append("lesson %d: the step-text read left %d problems open" % (n, max(int(tr.get("problemsOpen", 0) or 0), len(open_problems))))
+            if not tr.get("textHash"):
+                unbound.append("lesson %d: textRead has no textHash" % n)
+            elif tr["textHash"] != tour_text_hash(tours[n]):
+                stale.append("lesson %d: the step text changed after it was read" % n)
+            if int(tr.get("stepsRead", -1)) != len(tours[n]["steps"]):
+                stale.append("lesson %d: the reader read %s steps and the tour has %d" % (n, tr.get("stepsRead"), len(tours[n]["steps"])))
+        # Each claim verdict is bound to its claim id and text, and every claim now declared has a verdict.
+        now = dict(current_claims(tours[n], n))
+        judged = {}
+        for cl in v.get("claims", []):
+            cid = cl.get("id")
+            judged[cid] = cl
+            if cid not in now:
+                stale.append("lesson %d: verdict for claim %s, which the tour no longer declares" % (n, cid))
+            elif not cl.get("textHash"):
+                unbound.append("lesson %d: claim %s has no textHash" % (n, cid))
+            elif cl["textHash"] != text_hash(now[cid]):
+                stale.append("lesson %d: claim %s changed after it was judged" % (n, cid))
+        for cid in now:
+            if cid not in judged:
+                stale.append("lesson %d: claim %s has no verdict" % (n, cid))
         ok += 1
     if bad:
         raise Fail("; ".join(bad[:5]))
+    if unbound:
+        raise NotRun("ACCURACY_VERDICT_UNBOUND", "%d verdict parts carry no hash of the text they judged, so they cannot bind to the tour: %s. Run docs_checks.py --hashes and have the reader confirm and stamp them" % (len(unbound), "; ".join(unbound[:4])))
+    if stale:
+        raise NotRun("ACCURACY_VERDICT_STALE", "the tour changed after the reader judged it: %s" % "; ".join(stale[:4]))
     if missing:
         raise NotRun("ACCURACY_READER_PENDING", "no verdict file docs/_verdicts/a15a-lesson-NN.json for lessons %s; an agent that did not write the tour must read it" % ", ".join(missing))
-    return "%d lessons read by an agent that did not write them; every claim accurate" % ok
+    return "%d lessons read by an agent that did not write them; every claim accurate and bound to its text hash; step text read in full, no problem open" % ok
+
+
+def print_hashes(root):
+    """Prints what a reader stamps into a verdict: claim id with textHash, and the textRead textHash, per lesson."""
+    out = {}
+    for n, tour in sorted(load_tours(root).items()):
+        out[n] = {"claims": [{"id": cid, "textHash": text_hash(t)} for cid, t in current_claims(tour, n)], "textRead": {"stepsRead": len(tour["steps"]), "textHash": tour_text_hash(tour)}}
+    print(json.dumps(out, indent=2))
 
 
 def statement(root, lesson, patterns, label):
@@ -354,6 +433,127 @@ def a16_wording(root):
     return "wording found in %s; no claim of a run on CE" % ", ".join(found[:3])
 
 
+# ---------------------------------------------------------------- A17 wording and copy (modes-design.md sections 2 and 8)
+
+WIZARD_COPY = os.path.join("app", "src", "wizard-copy.json")
+TEST_KEYS_ID = "wizard.common.test-keys-only"
+TEST_KEYS_LINE = "Use test keys only. This course shows your keys on screen and in saved files."
+LOCAL_ROOT_SENTENCE = "A local root is trusted only by what was told to trust it"
+
+
+def copy_texts(value):
+    if isinstance(value, str):
+        return [value]
+    if isinstance(value, list):
+        return [x for v in value for x in copy_texts(v)]
+    if isinstance(value, dict):
+        return [x for k, v in value.items() if k in ("text", "title", "label", "body", "lines") for x in copy_texts(v)]
+    return []
+
+
+def load_wizard_copy(root):
+    p = os.path.join(root, WIZARD_COPY)
+    if not os.path.exists(p):
+        raise NotRun("PRODUCT_MISSING", "app/src/wizard-copy.json does not exist yet (the wizard words, keyed by copy id)")
+    data = json.load(open(p, encoding="utf-8"))
+    return {k: copy_texts(v) for k, v in data.items()}
+
+
+def ui_files(root):
+    src = os.path.join(root, "app", "src")
+    if not os.path.isdir(src):
+        raise NotRun("PRODUCT_MISSING", "app/src does not exist yet")
+    for dp, dn, fn in os.walk(src):
+        if "node_modules" in dp:
+            continue
+        for f in fn:
+            if f.endswith((".vue", ".ts", ".json", ".md")):
+                yield os.path.join(dp, f)
+
+
+# Prose may say "a real HSM" or "real keys" when it means production. A mode, a transport or a button label may never be called Real.
+FORBIDDEN_REAL = [r"(?i)\breal[- ]mode\b", r"(?i)\breal[- ]transport\b", r">\s*Real\s*<", r"\"Real\"", r"'Real'"]
+
+
+def a17_no_word_real(root):
+    """The UI names a mode 'Built-in key' or 'My test key'. It never says 'Real' for a mode, a key or a transport."""
+    files = list(ui_files(root))
+    text_by_file = {f: open(f, encoding="utf-8", errors="replace").read() for f in files}
+    both = {w: [os.path.relpath(f, root) for f, t in text_by_file.items() if w in t] for w in ("Built-in key", "My test key")}
+    if not all(both.values()):
+        raise NotRun("PRODUCT_MISSING", "the security page does not exist yet: app/src holds no text '%s'" % "' or '".join(w for w, v in both.items() if not v))
+    hits = []
+    for f, t in text_by_file.items():
+        for pat in FORBIDDEN_REAL:
+            m = re.search(pat, t)
+            if m:
+                hits.append("%s: '%s'" % (os.path.relpath(f, root), m.group(0).strip()))
+    if hits:
+        raise Fail("the word Real names a mode, key or transport in the UI source: " + "; ".join(hits[:5]))
+    return "the UI says Built-in key (%s) and My test key (%s); no 'Real mode', 'real key', 'real transport' or 'Real' label in %d files" % (both["Built-in key"][0], both["My test key"][0], len(files))
+
+
+def a17_test_keys_line(root):
+    copy = load_wizard_copy(root)
+    if TEST_KEYS_ID not in copy:
+        raise Fail("wizard-copy.json has no entry %s" % TEST_KEYS_ID)
+    got = norm(" ".join(copy[TEST_KEYS_ID]))
+    if got != TEST_KEYS_LINE:
+        raise Fail("%s reads '%s'; it must read '%s'" % (TEST_KEYS_ID, got, TEST_KEYS_LINE))
+    users = [os.path.relpath(f, root) for f in ui_files(root) if not f.endswith("wizard-copy.json") and TEST_KEYS_ID in open(f, encoding="utf-8", errors="replace").read()]
+    vue = [u for u in users if u.endswith(".vue")]
+    if not vue:
+        raise Fail("no .vue component uses %s, so the security page does not show the line" % TEST_KEYS_ID)
+    return "%s reads the exact line; used by %s" % (TEST_KEYS_ID, ", ".join(vue[:3]))
+
+
+def a17_no_outside_judge_line(root):
+    """Where no outside tool can judge a type, the words say so. Where a tool did judge, they name it. A pass never reads 'trusted'."""
+    copy = load_wizard_copy(root)
+    allv = {k: " ".join(v) for k, v in copy.items()}
+    none_ids = [k for k, v in allv.items() if "No outside tool can judge this" in v]
+    problems = []
+    if len(none_ids) < 2:
+        problems.append("'No outside tool can judge this' appears in %d entries; the payment keys and the passkey-shaped login need one each" % len(none_ids))
+    if not any("Our own check passed" in allv[k] for k in none_ids):
+        problems.append("no 'No outside tool can judge this' entry says 'Our own check passed' (the passkey-shaped login)")
+    if not any("Our code matches the published vectors" in allv[k] for k in none_ids):
+        problems.append("no 'No outside tool can judge this' entry says 'Our code matches the published vectors' (the payment keys)")
+    if not any("Checked against the root you gave it" in v for v in allv.values()):
+        problems.append("no entry says 'Checked against the root you gave it'")
+    for k, v in allv.items():
+        stripped = v.replace(LOCAL_ROOT_SENTENCE, "")
+        if re.search(r"(?i)\btrusted\b", stripped):
+            problems.append("%s says 'trusted' outside the sentence '%s'" % (k, LOCAL_ROOT_SENTENCE))
+        if re.search(r"(?i)device|dukpt|payment|passkey", k) and re.search(r"(?i)checked with openssl|checked with ssh", v):
+            problems.append("%s names an outside tool for a type no outside tool can judge" % k)
+    if problems:
+        raise Fail("; ".join(problems[:5]))
+    return "%d entries say no outside tool can judge it; cert checks read 'Checked against the root you gave it'; no entry says trusted" % len(none_ids)
+
+
+def a17_copy_grade_and_tics(root, max_grade, tic_gate):
+    copy = load_wizard_copy(root)
+    bad = []
+    for k, v in copy.items():
+        text = " ".join(v)
+        if len(re.findall(r"[A-Za-z]+", text)) >= 6:
+            g = grade(text)[0]
+            if g > max_grade:
+                bad.append("%s reads at grade %.1f (limit %.1f)" % (k, g, max_grade))
+    g_all = grade("\n".join(" ".join(v) for v in copy.values()))[0]
+    if g_all > max_grade:
+        bad.append("all wizard copy together reads at grade %.1f" % g_all)
+    if not os.path.exists(tic_gate):
+        raise NotRun("TOOL_MISSING", "tic-gate.py not found at " + tic_gate)
+    r = subprocess.run([sys.executable, tic_gate, os.path.join(root, WIZARD_COPY)], capture_output=True, text=True)
+    if r.returncode != 0:
+        bad.append("tic-gate.py found tics: " + (r.stdout or r.stderr).strip().replace("\n", " | ")[:200])
+    if bad:
+        raise Fail("; ".join(bad[:5]))
+    return "%d wizard copy entries: all text grade %.1f (limit %.1f), tic-gate.py clean" % (len(copy), g_all, max_grade)
+
+
 def main():
     ap = argparse.ArgumentParser()
     ap.add_argument("--root", required=True)
@@ -362,8 +562,12 @@ def main():
     ap.add_argument("--max-grade", type=float, default=8.9)
     ap.add_argument("--max-concept", type=float, default=0.30)
     ap.add_argument("--list", action="store_true")
+    ap.add_argument("--hashes", action="store_true", help="print the claim and text hashes a reader stamps into a15a verdicts")
     a = ap.parse_args()
     root = a.root
+    if a.hashes:
+        print_hashes(root)
+        return 0
     clauses = {
         "A3.tour.states-managed-heap-can-keep-copies": lambda: statement(root, 6, [r"managed heap|garbage collector|\bGC\b", r"cop(?:y|ies)"], "that a managed heap can keep copies of erased keys"),
         "A12.tour.states-no-constant-time-guarantee": lambda: statement(root, 11, [r"managed code", r"constant.time"], "that managed code has no constant-time guarantee"),
@@ -374,6 +578,10 @@ def main():
         "A15a.tours.claims-cite-a-source": lambda: a15a_claims_cite(root),
         "A15a.tours.reader-verdicts": lambda: a15a_reader(root),
         "A16.wording.cf-compiled-never-run-on-ce": lambda: a16_wording(root),
+        "A17.ui.no-word-real": lambda: a17_no_word_real(root),
+        "A17.ui.test-keys-line": lambda: a17_test_keys_line(root),
+        "A17.ui.no-outside-judge-line": lambda: a17_no_outside_judge_line(root),
+        "A17.copy.grade-and-tics": lambda: a17_copy_grade_and_tics(root, a.max_grade, a.tic_gate),
     }
     if a.list:
         print("\n".join(sorted(clauses)))

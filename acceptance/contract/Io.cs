@@ -103,6 +103,11 @@ namespace NetSec.Pki
     }
 }
 
+namespace NetSec.Trace
+{
+    public sealed class ListSink : ITraceSink { public void Write(TraceEvent e) { throw new NotImplementedException(); } public TraceEvent[] Events { get { throw new NotImplementedException(); } } }
+}
+
 namespace NetSec.Machine
 {
     public enum TamperPoint { Plain, Wire }
@@ -120,6 +125,9 @@ namespace NetSec.Machine
 
 namespace NetSec.Io
 {
+    /// <summary>Lets every event through at once. The golden recorder runs a lab with it.</summary>
+    public sealed class FreeRunGate : IStepGate { public IFuture Pass(TraceEvent e) { throw new NotImplementedException(); } }
+
     public interface IByteLink
     {
         IFuture<int> Read(byte[] b, int off, int n);

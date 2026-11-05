@@ -109,13 +109,54 @@ test('[A16.ui.training-only-label-on-glass] the chip reads TRAINING ONLY on a gl
   await expect(chip).toContainText(/TRAINING ONLY/);
 });
 
-test('[A16.ui.os-transport-label-in-real-mode] the chip reads OS TRANSPORT and the secrets panel hides values', async ({ page }) => {
+test('[A16.ui.os-transport-label-and-hidden-secrets] the chip reads OS TRANSPORT and the secrets panel hides values', async ({ page }) => {
   requireLive();
   await openApp(page);
   const sw = page.getByTestId('transport-switch');
-  if ((await sw.count()) === 0) throw new NotRun('UI_CONTROL_MISSING', 'no element with data-testid transport-switch; ux-design.md names no testid for the real-mode switch (CONTRACT.md asks for one)');
+  if ((await sw.count()) === 0) throw new NotRun('UI_CONTROL_MISSING', 'no element with data-testid transport-switch; ux-design.md names no testid for the OS transport switch (CONTRACT.md asks for one)');
   await sw.click();
   await expect(page.getByTestId('training-only-label')).toContainText(/OS TRANSPORT/);
   const rows = page.locator('[data-testid^="secret-row-"]');
-  expect(await rows.count(), 'secret rows shown in real mode').toBe(0);
+  expect(await rows.count(), 'secret rows shown on the OS transport').toBe(0);
+});
+
+/**
+ * A17: the Show keys switch (modes-design.md section 6, test id show-keys-switch). The Host holds the truth: GET /api/security/show-keys.
+ * The renderer must agree with it, show key bytes while ON, and show a fingerprint and the banner while OFF. The key compare of two different keys
+ * is covered through the API by A17.show-keys.fingerprint-compare, since the panel's markup for a match has no test id in the design.
+ */
+test('[A17.ui.show-keys-switch] on by default; off replaces key bytes with fingerprints and shows the banner; on brings the bytes back', async ({ page }) => {
+  requireLive();
+  const host0 = await hostGet('/api/security/show-keys');
+  if (host0.status === 404) throw new NotRun('PRODUCT_MISSING', 'GET /api/security/show-keys does not exist yet (slice V3)');
+  expect(host0.status, 'GET /api/security/show-keys').toBe(200);
+  expect(host0.body?.on, 'the Host starts with Show keys ON').toBe(true);
+  await openApp(page);
+  const sw = page.getByTestId('show-keys-switch');
+  if ((await sw.count()) === 0) throw new NotRun('UI_CONTROL_MISSING', 'no element with data-testid show-keys-switch (modes-design.md section 6)');
+  const isOn = async () => (await sw.getAttribute('aria-checked')) === 'true' || (await sw.isChecked().catch(() => false));
+  expect(await isOn(), 'the switch reads ON by default').toBe(true);
+
+  const lessons = await hostGet('/api/lessons');
+  const rows: any[] = Array.isArray(lessons.body) ? lessons.body : lessons.body?.lessons ?? [];
+  const built = rows.find(r => r.built);
+  if (!built) throw new NotRun('LESSON_NOT_BUILT', 'no lesson is built, so no secrets panel can fill');
+  await page.getByTestId(`lesson-item-${built.lesson}`).click();
+  const start = page.getByRole('button', { name: /start tour/i });
+  if (await start.isVisible().catch(() => false)) await start.click();
+  const secretRows = page.locator('[data-testid^="secret-row-"]');
+  await expect.poll(async () => await secretRows.count(), { timeout: 45_000, message: 'secret rows while Show keys is ON' }).toBeGreaterThan(0);
+  const textOf = async () => (await secretRows.allInnerTexts()).join('\n');
+  expect(await textOf(), 'ON: a row shows key bytes').toMatch(/[0-9a-f]{16,}/i);
+
+  await sw.click();
+  await expect.poll(async () => (await hostGet('/api/security/show-keys')).body?.on, { timeout: 15_000, message: 'the Host follows the switch to OFF' }).toBe(false);
+  expect(await isOn(), 'the switch reads OFF after the click').toBe(false);
+  await expect.poll(async () => /[0-9a-f]{32,}/i.test(await textOf()), { timeout: 15_000, message: 'key bytes leave the panel at once when the switch goes OFF' }).toBe(false);
+  expect(await textOf(), 'OFF: a row shows a fingerprint').toMatch(/fp:[0-9a-f]{8,}/i);
+  await expect(page.getByText(/Show keys is off/i).first(), 'the OFF banner').toBeVisible();
+
+  await sw.click();
+  await expect.poll(async () => (await hostGet('/api/security/show-keys')).body?.on, { timeout: 15_000, message: 'the Host follows the switch back to ON' }).toBe(true);
+  await expect.poll(async () => /[0-9a-f]{16,}/i.test(await textOf()), { timeout: 15_000, message: 'key bytes return for an open session when the switch goes ON' }).toBe(true);
 });

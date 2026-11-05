@@ -55,7 +55,7 @@ The command lines below come from section 11 and section 6. A flag marked ASSUME
 | `NetSec.Node.exe --role gateway` | `--listen 0 --server P --link ssh [--suite modern|legacy] --trace-file F [--tamper-envelope] [--seed N]` | `READY port=<p>` | Glass SSH server, glass TLS 1.3 client `X25519MLKEM768` to P. `--suite` (PR #80, default `modern`) picks the one SSH suite the gateway speaks; a CE on the other suite stops at `SSH_NO_COMMON_ALG`. A10 uses the default. It accepts a `direct-tcpip` channel to any target, as the Go `gogateway` does, so the `ssh.exe -L` run works. `--tamper-envelope` (ASSUMED) flips one byte of the PIN envelope after the SSH layer and before the TLS layer |
 | `NetSec.Node.exe --role pinpad` | `--listen 0 --pin 1234 --pan 4111111111111111 --trace-file F [--seed N]` | `READY port=<p>`; `RESULT {"ksn":"<12 byte hex>","pinBlockHex":"<clear PIN block hex>"}` (ASSUMED field names) | The CE connects to the PIN pad port. The PIN pad sends one envelope to the CE |
 | `NetSec.CeDevice.exe` | `--pinpad P --gateway G --trace-file F --link glass-ssh\|external-forward --suite modern\|legacy [--seed N] --pool 25` | `CE-READY pool=<w>/<c> ptr=<n> clr=<v>` within 10 s; `CE-RESULT {json}` at the end | Section 6. P is the PIN pad port the CE connects to. G is the gateway side port (the tap, or the ssh.exe forward). The design names `--trace T`. Section 11 says `--trace-file`, and the suite uses that |
-| `NetSec.Host.exe` | `--port P --token T`, and also the environment `NETSEC_PORT`, `NETSEC_TOKEN` (section 5), because sections 5 and 11 differ and the suite sends both; `LOCALAPPDATA`; `NETSEC_REAL_PEER=127.0.0.1:<port>` for real mode | binds `127.0.0.1:P` | `LOCALAPPDATA` moves the session folder. `NETSEC_REAL_PEER` (ASSUMED) tells real mode which TLS 1.3 server lesson 5 connects to. The suite starts a lesson with `session.start` in `mode: step`, then sends `session.run` (ASSUMED value) |
+| `NetSec.Host.exe` | `--port P --token T`, and also the environment `NETSEC_PORT`, `NETSEC_TOKEN` (section 5), because sections 5 and 11 differ and the suite sends both; `LOCALAPPDATA`; `NETSEC_OS_PEER=127.0.0.1:<port>` and `SSL_CERT_FILE=<peer certificate>` for the OS transport | binds `127.0.0.1:P` | `LOCALAPPDATA` moves the session folder. `NETSEC_OS_PEER` (ASSUMED, renamed from `NETSEC_REAL_PEER`) tells the OS transport which TLS 1.3 server lesson 5 connects to. The peer is an OpenSSL `s_server` with an RSA key (SslStream fails the handshake against an Ed25519 server certificate, modes-design.md section 7.1) and a self-signed certificate. `SSL_CERT_FILE` (ASSUMED) is the custom trust the OS transport must load for that certificate, since the system store does not hold it. `NETSEC_SECURITY_DIR` moves the `.security/` folder (section 5). The suite starts a lesson with `session.start` in `mode: step`, then sends `session.run` (ASSUMED value) |
 
 Trace file lines (NDJSON, one object per line, `ux-design.md` section 0 and `program-design.md` section 2.1): `actor`, `type`, `from`, `to`, `wire` (hex), `plain` (hex), `secrets[]` (`holder`, `name`, `hex`), `check` (`name`, `result` pass or fail, `code`), `traceId`, `hop` (`hop1` for CE to gateway, `hop2` for gateway to server), `streamId`, `streamSeq`, `message`.
 Each process emits a `wire.sent` event for the bytes it wrote to the socket after tamper (section 2.1). For one hop, the `wire.sent` bytes of the client end, joined in file order, equal the tap log client-to-server bytes. The `wire.sent` bytes of the server end equal the tap log server-to-client bytes (A10a).
@@ -71,4 +71,86 @@ All five processes use one `traceId`: the PIN pad makes it and the envelope carr
 | `GET /api/lessons` | A list of `{ lesson, built, ... }` for lessons 1 to 11 |
 | `GET /api/ce` | `label` equals `CF-compiled, run on the desktop CLR, never run on CE` |
 | `app/src` | The same wording appears in the UI source. Lesson 6 states that a managed heap can keep copies. Lesson 11 states that managed code has no constant-time guarantee. Every lesson has a step with `Built to show the parts. Do not copy.` |
-| UI | The renderer reads the Host address and token from `window.netsec.host = { port, token }` or from `?port=&token=` in the URL. A `transport-switch` test id selects real mode (ASSUMED; `ux-design.md` section 6 names none). The chip `training-only-label` reads `TRAINING ONLY` on glass and `OS TRANSPORT` in real mode |
+| UI | The renderer reads the Host address and token from `window.netsec.host = { port, token }` or from `?port=&token=` in the URL. A `transport-switch` test id selects the OS transport (ASSUMED; `ux-design.md` section 6 names none). The chip `training-only-label` reads `TRAINING ONLY` on glass and `OS TRANSPORT` on the OS transport |
+
+## 5. A17: security modes (what the Host must show)
+
+Source: `docs/modes-design.md` and `docs/wizards-ux.md` on `main` at c65e1bb (PRs #99 to #103), sections 2, 3.3, 4, 5, 6, 8, 9. A row marked ASSUMED is a place where the design names no field or value.
+The suite wrote the name it needs. A live Host that differs fails the clause at that field, and the message names it. The fake Host in `selftest/FakeHost/` is built from this section and from nothing else.
+
+### 5.1 Process and routes
+
+| Item | The suite uses | Notes |
+|---|---|---|
+| Start | `NetSec.Host.exe --port P --token T`, and `NETSEC_PORT`, `NETSEC_TOKEN`, `LOCALAPPDATA`, `NETSEC_SECURITY_DIR` (a temp folder), `NETSEC_OPENSSL`, `NETSEC_SSH` | A fresh `NETSEC_SECURITY_DIR` holds no `modes.json`, so Show keys is ON. A route under `/api/security` that the Host does not have answers with a bare 404, and the clause reads NOT RUN `PRODUCT_MISSING` |
+| `GET /api/health` | `showKeys` (bool) | A run stops early with `SUITE_NEEDS_SHOW_KEYS_ON` when it reads false |
+| `GET /api/security` | `types[]` with `typeId`, `mode` (`BuiltIn` or `Mine`), `state`, `version`; `showKeys` | `state` of a `BuiltIn` type is ASSUMED `BuiltIn`. Design 2.2 gives `Unconfigured`, `Configured`, `Verified`, `Broken` for `Mine` |
+| `PUT /api/security/types/{typeId}/mode` `{ mode }` | | Going to `BuiltIn` always works, and the binding stays |
+| `GET /api/security/readiness?lesson=N` | `mayRun`, `problems[]` with `typeId`, `code`, `detail` | `detail` names the type and its flow. Codes: `SECURITY_TYPE_NOT_READY`, `SECURITY_TYPE_NOT_PROVEN`, `SECURITY_TYPES_DISAGREE`. Field names follow `TypeProblem { TypeId, Code, Detail }` |
+| `GET /api/security/types/{typeId}/key` | `hex` (Show keys ON), `fingerprint`, `version`, `provider`, `hidden` (`toggle` while OFF), `publicHex` (for `token.issuer`) | Field names ASSUMED. The read is an Export by the caller `host/key-route` (ASSUMED name), audited. A changed row gives `VAULT_UNWRAP_FAILED`. An audit that cannot be written gives `VAULT_AUDIT_FAILED` (design 8.5) |
+| `GET`, `PUT /api/security/show-keys` `{ on }` | `on` | |
+| `POST /api/security/flows/{flowId}/runs` | `runId`, `step` | Flows: `my-certificates`, `my-ssh`, `my-payment`, `my-login`, `my-lesson-keys` |
+| `POST /api/security/runs/{id}/events` `{ event, stepSeq, data }` | `step` | `WIZARD_EVENT_NOT_ALLOWED` names the state and the event. `WIZARD_STEP_STALE` for an old `stepSeq`. `WIZARD_RUN_NOT_FOUND` (HTTP 404 with a code) for an unknown run |
+| `GET /api/security/vault/keys` | `keys[]` with `name` (ASSUMED: the type id for flow keys, `exercise/signing` and `exercise/derive` for the exercise), `exportable`, `versions`, `fingerprint`, `hidden: non-exportable`, `publicHex` | The exercise keys list at once, with no flow made |
+| `GET /api/security/vault/audit?after=N` | `rows[]` with `seq`, `caller`, `op`, `name`, `result`, `detail`, `prev_hash` | The table of design 4.1. The suite also reads `vault/vault.db` with Python sqlite3 (`checks/vaultdb.py`), and `vault/master.key` |
+| `POST /api/security/vault/exercise/sign` `{ text }` | `{ keyName, version, inputHex, signatureHex, publicKeyHex, command, output, code }` | Design 4.3. The suite verifies with its own OpenSSL |
+| `POST .../exercise/derive` `{ label }` | `{ keyName, version, label, outputHex, code }` | HKDF-SHA256 over the label. The same label gives the same output |
+| `POST .../exercise/export` | HTTP 409, `code: VAULT_EXPORT_REFUSED` | Audited as a refused export |
+| `POST .../exercise/audit-check` | `{ rows, firstBadSeq, code }` | `firstBadSeq` is 0 or absent while the chain is whole |
+| `GET /api/sessions/{id}/events` | One JSON array of events (as the Host answers today) | |
+| `GET /api/sessions/{id}/keylog` | | `KEYS_HIDDEN` while Show keys is OFF |
+| `GET /api/lessons` | `attacks[]` with `attackId`, `kind`, `expectCode`, `available`, `whyNot`, and `field` for a `flip-byte` row | `available` and `whyNot` are in design 8.3. `field` is ASSUMED (design 3.4 says `TamperPlan.Field`) |
+
+### 5.2 WebSocket
+
+| Message | The suite reads | Notes |
+|---|---|---|
+| `session.start` `{ lesson, seed, mode, transport }` | `session.started` with `sessionId`, `transportKind`, `trainingOnly`, `sessionFile`, `showKeys`, `security[]` | The suite starts in `mode: step`, then sends `session.run`. `lesson: 20` gives `LESSON_NOT_BUILT`, because the vault exercise is routes and not a lab (design 4.3). A refusal is an `error` frame with `code` and `message`, and no trace event follows |
+| `session.attack` `{ sessionId, attackId, mode: run }` | `session.started` (the fork), `session.forked`, `trace`, `session.finished` with `code` | The suite sends it on a new connection. The Host finds the parent by id |
+| `trace` frame | `event` with `type`, `streamId`, `streamSeq`, `actor`, `message`, `wire`, `plain`, `fields[]`, `check`, `secrets[]` | `secrets[]` entry: `name`, `holder`, and `hex` while Show keys is ON. While OFF: `fingerprint` (`fp:` and 8 bytes of SHA-256 as hex), `length`, `hidden` |
+| `key.in-use` event | `typeId`, `version`, `provider`, one `secrets[]` entry, on stream `<sessionId>/keys` | Design 6.3 gives the stream and the content. The three field names are ASSUMED. Opening the set called `Export(name, "host/lab-<n>")`, so the audit list holds one export row per vault key per start |
+
+### 5.3 The wizard step
+
+The suite drives a flow by step kind and by the events the step allows, so a state name never matters. The two design documents name states differently (`Make`, `Review`, `Check` in `modes-design.md` 8.2; `ChooseSource` and `Place`, `ReadBack`, `Prove` in `wizards-ux.md` 3.2) and agree on the kinds.
+
+| Field | Value |
+|---|---|
+| `kind` | `explain` (first step), `choose` or `generate` (the make screens), `file` (the branch), `review`, `prove`, `done` |
+| `allowed` | The events the table allows. The suite looks for `next` or `continue`, `choose` (with `{ source: make or files }`), `make`, `files` (with `{ paths }`), `check`, `back`, `cancel`. The event names are ASSUMED where the design names none |
+| `errors[]` | Stop the step. `code`, `message` |
+| `warnings[]` | Let the learner go on. `KEY_PATH_PERSONAL` is one. `code`, `message` |
+| `facts[]` at the review step | One per type: `typeId`, `name`, `notAfter`, `algorithm`, `fingerprint` (design 8.4). The suite checks all types of the flow are there (15 of 15 across the five flows) and the fixed names |
+| `facts[]` at the prove step | One per type: `typeId`, `judge` (`openssl`, `ssh.exe`, `none`), `says`, `command`, `output`, `passed` (design 8.6). `says` is a stable id: `checked-against-root`, `checked-with-openssl`, `checked-signature-only`, `checked-with-ssh-exe`, `no-outside-judge`. The words are in `app/src/wizard-copy.json` |
+| `copy` | Copy ids shown. The first step of every flow carries `wizard.common.test-keys-only` |
+| `back` | Allowed at the review step. It returns to the make screen, and making again writes a new version |
+
+### 5.4 "Use my own files" (ASSUMED layout)
+
+`paths` maps a key to an absolute path. For a type with a private key only (`token.issuer`, `device.enrolment`) the key is the type id and the file is an Ed25519 private key in PEM.
+For the certificate flow the file at `<typeId>` is the certificate in PEM, and `<typeId>.key` is its private key. The root's `.key` is left out for a trust-only root.
+`tls.trust` defaults to the root, and the suite also sends it. A leaf the root did not sign is refused at the check with a named code. An RSA or P-256 root is refused with `CERT_SIGNATURE_ALG_UNSUPPORTED`, and the message names the OS transport.
+`CredentialSet.FromFiles(directory)` is the other route to a learner's key. The suite uses it to judge a glass server from outside (see 5.6, referee clauses). Its file names are in design 3.3.
+
+### 5.5 Files in the product repository
+
+| File | Shape |
+|---|---|
+| `app/src/wizard-copy.json` | An object from copy id to text (a string, a list of strings, or `{ text }`). `wizard.common.test-keys-only` reads: Use test keys only. This course shows your keys on screen and in saved files. |
+| `tools/secret_guard.py` | Run from a repository root with no argument. Exit 0 when clean. Exit 1 and one line per problem, each naming the path, when a tracked or staged path is under `.security/`, ends in `.pfx .p12 .db .key .ndjson`, is named `master.key id_rsa id_ed25519 known_hosts`, or holds a PEM private key block (the header line, a base64 body and the footer) outside the allow-list of 3 files. A sentence that only names the header is no key: `docs/modes-design.md`, `docs/modes-real-world.md` and `docs/wizards-ux.md` name it, and the guard must pass them (the suite found this on `main` at c65e1bb: a rule that matches the bare words flags the design itself) |
+| `app/src/tours/lesson-NN.json` | A step may carry `textMine`. A claim carries `id`, `text`, `source` |
+| `docs/_verdicts/a15a-lesson-NN.json` | As before. Now each claim verdict carries `textHash`, and `textRead` carries `textHash`, `stepsRead` and `problemsOpen`. `python -I acceptance/checks/docs_checks.py --root . --hashes` prints the hashes. A verdict with no hash reads NOT RUN `ACCURACY_VERDICT_UNBOUND`. A verdict for text that changed reads NOT RUN `ACCURACY_VERDICT_STALE` |
+| `docs/_verdicts/cold-reader-lesson-10.json` | `{ reader: { name, kind: human or agent, freshContext }, clone: { fresh, commit }, keys: { issuerPublicHex }, run: { lesson: 10, token }, understoodWithoutHelp }`. A builder cannot be the reader. Until the file exists, A17.cold.lesson-10-fresh-clone reads NOT RUN `COLD_READER_PENDING` |
+| `app/src` UI | Test ids `show-keys-switch` (aria-checked or checked) and `secret-row-*`. The words `Built-in key` and `My test key`, and no `Real` as a mode, transport or label. The chip `training-only-label` reads `OS TRANSPORT` on the OS transport. The A16 clauses use `transport: os` and `NETSEC_OS_PEER=127.0.0.1:<port>`, and trust the peer certificate through `SSL_CERT_FILE` |
+
+### 5.6 Referee clauses on a learner's key
+
+Group `a17probe` links `NetSec.Core`. It builds a `CredentialSet` with `CredentialSet.FromFiles(dir)` from files the suite made with OpenSSL and `ssh-keygen`, sets `ProbeRequest.Credentials`, and puts OpenSSL, Go `crypto/tls`, `ssh.exe` and Go `x/crypto/ssh` at the other end (design 3.3, decision O14).
+It reaches the two members by reflection, so it compiles against a Core that lacks them, and every clause then reads NOT RUN `PRODUCT_MISSING`. With `--prop a17probe.training=1` the clauses use the training files and no `Credentials`, which proves the referee wiring on today's engines.
+
+### 5.7 Open questions
+
+1. **File layout of an import** (5.4). The design says one row per type, and a `chain.pem` beside the copies.
+2. **Names marked ASSUMED in 5.1 to 5.3.** Each is one line to change in `groups/a17/` and in the fake.
+3. **The state names** in `modes-design.md` 8.2 and `wizards-ux.md` 3.2 differ. The suite does not care, and the two documents should agree.
+4. **Golden traces** wait for the lead's word.

@@ -12,5 +12,17 @@
     <Compile Include="..\groups\kschedule\KeyScheduleClauses.cs" Link="kschedule\KeyScheduleClauses.cs" />
     <Compile Include="..\groups\binproof\BinProofClauses.cs" Link="binproof\BinProofClauses.cs" />
     <Compile Include="..\groups\keys\KeysClauses.cs" Link="keys\KeysClauses.cs" />
+    <Compile Include="..\groups\a17\A17Kit.cs" Link="a17\A17Kit.cs" />
+    <Compile Include="..\groups\a17\V0Clauses.cs" Link="a17\V0Clauses.cs" />
+    <Compile Include="..\groups\a17\V3Clauses.cs" Link="a17\V3Clauses.cs" />
+    <Compile Include="..\groups\a17\V1Clauses.cs" Link="a17\V1Clauses.cs" />
+    <Compile Include="..\groups\a17\WalkClauses.cs" Link="a17\WalkClauses.cs" />
+    <Compile Include="..\groups\a17\MyKeysClauses.cs" Link="a17\MyKeysClauses.cs" />
+    <Compile Include="..\groups\a17\ColdClauses.cs" Link="a17\ColdClauses.cs" />
+    <Compile Include="..\groups\a17\CertClauses.cs" Link="a17\CertClauses.cs" />
+    <Compile Include="..\groups\a17\TestPki.cs" Link="a17\TestPki.cs" />
+    <Compile Include="..\groups\a17\LessonKeysReferee.cs" Link="a17\LessonKeysReferee.cs" />
+    <Compile Include="..\groups\a17\RepoClauses.cs" Link="a17\RepoClauses.cs" />
+    <Compile Include="..\lib\Host\*.cs" Link="HostKit\%(Filename)%(Extension)" />
   </ItemGroup>
 </Project>
