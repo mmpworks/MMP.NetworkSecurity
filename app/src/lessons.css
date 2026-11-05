@@ -1,0 +1,20 @@
+/* Lesson views for lessons 4 to 6: the certificate chain and the key ladder. */
+.chain, .ladder { overflow: auto; height: 100%; padding: 8px 12px; box-sizing: border-box; }
+.chain-row { display: flex; align-items: stretch; gap: 0; min-width: 760px; }
+.chain-card { flex: 1 1 0; border: 1px solid var(--line); border-radius: 8px; padding: 6px 8px; font-size: 12px; cursor: pointer; min-width: 0; }
+.crow { display: flex; justify-content: space-between; gap: 6px; padding: 1px 0; }
+.crow code { font: 10px ui-monospace, Consolas, monospace; overflow: hidden; text-overflow: ellipsis; }
+.chain-link { flex: 0 0 74px; display: flex; flex-direction: column; align-items: center; justify-content: center; font-size: 11px; border-top: 3px dashed var(--muted); margin-top: 22px; height: 0; position: relative; }
+.chain-link .lk { position: absolute; top: -22px; font-size: 16px; font-weight: 800; }
+.chain-link.pass { border-top: 3px solid var(--pass); color: var(--pass); }
+.chain-link.fail { border-top: 3px dashed var(--fail); color: var(--fail); }
+.badges { display: flex; flex-wrap: wrap; gap: 4px; margin-top: 4px; }
+.cb { font-size: 11px; border: 1px solid var(--line); border-radius: 8px; padding: 0 6px; }
+.cb.pass { color: var(--pass); border-color: var(--pass); }
+.cb.fail { color: var(--fail); border-color: var(--fail); border-style: dashed; }
+.regs { margin-bottom: 8px; font-size: 13px; }
+.rung { display: flex; flex-wrap: wrap; align-items: center; gap: 4px 8px; padding: 4px 8px; margin-bottom: 4px; border-radius: 6px; border-left: 3px solid var(--secret); background: var(--surface2); font-size: 12px; }
+.rung.erased { opacity: .75; border-left: 3px dashed var(--muted); }
+.rung.erased .rname { text-decoration: line-through; text-decoration-color: var(--muted); }
+.rung .erased-tag { color: var(--encrypted); font-style: italic; }
+.rname { font-weight: 700; }
