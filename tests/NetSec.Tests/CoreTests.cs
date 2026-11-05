@@ -435,8 +435,11 @@ namespace NetSec.Tests
         }
     }
 
+    [Collection(TimingCollection.Name)]
     public class LabTests
     {
+        public LabTests() { NativeLib.Ensure(); }
+
         static LabContext Context(AttackDefinition attack) => new LabContext
         {
             SessionId = "s9", TraceId = "s9", Seed = 7, Gate = new FreeRunGate(), Sink = new ListSink(), Clock = new FixedClock(1), Random = new SeededRandom(7), Attack = attack, DeadlineMs = 2000,
@@ -462,7 +465,8 @@ namespace NetSec.Tests
                 IFuture<LabResult> control = LabCatalog.Find(attack.Lesson).Run(Context(null));
                 Make.Done(control);
                 Assert.True(control.Result.Completed);
-                IFuture<LabResult> run = LabCatalog.Find(attack.Lesson).Run(Context(attack));
+                LabContext attacked = Context(attack);
+                IFuture<LabResult> run = LabCatalog.Find(attack.Lesson).Run(attacked);
                 Make.Done(run);
                 Assert.Equal(attack.Expect == AttackOutcome.Rejected, !run.Result.Completed);
                 Assert.Equal(attack.ExpectCode, run.Result.FailedCode);

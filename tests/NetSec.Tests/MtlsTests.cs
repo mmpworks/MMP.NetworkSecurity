@@ -94,7 +94,9 @@ namespace NetSec.Tests
         {
             ProbeResult[] r = Probes(true, null);
             Assert.Equal("TLS13_CERT_REQUIRED", r[1].Code);
-            Assert.Equal(116, r[0].AlertReceived);
+            // Read at the sender. The refusal closes a socket with the client's bytes unread, so TCP may reset before the client reads the alert.
+            TraceEvent alert = r[1].Events.Single(e => e.Type == "wire.sent" && e.Message == "Alert");
+            Assert.Equal(116, alert.Plain[alert.Plain.Length - 1]);
         }
 
         [Fact]
