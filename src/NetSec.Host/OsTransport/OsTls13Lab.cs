@@ -41,7 +41,7 @@ public sealed class OsTls13Lab(string host, int port, string nameToCheck, X509Ce
             if (!tcp.ConnectAsync(host, port).Wait(TimeoutMs)) throw new IOException($"No answer from {host}:{port} in {TimeoutMs / 1000} s.");
             Emit("os.tcp.connected", $"Connected to {host}:{port}.", $"{host}:{port}");
 
-            using SslStream tls = new(tcp.GetStream(), false, (_, cert, chain, errors) => (refusal = Judge(cert, errors)) is null);
+            using SslStream tls = new(tcp.GetStream(), false, (_, cert, chain, errors) => (refusal = Judge(cert, chain, errors)) is null);
             tls.ReadTimeout = tls.WriteTimeout = TimeoutMs;
             tls.AuthenticateAsClient(new SslClientAuthenticationOptions
             {
@@ -68,8 +68,14 @@ public sealed class OsTls13Lab(string host, int port, string nameToCheck, X509Ce
         }
     }
 
-    /// <summary>Null when the server's certificate is fit to trust. With SSL_CERT_FILE set, the chain must end at one of its certificates and the name must fit.</summary>
-    string? Judge(X509Certificate? cert, SslPolicyErrors errors)
+    const string ServerAuth = "1.3.6.1.5.5.7.3.1";
+
+    /// <summary>
+    /// Null when the server's certificate is fit to trust. With SSL_CERT_FILE set, the rule is the one Windows applies to a TLS server, with
+    /// SSL_CERT_FILE as the only roots: the chain ends at one of them, through the certificates the server sent; every date fits; every issuer
+    /// is a CA; the leaf is made for server authentication; and the name fits. CustomRootTrust checks a purpose only when ApplicationPolicy names one.
+    /// </summary>
+    string? Judge(X509Certificate? cert, X509Chain? sent, SslPolicyErrors errors)
     {
         if (cert is null) return "The server sent no certificate.";
         if (errors.HasFlag(SslPolicyErrors.RemoteCertificateNameMismatch)) return $"The server's certificate does not name {nameToCheck}.";
@@ -78,7 +84,26 @@ public sealed class OsTls13Lab(string host, int port, string nameToCheck, X509Ce
         chain.ChainPolicy.TrustMode = X509ChainTrustMode.CustomRootTrust;
         chain.ChainPolicy.CustomTrustStore.AddRange(trust);
         chain.ChainPolicy.RevocationMode = X509RevocationMode.NoCheck;
-        return chain.Build(new X509Certificate2(cert)) ? null : "The server's certificate does not chain to a certificate in SSL_CERT_FILE.";
+        chain.ChainPolicy.ApplicationPolicy.Add(new System.Security.Cryptography.Oid(ServerAuth));
+        // SslStream hands the certificates the server sent in the chain's ExtraStore. The elements of its own build are added too, as a fallback.
+        if (sent is not null)
+        {
+            chain.ChainPolicy.ExtraStore.AddRange(sent.ChainPolicy.ExtraStore);
+            foreach (X509ChainElement element in sent.ChainElements) chain.ChainPolicy.ExtraStore.Add(element.Certificate);
+        }
+        return chain.Build(new X509Certificate2(cert)) ? null : Why(chain.ChainStatus.Select(s => s.Status).Aggregate(X509ChainStatusFlags.NoError, (a, b) => a | b));
+    }
+
+    /// <summary>One sentence per chain fault, the first that applies, with the Windows status names after it, so expired, wrong root and missing intermediate read differently.</summary>
+    static string Why(X509ChainStatusFlags flags)
+    {
+        string said = flags.HasFlag(X509ChainStatusFlags.NotTimeValid) ? "The server's certificate, or one above it, is outside its dates."
+            : flags.HasFlag(X509ChainStatusFlags.NotValidForUsage) ? "The server's certificate is not made for a TLS server."
+            : flags.HasFlag(X509ChainStatusFlags.InvalidBasicConstraints) ? "A certificate that signed the server's certificate is not a CA."
+            : flags.HasFlag(X509ChainStatusFlags.PartialChain) ? "The chain stops before a root in SSL_CERT_FILE: the server sent no certificate that links its certificate to one."
+            : flags.HasFlag(X509ChainStatusFlags.UntrustedRoot) ? "The chain ends at a root that is not in SSL_CERT_FILE."
+            : "The server's certificate chain does not hold.";
+        return $"{said} ({flags})";
     }
 
     static byte[] ReadLine(SslStream tls)

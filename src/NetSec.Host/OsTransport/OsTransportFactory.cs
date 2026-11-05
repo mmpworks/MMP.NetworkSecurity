@@ -14,12 +14,12 @@ public sealed class OsTransportFactory(Func<string, string?> env)
 {
     public const string Kind = "os";
 
-    /// <summary>"real" is the old name. The app sends it until its chip PR lands, so both names pick the OS transport. Remove "real" after that PR.</summary>
-    const string OldName = "real";
+    public const string Glass = "glass";
 
     const int OsLesson = 5;
 
-    public static bool IsAskedFor(string? transport) => transport is Kind or OldName;
+    /// <summary>The transports session.start takes. No value means glass. Any other value, such as the old name real, is refused by name.</summary>
+    public static bool IsKnown(string? transport) => transport is null or Glass or Kind;
 
     public ILab? LabFor(int lesson, out NetSecError? error)
     {

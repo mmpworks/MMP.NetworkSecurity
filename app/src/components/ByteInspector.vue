@@ -1,7 +1,7 @@
 <script setup lang="ts">
 import { computed, onBeforeUnmount, ref, watch } from 'vue'
 import { ASCII, fieldAt, h2, hexToBytes, isProtected } from '../layout'
-import { flipSelectedByte, isHighlighted, isReal, replayTick, selectedEvent, ui } from '../store'
+import { flipSelectedByte, isHighlighted, isOsTransport, replayTick, selectedEvent, ui } from '../store'
 
 const PER_ROW = 16
 const ROW_H = 22
@@ -62,7 +62,7 @@ function kindOf(off: number): string {
 const hl = (off: number) => { const f = fieldAt(fields.value, off); return !!f && isHighlighted('inspector', 'field', f.name) }
 const decoded = (f: { offset: number; length: number }) => { const h = hex.value.slice(f.offset * 2, (f.offset + Math.min(f.length, 12)) * 2); return f.length > 12 ? `${h}…` : h }
 const pick = (off: number) => { ui.selectedByte = off }
-const canFlip = computed(() => ui.selectedByte != null && !!ev.value && !isReal.value)
+const canFlip = computed(() => ui.selectedByte != null && !!ev.value && !isOsTransport.value)
 </script>
 
 <template>

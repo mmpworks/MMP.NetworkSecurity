@@ -226,7 +226,13 @@ namespace NetSec.Host
         {
             int lesson = Number(m, "lesson", -1);
             int seed = Number(m, "seed", RandomSeed());
-            if (OsTransportFactory.IsAskedFor(Text(m, "transport")))
+            string? transport = Text(m, "transport");
+            if (!OsTransportFactory.IsKnown(transport))
+            {
+                Fail(requestId, ErrorCodes.TransportUnknown, $"No transport is named {transport}. Use glass, the course's own engine, or os, the code Windows ships.");
+                return;
+            }
+            if (transport == OsTransportFactory.Kind)
             {
                 // The OS transport reads no course key, so no key decides whether it may run.
                 ILab? osLab = osTransport.LabFor(lesson, out NetSecError? osError);

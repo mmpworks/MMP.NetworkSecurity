@@ -45,3 +45,20 @@ Against the A17 control on 1e375f6, 6 verdicts changed and none went from PASS. 
 ## Friction
 
 1. One acceptance run of A9 to A15a together ran past the 10-minute limit. The groups had to run in smaller batches.
+
+## Review round 1 (Jared, #129 comment 6671808355) and the rename
+
+Red commit `b5f7702`: Jared's 9 cases, a 10th (intermediate not sent), a test that the three chain faults read differently, and two rename tests. 9 failed. No test file changed after it.
+
+| Item | Fix | Proof |
+|---|---|---|
+| Blocker: no server-auth purpose | `Judge` adds OID 1.3.6.1.5.5.7.3.1 to `ApplicationPolicy` | `eku-clientauth-only` and `eku-codesigning-only` refused with `NotValidForUsage`. Revert-check: without the line both are accepted |
+| Sent intermediate not used | The certificates the server sent go into `ExtraStore` | `via-intermediate-sent` accepted |
+| One message for every fault | `Why` gives one sentence per fault, then the Windows status names | `expired` (NotTimeValid), `other-root` (UntrustedRoot), `via-intermediate-not-sent` (PartialChain) read differently |
+| Rename | The app's `'real'` and `isReal` become `'os'` and `isOsTransport` in 6 files. The Host takes `glass` or `os`, and refuses any other name with `TRANSPORT_UNKNOWN` | `The_app_names_the_os_transport_os_and_never_real`; `HostLiveTests` sends `real` and gets `TRANSPORT_UNKNOWN` |
+
+The rename also fixes a live bug: `isReal` compared the session's `transportKind` with `'real'`, and the Host answers `'os'`, so the chip read TRAINING ONLY during an OS transport session.
+
+Left out: Jared's IPv6 note (`[::1]:4433` keeps its brackets). He did not run it, and neither did I.
+
+After the fix: Host tests 101 of 101. `npm run build` (vue-tsc, then vite) passes. Acceptance A1 to A8 147 of 147, A9 to A12 31 of 31, A16 8 of 8, A17 13 of 52 (no change). A13 to A15a were not rerun in this round. They gave 21 of 22 at `68c4ea7`. Counting that run, the total is 220 of 260.
