@@ -55,7 +55,7 @@
     {
       "id": "L10-C09",
       "verdict": "accurate",
-      "note": "Tours read at origin/fix/tour-10-keys-and-names commit abef365 (PR 59, open); lab run at origin/feat/l10-client-name 5f21ef3 (PR 69, open). Source line changed; claim re-read. Tours read at origin/fix/tour-10-enrolment head 8e77f1f (PR 34); names doc at main 279e9a1. Names doc: Roles and capabilities, last paragraph: 'A signature shows who calls only because the key was enrolled ahead of time. The lab enrols one device for one subject before the login starts.' Check table: 'device enrolled'. Order mutual TLS, login, calls: the Mutual TLS section. 'In the clear': the opening paragraph says a token shows on the wire and a real system sends it inside TLS. That paragraph still says 'The lab has no TLS yet', which contradicts the Mutual TLS section; the claim uses the reading that fits both. Richard should fix that sentence.",
+      "note": "Tours read at origin/fix/tour-10-keys-and-names commit 61d3265 (PR 59, open); lab run at main 5440eeb (PR 69 merged). Source line changed; claim re-read. Tours read at origin/fix/tour-10-enrolment head 8e77f1f (PR 34); names doc at main 279e9a1. Names doc: Roles and capabilities, last paragraph: 'A signature shows who calls only because the key was enrolled ahead of time. The lab enrols one device for one subject before the login starts.' Check table: 'device enrolled'. Order mutual TLS, login, calls: the Mutual TLS section. 'In the clear': the opening paragraph says a token shows on the wire and a real system sends it inside TLS. That paragraph still says 'The lab has no TLS yet', which contradicts the Mutual TLS section; the claim uses the reading that fits both. Richard should fix that sentence.",
       "checkedAgainst": "docs/lesson-10-names.md on main 279e9a1 (read)"
     },
     {
@@ -73,7 +73,7 @@
     {
       "id": "L10-C12",
       "verdict": "accurate",
-      "note": "Tours read at origin/fix/tour-10-keys-and-names commit abef365 (PR 59, open); lab run at origin/feat/l10-client-name 5f21ef3 (PR 69, open). Source line changed; claim re-read. Tours read at origin/fix/tour-10-enrolment head 8e77f1f (PR 34); names doc at main 279e9a1. Claim text unchanged; source now cites f72acef, whose row still matches. Check table: 'challenge issued ... The answered challenge is the one this login issued'; Attacks: L10-unissued-challenge, CHALLENGE_NOT_ISSUED. PR 20 review not read.",
+      "note": "Tours read at origin/fix/tour-10-keys-and-names commit 61d3265 (PR 59, open); lab run at main 5440eeb (PR 69 merged). Source line changed; claim re-read. Tours read at origin/fix/tour-10-enrolment head 8e77f1f (PR 34); names doc at main 279e9a1. Claim text unchanged; source now cites f72acef, whose row still matches. Check table: 'challenge issued ... The answered challenge is the one this login issued'; Attacks: L10-unissued-challenge, CHALLENGE_NOT_ISSUED. PR 20 review not read.",
       "checkedAgainst": "docs/lesson-10-names.md on main 279e9a1 (read)"
     },
     {
@@ -97,7 +97,7 @@
     {
       "id": "L10-C16",
       "verdict": "accurate",
-      "note": "Tours read at origin/fix/tour-10-keys-and-names commit abef365 (PR 59, open); lab run at origin/feat/l10-client-name 5f21ef3 (PR 69, open). Source line changed; claim re-read. Tours read at origin/fix/tour-10-enrolment head 8e77f1f (PR 34); names doc at main 279e9a1. Check table: proof age, iat within 60 seconds. 'No DPoP nonce': the check table lists none, and Auth.cs line 191 says 'this lab supplies no nonce, which sections 8 and 9 make optional'. 'One run only': Lesson10Auth.cs Session._seen is a per-session dictionary (line 79).",
+      "note": "Tours read at origin/fix/tour-10-keys-and-names commit 61d3265 (PR 59, open); lab run at main 5440eeb (PR 69 merged). Source line changed; claim re-read. Tours read at origin/fix/tour-10-enrolment head 8e77f1f (PR 34); names doc at main 279e9a1. Check table: proof age, iat within 60 seconds. 'No DPoP nonce': the check table lists none, and Auth.cs line 191 says 'this lab supplies no nonce, which sections 8 and 9 make optional'. 'One run only': Lesson10Auth.cs Session._seen is a per-session dictionary (line 79).",
       "checkedAgainst": "docs/lesson-10-names.md on main 279e9a1 (read); src/NetSec.Core/Auth/Auth.cs, src/NetSec.Core/Labs/Lesson10Auth.cs at f72acef (read)"
     },
     {
@@ -133,48 +133,48 @@
     {
       "id": "L10-C22",
       "verdict": "accurate",
-      "note": "Tours read at origin/fix/tour-10-keys-and-names commit abef365 (PR 59, open); lab run at origin/feat/l10-client-name 5f21ef3 (PR 69, open). Lesson10Auth.cs: the certificate uses KeyIds.ClientTlsEd25519 (fixed); the login key is a seed drawn from the run seed. Lab run, device-key secret for seeds 1, 2, 3, 1: f5f2384c..., 9482cece..., c362923a..., f5f2384c...; so it differs per seed and repeats for the same seed. The claim says 'a different seed drawn for each run'; precise wording is 'drawn from the run's seed'. The call phase streams are auth-call, with no certificate event.",
-      "checkedAgainst": "src/NetSec.Core/Labs/Lesson10Auth.cs (read); lab run on feat/l10-client-name 5f21ef3"
+      "note": "Tours read at origin/fix/tour-10-keys-and-names commit 61d3265 (PR 59, open); lab run at main 5440eeb (PR 69 merged). Lesson10Auth.cs: the certificate uses KeyIds.ClientTlsEd25519 (fixed); the login key is a seed drawn from the run seed. Lab run, device-key secret for seeds 1, 2, 3, 1: f5f2384c..., 9482cece..., c362923a..., f5f2384c...; so it differs per seed and repeats for the same seed. The claim says 'a different seed drawn for each run'; precise wording is 'drawn from the run's seed'. The call phase streams are auth-call, with no certificate event.",
+      "checkedAgainst": "src/NetSec.Core/Labs/Lesson10Auth.cs (read); lab run on main 5440eeb"
     },
     {
       "id": "L10-C23",
       "verdict": "accurate",
-      "note": "Tours read at origin/fix/tour-10-keys-and-names commit abef365 (PR 59, open); lab run at origin/feat/l10-client-name 5f21ef3 (PR 69, open). Jared's re-check of PR 20 (comment 6658016121) says 'Name matching is the application's job'. RFC 5280 binds name and key in the certificate; RFC 9525 section 6 puts name verification with the client application. The lab does it in Tls13ServerTable.cs: ExpectedClientName compared with leaf.SubjectIs after the chain check.",
+      "note": "Tours read at origin/fix/tour-10-keys-and-names commit 61d3265 (PR 59, open); lab run at main 5440eeb (PR 69 merged). Jared's re-check of PR 20 (comment 6658016121) says 'Name matching is the application's job'. RFC 5280 binds name and key in the certificate; RFC 9525 section 6 puts name verification with the client application. The lab does it in Tls13ServerTable.cs: ExpectedClientName compared with leaf.SubjectIs after the chain check.",
       "checkedAgainst": "Jared's comment (read); RFC 9525 section 6 (fetched earlier); src/NetSec.Core/Tls13/Tls13ServerTable.cs (read)"
     },
     {
       "id": "L10-C24",
       "verdict": "accurate",
-      "note": "Tours read at origin/fix/tour-10-keys-and-names commit abef365 (PR 59, open); lab run at origin/feat/l10-client-name 5f21ef3 (PR 69, open). Lab run L10-wrong-client-name: failedCode TLS13_CLIENT_NAME_REFUSED, failedCheck 'client name' (actor server); the client receives alert level 2, number 49. Lesson10Auth.cs line 171 issues a certificate named bank-hsm-admin to the attacker key under the training CA.",
-      "checkedAgainst": "lab run on feat/l10-client-name 5f21ef3"
+      "note": "Tours read at origin/fix/tour-10-keys-and-names commit 61d3265 (PR 59, open); lab run at main 5440eeb (PR 69 merged). Lab run L10-wrong-client-name: failedCode TLS13_CLIENT_NAME_REFUSED, failedCheck 'client name' (actor server); the client receives alert level 2, number 49. Lesson10Auth.cs line 171 issues a certificate named bank-hsm-admin to the attacker key under the training CA.",
+      "checkedAgainst": "lab run on main 5440eeb"
     },
     {
       "id": "L10-C25",
       "verdict": "accurate",
-      "note": "Tours read at origin/fix/tour-10-keys-and-names commit abef365 (PR 59, open); lab run at origin/feat/l10-client-name 5f21ef3 (PR 69, open). RFC 8446 section 6.2: 'access_denied: A valid certificate or PSK was received, but when access control was applied, the sender decided not to proceed with negotiation.' The claim drops 'or PSK', which does not matter here.",
+      "note": "Tours read at origin/fix/tour-10-keys-and-names commit 61d3265 (PR 59, open); lab run at main 5440eeb (PR 69 merged). RFC 8446 section 6.2: 'access_denied: A valid certificate or PSK was received, but when access control was applied, the sender decided not to proceed with negotiation.' The claim drops 'or PSK', which does not matter here.",
       "checkedAgainst": "RFC 8446 section 6.2 (fetched this session)"
     },
     {
       "id": "L10-C26",
       "verdict": "accurate",
-      "note": "Tours read at origin/fix/tour-10-keys-and-names commit abef365 (PR 59, open); lab run at origin/feat/l10-client-name 5f21ef3 (PR 69, open). Code: the check is leaf.SubjectIs(ExpectedClientName) and nothing else; a certificate that carries the allowed name passes whichever key it names, as long as the chain is good and CertificateVerify then proves that key. Read, not run.",
+      "note": "Tours read at origin/fix/tour-10-keys-and-names commit 61d3265 (PR 59, open); lab run at main 5440eeb (PR 69 merged). Code: the check is leaf.SubjectIs(ExpectedClientName) and nothing else; a certificate that carries the allowed name passes whichever key it names, as long as the chain is good and CertificateVerify then proves that key. Read, not run.",
       "checkedAgainst": "src/NetSec.Core/Tls13/Tls13ServerTable.cs lines 121 to 122 (read)"
     },
     {
       "id": "L10-C27",
       "verdict": "accurate",
-      "note": "Tours read at origin/fix/tour-10-keys-and-names commit abef365 (PR 59, open); lab run at origin/feat/l10-client-name 5f21ef3 (PR 69, open). Lesson10Auth.cs Body: RunMutualTls runs first on streams auth-mtls and stops the lab if it does not complete; the login runs on auth-login with a separate Session that holds no certificate. Lab run confirms the streams.",
-      "checkedAgainst": "lab run on feat/l10-client-name 5f21ef3; src/NetSec.Core/Labs/Lesson10Auth.cs (read)"
+      "note": "Tours read at origin/fix/tour-10-keys-and-names commit 61d3265 (PR 59, open); lab run at main 5440eeb (PR 69 merged). Lesson10Auth.cs Body: RunMutualTls runs first on streams auth-mtls and stops the lab if it does not complete; the login runs on auth-login with a separate Session that holds no certificate. Lab run confirms the streams.",
+      "checkedAgainst": "lab run on main 5440eeb; src/NetSec.Core/Labs/Lesson10Auth.cs (read)"
     },
     {
       "id": "L10-C28",
       "verdict": "accurate",
-      "note": "Tours read at origin/fix/tour-10-keys-and-names commit abef365 (PR 59, open); lab run at origin/feat/l10-client-name 5f21ef3 (PR 69, open). Lab run: the call stream (auth-call) has token, proof and permission checks and no certificate event.",
-      "checkedAgainst": "lab run on feat/l10-client-name 5f21ef3"
+      "note": "Tours read at origin/fix/tour-10-keys-and-names commit 61d3265 (PR 59, open); lab run at main 5440eeb (PR 69 merged). Lab run: the call stream (auth-call) has token, proof and permission checks and no certificate event.",
+      "checkedAgainst": "lab run on main 5440eeb"
     }
   ],
   "textRead": {
-    "readAt": "tour PR 59 head abef365 against the lab at PR 69 head 5f21ef3 (21 steps)",
+    "readAt": "tour PR 59 head 61d3265 against the lab at main 5440eeb (21 steps)",
     "method": "Every sentence of every step text read against the lab. The lab ran in-process (NetSec.Core: LabCatalog, Lesson10Auth, TimingAttackLab), once as a control and once for every try-it attack row; trace events, secrets, field lists and check names were compared with the words. Code was read where the trace did not show the fact. Statements about the UI (colours, panels) and about lesson 9 (not built) were not run.",
     "stepsRead": 21,
     "stepsWithProblems": 5,
@@ -223,8 +223,8 @@
     ],
     "notes": [
       "Bind defect closed: S08 is now a concept step and the device key step binds LoginRequest; all 18 event binds hit in the control run.",
-      "Low note, not counted: L10-S07 says 'the chain is fine and the signature verifies'. In the L10-wrong-client-name run the server shows only the client name failure; the certificate signature check passed silently, and CertificateVerify never ran because the name check comes first. Suggest 'the certificate's signature verifies'.",
-      "New sentences read and run: S03 (TLS key, name check pointer), S07 (client name check, alert 49, name-only limit), S08 (issuer reads no certificate, separate connections), S13 (signature would verify), S19 (60 seconds either way), S20 (calls read no certificate), S21."
+      "New sentences read and run: S03 (TLS key, name check pointer), S07 (client name check, alert 49, name-only limit), S08 (issuer reads no certificate, separate connections), S13 (signature would verify), S19 (60 seconds either way), S20 (calls read no certificate), S21.",
+      "S07 sentence fixed: 'The chain is fine, but the name is wrong, so the server refuses before it reads the signature.' In the L10-wrong-client-name run the server fails client name and CertificateVerify never runs, so the sentence is accurate. Re-run on main 5440eeb: control and all 13 attack rows behave as the steps say; all event binds hit; device-key secret differs for seeds 1, 2, 3 and repeats for seed 1."
     ],
     "problemsOpen": 0
   }
