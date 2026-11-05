@@ -438,7 +438,7 @@ namespace NetSec.Tests
     {
         static LabContext Context(AttackDefinition attack) => new LabContext
         {
-            SessionId = "s9", TraceId = "s9", Seed = 7, Gate = new FreeRunGate(), Sink = new ListSink(), Clock = new FixedClock(1), Random = new SeededRandom(7), Attack = attack,
+            SessionId = "s9", TraceId = "s9", Seed = 7, Gate = new FreeRunGate(), Sink = new ListSink(), Clock = new FixedClock(1), Random = new SeededRandom(7), Attack = attack, DeadlineMs = 2000,
         };
 
         [Fact]
@@ -472,7 +472,7 @@ namespace NetSec.Tests
         [Fact]
         public void An_unbuilt_lesson_has_no_lab()
         {
-            Assert.Null(LabCatalog.Find(5));
+            Assert.Null(LabCatalog.Find(99));
         }
     }
 }
