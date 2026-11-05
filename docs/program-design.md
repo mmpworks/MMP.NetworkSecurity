@@ -24,6 +24,7 @@ Consultation. Gems used: `server-replaces-never-merges`, `fail-soft-must-count`,
 |---|---|---|
 | `src/NetSec.Core` | net10.0, C# 3 | All shared source. Assembly `NetSec.Core` |
 | `src/NetSec.Core.NetCF` | net35 on CF refs, C# 3, `NETCF` | No source: `Compile Include="..\NetSec.Core\**\*.cs"`. Assembly `NetSec.Core` |
+| `src/AsyncProxy.Local`, `src/AsyncProxy.Local.NetCF` | netstandard2.0, and net35 on CF refs, C# 3 | No source: they compile the sibling's `src/MMP.AsyncProxy`. Assembly `MMP.AsyncProxy`, in this worktree's own output. The sibling is only read |
 | `src/NetSec.CeDevice` | net35 on CF refs, C# 3, Exe | The CE process (section 6) |
 | `src/NetSec.Node` | net10.0, C# 14, Exe | Thin main: `--role pinpad, gateway, server, bankhsm`. Logic lives in `Core/Bridge` (D13) |
 | `src/NetSec.Host` | net10.0, C# 14 | Minimal API, WebSocket, sessions, process control, `OsTransportFactory` |

@@ -99,7 +99,7 @@ Offsets index `wire`, as in the other lessons.
 | `host key shape` | `client` | `SSH_HOST_KEY_BAD` |
 | `x25519 result not zero` | both | `SSH_KEX_ZERO_SECRET` |
 | `exchange signature` | `client` | `SSH_EXCHANGE_SIGNATURE` |
-| `packet MAC` | receiver | `SSH_PACKET_MAC` |
+| `packet MAC` | receiver, with one passing event before each protected packet's `ssh.message.received` | `SSH_PACKET_MAC` |
 | `packet length` | receiver | `SSH_PACKET_LENGTH` |
 | `userauth accepted` | `client` | `SSH_AUTH_REFUSED` |
 | `userauth signature verify` | `server` | `SSH_AUTH_REFUSED` |
