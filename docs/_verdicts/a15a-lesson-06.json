@@ -1,0 +1,56 @@
+{
+  "reader": "reader-a15a",
+  "authors": [
+    "heather-s0-tour"
+  ],
+  "claims": [
+    {
+      "id": "L6-C01",
+      "verdict": "accurate",
+      "note": "Tours read at origin/feat/tours-6-11 (PR 18). Tier: secondary source. Overview bullets: 'each transaction will have a distinct key from all other transactions, except by coincidence' and 'if a present derived key is compromised, past and future keys ... remain uncompromised'. The article describes the TDEA variant; the lab uses AES DUKPT. The claim is generic, so it holds for both.",
+      "checkedAgainst": "Wikipedia, Derived unique key per transaction (secondary source, article source text fetched this session via the MediaWiki raw endpoint)"
+    },
+    {
+      "id": "L6-C02",
+      "verdict": "accurate",
+      "note": "Tours read at origin/feat/tours-6-11 (PR 18). Tier: secondary source. History section: 'all of the initialization keys of an entire family of devices are derived from a single key, the base derivation key (BDK). ... the recipient need only store the BDK.' Keys section names the BDK. Same TDEA-variant caveat as L6-C01.",
+      "checkedAgainst": "Wikipedia, Derived unique key per transaction (secondary source, article source text fetched this session via the MediaWiki raw endpoint)"
+    },
+    {
+      "id": "L6-C03",
+      "verdict": "accurate",
+      "note": "Tours read at origin/feat/tours-6-11 (PR 18). docs/lesson-6-names.md (feat/s2-dukpt), Facts the tour needs item 4: 'The bank keeps the base key and derives each key again from the KSN. It holds no per-reader key.' Event table: dukpt.bdk 'stays at the bank for the whole run'. D13 does not say this, but item 4 does.",
+      "checkedAgainst": "docs/lesson-6-names.md on origin/feat/s2-dukpt (read); docs/prd.md D13 (read)"
+    },
+    {
+      "id": "L6-C04",
+      "verdict": "accurate",
+      "note": "Tours read at origin/feat/tours-6-11 (PR 18). Names doc: 'ksn is 12 bytes: the 8-byte initial key id, then the 4-byte counter. pinBlock is 16 bytes.' Sale table: pinBlock visibleToWire false, other fields true. The code check builds the KSN with the counter in bytes 8 to 11 (DukptTests.cs).",
+      "checkedAgainst": "docs/lesson-6-names.md on origin/feat/s2-dukpt (read); tests/NetSec.Tests/DukptTests.cs (read)"
+    },
+    {
+      "id": "L6-C05",
+      "verdict": "accurate",
+      "note": "Tours read at origin/feat/tours-6-11 (PR 18). Tier: secondary source. Communication, Origination: the device 'Invalidates the key just used, and If necessary generates more future keys'. The claim says 'when needed', which matches 'if necessary'.",
+      "checkedAgainst": "Wikipedia, Derived unique key per transaction (secondary source, article source text fetched this session via the MediaWiki raw endpoint)"
+    },
+    {
+      "id": "L6-C06",
+      "verdict": "inaccurate",
+      "note": "Tours read at origin/feat/tours-6-11 (PR 18). The fact is true, but the cited section is wrong. 'What happens during a garbage collection' lists phases (mark, relocate, compact) and says the compacting phase 'moves objects that have survived'. The words 'memory-copying function to compact the reachable objects in memory' are under 'Memory release'. Learn also says compaction happens only when a collection finds a significant number of unreachable objects, and that large objects are usually not compacted. Fix: cite 'Memory release' for the copy sentence and 'What happens during a garbage collection' for the compacting phase. Add 'can' if the text says every collection copies.",
+      "checkedAgainst": "Microsoft Learn, Fundamentals of garbage collection (page fetched this session; primary vendor documentation)"
+    },
+    {
+      "id": "L6-C07",
+      "verdict": "unverified",
+      "note": "Tours read at origin/feat/tours-6-11 (PR 18). ANSI X9.24-3-2017 is a paid standard and I could not read it. docs/prd.md D13 does state 'X9.24-3 places the keys in secure devices at each end', so the PRD says it, but the PRD is the author's own reading. The public IFSF working document on AES DUKPT (ifsf.org, 2018) was fetched and has no sentence on secure devices. A search found no free copy of the standard or its Annex B vectors on x9.org. Disposition: keep as unverified, or have Steve buy X9.24-3, or soften the text to 'DUKPT keeps its keys in tamper-resistant hardware' with the Wikipedia Keys section (BDK usually stored in a TRSM or HSM) as the source.",
+      "checkedAgainst": "docs/prd.md D13 (read); IFSF working document ifsf.org 2018-09-04 (fetched); Wikipedia Keys section (fetched); ANSI X9.24-3-2017 not fetched (paid)"
+    },
+    {
+      "id": "L6-C08",
+      "verdict": "accurate",
+      "note": "Tours read at origin/feat/tours-6-11 (PR 18). tests/NetSec.Tests/DukptTests.cs on feat/s2-dukpt asserts 32 held keys at load and 31, 31, 30, 31 after sales 1 to 4. The names doc states the same run.",
+      "checkedAgainst": "tests/NetSec.Tests/DukptTests.cs, test The_register_count_follows_the_counter (read); docs/lesson-6-names.md (read)"
+    }
+  ]
+}
