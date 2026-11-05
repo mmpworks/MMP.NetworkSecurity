@@ -32,6 +32,7 @@ namespace Acceptance
 
     public sealed class Ctx
     {
+        public static Ctx Current;                // the context of this program, for helpers that run a lab and hold no Ctx
         public string Build = "none";            // net10, cf, or none
         public string VectorsDir = "";
         public string RepoRoot = "";             // product repo root (the folder that holds src/)
@@ -120,6 +121,7 @@ namespace Acceptance
                     default: Console.Error.WriteLine("unknown argument " + args[i]); return 2;
                 }
             }
+            Ctx.Current = c;
             if (c.AcceptanceDir.Length == 0) c.AcceptanceDir = FindAcceptanceDir();
             if (c.VectorsDir.Length == 0) c.VectorsDir = Path.Combine(c.AcceptanceDir, "vectors");
             if (c.RepoRoot.Length == 0) c.RepoRoot = Path.GetDirectoryName(c.AcceptanceDir);
