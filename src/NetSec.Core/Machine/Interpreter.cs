@@ -79,6 +79,12 @@ namespace NetSec.Machine
             Status = EngineStatus.Closed;
         }
 
+        /// <summary>Runs effects outside a table row: data the caller sends, a close, or the alert that follows a failure.</summary>
+        public void Perform(string step, params StepEffect[] effects)
+        {
+            for (int i = 0; i < effects.Length; i++) ApplyEffect(effects[i], step);
+        }
+
         public bool IsEnded { get { return Status == EngineStatus.Closed || Status == EngineStatus.Failed; } }
 
         /// <summary>Hands over what the last calls produced, and starts a new output.</summary>

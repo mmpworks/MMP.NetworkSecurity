@@ -111,6 +111,7 @@ namespace NetSec.Labs
                 case 1: return new Lesson01Aes();
                 case 2: return new Lesson02Seals();
                 case 3: return new Lesson03Kex();
+                case 7: return new Lesson07Tls11();
                 default: return null;
             }
         }
@@ -140,6 +141,8 @@ namespace NetSec.Labs
 
             Swap("L3-swap-server-share", 3, "X25519ServerShare", Lesson03Kex.SwappedServerShare(), ErrorCodes.KexConfirmMismatch, Lesson03Kex.ConfirmCheck),
             Flip("L3-flip-mlkem-ciphertext", 3, "MlKemCiphertext", Frame.HeaderSize + 10, ErrorCodes.KexConfirmMismatch, Lesson03Kex.ConfirmCheck),
+
+            Flip("L7-flip-record", 7, Lesson07Tls11.ApplicationData, Lesson07Tls11.CipherOffset, NetSec.Tls11.Tls11Codes.RecordMac, NetSec.Tls11.Tls11Checks.RecordHmac),
         };
 
         public static AttackDefinition[] All { get { return (AttackDefinition[])Rows.Clone(); } }
