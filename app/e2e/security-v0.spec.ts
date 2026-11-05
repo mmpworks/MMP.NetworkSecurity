@@ -1,6 +1,8 @@
 import { expect, test, type Page } from '@playwright/test'
 import * as fs from 'node:fs'
+import * as os from 'node:os'
 import * as path from 'node:path'
+import { generateKeyPairSync } from 'node:crypto'
 import { PORT, TOKEN, open } from './walk'
 
 // V0 UI against a real Host: the keys chip, the Security setup screen, the five-screen path of the sign-in flow (token.issuer and the device key),
@@ -139,4 +141,39 @@ test('Keep my place leaves the run open and the row reads Setup paused', async (
   await page.getByTestId('wizard-cancel').click()
   await page.getByTestId('wizard-cancel-discard').click()
   await expect(page.getByTestId('wizard-sheet')).toHaveCount(0)
+})
+
+test('the files branch refuses the wrong kind of key and a file that is no key, by name, and accepts an Ed25519 key', async ({ page }) => {
+  const dir = fs.mkdtempSync(path.join(os.tmpdir(), 'v0-keys-'))
+  const rsa = path.join(dir, 'rsa.pem')
+  const junk = path.join(dir, 'junk.pem')
+  const good = path.join(dir, 'issuer.pem')
+  fs.writeFileSync(rsa, generateKeyPairSync('rsa', { modulusLength: 2048 }).privateKey.export({ type: 'pkcs8', format: 'pem' }))
+  fs.writeFileSync(junk, 'this is not a key\n')
+  fs.writeFileSync(good, generateKeyPairSync('ed25519').privateKey.export({ type: 'pkcs8', format: 'pem' }))
+  await api('PUT', '/api/security/types/token.issuer/mode', { mode: 'BuiltIn' })
+  await api('PUT', '/api/security/types/device.enrolment/mode', { mode: 'BuiltIn' })
+  await open(page)
+  await page.getByTestId('security-setup-button').click()
+  await page.getByTestId('flow-my-login').click()
+  await page.getByTestId('wizard-next').click()
+  await page.getByTestId('flow-files-link').click()
+  await expect(page.getByTestId('flow-my-login-files')).toBeVisible()
+  const send = async (file: string) => { await page.getByTestId('flow-file-path-token.issuer').fill(file); await page.getByTestId('flow-files-send').click() }
+  await send(rsa)
+  await expect(page.getByTestId('wizard-error-code')).toHaveText('KEY_ALGORITHM_NOT_IN_ENGINE')
+  await expect(page.getByTestId('wizard-error-fix')).toContainText('The token key must be Ed25519')
+  await expect(page.getByTestId('wizard-error-detail')).toContainText('Ed25519')
+  await expect(page.getByTestId('flow-my-login-files')).toBeVisible()
+  await expect(page.getByTestId('wizard-next')).toBeDisabled()
+  await shot(page, '11-files-wrong-kind')
+  await send(junk)
+  await expect(page.getByTestId('wizard-error-code')).toHaveText('KEY_FILE_FORMAT')
+  await expect(page.getByTestId('wizard-error-fix')).toContainText('It must be a PEM private key')
+  await shot(page, '12-files-not-a-key')
+  await send(good)
+  await expect(page.getByTestId('flow-my-login-review')).toBeVisible()
+  await expect(page.getByTestId('wizard-error')).toHaveCount(0)
+  await page.getByTestId('wizard-cancel').click()
+  await page.getByTestId('wizard-cancel-discard').click()
 })

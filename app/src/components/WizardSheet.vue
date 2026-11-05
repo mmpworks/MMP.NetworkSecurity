@@ -150,6 +150,7 @@ async function toLesson() { await finish(); backToLesson() }
           <div v-if="error" class="wiz-error" data-testid="wizard-error" role="alert">
             <code data-testid="wizard-error-code">{{ error.code }}</code>
             <p data-testid="wizard-error-fix">{{ errorWords }}</p>
+            <p v-if="error.message && error.message !== errorWords" class="muted" data-testid="wizard-error-detail">{{ error.message }}</p>
           </div>
         </section>
 
