@@ -209,7 +209,7 @@ A modal sheet over the Security setup screen, 720 px wide at most, centered. The
 
 ### 3.2 The spine
 
-Every flow runs the Host's spine, drawn on five default screens: `Intro` (screen 1), `ChooseSource` and `Place` together as `make` (screen 2, with `options` as the branch), `ReadBack` (screen 3), `Prove` (screen 4), and `Done` (screen 5) (`modes-design.md` 8.4). The UI never adds, skips, or reorders a step. It renders `step.kind` (`explain`, `choose`, `file`, `entry`, `generate`, `review`, `prove`, `done`) and offers only the buttons in `step.allowed`.
+Every flow runs the Host's spine, drawn on five default screens: `Intro` (screen 1), `Make` (screen 2, with `PickFiles` as the branch, drawn as `options`), `Review` (screen 3), `Check` (screen 4), and `Done` (screen 5) (`modes-design.md` 8.2). The UI never adds, skips, or reorders a step. It renders `step.kind` (`explain`, `choose`, `file`, `generate`, `review`, `prove`, `done`) and offers only the buttons in `step.allowed`.
 
 ### 3.3 Words and reading level
 
@@ -228,7 +228,7 @@ Every flow runs the Host's spine, drawn on five default screens: `Intro` (screen
 | `Tab` | Moves through the control, the glossary terms, then the buttons. The focus ring is 2 px, as everywhere |
 | `Space` | Selects the focused radio choice |
 
-`Back` works up to `Place` (`modes-design.md` 8.4). After `Place` a new version exists, and the `Back` button is replaced by `Change my answers`, which starts a new setup that keeps the earlier version stored. A failed proof loses nothing.
+`Back` on `Review` returns to `Make` (`modes-design.md` 8.2). Making again writes a new version and keeps the earlier one stored. A failed check loses nothing.
 
 ### 3.5 Resume and undo
 
@@ -266,7 +266,7 @@ The first slice is `token.issuer` (`modes-design.md` slice V0). In the flows it 
 | Buttons | `Cancel setup`, `Continue` (default) |
 | Fails when | Nothing here fails. |
 
-### Screen 2 of 5: Make it for me (`flow-my-login-make`, `ChooseSource` and `Place`, kind `generate`)
+### Screen 2 of 5: Make it for me (`flow-my-login-make`, `Make`, kind `generate`)
 
 | Block | Words |
 |---|---|
@@ -289,7 +289,7 @@ One screen, one row per part. It returns to the Review screen after the Host che
 
 The warning of 3.6 applies to every file pick: `KEY_PATH_PERSONAL` appears first if the path is under `.ssh`. Nothing is saved until the files pass.
 
-### Screen 3 of 5: Review (`flow-my-login-review`, `ReadBack`, kind `review`)
+### Screen 3 of 5: Review (`flow-my-login-review`, `Review`, kind `review`)
 
 | Block | Words |
 |---|---|
@@ -302,7 +302,7 @@ The warning of 3.6 applies to every file pick: `KEY_PATH_PERSONAL` appears first
 | What good looks like | Every part has a name, a fingerprint, and dates. Copy a fingerprint if you want to compare it later. |
 | Fails when | Nothing fails here. The Host refused a bad key on the branch. |
 
-### Screen 4 of 5: Check (`flow-my-login-check`, `Prove`, kind `prove`)
+### Screen 4 of 5: Check (`flow-my-login-check`, `Check`, kind `prove`)
 
 | Block | Words |
 |---|---|
@@ -382,7 +382,7 @@ A learner can play with the practice vault. It opens from the map footer (`sec-v
 
 ## 6. The proof step in everyday words
 
-Every Prove screen has the same four parts, in this order: the real command in a code block, the real output in a code block, one sentence in words, and a tier line.
+Every Check screen has the same four parts, in this order: the real command in a code block, the real output in a code block, one sentence in words, and a tier line.
 
 | Part | Rule | Test id |
 |---|---|---|
@@ -416,14 +416,14 @@ The Host runs these (Jared's runs, `modes-real-world.md` section 5). Each `<...>
 | `lab.aes-key` | .NET library | Wrap, unwrap, compare with BCL `AesGcm` | none |
 | `lab.seal-key` | OpenSSL | `openssl mac -digest SHA256 -macopt hexkey:<hex> -in <file> HMAC`. The command ran. A comparison with the engine's tag has not run yet | "A MAC is a short code that shows a message stayed the same. A password is not a MAC key. A MAC is not a signature." |
 
-Rule for every Prove screen (Jared): show the command, its real output, and the name of who judged it. With no outside judge, say "our own check".
+Rule for every Check screen (Jared): show the command, its real output, and the name of who judged it. With no outside judge, say "our own check".
 
 ## 7. Show keys on every wizard screen
 
 | Where | With the switch On | With the switch Off |
 |---|---|---|
 | Read-back facts | The key bytes in a `Show all` fold, copy button | `fp:` fingerprint and length, "Hidden by the Show keys switch" |
-| Prove output | As the tool printed | The tool output is unchanged (it holds public data), key file paths only |
+| Check output | As the tool printed | The tool output is unchanged (it holds public data), key file paths only |
 | The setup screen header | Test-keys line says "Use test keys only. This course shows your keys on screen and in saved files." | Says "This course hides your keys on screen for now and shows short fingerprints instead. Saved files can still hold them." |
 | A non-exportable key | Shows the fingerprint only, no bytes, with the line "The course refuses to show it. A real HSM would refuse too. These files could still open it here." | Same |
 | The vault itself (map footer, vault exercise) | Label: "Practice vault. Not an HSM. Not FIPS validated." Non-export is a rule in this course's code. | Same |
@@ -439,10 +439,10 @@ Flipping the switch while a wizard is open replaces the facts block from the Hos
 | 3 | The course's own engines check Ed25519 signatures only. An RSA or ECDSA certificate stops with a named error code. RSA runs through the OS transport. ECDSA is not supported in the course's engines. | `KEY_ALGORITHM_NOT_IN_ENGINE` and `CERT_SIGNATURE_ALG_UNSUPPORTED` boxes, kind choice screens | `modes-design.md` 1.8, 8.5 |
 | 4 | A certificate signed by a middle authority must be sent together with that authority's certificate. This holds for a client too. Sent alone, it gets the error `certificate signed by unknown authority`. | `tls13.client` screen 4 and `CHAIN_INCOMPLETE` | Jared's finding, `modes-design.md` 8.5 |
 | 5 | Use test keys only. This course shows your keys on screen and in saved files. Nothing here can tell a test key from a production key, so the line is the whole control (Steve's ruling: no hard stop). | Every Intro, before any choice | `modes-design.md` 8.2 |
-| 6 | The key store is a plain file, and anyone who holds both files can read every key. It is not a production vault. | `Place` screens | `modes-design.md` O5 |
+| 6 | The key store is a plain file, and anyone who holds both files can read every key. It is not a production vault. | `Make` screens | `modes-design.md` O5 |
 | 7 | Card numbers and PINs stay test values. The wizard has no field for them. | `dukpt.bdk` Intro, `dukpt.pad` Intro | `modes-design.md` 1.6, O10 |
 | 8 | A key you mark as non-exportable shows its fingerprint only. "The course refuses to show it. A real HSM would refuse too. These files could still open it here." The choice is one-way. | the vault exercise (5.5) | `modes-design.md` 6.3 |
-| 9 | If the test tool is missing, your key is saved but not yet checked, and lessons will not run on it until it is. | Prove screen, `REFEREE_MISSING` | `modes-design.md` 2.3 |
+| 9 | If the test tool is missing, your key is saved but not yet checked, and lessons will not run on it until it is. | Check screen, `REFEREE_MISSING` | `modes-design.md` 2.3 |
 | 10 | Where no outside tool can judge a key, the screen says so and shows no green check. The course never checks its own key and calls it proof. | `prove-tier`, `Saved, no outside check` | Steve, 2026-11-05; Jared section 5 |
 | 11 | "Checked" means checked against the root you gave it. A self-signed certificate passes against itself. The check does not say a stranger would trust it. | `Checked` chip help text, every F1 Prove screen | Jared, section 3.1 |
 | 12 | The wizard never installs a root in the OS store without asking, and says what it changed. | `os-pick` step | Jared, section 3.1 |
@@ -504,7 +504,7 @@ The screens are the ids in 9.1 and 9.1a. A test walks the default path of every 
 | **Total, all paths** | | **36** |
 | **One flow, default path** | | **5** |
 
-### 9.4 Prove step
+### 9.4 Check step
 
 `prove-command`, `prove-output`, `prove-words`, `prove-tier`, `prove-run`, `prove-pass`, `prove-fail`, `prove-missing`.
 

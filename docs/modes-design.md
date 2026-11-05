@@ -485,7 +485,7 @@ Session files stay in `%LOCALAPPDATA%\MMP.NetworkSecurity\sessions\` (`Program.c
 | Rule | Detail |
 |---|---|
 | Path | Anything under `.security/`, or any `.pfx`, `.p12`, `.db`, `.key`, `.ndjson`, `master.key`, `id_rsa`, `id_ed25519`, `known_hosts`. A session file can hold keys. `git ls-files` finds none of these today |
-| PEM header | `PRIVATE KEY` in a file outside the allow-list. Today that is 3 files: `src/NetSec.Core/Pki/TrainingPki.cs`, `tests/NetSec.Tests/Tls13Tests.cs`, `acceptance/lib/Harness/OpenSshKey.cs` |
+| PEM block | A private key block, meaning the header line, a base64 body, and the footer, in a file outside the allow-list (`acceptance/CONTRACT.md` 5.5). A sentence that only names the header is no key, and these docs do that. The allow-list today is 3 files: `src/NetSec.Core/Pki/TrainingPki.cs`, `tests/NetSec.Tests/Tls13Tests.cs`, `acceptance/lib/Harness/OpenSshKey.cs` |
 | Ignore rule | `.gitignore` must hold the `.security/` line, and `git check-ignore .security/x` must agree |
 
 The clause runs beside a control: on a temp clone, a planted PEM file and a planted `.security/` file must each fail by name, and the unchanged tree must pass.
