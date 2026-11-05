@@ -131,6 +131,8 @@ namespace NetSec.Tests
             public void Absorb(byte[] message) { Absorbed++; }
             public byte[] Protect(string message, byte[] body) => body;
             public void InstallKeys(Direction direction, string suite, byte[] key, byte[] iv) { }
+            public void Remember(string name, byte[] value) { }
+            public byte[] PlainOf(InboundMessage message) => message.Bytes;
         }
 
         static Interpreter<Probe> Machine(StepRule<Probe> rule, Probe session) => new Interpreter<Probe>(
@@ -436,7 +438,7 @@ namespace NetSec.Tests
     {
         static LabContext Context(AttackDefinition attack) => new LabContext
         {
-            SessionId = "s9", TraceId = "s9", Seed = 7, Gate = new FreeRunGate(), Sink = new ListSink(), Clock = new FixedClock(1), Attack = attack,
+            SessionId = "s9", TraceId = "s9", Seed = 7, Gate = new FreeRunGate(), Sink = new ListSink(), Clock = new FixedClock(1), Random = new SeededRandom(7), Attack = attack,
         };
 
         [Fact]
@@ -461,7 +463,7 @@ namespace NetSec.Tests
                 Assert.True(control.Result.Completed);
                 IFuture<LabResult> run = LabCatalog.Find(attack.Lesson).Run(Context(attack));
                 Make.Done(run);
-                Assert.False(run.Result.Completed);
+                Assert.Equal(attack.Expect == AttackOutcome.Rejected, !run.Result.Completed);
                 Assert.Equal(attack.ExpectCode, run.Result.FailedCode);
                 Assert.Equal(attack.ExpectCheck, run.Result.FailedCheck);
             }

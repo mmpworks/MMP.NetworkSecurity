@@ -49,7 +49,7 @@ namespace NetSec.Trace
     /// <summary>The fields a caller chooses. TraceStream adds the identity and the time.</summary>
     public sealed class TraceEventDraft
     {
-        public string Type, Message, Step, From, To, WaitingFor;
+        public string Type, Message, Step, From, To, WaitingFor, Detail;
         public byte[] Wire, Plain;
         public TraceField[] Fields;
         public TraceSecret[] Secrets;
@@ -67,7 +67,7 @@ namespace NetSec.Trace
         public readonly long StreamSeq;
         public readonly string SessionId, TraceId, Hop;
         public readonly string Actor, From, To;
-        public readonly string Type, Message, Step;
+        public readonly string Type, Message, Step, Detail;
         public readonly byte[] Wire, Plain;
         public readonly TraceField[] Fields;
         public readonly TraceSecret[] Secrets;
@@ -82,7 +82,7 @@ namespace NetSec.Trace
             StreamSeq = seq;
             EventId = stream.StreamId + "#" + seq;
             SessionId = stream.SessionId; TraceId = stream.TraceId; Hop = stream.Hop; Actor = stream.Actor;
-            From = draft.From; To = draft.To; Type = draft.Type; Message = draft.Message; Step = draft.Step;
+            From = draft.From; To = draft.To; Type = draft.Type; Message = draft.Message; Step = draft.Step; Detail = draft.Detail;
             Wire = Copy(draft.Wire); Plain = Copy(draft.Plain);
             Fields = draft.Fields; Secrets = draft.Secrets; Check = draft.Check;
             WaitingFor = draft.WaitingFor;
@@ -158,6 +158,7 @@ namespace NetSec.Trace
             w.Text("type", e.Type);
             w.Text("message", e.Message);
             w.Text("step", e.Step);
+            w.Text("detail", e.Detail);
             w.Bytes("wire", e.Wire);
             w.Bytes("plain", e.Plain);
             w.Raw("fields", FieldsJson(e.Fields));

@@ -26,6 +26,11 @@ Each correction goes here, newest slice last. Later slices read this file first.
 5. **`RsaPrivate` holds n and d only, so it runs the full-size exponent.** Parsing a PKCS#8 key can drop the CRT values. On a real device this makes a private operation slower than a CRT one by a factor of about 4 (standard estimate, not measured here).
 6. **A2 tests valid ML-KEM exchanges only.** Implicit rejection and the key checks are reached by 36 NIST ACVP records in `tests/NetSec.Tests/vectors/mlkem768-acvp.txt`.
 
+## Lessons 1 to 3
+
+1. **Each side of a lab needs its own random stream.** Two pumps draw in an order the threads choose, so one shared stream gives different bytes on a same-seed rerun. `LabPair.Fork` draws a seed per side before the pumps start. Fork matching (`atSeq`) depends on this.
+2. **A rule reads a value only through `FrameSession.Secret`, and `Effect.Secret` stores it.** The interpreter calls `Remember`, so a rule stays free of side effects except `Draw`, which reads the side's random stream in rule order.
+
 ## S2
 
 1. **`openssl genpkey -outform DER` on OpenSSL 3.5.7 wrote a traditional `RSAPrivateKey`, not PKCS#8.** CONTRACT rule 5 needs `PrivateKeyInfo`. Run `openssl pkcs8 -topk8 -nocrypt` after it. The net10 test `An_rsa_key_is_pkcs8_with_its_matching_spki` pins the format.

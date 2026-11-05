@@ -25,6 +25,9 @@ namespace NetSec.Crypto
             _buffer = new byte[blockSize];
         }
 
+        /// <summary>Counts bytes the state already holds, so Finish writes the full message length.</summary>
+        protected void CountBytesAlreadyHashed(ulong bytes) { _totalBytes = bytes; }
+
         public int DigestSize { get { return _digestSize; } }
         public int BlockSize { get { return _blockSize; } }
 

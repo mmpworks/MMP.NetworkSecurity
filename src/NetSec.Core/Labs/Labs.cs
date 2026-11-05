@@ -24,10 +24,12 @@ namespace NetSec.Labs
         public long StreamSeq;
         public int Offset;
         public int Xor = 1;
+        public byte[] Replacement;
 
         public TamperResult Apply(TamperPoint point, string streamId, long streamSeq, string message, byte[] bytes)
         {
             if (point != Point || !Matches(streamId, streamSeq, message)) return TamperResult.Unchanged;
+            if (Replacement != null) return TamperResult.Replace(Replacement);
             if (Offset < 0 || Offset >= bytes.Length) return TamperResult.Unchanged;
             byte[] changed = (byte[])bytes.Clone();
             changed[Offset] = (byte)(changed[Offset] ^ Xor);
@@ -86,53 +88,15 @@ namespace NetSec.Labs
     /// <summary>Lesson 0: a client and a server on loopback, each its own EnginePump. The pipe has no lock.</summary>
     public sealed class EchoLab : ILab
     {
-        public const int DeadlineMs = 30000;
         static readonly byte[] Message = Encoding.UTF8.GetBytes("hello, pipe");
 
         public string LabId { get { return "lab-00-echo"; } }
 
-        public IFuture<LabResult> Run(LabContext context)
+        public IFuture<LabResult> Run(LabContext c)
         {
-            if (context == null) throw new ArgumentNullException("context");
-            return AsyncProxy.Run<LabResult>(delegate(Return<LabResult> ret) { return Body(context, ret); });
-        }
-
-        static IEnumerable<IFuture> Body(LabContext c, Return<LabResult> ret)
-        {
-            LinkListener listener = new LinkListener(new IPEndPoint(IPAddress.Loopback, 0));
-            IFuture<SocketLink> accepted = listener.Accept();
-            IFuture<SocketLink> connected = SocketLink.Connect(new IPEndPoint(IPAddress.Loopback, listener.Port));
-            yield return accepted;
-            yield return connected;
-            listener.Close();
-
-            int deadline = c.Gate is FreeRunGate ? DeadlineMs : 0;
-            ITamperHook attack = c.Attack == null ? null : c.Attack.Plan;
-            EchoEngine server = EchoEngine.Server(Stream(c, "server"), null);
-            EchoEngine client = EchoEngine.Client(Message, Stream(c, "client"), attack);
-            IFuture<PumpResult> serverRun = new EnginePump(server, accepted.Result, c.Sink, c.Gate, null, deadline, c.Clock).Run();
-            IFuture<PumpResult> clientRun = new EnginePump(client, connected.Result, c.Sink, c.Gate, attack, deadline, c.Clock).Run();
-            yield return clientRun;
-            yield return serverRun;
-
-            ret.Value = Result(clientRun.Result);
-        }
-
-        static TraceStream Stream(LabContext c, string actor)
-        {
-            return new TraceStream(c.SessionId + "/" + actor + "/echo", c.SessionId, c.TraceId, null, actor, c.Clock);
-        }
-
-        static LabResult Result(PumpResult run)
-        {
-            LabResult result = new LabResult();
-            result.Completed = run.Error == null;
-            if (run.Error != null)
-            {
-                result.FailedCode = run.Error.Code;
-                result.FailedCheck = run.Error.CheckName;
-            }
-            return result;
+            if (c == null) throw new ArgumentNullException("c");
+            ITamperHook plan = LabPair.Plan(c);
+            return LabPair.Run(c, EchoEngine.Client(Message, LabPair.Stream(c, "client", "echo"), plan), EchoEngine.Server(LabPair.Stream(c, "server", "echo"), plan), plan);
         }
     }
 
@@ -141,30 +105,88 @@ namespace NetSec.Labs
         /// <summary>The lab for a lesson number, or null when the lesson is not built yet.</summary>
         public static ILab Find(int lesson)
         {
-            return lesson == 0 ? new EchoLab() : null;
+            switch (lesson)
+            {
+                case 0: return new EchoLab();
+                case 1: return new Lesson01Aes();
+                case 2: return new Lesson02Seals();
+                case 3: return new Lesson03Kex();
+                default: return null;
+            }
         }
     }
 
+    /// <summary>The one list of attacks. Each row runs beside a control, and a test compares its code and check.</summary>
     public static class AttackCatalog
     {
-        public static AttackDefinition[] All
+        const string CbcText = "TextCbc", GcmText = "TextGcm1";
+
+        static readonly AttackDefinition[] Rows =
         {
-            get
-            {
-                TamperPlan flip = new TamperPlan();
-                flip.Message = EchoEngine.HelloName;
-                flip.Offset = 3;
-                AttackDefinition toy = new AttackDefinition();
-                toy.AttackId = "L0-flip-wire-byte";
-                toy.Lesson = 0;
-                toy.Kind = "flip-byte";
-                toy.Plan = flip;
-                toy.Options = new LabOption[0];
-                toy.Expect = AttackOutcome.Rejected;
-                toy.ExpectCode = ErrorCodes.EchoMismatch;
-                toy.ExpectCheck = EchoEngine.CompareCheck;
-                return new AttackDefinition[] { toy };
-            }
+            Flip("L0-flip-wire-byte", 0, EchoEngine.HelloName, 3, ErrorCodes.EchoMismatch, EchoEngine.CompareCheck),
+
+            WithOption("L1-use-ecb", 1, Lesson01Aes.OptionTextMode, "ecb", AttackOutcome.NoCheck, null, null),
+            Unchecked(Flip("L1-flip-cbc", 1, CbcText, Frame.HeaderSize + 16, null, null)),
+            Flip("L1-flip-gcm", 1, GcmText, Frame.HeaderSize + 12, ErrorCodes.AesGcmTag, Lesson01Aes.TagCheck),
+            WithOption("L1-reuse-nonce", 1, Lesson01Aes.OptionReuseNonce, "yes", AttackOutcome.Rejected, ErrorCodes.AesGcmNonceReuse, Lesson01Aes.NonceCheck),
+
+            Flip("L2-flip-hash-message", 2, "PlainHashSealed", Lesson02Seals.MessageOffset + 3, ErrorCodes.SealHashMismatch, Lesson02Seals.HashCheck),
+            Flip("L2-flip-hmac-message", 2, "HmacSealed", Lesson02Seals.MessageOffset + 3, ErrorCodes.SealHmacMismatch, Lesson02Seals.HmacCheck),
+            Flip("L2-flip-hmac-tag", 2, "HmacSealed", Lesson02Seals.SealOffset, ErrorCodes.SealHmacMismatch, Lesson02Seals.HmacCheck),
+            Flip("L2-flip-cmac-message", 2, "CmacSealed", Lesson02Seals.MessageOffset + 3, ErrorCodes.SealCmacMismatch, Lesson02Seals.CmacCheck),
+            Flip("L2-flip-cmac-tag", 2, "CmacSealed", Lesson02Seals.SealOffset, ErrorCodes.SealCmacMismatch, Lesson02Seals.CmacCheck),
+            WithOption("L2-extend-keyed-hash", 2, Lesson02Seals.OptionExtend, "KeyedHashSealed", AttackOutcome.Accepted, null, null),
+            WithOption("L2-extend-hmac", 2, Lesson02Seals.OptionExtend, "HmacSealed", AttackOutcome.Rejected, ErrorCodes.SealHmacMismatch, Lesson02Seals.HmacCheck),
+
+            Swap("L3-swap-server-share", 3, "X25519ServerShare", Lesson03Kex.SwappedServerShare(), ErrorCodes.KexConfirmMismatch, Lesson03Kex.ConfirmCheck),
+            Flip("L3-flip-mlkem-ciphertext", 3, "MlKemCiphertext", Frame.HeaderSize + 10, ErrorCodes.KexConfirmMismatch, Lesson03Kex.ConfirmCheck),
+        };
+
+        public static AttackDefinition[] All { get { return (AttackDefinition[])Rows.Clone(); } }
+
+        static AttackDefinition Flip(string id, int lesson, string message, int offset, string code, string check)
+        {
+            TamperPlan plan = new TamperPlan();
+            plan.Message = message;
+            plan.Offset = offset;
+            return Row(id, lesson, "flip-byte", plan, new LabOption[0], AttackOutcome.Rejected, code, check);
+        }
+
+        static AttackDefinition Unchecked(AttackDefinition row)
+        {
+            row.Expect = AttackOutcome.NoCheck;
+            return row;
+        }
+
+        static AttackDefinition Swap(string id, int lesson, string message, byte[] replacement, string code, string check)
+        {
+            TamperPlan plan = new TamperPlan();
+            plan.Kind = "swap-field";
+            plan.Message = message;
+            plan.Replacement = replacement;
+            return Row(id, lesson, "swap-field", plan, new LabOption[0], AttackOutcome.Rejected, code, check);
+        }
+
+        static AttackDefinition WithOption(string id, int lesson, string name, string value, AttackOutcome expect, string code, string check)
+        {
+            LabOption option = new LabOption();
+            option.Name = name;
+            option.Value = value;
+            return Row(id, lesson, "scenario", null, new LabOption[] { option }, expect, code, check);
+        }
+
+        static AttackDefinition Row(string id, int lesson, string kind, TamperPlan plan, LabOption[] options, AttackOutcome expect, string code, string check)
+        {
+            AttackDefinition row = new AttackDefinition();
+            row.AttackId = id;
+            row.Lesson = lesson;
+            row.Kind = kind;
+            row.Plan = plan;
+            row.Options = options;
+            row.Expect = expect;
+            row.ExpectCode = code;
+            row.ExpectCheck = check;
+            return row;
         }
     }
 }
