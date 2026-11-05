@@ -2,8 +2,8 @@
 
 Author: Echo. Date: 2026-11-05. Branch: `test/acceptance-suite`. Rule: D11. Builders never write under `acceptance/`.
 
-Conclusion: the suite has **M = 202 product clauses** (`clauses.json`). With no product built it reports **0 of 202 PASS, 0 FAIL, 202 NOT RUN**.
-Its 19 checks on itself all PASS. The suite is written against `docs/program-design.md` section 11 and the merged referees in `acceptance/referees`. Every group compiles against the contract stub on net10.0 and on net48 with the CF build of MMP.AsyncProxy.
+Conclusion: the suite has **M = 204 product clauses** (`clauses.json`). With no product built it reports **0 of 204 PASS, 0 FAIL, 204 NOT RUN**.
+Its 22 checks on itself all PASS. The suite is written against `docs/program-design.md` section 11 and the merged referees in `acceptance/referees`. Every group compiles against the contract stub on net10.0 and on net48 with the CF build of MMP.AsyncProxy.
 Disposition: merge this branch before S0 starts. Send the open items in section 7 to Richard and Jared.
 
 ## 1. Run it
@@ -25,11 +25,11 @@ Exit code 0 means every selected clause passed. Anything else exits 1.
 Command: `pwsh acceptance/run.ps1 -Clauses All -SelfTest` on this branch. Nothing under `src/` exists yet.
 
 ```
-[acceptance] 202 clauses selected of M = 202 (+ 19 self-checks in the file)
+[acceptance] 204 clauses selected of M = 204 (+ 22 self-checks in the file)
 [acceptance] group prim (net10): 32 clauses
   ... (one line for each group and build: dukpt, kschedule, tls13live, tls11, ssh, auth, nativeprod, native, bridge, host, keys, binproof, selftest, docs, e2e)
-[acceptance] 0 of 202 clauses PASS (0 FAIL, 202 NOT RUN); M = 202
-[acceptance] self-checks: 19 of 19 PASS
+[acceptance] 0 of 204 clauses PASS (0 FAIL, 204 NOT RUN); M = 204
+[acceptance] self-checks: 22 of 22 PASS
 ```
 
 | Assertion | M | PASS | FAIL | NOT RUN | Slice | Referee |
@@ -45,7 +45,7 @@ Command: `pwsh acceptance/run.ps1 -Clauses All -SelfTest` on this branch. Nothin
 | A9 | 4 | 0 | 0 | 4 | All | CF references and System.Reflection.Metadata |
 | A10 | 7 | 0 | 0 | 7 | S5 | live run, Go referees and taps |
 | A10a | 3 | 0 | 0 | 3 | S5 | Go tap |
-| A11 | 7 | 0 | 0 | 7 | S6 | Go tokenverify |
+| A11 | 9 | 0 | 0 | 9 | S6 | Go tokenverify and Go tlspeer |
 | A12 | 8 | 0 | 0 | 8 | S7 | cl.exe and a live run |
 | A13 | 15 | 0 | 0 | 15 | Each | Playwright |
 | A14 | 2 | 0 | 0 | 2 | Each | test over the tour files and a live Host |
@@ -55,10 +55,10 @@ Command: `pwsh acceptance/run.ps1 -Clauses All -SelfTest` on this branch. Nothin
 
 | Status and reason | Clauses |
 |---|---|
-| NOT RUN PRODUCT_MISSING | 201 |
+| NOT RUN PRODUCT_MISSING | 203 |
 | NOT RUN NOT_A_FRESH_RUN (`A13.fresh-clone.acceptance-unchanged`, needs `-Fresh`) | 1 |
 
-Self-checks (full text in the report): 19 of 19 PASS.
+Self-checks (full text in the report): 22 of 22 PASS.
 
 | Self-check | What it proves |
 |---|---|

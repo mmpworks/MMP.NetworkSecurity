@@ -16,7 +16,7 @@ The reader makes 4 sales, one at a time. Each sale uses the next counter, 1 to 4
 | `SaleApproved` | bank to reader | `type`, `length` | true |
 | `SaleDone` | bank to reader | `type`, `length` | true |
 
-`ksn` is 12 bytes: the 8-byte initial key id, then the 4-byte counter. `pinBlock` is 16 bytes. `plain` on `dukpt.message.sent` holds the PIN digits as text. `plain` on `dukpt.message.received` at the bank holds the PIN digits it opened.
+`ksn` is 12 bytes: the 8-byte initial key id, then the 4-byte counter. `pinBlock` is 16 bytes. `plain` on `dukpt.message.sent` holds the PIN digits as text. `plain` on `dukpt.message.received` at the bank holds the PIN digits it opened. A sale the bank refuses, a replay or a changed block, has an empty `plain`, because the bank opens no PIN for it.
 
 ## Events
 
@@ -49,7 +49,7 @@ The reader's `held` values in a run: 32 after the load, then 31, 31, 30, 31. So 
 
 ## Facts the tour needs
 
-1. A managed heap can keep copies, so erasing a register does not prove the bytes are gone from memory. A3 reads this statement in `lesson-06.json`.
+1. A managed heap can keep copies, so erasing a register does not prove the bytes are gone from memory. A3 reads this statement in `lesson-06.json`. The PIN digits also stay on the heap, because the code holds them in a string, which cannot be cleared.
 2. The tour step label from accuracy rule 7: `Built to show the parts. Do not copy.`
 3. All keys here are made up. `dukpt-bdk-128` comes from `TrainingKeySource`, and anyone can read it in the source.
 4. The bank keeps the base key and derives each key again from the KSN. It holds no per-reader key.

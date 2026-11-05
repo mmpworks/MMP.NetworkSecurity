@@ -1,0 +1,322 @@
+{
+  "steps": [
+    {
+      "id": "L8-S01",
+      "lesson": 8,
+      "title": "SSH: two proofs, no certificate authority",
+      "text": [
+        "SSH solves the same trust problem as TLS in a different way. There is no certificate authority. The client remembers each server's key, and the server checks each user's key.",
+        "So SSH asks for two proofs. The server proves itself with its host key. The client proves itself with its own key pair, and this is how a client authenticates to a server in SSH.",
+        "SSH is also one of the two ways an old device may reach a new server. Lesson 9 builds on this one.",
+        "Built to show the parts. Do not copy."
+      ],
+      "glossary": [],
+      "bind": { "kind": "concept" },
+      "highlight": ["diagram:lane=client", "diagram:lane=server"],
+      "unlock": { "mode": "ack" }
+    },
+    {
+      "id": "L8-S02",
+      "lesson": 8,
+      "title": "First, hello",
+      "text": [
+        "Each side sends one line of text that says it speaks SSH and names its software. This is the version line.",
+        "It travels in the clear. After this line, everything moves in packets."
+      ],
+      "glossary": [],
+      "bind": { "kind": "event", "eventType": "ssh.message.sent", "match": { "actor": "client", "message": "VersionLine" } },
+      "highlight": ["inspector:field=versionLine"],
+      "claims": [
+        {
+          "id": "L8-C01",
+          "text": "Each SSH side sends an identification string before the binary packet protocol starts.",
+          "source": "RFC 4253, section 4.2 (Protocol Version Exchange)"
+        }
+      ],
+      "unlock": { "mode": "event" }
+    },
+    {
+      "id": "L8-S03",
+      "lesson": 8,
+      "title": "Pick the tools together",
+      "text": [
+        "Each side sends a KexInit packet. It lists the algorithms it can use for key exchange, host key signatures, locking, and sealing.",
+        "The two sides pick the first match. If the lists share nothing, the check named algorithm match fails and the talk ends.",
+        "This round uses the modern set: curve25519-sha256, ssh-ed25519, aes128-ctr, and hmac-sha2-256."
+      ],
+      "glossary": [],
+      "bind": { "kind": "event", "eventType": "ssh.message.sent", "match": { "actor": "client", "message": "KexInit" } },
+      "highlight": ["inspector:field=kexAlgorithms", "inspector:field=hostKeyAlgorithms", "check:name=algorithm match"],
+      "claims": [
+        {
+          "id": "L8-C02",
+          "text": "Each side sends a list of supported algorithms in KEXINIT, and the algorithms are chosen from those lists by a fixed rule.",
+          "source": "RFC 4253, section 7.1 (Algorithm Negotiation)"
+        }
+      ],
+      "unlock": { "mode": "event" }
+    },
+    {
+      "id": "L8-S04",
+      "lesson": 8,
+      "title": "The server signs the exchange",
+      "text": [
+        "The key exchange works as in lesson 3: each side sends a public share, and both compute the same secret.",
+        "The server's reply adds two things. It sends its host key. It also signs a hash of everything said so far, which includes both shares. The signature shows that whoever holds the host key took part in this very exchange.",
+        "Try it: flip one byte of that signature. The client's check named exchange signature fails."
+      ],
+      "glossary": [],
+      "bind": { "kind": "event", "eventType": "wire.sent", "match": { "actor": "server", "message": "KexEcdhReply" } },
+      "highlight": ["inspector:field=hostKey", "inspector:field=serverShare", "inspector:field=exchangeSignature"],
+      "tryIt": {
+        "id": "L8-S04-T1",
+        "label": "Flip one byte of the exchange signature",
+        "action": { "type": "run-attack", "attackId": "L8-flip-exchange-signature" },
+        "expect": { "type": "check", "name": "exchange signature", "result": "fail" }
+      },
+      "claims": [
+        {
+          "id": "L8-C03",
+          "text": "The curve25519-sha256 method uses the same message flow and exchange hash structure as the ECDH method in RFC 5656, with Curve25519 as in RFC 7748.",
+          "source": "RFC 8731, section 3 (Key Exchange Methods)"
+        }
+      ],
+      "unlock": { "mode": "action", "ref": "L8-S04-T1" }
+    },
+    {
+      "id": "L8-S05",
+      "lesson": 8,
+      "title": "A share that makes a weak secret",
+      "text": [
+        "A bad server can send a share made of all zeros. Then both sides would compute a secret that anyone can compute.",
+        "So both sides check that the result of the X25519 step is not all zero. The check is named x25519 result not zero.",
+        "Try it: send the all-zero share. The check fails and the talk ends."
+      ],
+      "glossary": [],
+      "bind": { "kind": "event", "eventType": "check.result", "match": { "message": "x25519 result not zero" } },
+      "highlight": ["check:name=x25519 result not zero"],
+      "tryIt": {
+        "id": "L8-S05-T1",
+        "label": "Send an all-zero X25519 share",
+        "action": { "type": "run-attack", "attackId": "L8-zero-share" },
+        "expect": { "type": "check", "name": "x25519 result not zero", "result": "fail" }
+      },
+      "claims": [
+        {
+          "id": "L8-C04",
+          "text": "X25519 gives the all-zero value for an input point of small order, and implementations may check for an all-zero shared secret and abort. SSH curve25519-sha256 uses that check.",
+          "source": "RFC 7748, section 6.1 (Curve25519); RFC 8731, section 3 (Key Exchange Methods)"
+        }
+      ],
+      "unlock": { "mode": "action", "ref": "L8-S05-T1" }
+    },
+    {
+      "id": "L8-S06",
+      "lesson": 8,
+      "title": "Whose key is this?",
+      "text": [
+        "The host key card shows the server's key and its fingerprint, a short hash of the key. The client compares the key with the one it saved from an earlier visit. The check is named known_hosts match.",
+        "A host key is trusted because the client pinned it earlier. On the very first connect there is nothing to compare, so the first connect has no proof at all. The fingerprint card is the moment to check the key another way, such as asking the server's owner.",
+        "Try it: have the server present a different key. The saved key stays the same, the match fails, and the client stops."
+      ],
+      "glossary": [],
+      "bind": { "kind": "event", "eventType": "ssh.hostkey.seen", "match": { "actor": "client" } },
+      "highlight": ["check:name=known_hosts match"],
+      "tryIt": {
+        "id": "L8-S06-T1",
+        "label": "Present a different host key",
+        "action": { "type": "run-attack", "attackId": "L8-change-host-key" },
+        "expect": { "type": "check", "name": "known_hosts match", "result": "fail" }
+      },
+      "claims": [
+        {
+          "id": "L8-C05",
+          "text": "SSH has no infrastructure for distributing host keys. A client may accept a host key the first time it connects, save it, and compare it on later connections; connecting without first verifying the key is open to a man-in-the-middle attack.",
+          "source": "RFC 4251, section 4.1 (Host Keys) and section 9.3.4 (Man-in-the-middle)"
+        }
+      ],
+      "unlock": { "mode": "action", "ref": "L8-S06-T1" }
+    },
+    {
+      "id": "L8-S07",
+      "lesson": 8,
+      "title": "The lock switches on",
+      "text": [
+        "Both sides send NewKeys, and everything after it is sealed. SSH locks the packet length too, so an eavesdropper cannot even see where one packet ends and the next begins.",
+        "Try it: switch to the eavesdropper view. Each packet shows only noise and a seal."
+      ],
+      "glossary": ["eavesdropper"],
+      "bind": { "kind": "event", "eventType": "keys.installed", "match": { "actor": "client" } },
+      "highlight": ["inspector:field=encryptedPacket", "inspector:field=mac"],
+      "tryIt": {
+        "id": "L8-S07-T1",
+        "label": "Switch to the eavesdropper view",
+        "action": { "type": "set-view", "value": "eavesdropper" },
+        "expect": { "type": "view", "value": "eavesdropper" }
+      },
+      "unlock": { "mode": "action", "ref": "L8-S07-T1" }
+    },
+    {
+      "id": "L8-S08",
+      "lesson": 8,
+      "title": "Every packet carries a seal",
+      "text": [
+        "The receiver checks the seal on each packet. The check is named packet MAC. It passes on the normal run.",
+        "Try it: flip one byte of the protected login packet. The seal no longer fits, and the check fails."
+      ],
+      "glossary": [],
+      "bind": { "kind": "event", "eventType": "check.result", "match": { "message": "packet MAC" } },
+      "highlight": ["check:name=packet MAC"],
+      "tryIt": {
+        "id": "L8-S08-T1",
+        "label": "Flip one byte of a protected packet",
+        "action": { "type": "run-attack", "attackId": "L8-flip-packet" },
+        "expect": { "type": "check", "name": "packet MAC", "result": "fail" }
+      },
+      "unlock": { "mode": "action", "ref": "L8-S08-T1" }
+    },
+    {
+      "id": "L8-S09",
+      "lesson": 8,
+      "title": "Now the client proves who it is",
+      "text": [
+        "The server has proved itself. Now the client must prove itself. It names a public key, and the server says whether it would accept that key (UserauthQuery, then UserauthPkOk).",
+        "Then the client signs a message with the matching private key and sends it (UserauthSigned). The signed data includes the session id, so the signature works for this session only.",
+        "The server checks the signature against the public key it allows for this user. The check is named userauth signature verify.",
+        "Try it: name the allowed public key but sign with a different private key. The signature does not verify, and the server refuses."
+      ],
+      "glossary": [],
+      "bind": { "kind": "event", "eventType": "ssh.message.sent", "match": { "actor": "client", "message": "UserauthSigned" } },
+      "highlight": ["check:name=userauth signature verify"],
+      "tryIt": {
+        "id": "L8-S09-T1",
+        "label": "Sign with the wrong private key",
+        "action": { "type": "run-attack", "attackId": "L8-wrong-user-key" },
+        "expect": { "type": "check", "name": "userauth signature verify", "result": "fail" }
+      },
+      "claims": [
+        {
+          "id": "L8-C06",
+          "text": "In SSH public key authentication, possession of a private key serves as authentication. The client sends a signature made with its private key over data that starts with the session identifier, and the server must check that the key is valid for the user and that the signature is valid.",
+          "source": "RFC 4252, section 7 (Public Key Authentication Method: publickey)"
+        }
+      ],
+      "unlock": { "mode": "action", "ref": "L8-S09-T1" }
+    },
+    {
+      "id": "L8-S10",
+      "lesson": 8,
+      "title": "Run one command",
+      "text": [
+        "With the client accepted, it opens a channel and asks the server to run a command. This is the exec request.",
+        "The lab's server does not start a process. It answers from a fixed table of two commands, echo and whoami, so the lesson cannot be used to run anything."
+      ],
+      "glossary": [],
+      "bind": { "kind": "event", "eventType": "ssh.message.sent", "match": { "actor": "client", "message": "ChannelRequestExec" } },
+      "highlight": ["diagram:lane=server"],
+      "claims": [
+        {
+          "id": "L8-C07",
+          "text": "An SSH channel request can start a shell, an application program, or a subsystem at the remote end.",
+          "source": "RFC 4254, section 6.5 (Starting a Shell or a Command)"
+        },
+        {
+          "id": "L8-C08",
+          "text": "The lab's SSH server has a fixed table of two commands, echo and whoami, and starts no process.",
+          "source": "docs/lesson-ssh-names.md, What the tour must state, item 5 (branch feat/s4-ssh); docs/program-design.md, section 2.6, SSH-2 paragraph"
+        }
+      ],
+      "unlock": { "mode": "event" }
+    },
+    {
+      "id": "L8-S11",
+      "lesson": 8,
+      "title": "A tunnel through the server",
+      "text": [
+        "SSH can also carry other traffic. The client asks the server to open a connection to a target and relay it. This is a tunnel.",
+        "A server should not relay to just anywhere. The lab keeps an allow list of targets. The server checks the target against it, and the check is named tunnel allow list.",
+        "Try it: ask for a tunnel to a target that is off the list. The check fails."
+      ],
+      "glossary": [],
+      "bind": { "kind": "event", "eventType": "ssh.message.sent", "match": { "actor": "client", "message": "ChannelOpenTunnel" } },
+      "highlight": ["check:name=tunnel allow list"],
+      "tryIt": {
+        "id": "L8-S11-T1",
+        "label": "Ask for a tunnel to a target off the list",
+        "action": { "type": "run-attack", "attackId": "L8-refused-tunnel" },
+        "expect": { "type": "check", "name": "tunnel allow list", "result": "fail" }
+      },
+      "claims": [
+        {
+          "id": "L8-C09",
+          "text": "SSH TCP/IP forwarding uses direct-tcpip channels to open a connection to a host and port, and the receiving side must decide whether to allow the forwarding.",
+          "source": "RFC 4254, section 7.2 (TCP/IP Forwarding Channels); docs/lesson-ssh-names.md, tunnel allow list row (actor server, branch fix/ssh-followups)"
+        }
+      ],
+      "unlock": { "mode": "action", "ref": "L8-S11-T1" }
+    },
+    {
+      "id": "L8-S12",
+      "lesson": 8,
+      "title": "The old suite for the old device",
+      "text": [
+        "A second round runs the legacy suite that an older device might use: diffie-hellman-group14-sha1, aes128-cbc, hmac-sha1, and an ssh-rsa host key. Each weak part gets a note at the moment it applies.",
+        "SHA-1 has known collision attacks, and the ssh-rsa host key signs with SHA-1. aes128-cbc with a seal over the plain text has a published plaintext recovery attack.",
+        "HMAC-SHA-1 is a different case. There is no known practical break of it. It is old, and the modern suite replaces it.",
+        "Try it: flip one byte of the RSA signature in this round. The exchange signature check fails, even though round 1 passed."
+      ],
+      "glossary": [],
+      "bind": { "kind": "event", "eventType": "ssh.weak.exchange-hash", "match": { "actor": "client" } },
+      "highlight": ["check:name=exchange signature"],
+      "tryIt": {
+        "id": "L8-S12-T1",
+        "label": "Flip one byte of the legacy RSA signature",
+        "action": { "type": "run-attack", "attackId": "L8-legacy-flip-signature" },
+        "expect": { "type": "check", "name": "exchange signature", "result": "fail" }
+      },
+      "claims": [
+        {
+          "id": "L8-C10",
+          "text": "Collision attacks have been used to undermine SHA-1. In 2022 NIST announced that SHA-1 should be phased out by Dec. 31, 2030, and recommended SHA-2 or SHA-3.",
+          "source": "NIST news, NIST Retires SHA-1 Cryptographic Algorithm, 2022-12-15"
+        },
+        {
+          "id": "L8-C11",
+          "text": "The ssh-rsa host key format signs with RSASSA-PKCS1-v1_5 using the SHA-1 hash.",
+          "source": "RFC 4253, section 6.6 (Public Key Algorithms)"
+        },
+        {
+          "id": "L8-C12",
+          "text": "Error handling in the SSH protocol in SSH Tectia products and OpenSSH 4.7p1, and possibly other versions, makes it easier for remote attackers to recover certain plaintext data from an arbitrary block of ciphertext when a block cipher in CBC mode is used (CVE-2008-5161).",
+          "source": "NVD, CVE-2008-5161, description (the published paper by Albrecht, Paterson and Watson, 2009 was not fetched)"
+        },
+        {
+          "id": "L8-C13",
+          "text": "As of RFC 6194 (2011), there is no indication that attacks on SHA-1 extend to HMAC-SHA-1.",
+          "source": "RFC 6194, section 3.3 (HMAC-SHA-1)"
+        }
+      ],
+      "unlock": { "mode": "action", "ref": "L8-S12-T1" }
+    },
+    {
+      "id": "L8-S13",
+      "lesson": 8,
+      "title": "What was tested, and what was not",
+      "text": [
+        "In SSH the server proves itself with a host key the client pinned earlier, and the client proves itself with a signed message. Neither side needs a certificate authority.",
+        "The lab shows an old device's SSH suite beside a modern one on the desktop. The code is CF-compiled, run on the desktop CLR, never run on CE. The lab has not touched real CE hardware.",
+        "Built to show the parts. Do not copy."
+      ],
+      "glossary": [],
+      "bind": { "kind": "concept" },
+      "claims": [
+        {
+          "id": "L8-C14",
+          "text": "In this run, nothing has touched real Windows CE hardware. The engines are compiled for the CF runtime and run on the desktop CLR.",
+          "source": "docs/prd.md, Spike results table, row 'CE compiler, emulator, device'"
+        }
+      ],
+      "unlock": { "mode": "ack" }
+    }
+  ]
+}

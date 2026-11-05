@@ -105,9 +105,8 @@ namespace NetSec.Machine
         /// <summary>Passes wire bytes between two engines on one thread, in a plain loop, until neither has more to say.</summary>
         public static void Run(IProtocolEngine client, IProtocolEngine server)
         {
-            server.Start();
+            byte[] toClient = server.Start().Wire;
             byte[] toServer = client.Start().Wire;
-            byte[] toClient = new byte[0];
             while (toServer.Length > 0 || toClient.Length > 0)
             {
                 byte[] fromServer = toServer.Length > 0 ? server.Feed(toServer, 0, toServer.Length).Wire : new byte[0];
