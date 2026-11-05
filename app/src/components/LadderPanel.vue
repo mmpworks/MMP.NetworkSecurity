@@ -1,7 +1,7 @@
 <script setup lang="ts">
 import { computed } from 'vue'
 import { ladderRungs, registers } from '../lab'
-import { allEvents, isReal, selectedEvent, upToSeq } from '../store'
+import { allEvents, isOsTransport, selectedEvent, upToSeq } from '../store'
 
 // Lessons 5 and 6: the keys in the order the engine made them. A rung that the engine erased is shown erased. The register count comes from the event.
 const upTo = upToSeq
@@ -12,7 +12,7 @@ const short = (s: string) => s.replace(/^dukpt\./, '')
 
 <template>
   <div class="ladder" data-testid="key-ladder">
-    <div v-if="isReal" class="empty-note">Values are held by the OS. This course shows none of them with the OS transport.</div>
+    <div v-if="isOsTransport" class="empty-note">Values are held by the OS. This course shows none of them with the OS transport.</div>
     <template v-else>
       <div v-if="regs" class="regs" data-testid="reader-registers">Reader registers: <b>{{ regs.held }}</b> held, next counter {{ regs.next }}</div>
       <div v-if="!rungs.length" class="empty-note">Keys appear here as the engine derives them.</div>

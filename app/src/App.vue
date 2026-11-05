@@ -82,7 +82,7 @@ const raceUpTo = computed(() => selectedEvent.value?.seq ?? Infinity)
 const race = computed(() => ({ left: raceStats(shownEvents.value, raceUpTo.value, 'tls11'), right: raceStats(shownEvents.value, raceUpTo.value, 'tls13') }))
 
 function setView(v: ViewMode) { ui.view = v }
-function toggleTransport() { ui.transport = ui.transport === 'real' ? 'glass' : 'real' }
+function toggleTransport() { ui.transport = ui.transport === 'os' ? 'glass' : 'os' }
 
 function moveSelection(d: number) {
   const list = shownEvents.value
@@ -161,7 +161,7 @@ const shortcuts: [string, string][] = [
             <v-btn value="endpoints" data-testid="view-endpoints">Endpoints</v-btn><v-btn value="eavesdropper" data-testid="view-eavesdropper">Eavesdropper</v-btn><v-btn value="both" data-testid="view-both">Both</v-btn>
           </v-btn-toggle>
           <ShowKeysSwitch testid="show-keys-switch" />
-          <v-btn :variant="ui.transport === 'real' ? 'flat' : 'tonal'" :color="ui.transport === 'real' ? 'info' : undefined" data-testid="transport-switch" :aria-pressed="ui.transport === 'real'" @click="toggleTransport">OS transport</v-btn>
+          <v-btn :variant="ui.transport === 'os' ? 'flat' : 'tonal'" :color="ui.transport === 'os' ? 'info' : undefined" data-testid="transport-switch" :aria-pressed="ui.transport === 'os'" @click="toggleTransport">OS transport</v-btn>
           <select v-model.number="ui.speed" class="ns-select" data-testid="speed-select" aria-label="Animation speed"><option :value="0.5">0.5x</option><option :value="1">1x</option><option :value="2">2x</option></select>
           <select :value="ui.theme" class="ns-select" data-testid="theme-select" aria-label="Theme" @change="e => setTheme((e.target as HTMLSelectElement).value as any)"><option value="system">System</option><option value="light">Light</option><option value="dark">Dark</option></select>
           <v-btn size="small" icon="mdi-keyboard-outline" aria-label="Keyboard shortcuts" @click="ui.shortcuts = true" />

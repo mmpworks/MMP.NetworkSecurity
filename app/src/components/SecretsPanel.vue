@@ -1,6 +1,6 @@
 <script setup lang="ts">
 import { computed, reactive } from 'vue'
-import { isHighlighted, isReal, selectedEvent, shownEvents, ui, upToSeq } from '../store'
+import { isHighlighted, isOsTransport, selectedEvent, shownEvents, ui, upToSeq } from '../store'
 
 interface Row { holder: string; name: string; hex: string; derivedFrom: string[]; fresh: boolean }
 
@@ -46,7 +46,7 @@ const copy = (hex: string) => { try { void navigator.clipboard?.writeText(hex) }
 <template>
   <div class="secrets" data-testid="secrets-panel">
     <div class="inspector-tools"><span class="side-title">WHAT EACH SIDE KNOWS</span></div>
-    <div v-if="isReal" class="empty-note">Values are held by the OS. This course shows none of them with the OS transport.</div>
+    <div v-if="isOsTransport" class="empty-note">Values are held by the OS. This course shows none of them with the OS transport.</div>
     <template v-else-if="eve">
       <div class="secret-cols">
         <div class="secret-col" data-testid="secrets-col-eavesdropper">

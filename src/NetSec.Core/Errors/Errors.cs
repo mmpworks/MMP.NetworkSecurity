@@ -79,6 +79,7 @@ namespace NetSec.Errors
         public const string OsTransportNoPeer = "OS_TRANSPORT_NO_PEER";
         public const string OsTransportFailed = "OS_TRANSPORT_FAILED";
         public const string KeylogNotKept = "KEYLOG_NOT_KEPT";
+        public const string TransportUnknown = "TRANSPORT_UNKNOWN";
         public const string DhPeerOutOfRange = "DH_PEER_OUT_OF_RANGE";
         public const string HkdfPrkTooShort = "HKDF_PRK_TOO_SHORT";
         public const string RsaValueOutOfRange = "RSA_VALUE_OUT_OF_RANGE";

@@ -99,8 +99,8 @@ export const selectedEvent = computed<TraceEvent | null>(() => {
 export const lessonRow = computed(() => lessons.value.find(l => l.lesson === ui.lesson) ?? null)
 export const steps = computed<TourStep[]>(() => (ui.lesson != null ? TOURS.get(ui.lesson) ?? [] : []))
 export const step = computed<TourStep | null>(() => steps.value[tour.stepIndex] ?? null)
-export const isReal = computed(() => (active.value ? active.value.transportKind === 'real' : ui.transport === 'real'))
-export const trainingChip = computed(() => (isReal.value ? 'OS TRANSPORT' : 'TRAINING ONLY'))
+export const isOsTransport = computed(() => (active.value ? active.value.transportKind === 'os' : ui.transport === 'os'))
+export const trainingChip = computed(() => (isOsTransport.value ? 'OS TRANSPORT' : 'TRAINING ONLY'))
 
 const rawUnlock = computed<Unlock>(() => {
   const s = step.value
@@ -205,7 +205,7 @@ function onStarted(f: any) {
   const lesson = ui.lesson ?? 0
   const rec: SessionRec = {
     id: String(f.sessionId), parentId: '', label: `lesson ${lesson}`, lesson, seed: Number(f.seed ?? 0),
-    trainingOnly: !!f.trainingOnly, transportKind: String(f.transportKind ?? (f.trainingOnly ? 'glass' : 'real')), events: [], finished: null, replay: false,
+    trainingOnly: !!f.trainingOnly, transportKind: String(f.transportKind ?? (f.trainingOnly ? 'glass' : 'os')), events: [], finished: null, replay: false,
   }
   ui.sessions = [...ui.sessions.filter(s => s.id !== rec.id), rec]
   ui.activeId = rec.id
