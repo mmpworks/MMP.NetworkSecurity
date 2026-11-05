@@ -121,6 +121,7 @@ namespace NetSec.Labs
                 case 6: return new Lesson06Dukpt();
                 case 7: return new Lesson07Tls11();
                 case 8: return new Lesson08Ssh();
+                case 9: return new Lesson09Bridge();
                 case 10: return new Lesson10Auth();
                 case 11: return new TimingAttackLab();
                 default: return null;
@@ -164,6 +165,7 @@ namespace NetSec.Labs
             PlainFlip("L5-replace-key-share", 5, "ClientHello", Tls13Lab.ClientX25519ShareOffset, Tls13Codes.AeadTag),
             PlainFlip("L5-flip-mlkem-ciphertext", 5, "ServerHello", Tls13Lab.ServerMlKemCiphertextOffset, Tls13Codes.AeadTag),
             FlipLength("L5-flip-record-length", 5, "Finished"),
+            Swap("L5-clear-close-notify", 5, "ApplicationData", new byte[] { 21, 3, 3, 0, 2, 1, 0 }, ErrorCodes.UnexpectedMessage, Tls13Codes.CheckName(ErrorCodes.UnexpectedMessage)),
 
             WithOption("L6-replay-sale", 6, Lesson06Dukpt.OptionScenario, Lesson06Dukpt.ScenarioReplaySale, AttackOutcome.Rejected, ErrorCodes.DukptKsnReplay, Lesson06Dukpt.ReplayCheck),
             Flip("L6-flip-pin-block", 6, Lesson06Dukpt.SaleName, Lesson06Dukpt.PinBlockOffset + 3, ErrorCodes.DukptPinBlockFormat, Lesson06Dukpt.FormatCheck),
@@ -180,6 +182,10 @@ namespace NetSec.Labs
             WithOption("L8-wrong-user-key", 8, Lesson08Ssh.OptionWrongUserKey, "attacker", AttackOutcome.Rejected, SshCodes.AuthRefused, SshChecks.AuthSignature),
             WithOption("L8-refused-tunnel", 8, Lesson08Ssh.OptionRefusedTunnel, "yes", AttackOutcome.Rejected, SshCodes.TunnelRefused, SshChecks.TunnelAllowList),
             Flip("L8-legacy-flip-signature", 8, SshNames.KexdhReply, SshRsaSignatureOffset, SshCodes.ExchangeSignature, SshChecks.ExchangeSignature),
+
+            Flip("L9-tamper-hop1", 9, SshNames.ChannelData, SshProtectedBodyOffset, SshCodes.PacketMac, SshChecks.PacketMac),
+            Flip("L9-tamper-hop2", 9, "ApplicationData", Tls13Lab.RecordCipherOffset, Tls13Codes.AeadTag, Tls13Codes.CheckName(Tls13Codes.AeadTag)),
+            WithOption("L9-flip-pin-block", 9, Lesson09Bridge.OptionFlipPinBlock, "yes", AttackOutcome.Rejected, ErrorCodes.DukptMacMismatch, NetSec.Bridge.BankHsmCore.MacCheck),
 
             Flip("L10-change-token-claim", 10, "ReadTotals", Lesson10Auth.ClaimsOffset + 5, ErrorCodes.TokenBadSignature, NetSec.Auth.Token.SignatureCheck),
             WithOption("L10-expired-token", 10, Lesson10Auth.OptionTokenExpired, "yes", AttackOutcome.Rejected, ErrorCodes.TokenExpired, NetSec.Auth.Token.ExpiryCheck),
@@ -209,16 +215,6 @@ namespace NetSec.Labs
         const int SshRsaSignatureOffset = 669;
 
         public static AttackDefinition[] All { get { return (AttackDefinition[])Rows.Clone(); } }
-
-        /// <summary>Lesson 9's rows, which join All when its tour lands.</summary>
-        public static AttackDefinition[] Lesson9Unreleased { get { return (AttackDefinition[])Lesson9Rows.Clone(); } }
-
-        static readonly AttackDefinition[] Lesson9Rows =
-        {
-            Flip("L9-tamper-hop1", 9, SshNames.ChannelData, SshProtectedBodyOffset, SshCodes.PacketMac, SshChecks.PacketMac),
-            Flip("L9-tamper-hop2", 9, "ApplicationData", Tls13Lab.RecordCipherOffset, Tls13Codes.AeadTag, Tls13Codes.CheckName(Tls13Codes.AeadTag)),
-            WithOption("L9-flip-pin-block", 9, Lesson09Bridge.OptionFlipPinBlock, "yes", AttackOutcome.Rejected, ErrorCodes.DukptMacMismatch, NetSec.Bridge.BankHsmCore.MacCheck),
-        };
 
         static AttackDefinition Flip(string id, int lesson, string message, int offset, string code, string check)
         {

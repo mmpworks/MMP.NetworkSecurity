@@ -56,7 +56,7 @@ namespace NetSec.Tls13
 
     public sealed class ServerHelloInfo
     {
-        public int LegacyVersion, Suite, SelectedVersion, Group;
+        public int LegacyVersion, Suite, Compression, SelectedVersion, Group;
         public byte[] Random, SessionId, KeyShare;
         public FieldMark[] Marks;
 
@@ -222,7 +222,8 @@ namespace NetSec.Tls13
                 case ExtServerName:
                     r.U16("server_name.list_length", "length");
                     r.U8("server_name.type", "header");
-                    info.ServerName = Encoding.UTF8.GetString(r.Take("server_name", "data", r.U16("server_name.length", "length")), 0, length - 5);
+                    byte[] name = r.Take("server_name", "data", r.U16("server_name.length", "length"));
+                    info.ServerName = Encoding.UTF8.GetString(name, 0, name.Length);
                     break;
                 case ExtSupportedVersions:
                     info.Versions = ReadU16List(r, "supported_versions", r.U8("supported_versions.length", "length"));
@@ -266,7 +267,7 @@ namespace NetSec.Tls13
             info.Random = r.Take("random", "random", 32);
             info.SessionId = r.Take("session_id", "id", r.U8("session_id.length", "length"));
             info.Suite = r.U16("cipher_suite", "header");
-            r.U8("compression", "header");
+            info.Compression = r.U8("compression", "header");
             int extensions = r.Remaining > 0 ? r.U16("extensions.length", "length") : 0;
             int end = r.Remaining - extensions;
             while (r.Remaining > end) ReadServerExtension(r, info);

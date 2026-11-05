@@ -33,6 +33,12 @@
       "verdict": "accurate",
       "note": "Tours read at origin/feat/tours-4-5-10 (PR 23, commit 1b2fc21). Section 4.4.3: CertificateVerify 'is used to provide explicit proof that an endpoint possesses the private key corresponding to its certificate'; the signature covers Transcript-Hash(Handshake Context, Certificate).",
       "checkedAgainst": "RFC 8446 section 4.4.3 (RFC text fetched from rfc-editor.org this session)"
+    },
+    {
+      "id": "L4-C06",
+      "verdict": "accurate",
+      "checkedAgainst": "src/NetSec.Core/Pki/Certificate.cs ChainCheck.Trusted and RunForClient (read); RFC 5280 section 4.2 (earlier); unit test An_unknown_critical_extension_is_refused_and_a_non_critical_one_is_read_past passed; docs/lessons-4-5-names.md on fix/s3-tls-blockers b5d6641 (read)",
+      "note": "Tour read at origin/fix/tour-4-5-limits commit 14af058 (PR 87, open); lab run at origin/fix/s3-tls-blockers b5d6641. Code read: Trusted() checks that each issuer is a CA (IsCa from basicConstraints), every signature, any critical extension it does not know (HasUnknownCritical), and validity for chain[i] only. The anchors are never dated, so 'does not date the trust anchor' holds. keyUsage is listed as known (so a critical keyUsage is not refused) but never read; pathLen and name constraint values are never read (comment at line 288). The step text and claim leave out one thing the check also reads: extendedKeyUsage, which RunForClient uses to require clientAuth. That omission is harmless. All five attack rows of lesson 4 still fail by their named checks."
     }
   ],
   "textRead": {
@@ -42,6 +48,8 @@
     "stepsWithProblems": 0,
     "problemsFound": 0,
     "problems": [],
-    "notes": []
+    "notes": [
+      "Re-read at PR 87 (14af058): S10 adds the partial-check sentence, which matches Certificate.cs. 10 steps, no problems."
+    ]
   }
 }
