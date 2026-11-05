@@ -20,6 +20,7 @@ import LadderPanel from './components/LadderPanel.vue'
 import HostKeyPanel from './components/HostKeyPanel.vue'
 import TokenPanel from './components/TokenPanel.vue'
 import TimingPanel from './components/TimingPanel.vue'
+import OnionPanel from './components/OnionPanel.vue'
 import { isLadderEvent, pictureOf, protocols, raceStats } from './lab'
 import type { TraceEvent } from './types'
 
@@ -38,7 +39,7 @@ const position = computed(() => {
 const sessionTabs = computed(() => ui.sessions.filter(s => s.lesson === ui.lesson))
 
 // Lesson views: tabs appear only when the shown events carry that kind of data. A new selection of that kind opens its tab.
-type TabId = 'bytes' | 'picture' | 'chain' | 'ladder' | 'measures' | 'hostkey' | 'token' | 'timing'
+type TabId = 'bytes' | 'picture' | 'chain' | 'ladder' | 'measures' | 'hostkey' | 'token' | 'timing' | 'onion'
 const tabs = computed(() => {
   const list: { id: TabId; label: string }[] = [{ id: 'bytes', label: 'Bytes' }]
   const ev = shownEvents.value
@@ -48,6 +49,7 @@ const tabs = computed(() => {
   if (ev.some(e => isLadderEvent(e))) list.push({ id: 'ladder', label: 'Keys' })
   if (ev.some(e => e.fields.some(f => f.name === 'tokenHeader' || f.name === 'proofHeader') || (e.type === 'measure.result' && (e.message === 'token claims' || e.message === 'proof claims')))) list.push({ id: 'token', label: 'Token' })
   if (ev.some(e => e.type.startsWith('timing.'))) list.push({ id: 'timing', label: 'Timing' })
+  if (ev.some(e => e.type === 'pin.block.locked')) list.push({ id: 'onion', label: 'Onion' })
   if (ev.some(e => e.type === 'measure.result' && e.message !== 'Reader registers')) list.push({ id: 'measures', label: 'Measures' })
   return list
 })
@@ -58,6 +60,7 @@ function tabFor(e: TraceEvent): TabId {
   if (e.type === 'ssh.hostkey.seen') return 'hostkey'
   if (e.fields.some(f => f.name === 'tokenHeader' || f.name === 'proofHeader') || e.message === 'token claims' || e.message === 'proof claims') return 'token'
   if (e.type.startsWith('timing.')) return 'timing'
+  if (e.type === 'pin.block.locked' || e.type === 'gateway.envelope.relayed' || e.type === 'ce.reply.relayed') return 'onion'
   if (isLadderEvent(e) || e.message === 'Reader registers') return 'ladder'
   if (e.type === 'measure.result') return 'measures'
   return 'bytes'
@@ -192,6 +195,7 @@ const shortcuts: [string, string][] = [
                   <HostKeyPanel v-else-if="ui.inspectorTab === 'hostkey' && hasTab('hostkey')" />
                   <TokenPanel v-else-if="ui.inspectorTab === 'token' && hasTab('token')" />
                   <TimingPanel v-else-if="ui.inspectorTab === 'timing' && hasTab('timing')" />
+                  <OnionPanel v-else-if="ui.inspectorTab === 'onion' && hasTab('onion')" />
                   <LadderPanel v-else-if="ui.inspectorTab === 'ladder' && hasTab('ladder')" />
                   <MeasurePanel v-else-if="ui.inspectorTab === 'measures' && hasTab('measures')" />
                   <ByteInspector v-else />

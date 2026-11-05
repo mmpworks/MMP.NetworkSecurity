@@ -114,16 +114,17 @@ namespace NetSec.Tests
         [Theory]
         [InlineData(false)]
         [InlineData(true)]
-        public void Each_protected_packet_received_shows_a_passing_mac_check(bool legacy)
+        public void Each_direction_shows_one_passing_mac_check_on_its_first_protected_packet(bool legacy)
         {
             Duel d = Open(legacy ? SshAlgorithms.Legacy : SshAlgorithms.Modern);
             d.ClientCommand(new EngineCommand(EngineCommandKind.Exec, 0, null, "echo hello"));
             foreach (List<TraceEvent> events in new[] { d.ClientEvents, d.ServerEvents })
             {
-                int sealedPackets = events.Count(e => e.Type == "ssh.message.received" && e.Fields != null && e.Fields.Length > 0 && e.Fields[0].Name == "encryptedPacket");
-                int passes = events.Count(e => e.Type == "check.result" && e.Check.Passed && e.Message == SshChecks.PacketMac);
-                Assert.True(sealedPackets > 0);
-                Assert.Equal(sealedPackets, passes);
+                Assert.True(events.Count(e => e.Type == "ssh.message.received" && e.Fields != null && e.Fields.Length > 0 && e.Fields[0].Name == "encryptedPacket") > 1);
+                int pass = events.FindIndex(e => e.Type == "check.result" && e.Check.Passed && e.Message == SshChecks.PacketMac);
+                int firstSealed = events.FindIndex(e => e.Type == "ssh.message.received" && e.Fields != null && e.Fields.Length > 0 && e.Fields[0].Name == "encryptedPacket");
+                Assert.Equal(1, events.Count(e => e.Type == "check.result" && e.Check.Passed && e.Message == SshChecks.PacketMac));
+                Assert.True(pass >= 0 && pass < firstSealed, "the pass must come before the first protected packet's event");
             }
         }
 
@@ -295,6 +296,233 @@ namespace NetSec.Tests
             Assert.True(flood.Taken > stalled, "reading did not resume the target");
         }
 
+        // ---------------------------------------------------------------- Jared's re-check: relay, sender, ninth channel
+
+        sealed class SessionPair
+        {
+            public GlassSshSession Client, Server;
+            public int Channel;
+        }
+
+        static SessionPair OpenTunnelPair(Func<string, int, IFuture<IByteLink>> target, int deadlineMs = 30000)
+        {
+            MemoryLink[] links = MemoryLink.Pair();
+            SessionPair pair = new SessionPair();
+            pair.Server = new GlassSshSession(SshEngine.Server(ServerOptions(SshAlgorithms.Modern), Stream("server"), null, "client"), links[1], new ListSink(), new FreeRunGate(), null, deadlineMs, new FixedClock(1), target);
+            pair.Client = new GlassSshSession(SshEngine.Client(ClientOptions(SshAlgorithms.Modern), Stream("client"), null, "server"), links[0], new ListSink(), new FreeRunGate(), null, deadlineMs, new FixedClock(1), null);
+            pair.Server.Run();
+            pair.Client.Run();
+            Assert.True(pair.Client.Opened.Wait(30000));
+            IFuture<int> open = pair.Client.OpenTunnel("allowed", 1);
+            Assert.True(open.Wait(30000));
+            pair.Channel = open.Result;
+            return pair;
+        }
+
+        /// <summary>A target that always has bytes until it is closed, like a socket with a long reply.</summary>
+        sealed class LongReplyLink : IByteLink
+        {
+            long _taken;
+            volatile bool _closed;
+            public long Taken => Interlocked.Read(ref _taken);
+            public IFuture<int> Read(byte[] b, int off, int n)
+            {
+                if (_closed) return Futures.FromResult<int>(0);
+                Interlocked.Add(ref _taken, n);
+                return Futures.FromResult<int>(n);
+            }
+            public IFuture Write(byte[] b, int off, int n) => Futures.Completed;
+            public void Close() { _closed = true; }
+        }
+
+        /// <summary>A target that takes bytes slowly, or never.</summary>
+        sealed class SlowLink : IByteLink
+        {
+            readonly int _delayMs;
+            readonly Promise<int> _never = new Promise<int>();
+            long _written;
+            public SlowLink(int delayMs) { _delayMs = delayMs; }
+            public long Written => Interlocked.Read(ref _written);
+            public IFuture<int> Read(byte[] b, int off, int n) => _never.Future;
+            public IFuture Write(byte[] b, int off, int n)
+            {
+                Interlocked.Add(ref _written, n);
+                return _delayMs > 0 ? Futures.Delay(_delayMs) : new Promise().Future;
+            }
+            public void Close() => _never.TrySetResult(0);
+        }
+
+        /// <summary>SshScript.Tunnel takes this path: read part of a long reply, send EOF, collect to the end.</summary>
+        [Fact]
+        public void A_channel_ends_after_the_peers_eof_while_the_relay_waits_for_room()
+        {
+            LongReplyLink target = new LongReplyLink();
+            SessionPair pair = OpenTunnelPair((h, p) => Futures.FromResult<IByteLink>(target));
+            long seen = -1;
+            for (int i = 0; i < 100 && seen != target.Taken; i++)
+            {
+                seen = target.Taken;
+                Thread.Sleep(200);
+            }
+            pair.Client.Send(pair.Channel, new byte[0]);
+            bool ended = false;
+            DateTime stop = DateTime.UtcNow.AddSeconds(10);
+            while (!ended && DateTime.UtcNow < stop)
+            {
+                IFuture<AppChunk> next = pair.Client.Receive();
+                if (!next.Wait(10000)) break;
+                Assert.False(next.IsFaulted, "the session ended first: " + next.Exception?.Message);
+                ended = next.Result.Bytes.Length == 0;
+            }
+            Assert.True(ended, "the channel never ended");
+            Assert.False(pair.Client.Finished.IsCompleted, "the whole session ended with the channel");
+        }
+
+        const int UploadSize = 8 * 1024 * 1024;
+
+        [Theory]
+        [InlineData(UploadSize)]
+        [InlineData(256 * 1024)]
+        public void A_fast_sender_waits_for_a_slow_target_and_the_session_stays_up(int pieceSize)
+        {
+            SlowLink target = new SlowLink(2);
+            SessionPair pair = OpenTunnelPair((h, p) => Futures.FromResult<IByteLink>(target));
+            for (int sent = 0; sent < UploadSize; sent += pieceSize)
+            {
+                IFuture send = pair.Client.Send(pair.Channel, Filled(pieceSize));
+                Assert.True(send.Wait(120000), "the send did not finish");
+                Assert.False(send.IsFaulted, send.Exception?.Message);
+            }
+            for (int i = 0; i < 600 && target.Written < UploadSize; i++) Thread.Sleep(100);
+            Assert.False(pair.Client.Finished.IsCompleted, pair.Client.Finished.IsCompleted ? pair.Client.Finished.Result.Error?.Code : "");
+            Assert.Equal(UploadSize, target.Written);
+        }
+
+        [Fact]
+        public void Sends_that_a_caller_does_not_wait_for_arrive_in_order()
+        {
+            MemoryLink[] links = MemoryLink.Pair();
+            GlassSshSession server = new GlassSshSession(SshEngine.Server(ServerOptions(SshAlgorithms.Modern), Stream("server"), null, "client"), links[1], new ListSink(), new FreeRunGate(), null, 30000, new FixedClock(1), null);
+            GlassSshSession client = new GlassSshSession(SshEngine.Client(ClientOptions(SshAlgorithms.Modern), Stream("client"), null, "server"), links[0], new ListSink(), new FreeRunGate(), null, 30000, new FixedClock(1), null);
+            RecordLink record = new RecordLink();
+            server = new GlassSshSession(SshEngine.Server(ServerOptions(SshAlgorithms.Modern), Stream("server"), null, "client"), links[1], new ListSink(), new FreeRunGate(), null, 30000, new FixedClock(1), (h, p) => Futures.FromResult<IByteLink>(record));
+            server.Run();
+            client.Run();
+            Assert.True(client.Opened.Wait(30000));
+            IFuture<int> open = client.OpenTunnel("allowed", 1);
+            Assert.True(open.Wait(30000));
+            IFuture last = null;
+            for (int i = 0; i < 40; i++) last = client.Send(open.Result, Enumerable.Repeat((byte)i, 100 * 1024).ToArray());
+            Assert.True(last.Wait(60000));
+            for (int i = 0; i < 300 && record.Count < 40 * 100 * 1024; i++) Thread.Sleep(100);
+            Assert.False(client.Finished.IsCompleted, client.Finished.IsCompleted ? "the session ended: " + client.Finished.Result.Error?.Code : "");
+            Assert.Equal(40 * 100 * 1024, record.Count);
+            Assert.True(record.InOrder(100 * 1024), "the pieces arrived out of order");
+        }
+
+        sealed class RecordLink : IByteLink
+        {
+            readonly List<byte> _bytes = new List<byte>();
+            readonly Promise<int> _never = new Promise<int>();
+            public int Count { get { lock (_bytes) return _bytes.Count; } }
+            public bool InOrder(int piece)
+            {
+                lock (_bytes)
+                {
+                    for (int i = 0; i < _bytes.Count; i++)
+                        if (_bytes[i] != (byte)(i / piece)) return false;
+                    return true;
+                }
+            }
+            public IFuture<int> Read(byte[] b, int off, int n) => _never.Future;
+            public IFuture Write(byte[] b, int off, int n)
+            {
+                lock (_bytes) for (int i = 0; i < n; i++) _bytes.Add(b[off + i]);
+                return Futures.Completed;
+            }
+            public void Close() => _never.TrySetResult(0);
+        }
+
+        /// <summary>A send parked on a full window must not outlive its channel.</summary>
+        [Fact]
+        public void A_send_waiting_for_room_ends_when_the_peer_closes_the_channel()
+        {
+            SlowLink stuck = new SlowLink(0);
+            SessionPair pair = OpenTunnelPair((h, p) => Futures.FromResult<IByteLink>(stuck));
+            IFuture send = pair.Client.Send(pair.Channel, Filled(UploadSize));
+            for (int i = 0; i < 100 && stuck.Written == 0; i++) Thread.Sleep(50);
+            Thread.Sleep(500);
+            Assert.False(send.IsCompleted, "the send finished while the target took nothing");
+            pair.Server.Send(pair.Channel, new byte[0]);
+            Assert.True(send.Wait(20000), "the send never woke");
+            Assert.False(pair.Client.Finished.IsCompleted, "the whole session ended with the channel");
+        }
+
+        [Fact]
+        public void A_ninth_channel_faults_only_its_own_open_and_the_first_channel_still_works()
+        {
+            RecordLink[] targets = Enumerable.Range(0, 8).Select(_ => new RecordLink()).ToArray();
+            int next = 0;
+            SessionPair pair = OpenTunnelPair((h, p) => Futures.FromResult<IByteLink>(targets[Interlocked.Increment(ref next) - 1]));
+            for (int i = 1; i < 8; i++)
+            {
+                IFuture<int> open = pair.Client.OpenTunnel("allowed", 1);
+                Assert.True(open.Wait(30000));
+                Assert.False(open.IsFaulted);
+            }
+            IFuture<int> ninth = pair.Client.OpenTunnel("allowed", 1);
+            Assert.True(ninth.Wait(30000));
+            Assert.True(ninth.IsFaulted, "the ninth channel opened");
+            Assert.Equal(SshCodes.ChannelLimit, ((NetSecException)ninth.Exception).Error.Code);
+            Assert.False(pair.Client.Finished.IsCompleted, "the whole session ended");
+
+            Assert.True(pair.Client.Send(pair.Channel, new byte[] { 7 }).Wait(30000));
+            for (int i = 0; i < 100 && targets[0].Count == 0; i++) Thread.Sleep(50);
+            Assert.Equal(1, targets[0].Count);
+        }
+
+        // ---------------------------------------------------------------- the old device path: a peer with no strict KEX marker
+
+        /// <summary>Stands in for an old peer. It runs our own code with the marker off. No external peer without the marker exists on this machine: docs/lesson-ssh-names.md.</summary>
+        [Theory]
+        [InlineData(true, true, false)]
+        [InlineData(true, false, true)]
+        [InlineData(false, true, false)]
+        [InlineData(false, false, true)]
+        public void A_peer_with_no_strict_marker_completes_a_session_under_the_old_rules(bool legacy, bool clientOff, bool serverOff)
+        {
+            SshAlgorithms a = legacy ? SshAlgorithms.Legacy : SshAlgorithms.Modern;
+            SshClientOptions client = ClientOptions(a);
+            client.NoStrictKex = clientOff;
+            SshServerOptions server = ServerOptions(a);
+            server.NoStrictKex = serverOff;
+            Duel d = new Duel { Client = SshEngine.Client(client, Stream("client"), null, "server"), Server = SshEngine.Server(server, Stream("server"), null, "client") };
+            d.Start();
+            Assert.Equal(EngineStatus.Open, d.Client.Status);
+            Assert.Equal("off", d.ClientEvents.Single(e => e.Type == "ssh.kex.strict").Message);
+            Assert.Equal("off", d.ServerEvents.Single(e => e.Type == "ssh.kex.strict").Message);
+            d.ClientCommand(new EngineCommand(EngineCommandKind.Exec, 0, null, "echo hello"));
+            Assert.Null(d.ClientError);
+            Assert.Null(d.ServerError);
+            Assert.Equal("hello\n", Encoding.UTF8.GetString(d.ClientApp.Where(c => c.Channel == 0).SelectMany(c => c.Bytes).ToArray()));
+        }
+
+        /// <summary>The old rules still let a clear Ignore through. An old device gets this, and the lesson says so.</summary>
+        [Fact]
+        public void With_strict_kex_off_an_ignore_before_kexinit_passes()
+        {
+            SshClientOptions options = ClientOptions(SshAlgorithms.Legacy);
+            options.NoStrictKex = true;
+            SshEngine client = SshEngine.Client(options, Stream("client"), null, "server");
+            SshEngine server = SshEngine.Server(ServerOptions(SshAlgorithms.Legacy), Stream("server"), null, "client");
+            byte[] version = server.Start().Wire;
+            byte[] ignore = Forge(server, new ByteWriter().U8(SshMsg.Ignore).Prefixed("x").ToArray());
+            byte[] clientHello = client.Start().Wire;
+            byte[] serverKexInit = server.Feed(clientHello, 0, clientHello.Length).Wire;
+            byte[] toClient = new ByteWriter().Put(version).Put(ignore).Put(serverKexInit).ToArray();
+            Assert.Null(client.Feed(toClient, 0, toClient.Length).Error);
+        }
+
         // ---------------------------------------------------------------- should-fix 2 to 5: channel rules
 
         [Fact]
@@ -410,8 +638,11 @@ namespace NetSec.Tests
         public void A_client_refuses_to_open_past_the_same_limit()
         {
             Duel d = Open();
-            for (int i = 0; i < 100 && d.ClientError == null; i++) d.ClientCommand(new EngineCommand(EngineCommandKind.OpenChannel, i, null, "allowed:1"));
-            Assert.Equal(SshCodes.ChannelLimit, d.ClientError?.Code);
+            for (int i = 0; i < 9; i++) d.ClientCommand(new EngineCommand(EngineCommandKind.OpenChannel, i, null, "allowed:1"));
+            Assert.Null(d.ClientError);
+            Assert.Equal(EngineStatus.Open, d.Client.Status);
+            Assert.Equal(8, d.ClientSent(SshNames.ChannelOpenTunnel));
+            Assert.Contains(d.ClientEvents, e => e.Type == "check.result" && !e.Check.Passed && e.Message == SshChecks.ChannelLimit);
         }
 
         // ---------------------------------------------------------------- should-fix 7: sequence wrap
