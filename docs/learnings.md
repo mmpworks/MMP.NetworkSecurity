@@ -64,6 +64,9 @@ Each correction goes here, newest slice last. Later slices read this file first.
 9. **`Probe` throws `NotImplementedException` for TLS 1.1 and SSH until S4.** The suite maps that to NOT RUN. A7 and A8 stay NOT RUN for that reason, and S4 removes `Probe.NeedBuilt`.
 10. **The glass client offers no CCS and an empty session id, and tolerates a CCS from the peer.** OpenSSL and Go accept this. The glass server echoes the client's session id and sends no CCS.
 11. **`EncryptedExtensions` has no `group unchanged` check.** Design section 2.6 lists one. The group check runs at ServerHello, against the one group the client offered, so a second check at `ee` would always pass and show the learner nothing.
+12. **`Tls13KeySchedule.Resume` holds the resumption rung, and no engine calls it.** This engine reads a ticket and drops it. The RFC 8448 check is its only caller. Finished checks go through `VerifyFinished`, which calls `Hmac.Verify`.
+13. **`EnginePump` ran the engine and queued its output under two locks, so a caller's `Enqueue` could pass the read loop.** A record cipher numbers records in engine order, so the swap failed `TLS13_AEAD_TAG` on a clean link, about 1 run in 20 at 100% CPU. `PumpOrderTests` forces the window: 15 to 538 swaps per run before the fix, on both builds. `Drive` now holds one lock across both. A gate that shows a tag failure with no tamper is this class first.
+14. **A tap can lead a trace.** A pump writes `wire.sent` after the socket write, and the tap logs before it forwards. A comparison must wait for equal lengths and never for "at least". Unit tests alone hide this: the tap test passed 48 of 48 alone and failed under the full suite at load, so repeat a flake inside the full suite.
 
 ## S4, TLS 1.1
 
