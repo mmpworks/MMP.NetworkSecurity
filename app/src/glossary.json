@@ -1,0 +1,32 @@
+{
+  "terms": [
+    { "id": "client", "term": "client", "short": "The program that starts the talk and asks for something." },
+    { "id": "server", "term": "server", "short": "The program that waits for a client and answers it." },
+    { "id": "loopback", "term": "loopback", "short": "A link from your computer back to itself. No bytes leave the machine." },
+    { "id": "byte", "term": "byte", "short": "A small piece of data. One byte holds a number from 0 to 255." },
+    { "id": "hex", "term": "hex", "short": "A way to write bytes with the digits 0 to 9 and the letters a to f." },
+    { "id": "wire", "term": "wire", "short": "The path that carries bytes between two programs." },
+    { "id": "trace", "term": "trace", "short": "A list of everything that happened, in order." },
+    { "id": "event", "term": "trace event", "short": "One line in the trace. It records one step, such as bytes sent." },
+    { "id": "eavesdropper", "term": "eavesdropper", "short": "Someone who listens to the wire but takes no part in the talk." },
+    { "id": "plaintext", "term": "plaintext", "short": "Data that anyone can read." },
+    { "id": "ciphertext", "term": "ciphertext", "short": "Data scrambled by a key. It looks like random noise." },
+    { "id": "key", "term": "key", "short": "A secret number that locks and unlocks data." },
+    { "id": "aes", "term": "AES", "short": "A standard lock for data. It scrambles data in 16-byte blocks with a secret key." },
+    { "id": "block", "term": "block", "short": "A chunk of 16 bytes. AES locks data one block at a time." },
+    { "id": "iv", "term": "IV", "short": "A random starting value that makes each locked message differ, even under the same key." },
+    { "id": "nonce", "term": "nonce", "short": "A number used once. Each message under one key needs a new one." },
+    { "id": "ecb", "term": "ECB", "short": "A mode that locks each block alone. Equal blocks give equal results, which leaks patterns." },
+    { "id": "cbc", "term": "CBC", "short": "A mode that mixes each block with the one before it, so repeats look different." },
+    { "id": "gcm", "term": "GCM", "short": "A mode that locks data and adds a tag that catches any change." },
+    { "id": "tag", "term": "tag", "short": "A short seal sent with a message. The receiver checks it to catch changes." },
+    { "id": "hash", "term": "hash", "short": "A function that turns any data into a fixed-size fingerprint. A tiny change alters it fully." },
+    { "id": "hmac", "term": "HMAC", "short": "A seal made by hashing a message together with a secret key, in two rounds." },
+    { "id": "cmac", "term": "CMAC", "short": "A seal made from a block cipher such as AES and a secret key." },
+    { "id": "key-exchange", "term": "key exchange", "short": "A way for two programs to reach a shared secret while others listen." },
+    { "id": "key-share", "term": "key share", "short": "The public half of a key exchange. It is safe to send in the open." },
+    { "id": "ml-kem", "term": "ML-KEM", "short": "A key exchange built on lattice math, meant to resist quantum computers." },
+    { "id": "hybrid", "term": "hybrid", "short": "A key exchange that runs two methods together. An attacker must break both." },
+    { "id": "quantum-computer", "term": "quantum computer", "short": "A new kind of computer that could break some of today's locks, such as X25519." }
+  ]
+}

@@ -1,0 +1,36 @@
+<Project Sdk="Microsoft.NET.Sdk">
+
+  <!-- The builder suite. net10.0 tests the net10.0 build. net48 tests the CF binaries by HintPath, never a net48 recompile,
+       so one suite proves both builds (A9). The test project itself may use modern C#. -->
+
+  <PropertyGroup>
+    <TargetFrameworks>net10.0;net48</TargetFrameworks>
+    <LangVersion>latest</LangVersion>
+    <IsPackable>false</IsPackable>
+    <IsTestProject>true</IsTestProject>
+    <RootNamespace>NetSec.Tests</RootNamespace>
+    <NoWarn>$(NoWarn);CS1685</NoWarn>
+  </PropertyGroup>
+
+  <ItemGroup>
+    <PackageReference Include="Microsoft.NET.Test.Sdk" Version="17.14.1" />
+    <PackageReference Include="xunit" Version="2.9.3" />
+    <PackageReference Include="xunit.runner.visualstudio" Version="3.1.1" PrivateAssets="all" />
+  </ItemGroup>
+
+  <ItemGroup>
+    <ProjectReference Include="..\..\src\NetSec.CeDevice\NetSec.CeDevice.csproj" ReferenceOutputAssembly="false" SetTargetFramework="TargetFramework=net35" />
+  </ItemGroup>
+
+  <ItemGroup Condition="'$(TargetFramework)' == 'net10.0'">
+    <ProjectReference Include="..\..\src\NetSec.Core\NetSec.Core.csproj" />
+  </ItemGroup>
+
+  <ItemGroup Condition="'$(TargetFramework)' == 'net48'">
+    <PackageReference Include="Microsoft.NETFramework.ReferenceAssemblies" Version="1.0.3" PrivateAssets="all" />
+    <ProjectReference Include="..\..\src\NetSec.Core.NetCF\NetSec.Core.NetCF.csproj" ReferenceOutputAssembly="false" SetTargetFramework="TargetFramework=net35" />
+    <Reference Include="NetSec.Core"><HintPath>..\..\src\NetSec.Core.NetCF\bin\$(Configuration)\net35\NetSec.Core.dll</HintPath><Private>true</Private></Reference>
+    <Reference Include="MMP.AsyncProxy"><HintPath>..\..\src\NetSec.Core.NetCF\bin\$(Configuration)\net35\MMP.AsyncProxy.dll</HintPath><Private>true</Private></Reference>
+  </ItemGroup>
+
+</Project>
