@@ -123,7 +123,9 @@ if (-not (Test-ElectronBinary)) {
         Fail 'ELECTRON_BINARY_MISSING' 'app\node_modules\electron\dist has no electron.exe and no cached zip exists.' $fixText
     }
 }
-$reported = (& $electronExe --version 2>$null | Select-Object -First 1)
+# electron.exe is a GUI program and prints nothing to a pipe, so the version comes from dist\version (the file the official zip ships).
+$versionFile = Join-Path $electronDir 'dist\version'
+$reported = if (Test-Path $versionFile) { 'v' + (Get-Content $versionFile -Raw).Trim() } else { '' }
 $expected = 'v' + (Get-Content (Join-Path $electronDir 'package.json') -Raw | ConvertFrom-Json).version
 if ($reported -ne $expected) { Fail 'ELECTRON_VERSION_MISMATCH' "electron.exe reports $reported and the package expects $expected." 'Delete app\node_modules\electron\dist and run this script again.' }
 Say "Electron binary ok ($reported)"
