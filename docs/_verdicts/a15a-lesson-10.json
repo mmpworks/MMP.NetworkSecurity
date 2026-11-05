@@ -130,5 +130,52 @@
       "note": "Tours read at origin/fix/tour-10-enrolment head 8e77f1f (PR 34); names doc at main 279e9a1. Tours read at origin/fix/tour-10-enrolment commit ef3bf00 (PR 34). RFC 9449 section 8: 'An authorization server MAY supply a nonce value to be included by the client in DPoP proofs'; the nonce is used 'to limit the lifetime of DPoP proofs'. 'MAY' makes it optional.",
       "checkedAgainst": "RFC 9449 section 8 (RFC text fetched this session)"
     }
-  ]
+  ],
+  "textRead": {
+    "readAt": "main c0a105b; tour text identical to main 562047e (lessons 0 to 8, 10, 11)",
+    "method": "Every sentence of every step text read against the lab. The lab ran in-process (NetSec.Core: LabCatalog, Lesson10Auth, TimingAttackLab), once as a control and once for every try-it attack row; trace events, secrets, field lists and check names were compared with the words. Code was read where the trace did not show the fact. Statements about the UI (colours, panels) and about lesson 9 (not built) were not run.",
+    "stepsRead": 20,
+    "stepsWithProblems": 5,
+    "problemsFound": 5,
+    "problems": [
+      {
+        "step": "L10-S07",
+        "severity": "high",
+        "wrong": "The login uses the same device key.",
+        "right": "The login uses a different key, a device key made for the login. The lab does not link it to the certificate key.",
+        "evidence": "Lesson10Auth.cs: the certificate is signed with training key client-tls-ed25519; the login and DPoP use a random seed named auth.device-key."
+      },
+      {
+        "step": "L10-S03",
+        "severity": "medium",
+        "wrong": "It carries the name pump-reader-4 and the client's device key.",
+        "right": "It carries the name pump-reader-4 and the client's TLS key. This is not the login key of phase 2.",
+        "evidence": "Same code: KeyIds.ClientTlsEd25519 for the certificate."
+      },
+      {
+        "step": "L10-S19",
+        "severity": "high",
+        "wrong": "By now the server has checked the certificate, the token and the proof. It knows the call came from a holder of an enrolled key and a token the issuer signed.",
+        "right": "By now the server has checked the token and the proof. It knows the call carries a token the issuer signed and a proof from the key the token names.",
+        "evidence": "Lab run: the mTLS connection ends with a close alert before the login; the calls run on separate auth-call streams, not on that TLS connection."
+      },
+      {
+        "step": "L10-S12",
+        "severity": "low",
+        "wrong": "The signature is fine, the check fails, and no token is issued.",
+        "right": "The signature would verify, but the issuer fails the challenge issued check first.",
+        "evidence": "Lab run L10-unissued-challenge: only challenge issued fails; no challenge signature check runs."
+      },
+      {
+        "step": "L10-S18",
+        "severity": "low",
+        "wrong": "It rejects proofs older than 60 seconds, which is the check named proof age.",
+        "right": "It rejects proofs dated more than 60 seconds from now, in either direction, which is the check named proof age.",
+        "evidence": "Auth.cs: age > MaxAgeSeconds || age < -MaxAgeSeconds."
+      }
+    ],
+    "notes": [
+      "Bind defect: L10-S07 binds to secret.derived with actor client; the first such event is x25519_shared in the mutual TLS stream, not auth.device-key (about index 37 against 100 in the trace)."
+    ]
+  }
 }
