@@ -125,6 +125,9 @@ namespace NetSec.Machine
 
 namespace NetSec.Io
 {
+    /// <summary>Lets every event through at once. The golden recorder runs a lab with it.</summary>
+    public sealed class FreeRunGate : IStepGate { public IFuture Pass(TraceEvent e) { throw new NotImplementedException(); } }
+
     public interface IByteLink
     {
         IFuture<int> Read(byte[] b, int off, int n);
