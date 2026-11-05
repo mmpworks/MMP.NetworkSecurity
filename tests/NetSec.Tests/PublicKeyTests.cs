@@ -182,6 +182,33 @@ namespace NetSec.Tests
         }
 
         [Fact]
+        public void Verify_refuses_the_sign_bit_on_the_neutral_point_because_x_is_zero()
+        {
+            // RFC 8032 section 5.1.3 step 4. At y = 1, x = 0, so a set sign bit is a second encoding of one point.
+            byte[] signature = Hex.Decode("5866666666666666666666666666666666666666666666666666666666666666" + "0100000000000000000000000000000000000000000000000000000000000000");
+            byte[] control = Hex.Decode("0100000000000000000000000000000000000000000000000000000000000000");
+            byte[] signSet = Hex.Decode("0100000000000000000000000000000000000000000000000000000000000080");
+            Assert.True(Ed25519.Verify(control, new byte[] { 1 }, signature));
+            Assert.False(Ed25519.Verify(signSet, new byte[] { 1 }, signature));
+        }
+
+        [Fact]
+        public void Verify_refuses_the_sign_bit_on_the_order_2_point_because_x_is_zero()
+        {
+            // y = -1 is the only other point with x = 0. It has order 2, so h*A adds nothing when h is even, and h changes with the message.
+            byte[] signature = Hex.Decode("5866666666666666666666666666666666666666666666666666666666666666" + "0100000000000000000000000000000000000000000000000000000000000000");
+            byte[] control = Hex.Decode("ecffffffffffffffffffffffffffffffffffffffffffffffffffffffffffff7f");
+            byte[] signSet = Hex.Decode("ecffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffff");
+            int controlAccepted = 0;
+            for (byte m = 0; m < 16; m++)
+            {
+                if (Ed25519.Verify(control, new[] { m }, signature)) controlAccepted++;
+                Assert.False(Ed25519.Verify(signSet, new[] { m }, signature));
+            }
+            Assert.InRange(controlAccepted, 1, 15);
+        }
+
+        [Fact]
         public void Verify_returns_false_for_wrong_lengths()
         {
             Assert.False(Ed25519.Verify(new byte[31], new byte[0], Signature));

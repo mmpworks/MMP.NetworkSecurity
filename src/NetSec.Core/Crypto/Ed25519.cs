@@ -75,7 +75,11 @@ namespace NetSec.Crypto
             return difference == 0;
         }
 
-        /// <summary>RFC 8032 section 5.1.3 says decoding fails when y is at or above p. p is ed ff .. ff 7f, little-endian.</summary>
+        /// <summary>
+        /// RFC 8032 section 5.1.3 says decoding fails in three cases. This method checks the first: y is at or above p, where
+        /// p is ed ff .. ff 7f, little-endian. Ge25519.TryUnpackNegated checks the other two: no square root, and x = 0 with
+        /// the sign bit set.
+        /// </summary>
         static bool IsCanonicalY(byte[] pub)
         {
             if ((pub[31] & 0x7f) != 0x7f) return true;
