@@ -33,9 +33,13 @@ public sealed class LabSession : ITraceSink
     /// <summary>The keys this run reads, fixed at the start. A fork reuses them.</summary>
     public CredentialSet Credentials { get; }
 
-    public LabSession(string sessionId, int lesson, int seed, string mode, string sessionsDir, CredentialSet credentials, Action<string> broadcast)
+    /// <summary>glass for a course engine, os for Windows SslStream (OsTransport). An os session holds no secret, so it keeps no key log.</summary>
+    public string TransportKind { get; }
+
+    public LabSession(string sessionId, int lesson, int seed, string mode, string sessionsDir, CredentialSet credentials, Action<string> broadcast, string transportKind = "glass")
     {
         Credentials = credentials;
+        TransportKind = transportKind;
         SessionId = sessionId;
         Lesson = lesson;
         Seed = seed;
@@ -148,9 +152,10 @@ public sealed class SessionManager
     /// Starts a session and returns it, or a named error when the lesson has no lab. announce runs before the lab does,
     /// so session.started always goes out ahead of the session's first trace frame.
     /// </summary>
-    public LabSession? Start(int lesson, int seed, string mode, AttackDefinition? attack, string? sessionId, CredentialSet credentials, Action<LabSession> announce, out NetSecError? error)
+    /// <summary>osLab, when given, runs instead of the lesson's course lab, and the session is an os session.</summary>
+    public LabSession? Start(int lesson, int seed, string mode, AttackDefinition? attack, string? sessionId, CredentialSet credentials, Action<LabSession> announce, out NetSecError? error, ILab? osLab = null)
     {
-        ILab? lab = LabCatalog.Find(lesson);
+        ILab? lab = osLab ?? LabCatalog.Find(lesson);
         if (lab is null)
         {
             error = NetSecError.Of(ErrorCodes.LessonNotBuilt, $"Lesson {lesson} is not built yet.");
@@ -158,10 +163,10 @@ public sealed class SessionManager
         }
         error = null;
         string id = sessionId ?? NewId();
-        LabSession session = new(id, lesson, seed, mode, SessionsDir, credentials, Broadcast);
+        LabSession session = new(id, lesson, seed, mode, SessionsDir, credentials, Broadcast, osLab is null ? "glass" : OsTransport.OsTransportFactory.Kind);
         Keep(session);
         announce(session);
-        WriteKeyFacts(session, credentials);
+        if (osLab is null) WriteKeyFacts(session, credentials);
         LabContext context = new()
         {
             Seed = seed,

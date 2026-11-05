@@ -4,6 +4,7 @@ using System.Text;
 using System.Text.Json;
 using NetSec.Errors;
 using NetSec.Host;
+using NetSec.Host.OsTransport;
 using NetSec.Host.Security;
 using NetSec.Keys;
 using NetSec.Labs;
@@ -36,6 +37,7 @@ SessionManager sessions = new(sessionsDir);
 CeProcess ce = new();
 HostGuard guard = new(token);
 LessonRows lessons = new();
+OsTransportFactory osTransport = new(Environment.GetEnvironmentVariable);
 WizardTable wizardTable = WizardTable.Load(Path.Combine(AppContext.BaseDirectory, "wizard-flows.json"));
 SecurityStore security;
 try
@@ -69,8 +71,13 @@ app.MapGet("/api/sessions/{id}/events", (string id, long? after) =>
     sessions.Find(id) is { } s
         ? Results.Content("[" + string.Join(",", s.After(after ?? 0).Select(e => e.Line)) + "]", "application/json")
         : NoSuchSession(id));
-app.MapGet("/api/sessions/{id}/keylog", (string id) =>
-    sessions.Find(id) is not null ? Results.Text("", "text/plain") : NoSuchSession(id));
+// An os session's secrets live inside Windows, and the course never sees them, so it has no key log to give.
+app.MapGet("/api/sessions/{id}/keylog", (string id) => sessions.Find(id) switch
+{
+    null => NoSuchSession(id),
+    { TransportKind: OsTransportFactory.Kind } => Results.Json(new { code = ErrorCodes.KeylogNotKept, message = "This session ran on the OS transport. Windows holds its secrets, and the course never sees them, so there is no key log.", retryable = false, requestId = Guid.NewGuid().ToString("N") }, statusCode: 409),
+    _ => Results.Text("", "text/plain"),
+});
 app.MapGet("/api/ce", () => Results.Json(ce.Status()));
 app.MapPost("/api/ce/start", async () => Results.Json(await ce.StartAsync()));
 app.MapPost("/api/ce/stop", () => { ce.Stop(); return Results.Json(ce.Status()); });
@@ -80,7 +87,7 @@ app.Map("/ws", async ctx =>
 {
     if (!ctx.WebSockets.IsWebSocketRequest) { ctx.Response.StatusCode = 400; return; }
     using WebSocket socket = await ctx.WebSockets.AcceptWebSocketAsync();
-    await new HostSocket(socket, sessions, security).ServeAsync(ctx.RequestAborted);
+    await new HostSocket(socket, sessions, security, osTransport).ServeAsync(ctx.RequestAborted);
 });
 
 app.Lifetime.ApplicationStopping.Register(ce.Stop);
@@ -141,7 +148,7 @@ namespace NetSec.Host
     }
 
     /// <summary>One WebSocket: commands in, frames out. Frames carry the sessionId, so a reconnected socket keeps the live stream.</summary>
-    public sealed class HostSocket(WebSocket socket, SessionManager sessions, SecurityStore security)
+    public sealed class HostSocket(WebSocket socket, SessionManager sessions, SecurityStore security, OsTransportFactory osTransport)
     {
         LabSession? _current;
 
@@ -216,13 +223,16 @@ namespace NetSec.Host
 
         void Start(JsonElement m, string? requestId)
         {
-            if (Text(m, "transport") == "real")
-            {
-                Fail(requestId, ErrorCodes.RealModeNotBuilt, "Real mode is not built yet.");
-                return;
-            }
             int lesson = Number(m, "lesson", -1);
             int seed = Number(m, "seed", RandomSeed());
+            if (OsTransportFactory.IsAskedFor(Text(m, "transport")))
+            {
+                // The OS transport reads no course key, so no key decides whether it may run.
+                ILab? osLab = osTransport.LabFor(lesson, out NetSecError? osError);
+                if (osLab is null) Fail(requestId, osError!.Code, osError.Message);
+                else Begin(lesson, seed, Text(m, "mode") ?? "run", null, null, security.Credentials([]), requestId, null, osLab);
+                return;
+            }
             // GEM:decide-at-authoritative-boundary: the one place a lesson may refuse a key, before any event. A lab never falls back to built-in keys in silence.
             LabDecision ready = SecurityReadiness.Decide(LabCatalog.Needs(lesson), security.States());
             if (!ready.MayRun)
@@ -244,6 +254,7 @@ namespace NetSec.Host
         {
             LabSession? parent = Text(m, "sessionId") is { } id ? sessions.Find(id) : _current;
             if (parent is null) { Fail(requestId, "SESSION_NOT_FOUND", "No session to fork."); return; }
+            if (parent.TransportKind != "glass") { Fail(requestId, "ATTACK_NOT_ON_OS_TRANSPORT", "An attack changes bytes the course's own engine sends. On the OS transport, Windows sends them, so there is nothing to change."); return; }
             string forkId = SessionManager.NewId();
             AttackDefinition? attack = Text(m, "attackId") is { } attackId
                 ? AttackCatalog.All.FirstOrDefault(a => a.AttackId == attackId)
@@ -262,7 +273,7 @@ namespace NetSec.Host
             return plan is null ? null : new AttackDefinition { AttackId = "free-flip-byte", Lesson = parent.Lesson, Kind = kind, Plan = plan };
         }
 
-        void Begin(int lesson, int seed, string mode, AttackDefinition? attack, string? sessionId, CredentialSet credentials, string? requestId, Action<LabSession>? afterStarted)
+        void Begin(int lesson, int seed, string mode, AttackDefinition? attack, string? sessionId, CredentialSet credentials, string? requestId, Action<LabSession>? afterStarted, ILab? osLab = null)
         {
             LabSession? session = sessions.Start(lesson, seed, mode, attack, sessionId, credentials, started =>
             {
@@ -273,14 +284,14 @@ namespace NetSec.Host
                     requestId,
                     sessionId = started.SessionId,
                     seed,
-                    transportKind = "glass",
-                    trainingOnly = true,
+                    transportKind = started.TransportKind,
+                    trainingOnly = started.TransportKind == "glass",
                     sessionFile = started.SessionFile,
                     showKeys = security.ShowKeys,
                     security = credentials.Mine().Select(c => new { typeId = c.TypeId, mode = c.Mode.ToString(), provider = c.ProviderKind, version = c.Version, fingerprint = c.Fingerprint }),
                 });
                 afterStarted?.Invoke(started);
-            }, out NetSecError? error);
+            }, out NetSecError? error, osLab);
             if (session is null) Fail(requestId, error!.Code, error.Message);
         }
 
