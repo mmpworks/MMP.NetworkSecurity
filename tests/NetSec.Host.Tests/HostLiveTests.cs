@@ -242,7 +242,7 @@ namespace NetSec.Host.Tests
         {
             JsonElement rows = await GetJson("/api/lessons");
             Assert.Equal(Enumerable.Range(1, 11), rows.EnumerateArray().Select(r => r.GetProperty("lesson").GetInt32()));
-            Assert.Equal(new[] { 1, 2, 3 }, rows.EnumerateArray().Where(r => r.GetProperty("built").GetBoolean()).Select(r => r.GetProperty("lesson").GetInt32()));
+            Assert.Equal(new[] { 1, 2, 3, 6 }, rows.EnumerateArray().Where(r => r.GetProperty("built").GetBoolean()).Select(r => r.GetProperty("lesson").GetInt32()));
             JsonElement toy = await GetJson("/api/lessons/0");
             Assert.True(toy.GetProperty("built").GetBoolean());
             Assert.Equal("L0-flip-wire-byte", toy.GetProperty("attacks")[0].GetProperty("attackId").GetString());
