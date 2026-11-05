@@ -268,7 +268,7 @@ Command line: `--pinpad P --gateway G --trace T --trace-id ID --link glass-ssh|e
 
 **Binary proof, from outside.** A test reads the exe and DLLs with `System.Reflection.Metadata` and asserts `mscorlib` token `969db8053d3322ac`. `GET /api/ce` returns `{ running, pid, exePath, mscorlibToken, clr, ptr, label, profile, budget, link, ports }`. `--ce external` makes the Host skip the spawn and wait on the ports, which is the seam for a real board.
 
-**Bridge processes (D13, A10).** `BridgeSupervisor` in the Host starts all five, or attaches with `--external`.
+**Bridge processes (D13, A10).** Five processes. Decision, 2026-11-05: `BridgeSupervisor` is not built. This design was the only place that named it. The PRD, `ux-design.md` and `acceptance/CONTRACT.md` ask for no such thing. A10 starts the processes from outside. Lesson 9 runs the same code in one process, so a learner can step it. `/api/ce` runs the CE alone, through `CeProcess`. A later UI that starts all five from the app would need it.
 | Process | Build | Holds | Does |
 |---|---|---|---|
 | PIN-pad | `Node --role pinpad` | DUKPT initial key, registers | Makes the PIN block (ISO 9564 format 4), locks it, CMACs a `PinEnvelope {traceId, KSN, cipher, mac}`. Sends to CE over TCP |

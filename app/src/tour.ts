@@ -54,6 +54,8 @@ export interface UnlockContext {
   actionDone: boolean
   /** Outcome the active session ended with (completed, caught), or empty while it runs. */
   outcome: string
+  /** The check a caught attack fork ended on, from session.finished. It can differ from the first failed check event (a peer may report PEER_CLOSED_EARLY first). */
+  caughtCheck: string
   /** Events that arrived after the step's try-it started. */
   eventsSinceTryIt: readonly TraceEvent[]
 }
@@ -85,7 +87,7 @@ export function expectationMet(step: TourStep, ctx: UnlockContext): boolean {
   if (!x) return true
   switch (x.type) {
     case 'view': return ctx.view === x.value
-    case 'check': return ctx.eventsSinceTryIt.some(e => e.check && (!x.name || e.check.name === x.name) && (!x.result || e.check.result === x.result))
+    case 'check': return (x.result !== 'pass' && !!x.name && ctx.caughtCheck === x.name) || ctx.eventsSinceTryIt.some(e => e.check && (!x.name || e.check.name === x.name) && (!x.result || e.check.result === x.result))
     case 'selected': return ctx.selectedSeq != null
     case 'ran': return ctx.actionDone
     case 'attack-outcome': return ctx.outcome !== '' && ctx.outcome === (x.outcome ?? 'completed')

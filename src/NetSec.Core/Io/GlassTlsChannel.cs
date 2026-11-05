@@ -20,12 +20,17 @@ namespace NetSec.Io
     {
         const int DeadlineMs = 30000;
 
+        /// <summary>TLS has no flow window, so a reader that stops reading would let a peer grow this queue with no end. The cap is a quarter of the CE profile's 64 MB.</summary>
+        public const int MaxQueuedBytes = 16 * 1024 * 1024;
+
         readonly object _lock = new object();
         readonly Queue<AppChunk> _arrived = new Queue<AppChunk>();
+        long _queuedBytes;
         readonly ITlsEngine _engine;
         readonly EnginePump _pump;
         Promise<AppChunk> _waiter;
         PumpResult _ended;
+        NetSecError _overflow;
 
         public GlassTlsChannel(TransportRequest request, ITlsEngine engine)
         {
@@ -53,7 +58,13 @@ namespace NetSec.Io
         {
             lock (_lock)
             {
-                if (_arrived.Count > 0) return Futures.FromResult<AppChunk>(_arrived.Dequeue());
+                if (_overflow != null) return Futures.FromException<AppChunk>(new NetSecException(_overflow));
+                if (_arrived.Count > 0)
+                {
+                    AppChunk next = _arrived.Dequeue();
+                    _queuedBytes -= next.Bytes.Length;
+                    return Futures.FromResult<AppChunk>(next);
+                }
                 if (_ended != null) return Ending(_ended);
                 _waiter = new Promise<AppChunk>(PromiseOptions.RunContinuationsAsynchronously);
                 return _waiter.Future;
@@ -73,13 +84,27 @@ namespace NetSec.Io
         void Arrive(AppChunk chunk)
         {
             Promise<AppChunk> waiter;
+            bool overflowed = false;
             lock (_lock)
             {
                 waiter = _waiter;
                 _waiter = null;
-                if (waiter == null) _arrived.Enqueue(chunk);
+                if (waiter == null) overflowed = Queue(chunk);
             }
             if (waiter != null) waiter.TrySetResult(chunk);
+            if (overflowed) _pump.Enqueue(EngineCommand.Abort(_overflow.Code, _overflow.Message));
+        }
+
+        /// <summary>True the first time the queue passes its cap. The queue then empties, and the next Receive gets the named error.</summary>
+        bool Queue(AppChunk chunk)
+        {
+            if (_overflow != null) return false;
+            _arrived.Enqueue(chunk);
+            _queuedBytes += chunk.Bytes.Length;
+            if (_queuedBytes <= MaxQueuedBytes) return false;
+            _overflow = NetSecError.Of(ErrorCodes.ChannelBufferFull, "the reader left more than " + MaxQueuedBytes + " bytes unread");
+            _arrived.Clear();
+            return true;
         }
 
         void End(IFuture<PumpResult> run)

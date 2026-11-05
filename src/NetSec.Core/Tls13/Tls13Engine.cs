@@ -36,6 +36,8 @@ namespace NetSec.Tls13
 
         public static Tls13Engine CreateClient(Tls13Options options)
         {
+            if (options.CertificateChain != null && options.CertificateChain.Length != 0 && options.SigningSeed == null)
+                throw new ArgumentException("a client with a certificate chain needs the key that signs for it", "options");
             return new Tls13Engine(Tls13ClientTable.Table, Tls13ClientTable.Start, options);
         }
 
@@ -76,6 +78,7 @@ namespace NetSec.Tls13
                 case EngineCommandKind.Send: Send(c.Bytes); break;
                 case EngineCommandKind.Close: Close(); break;
                 case EngineCommandKind.PeerClosed: PeerClosed(); break;
+                case EngineCommandKind.Abort: if (!_machine.IsEnded) _machine.Fail(c.AbortCode, c.AbortCode, c.AbortDetail, null); break;
             }
             return Take();
         }
