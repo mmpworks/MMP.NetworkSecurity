@@ -1,6 +1,7 @@
 using System;
 using System.Diagnostics;
 using System.IO;
+using System.Linq;
 using System.Runtime.InteropServices;
 using System.Text;
 using MMP.AsyncProxy;
@@ -268,10 +269,10 @@ namespace NetSec.Tests
         static string Plain(TraceEvent e) => Encoding.UTF8.GetString(e.Plain, 0, e.Plain.Length);
 
         [Fact]
-        public void Lesson_11_stays_unbuilt_until_its_tour_and_ui_land()
+        public void Lesson_11_is_built_and_its_rows_join_the_catalog()
         {
-            Assert.Null(LabCatalog.Find(11));
-            Assert.DoesNotContain(AttackCatalog.All, a => a.Lesson == 11);
+            Assert.IsType<TimingAttackLab>(LabCatalog.Find(11));
+            Assert.Equal(new[] { "L11-guess-leaky", "L11-guess-constant-time" }, AttackCatalog.All.Where(a => a.Lesson == 11).Select(a => a.AttackId).ToArray());
         }
 
         [Fact]

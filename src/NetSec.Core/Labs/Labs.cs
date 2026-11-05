@@ -123,6 +123,7 @@ namespace NetSec.Labs
                 case 8: return new Lesson08Ssh();
                 case 9: return new Lesson09Bridge();
                 case 10: return new Lesson10Auth();
+                case 11: return new TimingAttackLab();
                 default: return null;
             }
         }
@@ -199,6 +200,9 @@ namespace NetSec.Labs
             WithOption("L10-unissued-challenge", 10, Lesson10Auth.OptionAnswerUnissued, "yes", AttackOutcome.Rejected, ErrorCodes.ChallengeNotIssued, NetSec.Auth.Challenge.IssuedCheck),
             WithOption("L10-unknown-device", 10, Lesson10Auth.OptionUnknownDevice, "yes", AttackOutcome.Rejected, ErrorCodes.DeviceNotEnrolled, NetSec.Auth.Challenge.EnrolledCheck),
             WithOption("L10-wrong-audience", 10, Lesson10Auth.OptionTokenAudience, "https://other.training/api", AttackOutcome.Rejected, ErrorCodes.TokenBadAudience, NetSec.Auth.Token.AudienceCheck),
+
+            TimingAttackLab.AttackRows[0],
+            TimingAttackLab.AttackRows[1],
         };
 
         // Packet header 5, type 1, host key 4 + 51, share 4 + 32, signature length 4, name 4 + 11, value length 4, then 10 bytes into the signature value.

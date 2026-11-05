@@ -1,6 +1,6 @@
 # Lesson 11: names for the tour and UI lanes
 
-Conclusion: the lab, the native library and the attack rows exist, and lesson 11 stays `built: false` until its tour and UI land. The tour and UI lanes bind to the names below. Source of truth for the JSON: `src/NetSec.Core/Native/TimingReport.cs`. Source of truth for the events: `src/NetSec.Core/Labs/Lesson11Timing.cs`.
+Conclusion: the lab, the native library and the attack rows exist, and lesson 11 is released. The tour and UI lanes bind to the names below. Source of truth for the JSON: `src/NetSec.Core/Native/TimingReport.cs`. Source of truth for the events: `src/NetSec.Core/Labs/Lesson11Timing.cs`.
 
 ## 1. Lanes
 
