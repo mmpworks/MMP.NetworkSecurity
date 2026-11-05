@@ -129,6 +129,24 @@
       "verdict": "accurate",
       "note": "Tours read at main 6e0c1e5 (PR 60 merged); lab run at main 6e0c1e5. RFC 4251 section 4.1 gives two trust models: a local host-key database, and a host name-to-key association certified by a trusted CA. The lab pins the host key (check known_hosts match) and the control run shows no CA step.",
       "checkedAgainst": "RFC 4251 section 4.1 (fetched this session); lab run, lesson 8"
+    },
+    {
+      "id": "L8-C22",
+      "verdict": "accurate",
+      "checkedAgainst": "docs/lesson-ssh-names.md on fix/ssh-relay-room d801e49 (read); lab run, lesson 8; unit test Each_direction_shows_one_passing_mac_check_on_its_first_protected_packet (both suites) passed",
+      "note": "Tour read at origin/fix/tour-8-limits commit b1a6a2f (PR 83, open); lab run at origin/fix/ssh-relay-room d801e49 (PR 77, open). Lab run at PR 77: the control run holds exactly one passing 'packet MAC' event per direction per round (server#30 and client#34 in the modern round, the same in the legacy round), each placed before the first protected ssh.message.received of that direction; 4 events in all against 40 before. The check runs on every packet (names doc); later passes stay quiet. L8-flip-packet still fails packet MAC. The tour sentence says 'on the first protected packet'; the claim says 'before the first protected packet is received'; both match the trace."
+    },
+    {
+      "id": "L8-C23",
+      "verdict": "accurate",
+      "checkedAgainst": "docs/lesson-ssh-names.md on fix/ssh-relay-room d801e49 (read); unit test A_ninth_channel_faults_only_its_own_open... passed; throwaway tests against NetSec.Core (scratch copy of PR 77), run this session",
+      "note": "Tour read at origin/fix/tour-8-limits commit b1a6a2f (PR 83, open); lab run at origin/fix/ssh-relay-room d801e49 (PR 77, open). Reproduced with a read deadline of 3,000 ms in place of 30,000: (1) a client sends 6 MiB into a tunnel whose target never takes a byte: the session ends after 3,065 ms with LINK_DEADLINE, and the send never completes; (2) an idle tunnel with no traffic: the session ends after 3,000 ms with LINK_DEADLINE. The 30 second figure is the default deadline (SshProbe.ReadDeadlineMs = 30000, the lab's LabPair.DeadlineMs). Ninth channel: the unit test opens 8 channels, the ninth open faults with SshCodes.ChannelLimit, the session stays up and the first channel still delivers its byte."
+    },
+    {
+      "id": "L8-C24",
+      "verdict": "accurate",
+      "checkedAgainst": "docs/lesson-ssh-names.md on fix/ssh-relay-room d801e49 (read); capture of the KexInit of ssh.exe 9.5p2, Git ssh 10.3p1 and PuTTY plink 0.80 against a listening socket; unit tests A_peer_with_no_strict_marker_completes_a_session_under_the_old_rules (4 cases) and Ssh_exe_runs_a_command_on_our_server_with_strict_kex_off (2 suites) passed",
+      "note": "Tour read at origin/fix/tour-8-limits commit b1a6a2f (PR 83, open); lab run at origin/fix/ssh-relay-room d801e49 (PR 77, open). Run this session: all three outside clients on this machine offer kex-strict-c-v00@openssh.com (Windows ssh.exe 9.5p2, Git ssh 10.3p1, PuTTY plink 0.80), so no peer without the marker exists here, as the claim says. Our code with the marker off against our code: 4 cases passed, both suites, both directions, event 'off' on both sides, exec echo works. ssh.exe against our server with the marker off: passed on Modern and Legacy, exit 0, output 'hello', event 'off'. Not re-run: 'our client against Go' with the marker off; no committed test covers it. It follows from the code (StrictKex = OffersStrictKex && peer offers), so a marker-off client runs the old rules whatever Go offers. The limit statement (a real old peer stays unproved; nothing ran on CE) is conservative and correct. Small correction to the names doc, not the tour: it says Git ssh 10.3p1 and plink 0.80 'neither ran here'; I ran their KexInit and both offer the marker."
     }
   ],
   "textRead": {
@@ -158,7 +176,8 @@
     "notes": [
       "Lesson 9 is referenced by L8-S01 and has no tour yet; plan statement.",
       "New text read and run on main 32f6219: S03 (Modern means newer), S04 strict KEX (events on in both rounds; sweep and Ignore tests reproduced), S07 no pin refuses (run), S08 packet length (RFC 4253 6.3), S12 channel window (unit test run). No new problems.",
-      "Bind defect closed: check.result packet MAC now fires on the normal run (PR 66)."
+      "Bind defect closed: check.result packet MAC now fires on the normal run (PR 66).",
+      "Re-read at PR 83 (b1a6a2f) against the lab at PR 77 (d801e49): S09 (packet MAC once per direction, bind hits 4 events), S11 (30 second deadline ends a parked sender and an idle tunnel; ninth channel refused by name), S14 (old-device limit; outside clients all offer the marker). No new problems; 14 steps."
     ],
     "problemsOpen": 0
   }
