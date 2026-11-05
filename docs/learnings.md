@@ -147,3 +147,7 @@ Each correction goes here, newest slice last. Later slices read this file first.
 ## Gate hang limit
 
 1. **Each `dotnet test` step in the gate now ends a stuck test at 3 minutes and names it.** The slowest test takes 11.4 s at 100% CPU. `--blame-hang-dump-type none` keeps the run on net48 and writes no dump. The name sits in the last lines of the step, so the gate report keeps it. A9 runs its own `dotnet test` with a 30-minute limit per build, so after a hang the gate still waits for A9.
+
+## Step gate
+
+1. **A step that finds no event waiting is held for the next event, and more such steps add nothing.** A lab can do slow work before its first event, so a step can arrive in that gap. The app no longer needs its 3 s resend.

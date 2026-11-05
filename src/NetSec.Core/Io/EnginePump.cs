@@ -31,12 +31,18 @@ namespace NetSec.Io
         readonly object _lock = new object();
         readonly Queue<Promise> _waiting = new Queue<Promise>();
         bool _open;
+        bool _stepHeld;
 
         public IFuture Pass(TraceEvent e)
         {
             lock (_lock)
             {
                 if (_open) return Futures.Completed;
+                if (_stepHeld)
+                {
+                    _stepHeld = false;
+                    return Futures.Completed;
+                }
                 Promise waiter = new Promise(PromiseOptions.RunContinuationsAsynchronously);
                 _waiting.Enqueue(waiter);
                 return waiter.Future;
@@ -49,7 +55,11 @@ namespace NetSec.Io
         {
             Promise waiter = null;
             lock (_lock)
+            {
+                // A lab can do slow work before an event reaches the gate. One step waits for that event. More steps add nothing, because the app resends.
                 if (_waiting.Count > 0) waiter = _waiting.Dequeue();
+                else _stepHeld = true;
+            }
             if (waiter != null) waiter.TrySetResult();
         }
 
@@ -59,6 +69,7 @@ namespace NetSec.Io
             lock (_lock)
             {
                 _open = true;
+                _stepHeld = false;
                 released = _waiting.ToArray();
                 _waiting.Clear();
             }
@@ -67,7 +78,11 @@ namespace NetSec.Io
 
         public void Pause()
         {
-            lock (_lock) _open = false;
+            lock (_lock)
+            {
+                _open = false;
+                _stepHeld = false;
+            }
         }
     }
 
