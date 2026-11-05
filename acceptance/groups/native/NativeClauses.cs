@@ -26,38 +26,7 @@ namespace Acceptance
             [DllImport("netsec_ct.dll")] public static extern int nsct_sample(int which, byte[] a, byte[] b, uint n, uint[] ticks, uint samples, out uint freq);
         }
 
-        static string BuiltDll;
-
-        /// <summary>Builds the library from the product sources into the work folder. Runs once per program.</summary>
-        static string Build(Ctx c)
-        {
-            if (BuiltDll != null) return BuiltDll;
-            string src = Path.Combine(c.RepoRoot, "native", "netsec_ct.c");
-            if (!File.Exists(src)) throw new NotRunException("PRODUCT_MISSING", "native/netsec_ct.c does not exist yet (slice S7)");
-            string vcvars = c.Prop("vcvars64", @"C:\Program Files\Microsoft Visual Studio\2022\Community\VC\Auxiliary\Build\vcvars64.bat");
-            if (!File.Exists(vcvars)) throw new NotRunException("TOOL_MISSING", "vcvars64.bat not found at " + vcvars);
-            string outDir = Path.Combine(c.WorkDir, "native-x64");
-            Directory.CreateDirectory(outDir);
-            string cmd = Path.Combine(outDir, "build.cmd");
-            File.WriteAllText(cmd,
-                "@echo off\r\n" +
-                "call \"" + vcvars + "\" >nul\r\n" +
-                "if errorlevel 1 exit /b 91\r\n" +
-                "cd /d \"" + c.RepoRoot + "\"\r\n" +
-                "cl /nologo /W4 /WX /O2 /TP /LD /DNSCT_BUILD native\\netsec_ct.c /Fe\"" + outDir + "\\netsec_ct.dll\" /Fo\"" + outDir + "\\netsec_ct.obj\"\r\n" +
-                "if errorlevel 1 exit /b 92\r\n" +
-                "cl /nologo /W4 /WX /O2 /TC /c native\\netsec_ct.c /Fo\"" + outDir + "\\c_check.obj\"\r\n" +
-                "if errorlevel 1 exit /b 93\r\n");
-            string output;
-            int code = Proc.Run("cmd.exe", "/c \"" + cmd + "\"", c.RepoRoot, 300000, out output);
-            if (code == 92) throw new FailException("cl.exe failed to build the DLL as C++ (/TP /W4 /WX): " + Tail(output));
-            if (code == 93) throw new FailException("cl.exe failed to compile the same file as C (/TC): the library must stay plain C-compatible so a CE compiler can take it. " + Tail(output));
-            if (code != 0) throw new NotRunException("TOOL_FAILED", "build.cmd exited " + code + ": " + Tail(output));
-            string dll = Path.Combine(outDir, "netsec_ct.dll");
-            if (!File.Exists(dll)) throw new FailException("cl.exe reported success and wrote no DLL");
-            BuiltDll = dll;
-            return dll;
-        }
+        static string Build(Ctx c) { return NativeBuild.Build(c); }
 
         static string Tail(string s) { s = s.Trim(); return s.Length > 600 ? s.Substring(s.Length - 600) : s; }
 
