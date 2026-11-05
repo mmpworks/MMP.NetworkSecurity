@@ -2,13 +2,11 @@ using System;
 using System.Collections.Generic;
 using System.IO;
 using System.Net;
-using System.Net.WebSockets;
-using System.Text;
-using System.Threading;
+using System.Security.Cryptography;
 
 namespace Acceptance
 {
-    // The wizard machine and the lesson sessions of the fake Host. See FakeHost.cs.
+    // The wizard machine of the fake Host. See FakeHost.cs.
     public sealed partial class FakeHost
     {
         static string[] FlowTypesOf(string flowId) { return A17.TypesOf(flowId); }
@@ -21,7 +19,7 @@ namespace Acceptance
             {
                 case "Intro": return new List<string> { "next", "cancel" };
                 case "ChooseSource": return new List<string> { "choose", "back", "cancel" };
-                case "PickFiles": return new List<string> { "files", "back", "cancel" };
+                case "PickFiles": return new List<string> { "files", "next", "back", "cancel" };
                 case "Options": return new List<string> { "option", "next", "back", "cancel" };
                 case "ReadBack": case "Place": return new List<string> { "next", "back", "cancel" };
                 case "Check":
@@ -36,12 +34,12 @@ namespace Acceptance
         {
             switch (state)
             {
-                case "Intro": return "info";
+                case "Intro": return "explain";
                 case "ChooseSource": return "choose";
-                case "PickFiles": return "pick";
-                case "Options": return "options";
+                case "PickFiles": return "file";
+                case "Options": return "choose";
                 case "ReadBack": return "review";
-                case "Place": return "place";
+                case "Place": return "generate";
                 case "Check": return "prove";
                 default: return "done";
             }
@@ -68,8 +66,20 @@ namespace Acceptance
         static string JudgeOf(string typeId)
         {
             if (typeId.StartsWith("ssh.")) return "ssh.exe";
-            if (typeId.StartsWith("dukpt.") || typeId.StartsWith("lab.") || typeId == "device.enrolment") return "none";
+            if (typeId.StartsWith("dukpt.") || typeId == "device.enrolment") return "none";
             return "openssl";
+        }
+
+        string SaysOf(string typeId)
+        {
+            switch (JudgeOf(typeId))
+            {
+                case "ssh.exe": return "Checked with ssh.exe";
+                case "none": return typeId == "device.enrolment" ? "No outside tool can judge this. Our own check passed." : "No outside tool can judge this. Our code matches the published vectors.";
+                default:
+                    if (typeId == "token.issuer" || typeId.StartsWith("lab.")) return "Checked with OpenSSL";
+                    return M("says-trusted") ? "Trusted" : "Checked against the root you gave it";
+            }
         }
 
         void FlowEvent(HttpListenerContext ctx, FlowRun r, Dictionary<string, object> body)
@@ -81,7 +91,6 @@ namespace Acceptance
             if (!AllowedIn(r).Contains(ev) && !M("machine-allows-any"))
             { Fail(ctx, 409, "WIZARD_EVENT_NOT_ALLOWED", "event '" + ev + "' is not allowed in state '" + r.State + "'"); return; }
             r.Errors.Clear();
-            string from = r.State;
             switch (ev)
             {
                 case "next":
@@ -89,7 +98,10 @@ namespace Acceptance
                     {
                         case "Intro": Go(r, "ChooseSource"); break;
                         case "Options": Go(r, "ReadBack"); break;
-                        case "PickFiles": Go(r, "ReadBack"); break;
+                        case "PickFiles":
+                            if (r.FileBlocked || r.Paths.Count == 0) { r.Errors.Add(D("code", "KEY_FILE_UNREADABLE", "severity", "error", "message", "Pick a readable key file for each row first.")); break; }
+                            Go(r, HasOptions(r.FlowId) ? "Options" : "ReadBack");
+                            break;
                         case "ReadBack": Go(r, "Place"); break;
                         case "Place": Apply(r); Go(r, "Check"); break;
                         case "Check":
@@ -100,8 +112,8 @@ namespace Acceptance
                     break;
                 case "choose":
                     r.Source = MiniJson.Str(data, "source");
-                    if (r.Source == "files" && r.FlowId == "my-ssh") Go(r, "PickFiles");
-                    else if (r.Source == "make") Go(r, "Options");
+                    if (r.Source == "files") Go(r, "PickFiles");
+                    else if (r.Source == "make") Go(r, HasOptions(r.FlowId) ? "Options" : "ReadBack");
                     else { Fail(ctx, 409, "WIZARD_SOURCE_UNAVAILABLE", "source " + r.Source + " is not offered by " + r.FlowId); return; }
                     break;
                 case "option":
@@ -124,32 +136,59 @@ namespace Acceptance
             Write(ctx, 200, D("runId", r.RunId, "step", StepJson(r)));
         }
 
+        static bool HasOptions(string flowId) { return flowId == "my-ssh" || flowId == "my-payment" || flowId == "my-login"; }
+
         static void Go(FlowRun r, string to) { r.Back.Add(r.State); r.State = to; }
+
+        static bool IsEd25519Type(string typeId) { return typeId == "token.issuer" || typeId == "device.enrolment"; }
 
         void CheckPaths(FlowRun r, Dictionary<string, object> data)
         {
             Dictionary<string, object> paths = MiniJson.Obj(data, "paths");
             string ssh = Path.Combine(Environment.GetFolderPath(Environment.SpecialFolder.UserProfile), ".ssh");
+            r.FileBlocked = false;
             if (paths == null) return;
             foreach (KeyValuePair<string, object> kv in paths)
             {
                 string p = kv.Value as string ?? "";
+                r.Paths[kv.Key] = p;
                 if (!M("no-personal-warning") && p.StartsWith(ssh, StringComparison.OrdinalIgnoreCase))
                     r.Errors.Add(D("code", "KEY_PATH_PERSONAL", "severity", "warning", "typeId", kv.Key, "message", "This path is in your own .ssh folder. Use a test key."));
                 if (!File.Exists(p))
+                {
                     r.Errors.Add(D("code", "KEY_FILE_UNREADABLE", "severity", "error", "typeId", kv.Key, "message", "The file cannot be read."));
+                    r.FileBlocked = true;
+                }
+                else if (IsEd25519Type(kv.Key) && ReadKey(p) == null)
+                {
+                    r.Errors.Add(D("code", "KEY_FILE_FORMAT", "severity", "error", "typeId", kv.Key, "message", "The file is not an Ed25519 private key."));
+                    r.FileBlocked = true;
+                }
             }
         }
+
+        static byte[] RandomBytes(int n) { byte[] b = new byte[n]; RandomNumberGenerator.Fill(b); return b; }
 
         void Apply(FlowRun r)
         {
             foreach (string id in FlowTypesOf(r.FlowId))
             {
                 TypeState t = _types[id];
-                t.Mode = "Mine"; t.Bound = true; t.Verified = false;
+                t.Mode = "Mine"; t.Bound = true; t.Verified = false; t.Version++;
                 bool hidden;
-                t.KeepHidden = r.KeepHidden.TryGetValue(id, out hidden) && hidden;
-                if (id == "token.issuer") t.Key = NewKey("issuer");
+                r.KeepHidden.TryGetValue(id, out hidden);
+                // Exportable is set when the vault key is made, and it is one-way: a later run cannot turn a hidden key back into a showing one.
+                t.KeepHidden = (t.KeepHidden && !M("exportable-flips")) || hidden;
+                bool imported = r.Source == "files" && r.Paths.ContainsKey(id);
+                t.Provider = imported ? "file" : "vault";
+                if (id == "token.issuer")
+                {
+                    t.Key = imported ? ReadKey(r.Paths[id]) : NewKey("issuer");
+                    t.Seed = t.Key.Seed;
+                }
+                else if (IsEd25519Type(id) && imported) t.Seed = ReadKey(r.Paths[id]).Seed;
+                else t.Seed = RandomBytes(id.StartsWith("dukpt.") || id.StartsWith("lab.") ? 16 : 32);
+                if (t.Provider == "vault") VaultStore(t, t.KeepHidden);
             }
         }
 
@@ -161,104 +200,9 @@ namespace Acceptance
                 _types[id].Verified = true;
                 string judge = JudgeOf(id);
                 if (M("device-judge-claimed") && id == "device.enrolment") judge = "openssl";
-                if (!M("no-judge-facts")) r.Facts.Add(D("typeId", id, "judge", judge));
+                if (!M("no-judge-facts")) r.Facts.Add(D("typeId", id, "judge", judge, "says", SaysOf(id)));
             }
             r.Checked = true;
-        }
-
-        // ------------------------------------------------------------ sessions over the WebSocket
-
-        static void SendText(WebSocket ws, object o)
-        {
-            byte[] b = Encoding.UTF8.GetBytes(MiniJson.Write(o));
-            ws.SendAsync(new ArraySegment<byte>(b), WebSocketMessageType.Text, true, CancellationToken.None).Wait(15000);
-        }
-
-        void HandleSocket(HttpListenerContext ctx)
-        {
-            WebSocket ws = ctx.AcceptWebSocketAsync(null).Result.WebSocket;
-            byte[] buf = new byte[1 << 16];
-            List<Dictionary<string, object>> pending = null;
-            string sessionId = null;
-            while (ws.State == WebSocketState.Open)
-            {
-                WebSocketReceiveResult r;
-                try { r = ws.ReceiveAsync(new ArraySegment<byte>(buf), CancellationToken.None).Result; } catch (Exception) { break; }
-                if (r.MessageType == WebSocketMessageType.Close) break;
-                Dictionary<string, object> m = MiniJson.AsObject(MiniJson.Parse(Encoding.UTF8.GetString(buf, 0, r.Count)));
-                string type = MiniJson.Str(m, "type");
-                if (type == "session.start")
-                {
-                    lock (_gate)
-                    {
-                        int lesson = (int)MiniJson.Num(m, "lesson", 0);
-                        if (lesson < 1 || lesson > 11) { SendText(ws, D("type", "error", "code", "LESSON_NOT_BUILT", "message", "lesson " + lesson + " is not built")); break; }
-                        List<Dictionary<string, object>> problems = Problems(lesson);
-                        if (problems.Count > 0)
-                        {
-                            Dictionary<string, object> first = problems[0];
-                            SendText(ws, D("type", "error", "requestId", MiniJson.Str(m, "requestId"), "code", MiniJson.Str(first, "code"), "message", MiniJson.Str(first, "message")));
-                            break;
-                        }
-                        sessionId = "s" + (++_next);
-                        pending = LessonEvents(lesson);
-                        _sessions[sessionId] = pending;
-                        string file = Path.Combine(Dir, "session-" + sessionId + ".ndjson");
-                        File.WriteAllText(file, string.Join("\n", pending.ConvertAll(e => MiniJson.Write(e)).ToArray()) + "\n");
-                        List<object> sec = new List<object>();
-                        foreach (string id in A17.AllTypes) sec.Add(TypeJson(_types[id]));
-                        SendText(ws, D("type", "session.started", "sessionId", sessionId, "transportKind", MiniJson.Str(m, "transport") ?? "glass",
-                            "trainingOnly", (MiniJson.Str(m, "transport") ?? "glass") == "glass", "sessionFile", file, "showKeys", _showKeys, "security", sec));
-                    }
-                }
-                else if (type == "session.run" && pending != null)
-                {
-                    foreach (Dictionary<string, object> e in pending) SendText(ws, D("type", "trace", "event", e));
-                    SendText(ws, D("type", "session.finished", "sessionId", sessionId, "events", (double)pending.Count));
-                    break;
-                }
-            }
-            try { ws.CloseOutputAsync(WebSocketCloseStatus.NormalClosure, "done", CancellationToken.None).Wait(5000); } catch (Exception) { }
-            try { ws.Dispose(); } catch (Exception) { }
-        }
-
-        List<object> Secret(string name, string holder, byte[] bytes, bool hiddenByLearner)
-        {
-            List<object> one = new List<object>();
-            Dictionary<string, object> s = D("name", name, "holder", holder, "fingerprint", A17.Fingerprint(Hex.Encode(bytes)));
-            if (_showKeys && !hiddenByLearner) s["hex"] = Hex.Encode(bytes);
-            else s["hidden"] = hiddenByLearner ? "learner" : "show-keys-off";
-            one.Add(s);
-            return one;
-        }
-
-        List<Dictionary<string, object>> LessonEvents(int lesson)
-        {
-            List<Dictionary<string, object>> evs = new List<Dictionary<string, object>>();
-            if (lesson == 10)
-            {
-                KeyPair signer = M("token-wrong-key") ? _builtinIssuer : ActiveIssuer();
-                long now = DateTimeOffset.UtcNow.ToUnixTimeSeconds();
-                string token = Sign(signer, "{\"iss\":\"lab\",\"sub\":\"learner\",\"iat\":" + now + ",\"exp\":" + (now + 300) + "}");
-                KeyPair shown = M("pub-in-trace-wrong") ? _builtinIssuer : ActiveIssuer();
-                List<object> secrets = new List<object>();
-                secrets.AddRange(Secret("auth.token", "issuer", Encoding.ASCII.GetBytes(token), _types["token.issuer"].KeepHidden));
-                secrets.AddRange(Secret("auth.issuer-public", "issuer", Hex.Decode(shown.PublicHex), false));
-                evs.Add(D("type", "auth.token-issued", "eventId", "e1", "secrets", secrets));
-                return evs;
-            }
-            if (lesson == 5)
-            {
-                for (int i = 1; i <= 5; i++)
-                {
-                    byte[] b = new byte[32];
-                    new Random(20261105 + i).NextBytes(b);
-                    evs.Add(D("type", "tls.secret", "eventId", "e" + i, "secrets", Secret("tls.secret" + i, "peer", b, false)));
-                }
-                return evs;
-            }
-            evs.Add(D("type", "lesson.step", "eventId", "e1", "secrets", new List<object>()));
-            return evs;
         }
     }
 }

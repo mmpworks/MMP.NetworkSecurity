@@ -39,7 +39,9 @@ namespace Acceptance
                 Check.True(A17.ProblemCodes(r).Contains("token.issuer:SECURITY_TYPE_NOT_READY"), "problems[] lacks token.issuer:SECURITY_TYPE_NOT_READY, has [" + ProblemText(r) + "]");
                 SessionRun refused = HostSession.Run(h, 10, "glass", null);
                 Check.Equal("error code of session.start on an unconfigured type", "SECURITY_TYPE_NOT_READY", refused.ErrorCode);
-                Check.True((refused.Frames.Count > 0 ? refused.Frames[refused.Frames.Count - 1] : "").Contains("token.issuer"), "the refusal does not name the type token.issuer");
+                string frame = refused.Frames.Count > 0 ? refused.Frames[refused.Frames.Count - 1] : "";
+                Check.True(frame.Contains("token.issuer"), "the refusal does not name the type token.issuer: " + frame);
+                Check.True(frame.Contains("my-login"), "the refusal does not name the flow my-login that makes the type: " + frame);
                 Check.True(refused.Events.Count == 0, "a refused lab still sent " + refused.Events.Count + " trace events: it ran anyway");
 
                 // Configured, not proven: the flow wrote the binding and the check has not run. An unchecked key can fail for an unnamed reason inside a lesson.

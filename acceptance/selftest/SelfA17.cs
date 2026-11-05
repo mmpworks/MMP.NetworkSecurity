@@ -26,6 +26,18 @@ namespace Acceptance
             new Case("A17.import.warns-on-personal-ssh-path", V0Clauses.WarnsOnPersonalSshPath, "no-personal-warning"),
             new Case("A17.flow.login.walk", V0Clauses.LoginWalk, "machine-allows-any", "stale-accepted", "back-after-check", "no-judge-facts", "device-judge-claimed"),
             new Case("A17.referee.token-issuer-go", V0Clauses.TokenIssuerGo, "token-wrong-key", "key-route-other-public", "pub-in-trace-wrong"),
+            new Case("A17.show-keys.default-on", V3Clauses.DefaultOn, "default-off", "no-health-showkeys"),
+            new Case("A17.show-keys.off-holds-no-secret", V3Clauses.OffHoldsNoSecret, "off-keeps-hex-in-events", "off-keeps-hex-in-file", "off-hex-in-frames", "hidden-missing", "keylog-served-when-off"),
+            new Case("A17.show-keys.mine-shows-exportable", V3Clauses.MineShowsExportable, "mine-key-route-no-hex", "no-key-in-use"),
+            new Case("A17.show-keys.non-exportable-hidden-when-on", V3Clauses.NonExportableHiddenWhenOn, "nonexportable-leaks", "nonexportable-hides-all"),
+            new Case("A17.show-keys.fingerprint-compare", V3Clauses.FingerprintCompare, "fingerprint-wrong"),
+            new Case("A17.vault.export-refused-and-audited", V1Clauses.ExportRefusedAndAudited, "export-not-audited", "export-allowed"),
+            new Case("A17.vault.exercise-sign-judged-by-openssl", V1Clauses.ExerciseSignJudgedByOpenssl, "sign-bad-signature"),
+            new Case("A17.vault.exercise-walk", V1Clauses.ExerciseWalk, "walk-order-wrong", "export-allowed"),
+            new Case("A17.vault.course-read-audited", V1Clauses.CourseReadAudited, "course-read-as-export", "course-read-unaudited"),
+            new Case("A17.vault.tampered-row-refused", V1Clauses.TamperedRowRefused, "tamper-ignored"),
+            new Case("A17.vault.audit-failure-refuses", V1Clauses.AuditFailureRefuses, "audit-failure-ignored"),
+            new Case("A17.vault.exportable-is-one-way", V1Clauses.ExportableIsOneWay, "exportable-flips"),
         };
 
         static string Outcome(Body b, Ctx c)
@@ -44,6 +56,13 @@ namespace Acceptance
             foreach (KeyValuePair<string, string> kv in c.Props) n.Props[kv.Key] = kv.Value;
             n.Props.Remove("host");
             n.Props["a17.attach"] = fake.Port + "," + fake.Token + "," + fake.Dir;
+            // The tour of lab 20, bound to the four events the exercise sends.
+            string tours = Path.Combine(n.WorkDir, "tours");
+            Directory.CreateDirectory(tours);
+            File.WriteAllText(Path.Combine(tours, "lesson-20.json"),
+                "{\"steps\":[{\"id\":\"L20-S1\",\"bind\":{\"kind\":\"event\",\"eventType\":\"vault.sign\"}},{\"id\":\"L20-S2\",\"bind\":{\"kind\":\"event\",\"eventType\":\"vault.derive\"}},"
+                + "{\"id\":\"L20-S3\",\"bind\":{\"kind\":\"event\",\"eventType\":\"vault.refused\"}},{\"id\":\"L20-S4\",\"bind\":{\"kind\":\"event\",\"eventType\":\"vault.audit\"}}]}");
+            n.Props["tours.dir"] = tours;
             return n;
         }
 
@@ -51,7 +70,7 @@ namespace Acceptance
         {
             string tag = k.Id.Replace('.', '-') + "-" + (mutation.Length == 0 ? "good" : mutation);
             string dir = Path.Combine(c.WorkDir, "fake-" + tag);
-            using (FakeHost fake = new FakeHost(dir, mutation, Referees.OpenSsl(c)))
+            using (FakeHost fake = new FakeHost(dir, mutation, Referees.OpenSsl(c), Path.Combine(c.AcceptanceDir, "selftest", "FakeHost", "fakevault.py")))
                 return Outcome(k.Run, WithFake(c, fake, tag));
         }
 
@@ -60,8 +79,11 @@ namespace Acceptance
         {
             int passes = 0, bites = 0;
             List<string> notRun = new List<string>();
+            // ACC_SELF_ONLY keeps only the clauses whose id holds that text, so one clause can be run again while it is being fixed.
+            string only = Environment.GetEnvironmentVariable("ACC_SELF_ONLY");
             foreach (Case k in Cases)
             {
+                if (!string.IsNullOrEmpty(only) && k.Id.IndexOf(only, StringComparison.Ordinal) < 0) continue;
                 string good = Against(c, k, "");
                 if (good.StartsWith("NOT RUN")) { notRun.Add(k.Id + " (" + good.Substring(0, Math.Min(good.Length, 90)) + ")"); continue; }
                 Check.True(good.StartsWith("PASS"), k.Id + " should PASS on the faithful fake, gave " + good);
@@ -71,6 +93,9 @@ namespace Acceptance
                     string bad = Against(c, k, m);
                     Check.True(bad.StartsWith("FAIL"), k.Id + " should FAIL when the fake has the defect '" + m + "', gave " + bad);
                     bites++;
+                    // ACC_SELF_LOG names a file that receives one line per defect with the reason the clause gave, so a person can check each FAIL is for the right reason.
+                    string log = Environment.GetEnvironmentVariable("ACC_SELF_LOG");
+                    if (!string.IsNullOrEmpty(log)) File.AppendAllText(log, m + " => " + bad.Substring(0, Math.Min(bad.Length, 230)) + "\n");
                 }
             }
             if (passes == 0) throw new NotRunException("REFEREE_MISSING", "no A17 clause could run on the fake: " + string.Join("; ", notRun.ToArray()));

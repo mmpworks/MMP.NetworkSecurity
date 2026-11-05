@@ -201,7 +201,7 @@ namespace Acceptance
 
             /// <summary>
             /// "Make them for me" through the whole spine: Intro, ChooseSource, [Options], ReadBack, Place, Check, Done. keepHidden lists the types the
-            /// learner asks to keep from showing. Stops at stopAt (a state name) when given, with that state as the current step.
+            /// learner asks to keep from showing. Stops at stopAt (a state name, or "Checked") when given, with that state as the current step.
             /// </summary>
             public void MakeForMe(Dictionary<string, bool> keepHidden, string stopAt)
             {
@@ -212,6 +212,30 @@ namespace Acceptance
                 if (stopAt == "ChooseSource") return;
                 Reply c = Send("choose", Obj("source", "make"));
                 Check.True(c.Ok, "event choose (make) got " + c);
+                Tail(keepHidden, stopAt);
+            }
+
+            /// <summary>"Use my files": one key file per type, by path. Same spine after the files are read.</summary>
+            public void UseFiles(Dictionary<string, string> paths, Dictionary<string, bool> keepHidden, string stopAt)
+            {
+                Check.Equal("first state of " + FlowId, "Intro", State);
+                Next();
+                Reply c = Send("choose", Obj("source", "files"));
+                Check.True(c.Ok, "event choose (files) got " + c);
+                Check.Equal("state after choosing files", "PickFiles", State);
+                Dictionary<string, object> p = new Dictionary<string, object>();
+                foreach (KeyValuePair<string, string> kv in paths) p[kv.Key] = kv.Value;
+                Reply f = Send("files", Obj("paths", p));
+                Check.True(f.Ok, "event files got " + f);
+                foreach (Dictionary<string, object> e in Errors)
+                    Check.True(MiniJson.Str(e, "severity") != "error", "event files gave the error " + MiniJson.Str(e, "code") + ": " + MiniJson.Str(e, "message"));
+                // A clean read may move on by itself, or wait for next. Both are fine.
+                if (State == "PickFiles") Next();
+                Tail(keepHidden, stopAt);
+            }
+
+            void Tail(Dictionary<string, bool> keepHidden, string stopAt)
+            {
                 if (State == "Options")
                 {
                     if (keepHidden != null)
@@ -323,6 +347,47 @@ namespace Acceptance
             sb.Append(ev.Body ?? "").Append('\n');
             if (!string.IsNullOrEmpty(run.SessionFile) && File.Exists(run.SessionFile)) sb.Append(File.ReadAllText(run.SessionFile)).Append('\n');
             return sb.ToString();
+        }
+
+        /// <summary>An Ed25519 private key the suite made itself, so it knows the bytes. Returns the PEM path, the 32-byte seed as hex, and the public key as hex.</summary>
+        public sealed class TestKey { public string Pem, SeedHex, PublicHex; }
+
+        public static TestKey MakeEd25519(Ctx c, string name)
+        {
+            string dir = TempDir(c, "keys"), o, pem = Path.Combine(dir, name + ".pem"), priv = Path.Combine(dir, name + ".priv.der"), pub = Path.Combine(dir, name + ".pub.der");
+            string openssl = Referees.OpenSsl(c);
+            if (Proc.Run(openssl, "genpkey -algorithm ed25519 -out \"" + pem + "\"", dir, 30000, out o) != 0) throw new FailException("openssl genpkey failed: " + o);
+            if (Proc.Run(openssl, "pkey -in \"" + pem + "\" -outform DER -out \"" + priv + "\"", dir, 30000, out o) != 0) throw new FailException("openssl pkey failed: " + o);
+            if (Proc.Run(openssl, "pkey -in \"" + pem + "\" -pubout -outform DER -out \"" + pub + "\"", dir, 30000, out o) != 0) throw new FailException("openssl pkey -pubout failed: " + o);
+            byte[] p8 = File.ReadAllBytes(priv), spki = File.ReadAllBytes(pub);
+            Check.True(p8.Length == 48 && spki.Length == 44, "the Ed25519 DER sizes are " + p8.Length + " and " + spki.Length + "; expected 48 and 44");
+            return new TestKey { Pem = pem, SeedHex = Hex.Encode(Hex.Slice(p8, 16, 32)), PublicHex = Hex.Encode(Hex.Slice(spki, 12, 32)) };
+        }
+
+        // ------------------------------------------------------------ the practice vault, read from its file
+
+        public static string VaultDbPath(HostProc h)
+        {
+            if (string.IsNullOrEmpty(h.SecurityDir)) throw new FailException("the suite does not know the Host's security folder");
+            return Path.Combine(h.SecurityDir, "vault", "vault.db");
+        }
+
+        /// <summary>Runs checks/vaultdb.py against the Host's vault.db. Returns the parsed JSON, or a FAIL that carries the script's output.</summary>
+        public static object VaultDb(Ctx c, HostProc h, string command)
+        {
+            string db = VaultDbPath(h), o;
+            if (!File.Exists(db)) throw new FailException("the Host wrote no vault file at " + db + " (modes-design.md section 5.1)");
+            string script = Path.Combine(c.AcceptanceDir, "checks", "vaultdb.py");
+            int code = Proc.Run("python", "-I \"" + script + "\" " + command + " \"" + db + "\"", c.AcceptanceDir, 60000, out o);
+            if (code != 0) throw new FailException("vaultdb.py " + command + " exited " + code + ": " + o.Trim());
+            return MiniJson.Parse(o.Trim());
+        }
+
+        public static List<Dictionary<string, object>> FileAuditRows(Ctx c, HostProc h)
+        {
+            List<Dictionary<string, object>> rows = new List<Dictionary<string, object>>();
+            foreach (object o in (List<object>)VaultDb(c, h, "audit-rows")) rows.Add(MiniJson.AsObject(o));
+            return rows;
         }
 
         public static string TempDir(Ctx c, string name)

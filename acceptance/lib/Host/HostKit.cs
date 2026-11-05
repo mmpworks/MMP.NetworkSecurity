@@ -74,7 +74,8 @@ namespace Acceptance
     {
         public int Status;
         public string Body;
-        public Dictionary<string, object> Json;
+        public Dictionary<string, object> Json;       // set when the body is a JSON object
+        public List<object> Array;                    // set when the body is a JSON array, as GET /api/sessions/{id}/events answers
         public bool Ok { get { return Status >= 200 && Status < 300; } }
 
         /// <summary>The named code of an error answer: "code" at the top of the body, or inside "error".</summary>
@@ -109,7 +110,8 @@ namespace Acceptance
                 Reply reply = new Reply();
                 reply.Status = (int)r.StatusCode;
                 reply.Body = r.Content.ReadAsStringAsync().Result;
-                try { reply.Json = MiniJson.AsObject(MiniJson.Parse(reply.Body)); } catch (FormatException) { reply.Json = null; }
+                try { object parsed = MiniJson.Parse(reply.Body); reply.Json = parsed as Dictionary<string, object>; reply.Array = parsed as List<object>; }
+                catch (FormatException) { reply.Json = null; reply.Array = null; }
                 return reply;
             }
         }

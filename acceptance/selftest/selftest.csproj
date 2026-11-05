@@ -14,6 +14,8 @@
     <Compile Include="..\groups\keys\KeysClauses.cs" Link="keys\KeysClauses.cs" />
     <Compile Include="..\groups\a17\A17Kit.cs" Link="a17\A17Kit.cs" />
     <Compile Include="..\groups\a17\V0Clauses.cs" Link="a17\V0Clauses.cs" />
+    <Compile Include="..\groups\a17\V3Clauses.cs" Link="a17\V3Clauses.cs" />
+    <Compile Include="..\groups\a17\V1Clauses.cs" Link="a17\V1Clauses.cs" />
     <Compile Include="..\lib\Host\*.cs" Link="HostKit\%(Filename)%(Extension)" />
   </ItemGroup>
 </Project>
