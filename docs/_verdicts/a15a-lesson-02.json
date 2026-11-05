@@ -8,43 +8,50 @@
       "id": "L2-C01",
       "verdict": "accurate",
       "note": "FIPS 180-4 section 1, Figure 1: SHA-256 message digest size 256 bits. Section 6.2: 'The final result of SHA-256 is a 256-bit message digest.' 32 bytes is 256 / 8.",
-      "checkedAgainst": "FIPS 180-4 sections 1 and 6.2, PDF fetched from nvlpubs.nist.gov this session"
+      "checkedAgainst": "FIPS 180-4 sections 1 and 6.2, PDF fetched from nvlpubs.nist.gov this session",
+      "textHash": "5cbbb72ece1b986957152f177bd1a7621afcf193045e3066d09f5502b2e2bce4"
     },
     {
       "id": "L2-C02",
       "verdict": "accurate",
       "note": "Re-checked against tours at feat/tours-6-11 commit 8b3ae45. FIPS 180-4 section 5.1.1: append bit 1, then k zero bits, then the 64-bit message length. Section 6.2.2: blocks run in order, each from the previous hash value H(i-1), and the final H(N) forms the 256-bit digest, so the digest is the start state for more blocks. FIPS 202 Appendix A.1 (Summary) names 'length-extension attacks'. Lab result row L2-extend-keyed-hash in lessons-1-3-names.md: forged seal Accepted. Text states the mechanism and the lab result only.",
-      "checkedAgainst": "FIPS 180-4 sections 5.1.1, 6.2.2 (fetched); FIPS 202 Appendix A.1 (fetched this session); docs/lessons-1-3-names.md Lesson 2 attacks (read)"
+      "checkedAgainst": "FIPS 180-4 sections 5.1.1, 6.2.2 (fetched); FIPS 202 Appendix A.1 (fetched this session); docs/lessons-1-3-names.md Lesson 2 attacks (read)",
+      "textHash": "4afe9b1333403739b413c44736b92f48e413d54fefb7707474b2c17558d233ad"
     },
     {
       "id": "L2-C03",
       "verdict": "accurate",
       "note": "Re-checked against tours at feat/tours-6-11 commit 8b3ae45. Claim is now the formula only. RFC 2104 section 2: H(K XOR opad, H(K XOR ipad, text)), ipad 0x36, opad 0x5C.",
-      "checkedAgainst": "RFC 2104 section 2 (fetched)"
+      "checkedAgainst": "RFC 2104 section 2 (fetched)",
+      "textHash": "422ef874618be224d96989e4794f230126ee9ac3e6ebd9c998432363b00716a3"
     },
     {
       "id": "L2-C04",
       "verdict": "accurate",
       "note": "Re-checked against tours at feat/tours-6-11 commit 8b3ae45. Section 3 Introduction: a MAC algorithm based on a symmetric key block cipher. Section 3 and 5.2 name AES. Section 6.2 is MAC generation.",
-      "checkedAgainst": "NIST SP 800-38B sections 3, 5.2, 6.2 (fetched)"
+      "checkedAgainst": "NIST SP 800-38B sections 3, 5.2, 6.2 (fetched)",
+      "textHash": "35c5600dbba7e5e49100161e38c27685186ceabf3c86f681ee39a43c93d86b55"
     },
     {
       "id": "L2-C05",
       "verdict": "accurate",
       "note": "SP 800-175B Rev. 1 section 4.2.2: when several parties know the key, 'assurance of the source cannot be obtained (e.g., from entity B's perspective as a receiver, either entity A or entity B could be the source, since both know the key)'. The front matter (before section 1) defines non-repudiation as assurance of source provided to a third party; section 4.2.3 says signatures support it. The cited section is 4.2.2.",
-      "checkedAgainst": "NIST SP 800-175B Rev. 1 front matter, sections 4.2.2, 4.2.3, PDF fetched this session"
+      "checkedAgainst": "NIST SP 800-175B Rev. 1 front matter, sections 4.2.2, 4.2.3, PDF fetched this session",
+      "textHash": "adc88a57b4bb28debca9c7c2aaba25bc548026180730f739aea4c40241664423"
     },
     {
       "id": "L2-C06",
       "verdict": "accurate",
       "note": "Re-checked against tours at feat/tours-6-11 commit 8b3ae45. docs/lessons-1-3-names.md Lesson 2 attacks, row L2-extend-hmac: 'The same forgery against HmacSealed', expect Rejected, code SEAL_HMAC_MISMATCH, check name HMAC compare. Claim text matches the row.",
-      "checkedAgainst": "docs/lessons-1-3-names.md Lesson 2 attacks (read)"
+      "checkedAgainst": "docs/lessons-1-3-names.md Lesson 2 attacks (read)",
+      "textHash": "0f81f0cde9693156bb41c43cc96bec19f0e0a6274a3fc1baa7b07db90ea0a253"
     },
     {
       "id": "L2-C07",
       "verdict": "accurate",
       "note": "Tours read at main 6e0c1e5 (PR 60 merged); lab run at main 6e0c1e5. Lab run, default seed 7: measure.result SHA-256 avalanche detail bits=106;of=256. The claim says 106 of the 256 cells differ in the default run.",
-      "checkedAgainst": "lab run, lesson 2; src/NetSec.Core/Labs/Lesson02Seals.cs (read)"
+      "checkedAgainst": "lab run, lesson 2; src/NetSec.Core/Labs/Lesson02Seals.cs (read)",
+      "textHash": "c373f9cfeb4612ae14960ee3143050e2af7228cf2b6bc17ed4972265497e91ab"
     }
   ],
   "textRead": {
@@ -72,6 +79,8 @@
       }
     ],
     "notes": [],
-    "problemsOpen": 0
+    "problemsOpen": 0,
+    "textHash": "a4d8d1278708ccc76e435c3bf540bf71acef7a793f33f97e52b8009f5e7291e9",
+    "boundAt": "main f43b560: the tour text and claims on main equal the versions I judged (compared step by step and claim by claim); hashes stamped by acceptance/checks/docs_checks.py --hashes logic"
   }
 }

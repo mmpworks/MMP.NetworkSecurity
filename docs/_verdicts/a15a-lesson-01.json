@@ -8,31 +8,36 @@
       "id": "L1-C01",
       "verdict": "accurate",
       "note": "SP 800-38A section 6.1: 'under a given key, any given plaintext block always gets encrypted to the same ciphertext block'. The pattern-leak consequence is an inference the SP only implies ('If this property is undesirable... should not be used'). Acceptable as written.",
-      "checkedAgainst": "NIST SP 800-38A section 6.1, PDF fetched from nvlpubs.nist.gov this session"
+      "checkedAgainst": "NIST SP 800-38A section 6.1, PDF fetched from nvlpubs.nist.gov this session",
+      "textHash": "b005b76f9e6a6deace355b7d57567cbab5fdad451cef208a1b2a1289f8927689"
     },
     {
       "id": "L1-C02",
       "verdict": "accurate",
       "note": "SP 800-38D section 7.2, Algorithm 5: output is 'plaintext P or indication of inauthenticity FAIL'; step 8 returns P only if T = T', else FAIL. The SP permits but does not require tag-first order ('the verification of the tag may precede the computation of the plaintext'). The observable rule, no plaintext on tag failure, holds.",
-      "checkedAgainst": "NIST SP 800-38D section 7.2, PDF fetched this session"
+      "checkedAgainst": "NIST SP 800-38D section 7.2, PDF fetched this session",
+      "textHash": "86aa5b8de71a7fd0d91b986f80639458530ff2f40be50341fb93ca33aebfc62f"
     },
     {
       "id": "L1-C03",
       "verdict": "accurate",
       "note": "Re-checked against tours at feat/tours-6-11 commit 8b3ae45. Source now adds Appendix A. Appendix A: a repeated IV likely lets an adversary learn the hash subkey and construct a forgery; it also covers the Counter mode confidentiality loss. Text and source agree.",
-      "checkedAgainst": "NIST SP 800-38D sections 5.2.1, 8, Appendix A, PDF fetched this session"
+      "checkedAgainst": "NIST SP 800-38D sections 5.2.1, 8, Appendix A, PDF fetched this session",
+      "textHash": "852577f6e1c65608f26e69ee290876196305e66d07615436deaf5219ee751f5f"
     },
     {
       "id": "L1-C04",
       "verdict": "accurate",
       "note": "Re-checked against tours at feat/tours-6-11 commit 8b3ae45. Source now adds SP 800-38D Appendix A ('in most cases it will not be feasible for the authenticated decryption function to detect the repetition'). Text and source agree.",
-      "checkedAgainst": "docs/ux-design.md section 8 (read); src/NetSec.Core/Labs/Lesson01Aes.cs (read); NIST SP 800-38D Appendix A (fetched)"
+      "checkedAgainst": "docs/ux-design.md section 8 (read); src/NetSec.Core/Labs/Lesson01Aes.cs (read); NIST SP 800-38D Appendix A (fetched)",
+      "textHash": "c4a274b473ed869a9cc3882db0f5fc75814d613789384a8f644383b527c3bc74"
     },
     {
       "id": "L1-C05",
       "verdict": "accurate",
       "note": "SP 800-38A section 6.2 CBC decryption: P_j = CIPH^-1(C_j) XOR C_(j-1). A flipped bit in C_j garbles P_j and flips the same bit in P_(j+1). Matches lessons-1-3-names.md row L1-flip-cbc. Holds for every block except the last (no next block).",
-      "checkedAgainst": "NIST SP 800-38A section 6.2 (fetched); docs/lessons-1-3-names.md Lesson 1 attacks (read)"
+      "checkedAgainst": "NIST SP 800-38A section 6.2 (fetched); docs/lessons-1-3-names.md Lesson 1 attacks (read)",
+      "textHash": "1934c23018043fe4abf165c99a8d6fe5a64d460e4a79cf2ca9322aa203486e5a"
     }
   ],
   "textRead": {
@@ -42,6 +47,8 @@
     "stepsWithProblems": 0,
     "problemsFound": 0,
     "problems": [],
-    "notes": []
+    "notes": [],
+    "textHash": "c3f3dd3fcb3ffb034a83f019c5e5a56039229de4f49045e0ee4cf41a71aea704",
+    "boundAt": "main f43b560: the tour text and claims on main equal the versions I judged (compared step by step and claim by claim); hashes stamped by acceptance/checks/docs_checks.py --hashes logic"
   }
 }

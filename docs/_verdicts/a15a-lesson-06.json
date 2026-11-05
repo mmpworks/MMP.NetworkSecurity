@@ -8,67 +8,78 @@
       "id": "L6-C01",
       "verdict": "accurate",
       "note": "Tours read at origin/feat/tours-6-11 (PR 18). Tier: secondary source. Overview bullets: 'each transaction will have a distinct key from all other transactions, except by coincidence' and 'if a present derived key is compromised, past and future keys ... remain uncompromised'. The article describes the TDEA variant; the lab uses AES DUKPT. The claim is generic, so it holds for both.",
-      "checkedAgainst": "Wikipedia, Derived unique key per transaction (secondary source, article source text fetched this session via the MediaWiki raw endpoint)"
+      "checkedAgainst": "Wikipedia, Derived unique key per transaction (secondary source, article source text fetched this session via the MediaWiki raw endpoint)",
+      "textHash": "55f96052a46e1a60973a8f626b001fa45029fad1930c25f5f294e83694717c2d"
     },
     {
       "id": "L6-C02",
       "verdict": "accurate",
       "note": "Tours read at origin/feat/tours-6-11 (PR 18). Tier: secondary source. History section: 'all of the initialization keys of an entire family of devices are derived from a single key, the base derivation key (BDK). ... the recipient need only store the BDK.' Keys section names the BDK. Same TDEA-variant caveat as L6-C01.",
-      "checkedAgainst": "Wikipedia, Derived unique key per transaction (secondary source, article source text fetched this session via the MediaWiki raw endpoint)"
+      "checkedAgainst": "Wikipedia, Derived unique key per transaction (secondary source, article source text fetched this session via the MediaWiki raw endpoint)",
+      "textHash": "94234587b2a4cea30ea774dabc5c48c13343c840c9eb2d46a3d5bb37513d1809"
     },
     {
       "id": "L6-C03",
       "verdict": "accurate",
       "note": "Tours read at origin/feat/tours-6-11 (PR 18). docs/lesson-6-names.md (feat/s2-dukpt), Facts the tour needs item 4: 'The bank keeps the base key and derives each key again from the KSN. It holds no per-reader key.' Event table: dukpt.bdk 'stays at the bank for the whole run'. D13 does not say this, but item 4 does.",
-      "checkedAgainst": "docs/lesson-6-names.md on origin/feat/s2-dukpt (read); docs/prd.md D13 (read)"
+      "checkedAgainst": "docs/lesson-6-names.md on origin/feat/s2-dukpt (read); docs/prd.md D13 (read)",
+      "textHash": "5842a1c9f479c070729e855a5ea2741cca465077df4a1ba46ce6b0577268a8cc"
     },
     {
       "id": "L6-C04",
       "verdict": "accurate",
       "note": "Tours read at origin/feat/tours-6-11 (PR 18). Names doc: 'ksn is 12 bytes: the 8-byte initial key id, then the 4-byte counter. pinBlock is 16 bytes.' Sale table: pinBlock visibleToWire false, other fields true. The code check builds the KSN with the counter in bytes 8 to 11 (DukptTests.cs).",
-      "checkedAgainst": "docs/lesson-6-names.md on origin/feat/s2-dukpt (read); tests/NetSec.Tests/DukptTests.cs (read)"
+      "checkedAgainst": "docs/lesson-6-names.md on origin/feat/s2-dukpt (read); tests/NetSec.Tests/DukptTests.cs (read)",
+      "textHash": "de2f3210705b9a4f9ea807869551b74fa551b95d5b072aa5a6010316151802c9"
     },
     {
       "id": "L6-C05",
       "verdict": "accurate",
       "note": "Tours read at origin/feat/tours-6-11 (PR 18). Tier: secondary source. Communication, Origination: the device 'Invalidates the key just used, and If necessary generates more future keys'. The claim says 'when needed', which matches 'if necessary'.",
-      "checkedAgainst": "Wikipedia, Derived unique key per transaction (secondary source, article source text fetched this session via the MediaWiki raw endpoint)"
+      "checkedAgainst": "Wikipedia, Derived unique key per transaction (secondary source, article source text fetched this session via the MediaWiki raw endpoint)",
+      "textHash": "2eb37df9e69bf6921287fd0a4022d22cc4be3361a85a25476b3da8aa5084809b"
     },
     {
       "id": "L6-C06",
       "verdict": "accurate",
       "note": "Re-checked against tours at origin/feat/tours-6-11 commit 5b18067. Source now names 'Memory release'. That section reads 'it uses a memory-copying function to compact the reachable objects in memory'. Learn also says compaction happens only when a collection finds many unreachable objects; the tour text says the heap 'can keep copies', which fits.",
-      "checkedAgainst": "Microsoft Learn, Fundamentals of garbage collection, Memory release (fetched)"
+      "checkedAgainst": "Microsoft Learn, Fundamentals of garbage collection, Memory release (fetched)",
+      "textHash": "6b80877b99512646c6d4b762605e75d8473033ba74088ad0538f3d0a1be15dc5"
     },
     {
       "id": "L6-C07",
       "verdict": "accurate",
       "note": "Re-checked against tours at origin/feat/tours-6-11 commit 5b18067. Tier: secondary. Claim reworded to the Wikipedia Keys section: 'The BDK is usually stored inside a tamper-resistant security module (TRSM), or hardware security module (HSM).' The two tour sentences (S09, S13) now say 'usually', which matches. The X9.24-3 claim itself is gone, so the paid-standard gap no longer blocks.",
-      "checkedAgainst": "Wikipedia, Derived unique key per transaction, Keys section (article source fetched)"
+      "checkedAgainst": "Wikipedia, Derived unique key per transaction, Keys section (article source fetched)",
+      "textHash": "4b60eed9a3db89393678dcc2619b00ab2bfec7698ad758e34c0b45cd36c04c8b"
     },
     {
       "id": "L6-C08",
       "verdict": "accurate",
       "note": "Tours read at origin/feat/tours-6-11 (PR 18). tests/NetSec.Tests/DukptTests.cs on feat/s2-dukpt asserts 32 held keys at load and 31, 31, 30, 31 after sales 1 to 4. The names doc states the same run.",
-      "checkedAgainst": "tests/NetSec.Tests/DukptTests.cs, test The_register_count_follows_the_counter (read); docs/lesson-6-names.md (read)"
+      "checkedAgainst": "tests/NetSec.Tests/DukptTests.cs, test The_register_count_follows_the_counter (read); docs/lesson-6-names.md (read)",
+      "textHash": "9544b564cdbbff0aadf546a85d56bf1439edf0ec8e6be819e94e876a3c17548e"
     },
     {
       "id": "L6-C09",
       "verdict": "accurate",
       "note": "Tours read at origin/fix/tour-6-pin-digits (PR 32). lesson-6-names.md Facts item 1 (fix/dukpt-verdict) says 'The PIN digits also stay on the heap, because the code holds them in a string, which cannot be cleared.' Code: PinBlock.cs takes and returns the PIN as a .NET string (EncryptFormat4, TryDecryptFormat4) and DukptBank keeps 'public string Pin'. Microsoft Learn, String class, 'Immutability and the StringBuilder class': 'A String object is called immutable (read-only), because its value cannot be modified after it has been created.' Note: Learn states immutability, not 'cannot be cleared'. The second follows for normal code; unsafe code can overwrite string memory. Suggest 'cannot be cleared by normal code'. Step L6-S11 reword ('The bank gets no PIN digits from it') matches names doc line 19: a refused sale has an empty plain.",
-      "checkedAgainst": "docs/lesson-6-names.md on local branch fix/dukpt-verdict (read); src/NetSec.Core/Dukpt/PinBlock.cs, DukptBank.cs on fix/dukpt-verdict (read); Microsoft Learn String class (page fetched)"
+      "checkedAgainst": "docs/lesson-6-names.md on local branch fix/dukpt-verdict (read); src/NetSec.Core/Dukpt/PinBlock.cs, DukptBank.cs on fix/dukpt-verdict (read); Microsoft Learn String class (page fetched)",
+      "textHash": "e4e1d492de0fa007782a6ff9537f2d753694274d123cfdb77c675aa370f436ba"
     },
     {
       "id": "L6-C10",
       "verdict": "accurate",
       "note": "Tours read at origin/fix/tour-6-format-check (PR 40). I reproduced the 2,000-try figure myself instead of taking the relayed number. Probe: a console program against NetSec.Core at origin/main (aff0619) builds a real PIN block for KSN counter 1, flips bytes in it 2,000 times, and calls DukptBank.OpenPinSale each time on one ledger. Output: 'forged tries=2000 ksnFreeAfterEach=2000 lastCode=DUKPT_PINBLOCK_FORMAT' then 'real sale code=null pin=1234'. So the format check refuses every forged block, never records the KSN, and has no try limit; the real sale still passes afterwards. Code: DukptBank.OpenPinSale records the KSN only when sale.Code is null. PR 35 body, table row 'A forged block burns a real sale's KSN' and advisory 3 ('The format check is not integrity') agree. CMAC half: BankHsmCore.Decide (src/NetSec.Core/Bridge/PinEnvelope.cs) derives the MAC key from the BDK and KSN and verifies the CMAC before it checks the ledger, so a block from someone without the key is refused before the format check. program-design.md section 6, PIN-pad row, names the PinEnvelope with a MAC. Limits: the word 'lesson 9' is a plan statement. Lesson 9 has no tour yet, and the bridge acceptance clauses that need the server role report NODE_ROLE_NOT_BUILT in PR 35. The code facts hold today; the end-to-end lesson does not exist yet. Suggest replacing the relayed 2,000 figure in the source line with the probe command and output, since the claim then rests on a run rather than a message.",
-      "checkedAgainst": "src/NetSec.Core/Dukpt/DukptBank.cs, src/NetSec.Core/Bridge/PinEnvelope.cs at origin/main (read); throwaway probe run against NetSec.Core, 2,000 tries (run this session); PR 35 body (read); docs/program-design.md section 6 (read)"
+      "checkedAgainst": "src/NetSec.Core/Dukpt/DukptBank.cs, src/NetSec.Core/Bridge/PinEnvelope.cs at origin/main (read); throwaway probe run against NetSec.Core, 2,000 tries (run this session); PR 35 body (read); docs/program-design.md section 6 (read)",
+      "textHash": "3bb1e6803fbb9788b113ea40a70f6c37d0fc8ff5089dbe3d43912265eeb44fd8"
     },
     {
       "id": "L6-C11",
       "verdict": "accurate",
       "note": "Tours read at main 6e0c1e5 (PR 60 merged); lab run at main 6e0c1e5. Lesson06Dukpt.cs: LoadReader(DukptBank.DeriveInitialKey(bdk, InitialKeyId)) derives the key outside the reader and loads it; the reader session holds no BDK; lab run shows the same dukpt.initial value on bank and reader and no wire event carrying it.",
-      "checkedAgainst": "src/NetSec.Core/Labs/Lesson06Dukpt.cs (read); lab run, lesson 6"
+      "checkedAgainst": "src/NetSec.Core/Labs/Lesson06Dukpt.cs (read); lab run, lesson 6",
+      "textHash": "167eed9dd375247078302f060f95ea8b4ea1632e2fae4ae4a14b60a97538c97c"
     }
   ],
   "textRead": {
@@ -90,6 +101,8 @@
     "notes": [
       "L6-S11 says a seal over the whole envelope closes the gap 'in the bridge lab (lesson 9)'. Lesson 9 has no tour yet; the sentence is a plan statement until it does."
     ],
-    "problemsOpen": 0
+    "problemsOpen": 0,
+    "textHash": "7d0c2d14d2933fbceadaf7109189e745ccb5f600beb282b2e32366c42cb55b92",
+    "boundAt": "main f43b560: the tour text and claims on main equal the versions I judged (compared step by step and claim by claim); hashes stamped by acceptance/checks/docs_checks.py --hashes logic"
   }
 }

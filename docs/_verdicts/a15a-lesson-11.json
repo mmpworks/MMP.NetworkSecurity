@@ -8,49 +8,57 @@
       "id": "L11-C01",
       "verdict": "accurate",
       "note": "Tours read at origin/feat/tours-6-11 (PR 18). Names doc section 2: 'The lab measures 100,000 samples per case for leaky and constant-time, and 20,000 per case for managed. The histogram spread uses nanoseconds from the same run.' Four cases are listed in the order table.",
-      "checkedAgainst": "docs/lesson-11-names.md section 2 on origin/feat/s7 (read)"
+      "checkedAgainst": "docs/lesson-11-names.md section 2 on origin/feat/s7 (read)",
+      "textHash": "c66743fc30d0d999a69c724780cf0d7f304a7268fba1ba17a6894b8f9aa88fd7"
     },
     {
       "id": "L11-C02",
       "verdict": "accurate",
       "note": "Tours read at origin/feat/tours-6-11 (PR 18). NIST e-Handbook 1.3.5.3 gives T = (Y1bar - Y2bar) / sqrt(s1^2/N1 + s2^2/N2), the reduced pooled form when equal variances are assumed, and says 'The variances of the two samples may be assumed to be equal or unequal.' Tier: primary reference text from NIST/SEMATECH.",
-      "checkedAgainst": "NIST/SEMATECH e-Handbook of Statistical Methods section 1.3.5.3 (page fetched this session)"
+      "checkedAgainst": "NIST/SEMATECH e-Handbook of Statistical Methods section 1.3.5.3 (page fetched this session)",
+      "textHash": "4abf68245313f199e5b2ffda192ec683d5a2da7e3f51296203d877ea2e7d0f5c"
     },
     {
       "id": "L11-C03",
       "verdict": "accurate",
       "note": "Tours read at origin/feat/tours-6-11 (PR 18). docs/learnings.md S7 item 2: over 20 interleaved runs of 100,000 samples, the constant-time compare went over 4.5 in 5 of 20 and the identical-case control in 1 of 20. A second pass gave 6 of 20 and 3 of 20; the claim cites the first pass only, which is stated. Note: lesson-11-names.md says '1 of 20 and 3 of 20' in its do-not-write list, a mix of the two passes; learnings is the source of record.",
-      "checkedAgainst": "docs/learnings.md section S7 item 2 on origin/feat/s7 (read)"
+      "checkedAgainst": "docs/learnings.md section S7 item 2 on origin/feat/s7 (read)",
+      "textHash": "eb948480dbde4fe932a8af0659f2f0be1daab133adf7d7d0d806f8118cbd11d3"
     },
     {
       "id": "L11-C04",
       "verdict": "accurate",
       "note": "Re-checked against tours at origin/feat/tours-6-11 commit d003b09. Sentence 1 now covers one documented API: the Learn Remarks promise fixed time for FixedTimeEquals. Sentence 2 is the lab's position. Tier: indirect (house rule PRD rule 5, plus the runtime source marking FixedTimeEquals NoInlining and NoOptimization so the JIT cannot change its timing). Sentence 3 is backed by the dudect README 'Further notes'.",
-      "checkedAgainst": "Microsoft Learn FixedTimeEquals Remarks (fetched); dotnet/runtime CryptographicOperations.cs (fetched); docs/prd.md rule 5 (read)"
+      "checkedAgainst": "Microsoft Learn FixedTimeEquals Remarks (fetched); dotnet/runtime CryptographicOperations.cs (fetched); docs/prd.md rule 5 (read)",
+      "textHash": "e935c59f933c42cfadf42b56f55cc64fcd5c66f982780e11598f90a4d8573ad6"
     },
     {
       "id": "L11-C05",
       "verdict": "accurate",
       "note": "Tours read at origin/feat/tours-6-11 (PR 18). dudect README, 'Further notes': 'Whether some piece of code executes in constant time depends on lots of factors, such as: how the code is written, compiler version, compiler flags, architecture, ...'; dudect_simple_O0 leaks while dudect_simple_O2 shows no leakage with a few million measurements. Tier: secondary source (tool README by the dudect authors). Section name is right.",
-      "checkedAgainst": "dudect README on github.com/oreparaz/dudect, Further notes (fetched via raw.githubusercontent.com this session)"
+      "checkedAgainst": "dudect README on github.com/oreparaz/dudect, Further notes (fetched via raw.githubusercontent.com this session)",
+      "textHash": "230801d89f0b15d1fbdff24b465f3a01fb1601b84e77dd73036abeca36ad6bf2"
     },
     {
       "id": "L11-C06",
       "verdict": "accurate",
       "note": "Tours read at origin/feat/tours-6-11 (PR 18). Learn Remarks: 'compares the contents from two buffers for equality in a way that doesn't leak timing information ... will short-circuit and return false only if left and right have different lengths. Fixed-time behavior is guaranteed in all other cases'. Tier: primary vendor documentation. The same page says the time depends on the length of the sequences.",
-      "checkedAgainst": "Microsoft Learn, CryptographicOperations.FixedTimeEquals, Remarks (fetched)"
+      "checkedAgainst": "Microsoft Learn, CryptographicOperations.FixedTimeEquals, Remarks (fetched)",
+      "textHash": "96b854d7bd1ef1ce3a6f87d1ba7c4ce8875c4442f1bdf11a3ce40d90ec7ae286"
     },
     {
       "id": "L11-C07",
       "verdict": "accurate",
       "note": "Tours read at origin/feat/tours-6-11 (PR 18). docs/learnings.md S7 item 3: 'The lab's guess loop stretches each secret byte to a 1,024-byte block. One loop pass takes about 0.33 ns, and the clock tick is 100 ns.' The names doc Guess JSON shows blockBytes 1024 and tickFrequency 10,000,000 (100 ns).",
-      "checkedAgainst": "docs/learnings.md S7 item 3 on origin/feat/s7 (read); docs/lesson-11-names.md section 2 (read)"
+      "checkedAgainst": "docs/learnings.md S7 item 3 on origin/feat/s7 (read); docs/lesson-11-names.md section 2 (read)",
+      "textHash": "e0badc3d30d67584b34f7909adba1e7b2566a4a50ad51d599c179e3078503666"
     },
     {
       "id": "L11-C08",
       "verdict": "accurate",
       "note": "Re-checked against tours at origin/feat/tours-6-11 commit 5b18067. Claim now reads 'the dudect authors call their test perhaps the simplest form of leakage detection'. README, Questions: 'Absolutely not. The test implemented is perhaps the simplest form of leakage detection.' Hedge kept.",
-      "checkedAgainst": "dudect README, Questions (fetched)"
+      "checkedAgainst": "dudect README, Questions (fetched)",
+      "textHash": "bcc264e918b2081ce921fa6316672fd9f94be255e3f3d79188860c8ce25b6a69"
     }
   ],
   "textRead": {
@@ -60,6 +68,8 @@
     "stepsWithProblems": 0,
     "problemsFound": 0,
     "problems": [],
-    "notes": []
+    "notes": [],
+    "textHash": "7a035ffd152a1ede65e56ebe4c057e9f697271d738407336ee42198bdc0607d7",
+    "boundAt": "main f43b560: the tour text and claims on main equal the versions I judged (compared step by step and claim by claim); hashes stamped by acceptance/checks/docs_checks.py --hashes logic"
   }
 }

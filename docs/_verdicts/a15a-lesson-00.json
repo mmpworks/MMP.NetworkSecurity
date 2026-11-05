@@ -8,25 +8,29 @@
       "id": "L0-C01",
       "verdict": "accurate",
       "note": "Re-checked against tours at feat/tours-6-11 commit 8b3ae45. Source now EchoEngine.cs. Class summary says 'It has no lock' and 'before any cryptography exists'; ServerHello returns message.Body unchanged in the reply frame; ClientReply compares with the bytes sent. Quoted source strings match the file.",
-      "checkedAgainst": "src/NetSec.Core/Machine/EchoEngine.cs (read)"
+      "checkedAgainst": "src/NetSec.Core/Machine/EchoEngine.cs (read)",
+      "textHash": "fa7ac7668a57801a8b7f64d95792b9a12e24474aa024ff16e0c5d3fc4ae2623b"
     },
     {
       "id": "L0-C02",
       "verdict": "accurate",
       "note": "prd.md D4 reads 'Every engine step emits a trace event with bytes, parsed fields, and the secrets in use'. ux-design.md Conclusion item 2 reads 'Every pixel that moves comes from one trace event. The UI invents no bytes, no secrets, and no check results.' Code: Interpreter.cs comment says each effect emits its trace event in one switch.",
-      "checkedAgainst": "docs/prd.md D4 (read); docs/ux-design.md Conclusion item 2 (read); src/NetSec.Core/Machine/Interpreter.cs (read)"
+      "checkedAgainst": "docs/prd.md D4 (read); docs/ux-design.md Conclusion item 2 (read); src/NetSec.Core/Machine/Interpreter.cs (read)",
+      "textHash": "259977f885066f4ae0a3be34d54b37e588984f73f01b83c68b2c3d2c71379283"
     },
     {
       "id": "L0-C03",
       "verdict": "accurate",
       "note": "ux-design.md section 2 moment 2: protected rows turn to amber noise labelled unreadable. Code: ByteInspector.vue hides only fields with visibleToWire false in the Eavesdropper view; other fields and arrows keep their readable state.",
-      "checkedAgainst": "docs/ux-design.md section 2 moment 2 (read); app/src/components/ByteInspector.vue, SequenceDiagram.vue (read)"
+      "checkedAgainst": "docs/ux-design.md section 2 moment 2 (read); app/src/components/ByteInspector.vue, SequenceDiagram.vue (read)",
+      "textHash": "fdd857fd67a01c63e766a46ea85a317b98b1e01edd208f30b963b4235a4a171d"
     },
     {
       "id": "L0-C04",
       "verdict": "accurate",
       "note": "Tours read at main 6e0c1e5 (PR 60 merged); lab run at main 6e0c1e5. Lab run: EchoHello plainHex 01000b68656c6c6f2c2070697065 and EchoReply 02000b68656c6c6f2c2070697065. The frame is a type byte, a 2-byte length (000b) and the body; type 1 for the hello and 2 for the reply; everything else is equal.",
-      "checkedAgainst": "src/NetSec.Core/Machine/EchoEngine.cs (read); lab run, lesson 0"
+      "checkedAgainst": "src/NetSec.Core/Machine/EchoEngine.cs (read); lab run, lesson 0",
+      "textHash": "c12ea423a839fef070254d74b289bee44d90ff2af82bdb0a6a2d1fff6f5adb68"
     }
   ],
   "textRead": {
@@ -46,6 +50,8 @@
       }
     ],
     "notes": [],
-    "problemsOpen": 0
+    "problemsOpen": 0,
+    "textHash": "7e2aa479ccb2e9300317df6087839cee0ac87ae9baf77ae0cd670d6b2ad3abb5",
+    "boundAt": "main f43b560: the tour text and claims on main equal the versions I judged (compared step by step and claim by claim); hashes stamped by acceptance/checks/docs_checks.py --hashes logic"
   }
 }
