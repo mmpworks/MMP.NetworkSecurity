@@ -99,7 +99,7 @@ Steve chose five grouped "make my set" flows. Each flow has a **default path of 
 | 4 | Make my sign-in set (Host flow `my-login`) | `token.issuer`, `device.enrolment` (named "Device key, no outside check") | 10 | `flow-my-login` |
 | 5 | Make my data keys (Host flow `my-lesson-keys`) | `lab.aes-key`, `lab.seal-key` | 1, 2 | `flow-my-lesson-keys` |
 
-The flow ids are the Host's (`wizard-flows.json`, `modes-design.md` 8.1). Test ids add the prefix `flow-`: `flow-my-certificates-make`. The Host spine maps to the five screens: `Intro` is screen 1, `ChooseSource` and `Place` are screen 2 (`make`), `PickFiles` is the branch (`options`), `ReadBack` is screen 3, `Check` is screen 4, `Done` is screen 5.
+The flow ids are the Host's (`wizard-flows.json`, `modes-design.md` 8.1). Test ids add the prefix `flow-`: `flow-my-certificates-make`. The Host spine maps to the five screens: `Intro` is screen 1, `Make` is screen 2, `PickFiles` is the branch (`options`), `Review` is screen 3, `Check` is screen 4, `Done` is screen 5.
 
 #### The default path (the same five screens in every flow)
 
@@ -444,7 +444,7 @@ Flipping the switch while a wizard is open replaces the facts block from the Hos
 | 8 | A key you mark as non-exportable shows its fingerprint only. "The course refuses to show it. A real HSM would refuse too. These files could still open it here." The choice is one-way. | the vault exercise (5.5) | `modes-design.md` 6.3 |
 | 9 | If the test tool is missing, your key is saved but not yet checked, and lessons will not run on it until it is. | Check screen, `REFEREE_MISSING` | `modes-design.md` 2.3 |
 | 10 | Where no outside tool can judge a key, the screen says so and shows no green check. The course never checks its own key and calls it proof. | `prove-tier`, `Saved, no outside check` | Steve, 2026-11-05; Jared section 5 |
-| 11 | "Checked" means checked against the root you gave it. A self-signed certificate passes against itself. The check does not say a stranger would trust it. | `Checked` chip help text, every F1 Prove screen | Jared, section 3.1 |
+| 11 | "Checked" means checked against the root you gave it. A self-signed certificate passes against itself. The check does not say a stranger would trust it. | `Checked` chip help text, every F1 Check screen | Jared, section 3.1 |
 | 12 | The wizard never installs a root in the OS store without asking, and says what it changed. | `os-pick` step | Jared, section 3.1 |
 | 13 | A valid chain is not permission. | `tls13.client` Done | Jared, section 3.3 |
 | 14 | A fingerprint on the same screen proves nothing. Compare it on a second channel. | `ssh.known-hosts` `compare` step | Jared, section 3.4 |
