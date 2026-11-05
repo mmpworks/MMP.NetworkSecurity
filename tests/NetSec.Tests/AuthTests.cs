@@ -267,10 +267,10 @@ namespace NetSec.Tests
         }
 
         [Fact]
-        public void Lesson_10_stays_unbuilt_until_its_tour_lands()
+        public void Lesson_10_is_released_with_its_lab_and_its_rows()
         {
-            Assert.Null(LabCatalog.Find(10));
-            Assert.DoesNotContain(AttackCatalog.All, a => a.Lesson == 10);
+            Assert.Equal("lab-10-auth", LabCatalog.Find(10).LabId);
+            Assert.Equal(13, AttackCatalog.All.Count(a => a.Lesson == 10));
         }
 
         [Fact]
@@ -309,7 +309,7 @@ namespace NetSec.Tests
         [Fact]
         public void Every_row_stops_at_its_named_check_with_one_thing_changed()
         {
-            AttackDefinition[] rows = AttackCatalog.Lesson10Unreleased;
+            AttackDefinition[] rows = AttackCatalog.All.Where(a => a.Lesson == 10).ToArray();
             Assert.Equal(13, rows.Length);
             foreach (AttackDefinition a in rows)
             {
@@ -324,7 +324,7 @@ namespace NetSec.Tests
         [Fact]
         public void The_flip_row_aims_inside_the_token_claims()
         {
-            AttackDefinition change = AttackCatalog.Lesson10Unreleased.Single(a => a.AttackId == "L10-change-token-claim");
+            AttackDefinition change = AttackCatalog.All.Where(a => a.Lesson == 10).Single(a => a.AttackId == "L10-change-token-claim");
             Assert.Equal(Lesson10Auth.ClaimsOffset + 5, change.Plan.Offset);
             Run control = Go();
             TraceEvent read = control.Events.First(e => e.Type == "wire.sent" && e.Message == "ReadTotals");

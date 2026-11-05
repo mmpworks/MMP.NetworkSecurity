@@ -261,7 +261,7 @@ namespace NetSec.Tests
         public void A_refused_client_certificate_fails_its_check_on_the_server(string attackId, string check)
         {
             LabResult result;
-            TraceEvent[] events = Events(AttackCatalog.Lesson10Unreleased.Single(a => a.AttackId == attackId), out result);
+            TraceEvent[] events = Events(AttackCatalog.All.Where(a => a.Lesson == 10).Single(a => a.AttackId == attackId), out result);
             Assert.False(result.Completed);
             Assert.Contains(events, e => e.Type == "check.result" && e.Actor == "server" && e.Message == check && !e.Check.Passed);
         }
@@ -269,7 +269,7 @@ namespace NetSec.Tests
         [Fact]
         public void The_catalog_holds_the_new_rows()
         {
-            string[] ids = AttackCatalog.Lesson10Unreleased.Select(a => a.AttackId).ToArray();
+            string[] ids = AttackCatalog.All.Where(a => a.Lesson == 10).Select(a => a.AttackId).ToArray();
             Assert.Contains("L10-unissued-challenge", ids);
             Assert.Contains("L10-unknown-device", ids);
             Assert.Contains("L10-wrong-audience", ids);
