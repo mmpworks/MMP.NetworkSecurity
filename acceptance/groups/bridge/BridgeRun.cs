@@ -154,6 +154,43 @@ namespace Acceptance
             return MiniJson.AsObject(MiniJson.Parse(line.Substring(line.IndexOf(' ') + 1).Trim()));
         }
 
+        static string CeResultLine(Proc ce)
+        {
+            foreach (string l in ce.Lines) if (l.StartsWith("CE-RESULT")) return l;
+            return null;
+        }
+
+        static string CeSummary(Proc ce)
+        {
+            string r = CeResultLine(ce);
+            return r == null ? "The CE printed no CE-RESULT." : "The CE printed: " + r;
+        }
+
+        /// <summary>
+        /// Waits for the RESULT line of a process. While it waits it reads the CE's CE-RESULT line. A CE that stopped with a code ending
+        /// _NOT_BUILT (for example CE_LINK_NOT_BUILT) means the product is missing a part, so this throws NOT RUN PRODUCT_MISSING at once
+        /// and not after the full wait. Returns null on timeout.
+        /// </summary>
+        string WaitOrCeStop(Proc p, string what, Proc ce, int ms)
+        {
+            DateTime end = DateTime.UtcNow.AddMilliseconds(ms);
+            while (DateTime.UtcNow < end)
+            {
+                foreach (string l in p.Lines) if (l.StartsWith("RESULT")) return l;
+                string cr = CeResultLine(ce);
+                if (cr != null)
+                {
+                    Dictionary<string, object> d = null;
+                    try { d = ResultOf(cr); } catch (FormatException) { }
+                    string code = d == null ? null : MiniJson.Str(d, "code");
+                    if (code != null && code.EndsWith("_NOT_BUILT", StringComparison.Ordinal))
+                        throw new NotRunException("PRODUCT_MISSING", "the CE stopped before the " + what + " could finish: " + cr);
+                }
+                Thread.Sleep(100);
+            }
+            return null;
+        }
+
         // ---------------------------------------------------------------- the run
 
         BridgeOutcome Execute()
@@ -226,14 +263,16 @@ namespace Acceptance
             o.CeReady = WaitLine(ce, "CE-READY", 10000, "CE");                      // a CE that stays silent is a failure (CE_DEVICE_SILENT)
 
             bool tampered = _tamper.Hop1Flip || _tamper.Hop2Flip || _tamper.EnvelopeFlip;
-            string padResult = pad.WaitForLine(delegate (string l) { return l.StartsWith("RESULT"); }, tampered ? 20000 : 60000);
+            // The CE is the first process that can stop the flow. Its CE-RESULT line names the stop, so the wait watches it too.
+            // A code that ends in _NOT_BUILT means a part of the product is not there yet: that is NOT RUN PRODUCT_MISSING, never a fault of the bank.
+            string padResult = WaitOrCeStop(pad, "PIN pad", ce, tampered ? 20000 : 60000);
             if (padResult != null) o.PinPad = ResultOf(padResult);
-            else if (!tampered) throw new FailException("PIN pad printed no RESULT line. Output: " + pad.AllOutput);
+            else if (!tampered) throw new FailException("PIN pad printed no RESULT line. " + CeSummary(ce) + " PIN pad output: " + pad.AllOutput);
 
             // the bank ends the lab. A tamper that stops the flow gets a shorter wait.
-            string bankResult = bankP.WaitForLine(delegate (string l) { return l.StartsWith("RESULT"); }, tampered ? 20000 : 60000);
+            string bankResult = WaitOrCeStop(bankP, "bank HSM", ce, tampered ? 20000 : 60000);
             if (bankResult != null) o.Bank = ResultOf(bankResult);
-            else if (!(_tamper.Hop1Flip || _tamper.Hop2Flip)) throw new FailException("bank HSM printed no RESULT line. Bank output: " + bankP.AllOutput);
+            else if (!(_tamper.Hop1Flip || _tamper.Hop2Flip)) throw new FailException("bank HSM printed no RESULT line. " + CeSummary(ce) + " Bank output: " + bankP.AllOutput);
             Thread.Sleep(1200);                                                     // let the last trace lines and the tap logs land
 
             List<string> unparsed = new List<string>();
