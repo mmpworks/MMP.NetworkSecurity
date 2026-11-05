@@ -106,3 +106,7 @@ Each correction goes here, newest slice last. Later slices read this file first.
 17. **Strict KEX is cheap, so both suites offer it.** It took one name in `KexInit`, a sequence reset after `NewKeys`, and a refusal of `Ignore` during the exchange. Source read this session: `draft-miller-sshm-strict-kex`, sections 3.1 to 3.3. A peer with no marker gets the old rules, so an old device still connects. Add `chacha20-poly1305` or an `-etm` MAC only with strict KEX required.
 18. **The sequence number stops by name at 2^32.** RFC 4253 section 6.4 lets it wrap. RFC 4344 section 3.1 says not to send 2^32 packets under one key, and this engine has no rekey. The check runs in the writer and the reader, so a command path needs the same failure guard as a feed.
 19. **A test can pass for the wrong reason on a closed channel.** The first second-confirmation test ran the exec to its end, so the channel had gone and the failure came from that. A rule-breaking test must assert the state it attacks is still live.
+
+## Pump deadline test
+
+1. **The side whose deadline fires reports `LINK_DEADLINE`. The side that then reads the close reports `PEER_CLOSED_EARLY`, and that is its true outcome.** A test that names one side's code must fix the order with two deadlines. `LabPair.Named` drops the second code, so a lab reports the real failure in either order.

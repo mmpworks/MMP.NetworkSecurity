@@ -35,6 +35,8 @@ export interface TraceEvent {
   secrets: TraceSecret[]
   check: TraceCheck | null
   waiting: string
+  /** `name=value;name=value` on measure.result events. */
+  detail: string
 }
 
 export interface LessonRow {
@@ -58,7 +60,7 @@ export interface TourBind { kind: 'event' | 'concept'; eventType?: string; match
 
 export interface TourAction { type: 'set-view' | 'flip-byte' | 'run-attack' | 'toggle-field' | 'press-run' | 'select-event'; value?: string; attackId?: string }
 
-export interface TourExpect { type: 'view' | 'check' | 'selected' | 'ran'; value?: string; name?: string; result?: 'pass' | 'fail' }
+export interface TourExpect { type: 'view' | 'check' | 'selected' | 'ran' | 'attack-outcome'; value?: string; name?: string; result?: 'pass' | 'fail'; outcome?: string }
 
 export interface TourStep {
   id: string
