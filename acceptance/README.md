@@ -2,7 +2,7 @@
 
 Author: Echo. Date: 2026-11-05. Branch: `test/acceptance-suite`. Rule: D11. Builders never write under `acceptance/`.
 
-Conclusion: the suite has **M = 260 product clauses** (`clauses.json`): the 208 of the first release and 52 for A17 (section 8). With no product built it reports **0 of 260 PASS, 0 FAIL, 260 NOT RUN**.
+Conclusion: the suite has **M = 261 product clauses** (`clauses.json`): the 208 of the first release and 53 for A17 (section 8). With no product built it reports **0 of 261 PASS, 0 FAIL, 261 NOT RUN**.
 Its 31 checks on itself all PASS. The suite is written against `docs/program-design.md` section 11, `docs/modes-design.md`, and the merged referees in `acceptance/referees`. Every group compiles against the contract stub on net10.0 and on net48 with the CF build of MMP.AsyncProxy.
 Disposition: merge this branch. Send the open items in section 7 and in `CONTRACT.md` section 5.7 to Richard and Jared.
 
@@ -166,7 +166,7 @@ These appear later by design, each named in the report: `REFEREE_MISSING`, `REFE
 
 ## 8. A17: per-type test keys, wizards and the vault (added 2026-11-05)
 
-Conclusion: A17 adds **52 clauses**, so M is **260** (208 + 52). The A16 renames add none. Source: `docs/modes-design.md` and `docs/wizards-ux.md` on `main` at c65e1bb. The Host contract the clauses read is `CONTRACT.md` section 5.
+Conclusion: A17 adds **53 clauses**, so M is **261** (208 + 53). The A16 renames add none. Source: `docs/modes-design.md` and `docs/wizards-ux.md` on `main` at c65e1bb. The Host contract the clauses read is `CONTRACT.md` section 5.
 Disposition: merge. Then the builders' slices V0 to V8 turn the clauses from NOT RUN to PASS one by one.
 
 | Group | Clauses | Judge |
