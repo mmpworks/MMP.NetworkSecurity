@@ -57,6 +57,11 @@ namespace NetSec.Io
         public IStepGate Gate;
         public ITamperHook Tamper;
         public string TraceId, Hop, PeerName;
+        // SSH only. Null KnownHosts means trust on first use. A server with no AllowTunnel refuses every tunnel.
+        public int PeerPort;
+        public string KnownHosts;
+        public Func<string, int, bool> AllowTunnel;
+        public Func<string, int, IFuture<IByteLink>> OpenTarget;
         // The contract keeps DeviceProfile in NetSec.Bridge. tools/layer_check.py allows this one upward name.
         public NetSec.Bridge.DeviceProfile Profile;
     }
@@ -91,13 +96,14 @@ namespace NetSec.Io
 
         public string Kind { get { return "glass"; } }
 
-        /// <summary>S0 applies the policy. The TLS 1.3, TLS 1.1, and SSH engines arrive in S3 and S4.</summary>
+        /// <summary>Applies the policy, then opens the engine. SSH is built. The TLS 1.3 and TLS 1.1 engines arrive in S3 and S4.</summary>
         public IFuture<ISecureChannel> Open(TransportRequest request)
         {
             if (request == null) throw new ArgumentNullException("request");
             NetSec.Bridge.DeviceProfile profile = request.Profile ?? NetSec.Bridge.DeviceProfile.Modern;
             if (TransportPolicy.Decide(profile, Kind, request.Protocol) == TransportDecision.Refused)
                 return Refuse(ErrorCodes.CeTransportUnavailable, profile.Name + " refuses " + request.Protocol);
+            if (request.Protocol == WireProtocol.Ssh) return SshSetup.Open(_keys, request);
             return Refuse(ErrorCodes.TransportNotBuilt, "the glass " + request.Protocol + " engine is not built yet");
         }
 

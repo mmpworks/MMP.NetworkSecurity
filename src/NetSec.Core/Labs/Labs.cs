@@ -8,6 +8,7 @@ using NetSec.Errors;
 using NetSec.Io;
 using NetSec.Machine;
 using NetSec.Platform;
+using NetSec.Ssh;
 using NetSec.Trace;
 
 namespace NetSec.Labs
@@ -111,6 +112,7 @@ namespace NetSec.Labs
                 case 1: return new Lesson01Aes();
                 case 2: return new Lesson02Seals();
                 case 3: return new Lesson03Kex();
+                case 8: return new Lesson08Ssh();
                 default: return null;
             }
         }
@@ -140,7 +142,24 @@ namespace NetSec.Labs
 
             Swap("L3-swap-server-share", 3, "X25519ServerShare", Lesson03Kex.SwappedServerShare(), ErrorCodes.KexConfirmMismatch, Lesson03Kex.ConfirmCheck),
             Flip("L3-flip-mlkem-ciphertext", 3, "MlKemCiphertext", Frame.HeaderSize + 10, ErrorCodes.KexConfirmMismatch, Lesson03Kex.ConfirmCheck),
+
+            WithOption("L8-change-host-key", 8, Lesson08Ssh.OptionHostKey, "attacker", AttackOutcome.Rejected, SshCodes.HostKeyChanged, SshChecks.KnownHosts),
+            Flip("L8-flip-exchange-signature", 8, SshNames.KexEcdhReply, SshEd25519SignatureOffset, SshCodes.ExchangeSignature, SshChecks.ExchangeSignature),
+            WithOption("L8-zero-share", 8, Lesson08Ssh.OptionZeroShare, "yes", AttackOutcome.Rejected, SshCodes.KexZeroSecret, SshChecks.ZeroSecret),
+            Flip("L8-flip-packet", 8, SshNames.UserauthSigned, SshProtectedBodyOffset, SshCodes.PacketMac, SshChecks.PacketMac),
+            WithOption("L8-wrong-user-key", 8, Lesson08Ssh.OptionWrongUserKey, "attacker", AttackOutcome.Rejected, SshCodes.AuthRefused, SshChecks.AuthSignature),
+            WithOption("L8-refused-tunnel", 8, Lesson08Ssh.OptionRefusedTunnel, "yes", AttackOutcome.Rejected, SshCodes.TunnelRefused, SshChecks.TunnelAllowList),
+            Flip("L8-legacy-flip-signature", 8, SshNames.KexdhReply, SshRsaSignatureOffset, SshCodes.ExchangeSignature, SshChecks.ExchangeSignature),
         };
+
+        // Packet header 5, type 1, host key 4 + 51, share 4 + 32, signature length 4, name 4 + 11, value length 4, then 10 bytes into the signature value.
+        const int SshEd25519SignatureOffset = 130;
+
+        // Past the first encrypted block, which holds the length. A flip there reaches the MAC check rather than the length check.
+        const int SshProtectedBodyOffset = 20;
+
+        // Header 5, type 1, RSA host key 4 + 279, f 4 + 256 or 257, signature length 4, name 4 + 7, value length 4: the 256-byte value starts near 569. This lands inside it for either size of f.
+        const int SshRsaSignatureOffset = 669;
 
         public static AttackDefinition[] All { get { return (AttackDefinition[])Rows.Clone(); } }
 
