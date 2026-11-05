@@ -1,10 +1,10 @@
 <script setup lang="ts">
 import { computed } from 'vue'
 import { avalancheOf, parseDetail, percent } from '../lab'
-import { selectedEvent, shownEvents } from '../store'
+import { selectedEvent, shownEvents, upToSeq } from '../store'
 
 // Numbers come from measure.result events and nothing else (ux-design.md: no fake data).
-const upTo = computed(() => selectedEvent.value?.seq ?? Infinity)
+const upTo = upToSeq
 const measures = computed(() => shownEvents.value.filter(e => e.type === 'measure.result' && e.seq <= upTo.value).map(e => ({ e, d: parseDetail(e.detail), av: e.message.includes('avalanche') ? avalancheOf(e.plain) : null })))
 </script>
 

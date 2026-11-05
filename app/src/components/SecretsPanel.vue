@@ -1,10 +1,10 @@
 <script setup lang="ts">
 import { computed, reactive } from 'vue'
-import { isHighlighted, isReal, selectedEvent, shownEvents, ui } from '../store'
+import { isHighlighted, isReal, selectedEvent, shownEvents, ui, upToSeq } from '../store'
 
 interface Row { holder: string; name: string; hex: string; derivedFrom: string[]; fresh: boolean }
 
-const upTo = computed(() => selectedEvent.value?.seq ?? Infinity)
+const upTo = upToSeq
 // A row exists only when the holder gained the value at or before the selected event.
 const rows = computed<Row[]>(() => {
   const m = new Map<string, Row>()
