@@ -77,7 +77,8 @@ Each correction goes here, newest slice last. Later slices read this file first.
 
 8. **Review of PR 49 (Jared), fixed in the follow-up.** OpenSSL's default client refuses a server with no `renegotiation_info` answer, even at `@SECLEVEL=0`, so the server role needs an outside judge beside the client role. A7 judges only the client, and `Tls11Tests` now runs `s_client` against the glass server.
 9. **A failed engine's alert write can hit a closed socket.** `EnginePump` then reported `LINK_LOST` over the engine's named failure. The pump now keeps the engine's failure. This applies to TLS 1.3 and SSH too.
-10. **TLS has no flow window, so `GlassTlsChannel` caps its unread queue at 16 MiB and then names `CHANNEL_BUFFER_FULL`.** The cap is a call: a quarter of the CE profile's 64 MB. A real device needs a measured number.
+10. **Three readings of the sources.** RFC 9325 section 4.5 sets the RSA floor at 2048 bits, and the same document says TLS 1.1 must not be negotiated, so a floor cannot make this engine current. RFC 4346 section 7.2.2 sends `record_overflow` above 2^14 + 1024 decrypted bytes, and section 6.2.1 says plaintext should not exceed 2^14. This engine uses the smaller number. Section 7.2.2 leaves some alert levels to the sender, so "must send a fatal alert" is too strong for that section.
+11. **TLS has no flow window, so `GlassTlsChannel` caps its unread queue at 16 MiB and then names `CHANNEL_BUFFER_FULL`.** The cap is a call: a quarter of the CE profile's 64 MB. A real device needs a measured number.
 
 ## S6
 

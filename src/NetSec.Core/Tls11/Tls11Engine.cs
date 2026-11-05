@@ -106,7 +106,7 @@ namespace NetSec.Tls11
             return Take();
         }
 
-        /// <summary>After each call: a failure owes the peer one fatal alert (RFC 4346 section 7.2.2), unless the peer ended the session first.</summary>
+        /// <summary>After each call: a failure sends the peer one fatal alert, unless the peer ended the session first. RFC 4346 section 7.2.2 names the alerts and leaves some levels to the sender. This engine sends each one as fatal.</summary>
         EngineOutput Take()
         {
             if (_machine.Status == EngineStatus.Failed && !_noAlertOwed)
@@ -128,6 +128,7 @@ namespace NetSec.Tls11
                 _machine.Fail(Tls11Codes.RecordMac, Tls11Checks.RecordHmac, "a record failed its MAC or padding check", null);
                 return;
             }
+            // RFC 4346 section 6.2.1: plaintext should not exceed 2^14. This engine offers null compression only, so the content is the plaintext.
             if (content.Length > Tls11RecordCipher.MaxContent)
             {
                 _machine.Fail(Tls11Codes.RecordOverflow, Tls11Checks.MessageShape, "a record holds " + content.Length + " bytes of content, and the limit is " + Tls11RecordCipher.MaxContent, null);

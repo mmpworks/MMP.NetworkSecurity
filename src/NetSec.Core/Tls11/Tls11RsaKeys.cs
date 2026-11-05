@@ -6,7 +6,7 @@ namespace NetSec.Tls11
     /// <summary>RSA keys in the DER forms that X.509 and PKCS#8 use. A public key comes from the wire, so its shape gets a check before any arithmetic runs.</summary>
     public static class Tls11RsaKeys
     {
-        /// <summary>On RSA key transport this key guards the whole session, so a small key the CA signed is still refused. The training key has this size.</summary>
+        /// <summary>RFC 9325 section 4.5: "at least a 2048-bit modulus". On RSA key transport this key guards the whole session, so a small key the CA signed is still refused. The training key has this size.</summary>
         public const int MinModulusBits = 2048;
 
         /// <summary>Reads RSAPublicKey (RFC 8017 appendix A.1.1). Null means the key is unusable, and problem says why.</summary>
