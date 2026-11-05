@@ -207,8 +207,11 @@ namespace NetSec.Tests
                 "L1-use-ecb", "L1-flip-cbc", "L1-flip-gcm", "L1-reuse-nonce",
                 "L2-flip-hash-message", "L2-flip-hmac-message", "L2-flip-hmac-tag", "L2-flip-cmac-message", "L2-flip-cmac-tag", "L2-extend-keyed-hash", "L2-extend-hmac",
                 "L3-swap-server-share", "L3-flip-mlkem-ciphertext",
+                "L6-replay-sale", "L6-flip-pin-block", "L6-ask-past-key",
+                "L7-downgrade", "L7-modern-server", "L7-flip-record",
+                "L8-change-host-key", "L8-flip-exchange-signature", "L8-zero-share", "L8-flip-packet", "L8-wrong-user-key", "L8-refused-tunnel", "L8-legacy-flip-signature",
             };
-            Assert.Equal(expected, AttackCatalog.All.Where(a => a.Lesson >= 1 && a.Lesson <= 3).Select(a => a.AttackId).ToArray());
+            Assert.Equal(expected, AttackCatalog.All.Where(a => a.Lesson >= 1 && a.Lesson != 4 && a.Lesson != 5).Select(a => a.AttackId).ToArray());
         }
     }
 }

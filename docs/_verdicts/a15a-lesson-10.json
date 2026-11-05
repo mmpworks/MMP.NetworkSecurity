@@ -1,0 +1,56 @@
+{
+  "reader": "reader-a15a",
+  "authors": [
+    "heather-s0-tour"
+  ],
+  "claims": [
+    {
+      "id": "L10-C01",
+      "verdict": "accurate",
+      "note": "Tours read at origin/feat/tours-4-5-10 (PR 23, commit 1b2fc21). Tier: primary. The W3C Web Authentication Level 2 abstract: an API for 'the creation and use of strong, attested, scoped, public key-based credentials', 'each scoped to a given WebAuthn Relying Party', created by authenticators, with a user agent mediating access. The lab-scope sentence matches lesson-10-names.md (no browser, no authenticator).",
+      "checkedAgainst": "W3C Web Authentication Level 2, Abstract (page fetched this session); docs/lesson-10-names.md on origin/feat/s6 (read)"
+    },
+    {
+      "id": "L10-C02",
+      "verdict": "accurate",
+      "note": "Tours read at origin/feat/tours-4-5-10 (PR 23, commit 1b2fc21). lesson-10-names.md Attacks: L10-replay-challenge, Expect Rejected, code CHALLENGE_REPLAY, check 'challenge already used'.",
+      "checkedAgainst": "docs/lesson-10-names.md on origin/feat/s6 (read)"
+    },
+    {
+      "id": "L10-C03",
+      "verdict": "accurate",
+      "note": "Tours read at origin/feat/tours-4-5-10 (PR 23, commit 1b2fc21). RFC 7515 section 7.1: compact form is three BASE64URL parts joined by '.'. RFC 7519 section 4.1.4: exp is the time on or after which the JWT MUST NOT be accepted. The first sentence (a JWT is a set of claims carried in a JWS) is in RFC 7519 sections 2 and 3, which the source does not name. Suggest adding RFC 7519 section 3.",
+      "checkedAgainst": "RFC 7515 section 7.1; RFC 7519 sections 3, 4.1.4 (RFC text fetched from rfc-editor.org this session)"
+    },
+    {
+      "id": "L10-C04",
+      "verdict": "accurate",
+      "note": "Tours read at origin/feat/tours-4-5-10 (PR 23, commit 1b2fc21). RFC 9449 section 4.2: a DPoP proof is a JWT signed with a private key chosen by the client; the header carries typ, alg, jwk (public key); the payload carries jti, htm, htu, iat, and ath when used with an access token.",
+      "checkedAgainst": "RFC 9449 section 4.2 (RFC text fetched from rfc-editor.org this session)"
+    },
+    {
+      "id": "L10-C05",
+      "verdict": "accurate",
+      "note": "Tours read at origin/feat/tours-4-5-10 (PR 23, commit 1b2fc21). RFC 9449 Abstract: 'a mechanism for sender-constraining OAuth 2.0 tokens via a proof-of-possession mechanism on the application level'. Lab: the names doc check 'proof binding' and code DPOP_JKT_MISMATCH apply the idea to the lab's own token.",
+      "checkedAgainst": "RFC 9449 Abstract; docs/lesson-10-names.md (read)"
+    },
+    {
+      "id": "L10-C06",
+      "verdict": "accurate",
+      "note": "Tours read at origin/feat/tours-4-5-10 (PR 23, commit 1b2fc21). Section 11.1: servers 'MUST only accept DPoP proofs for a limited time after their creation'; they 'can store the jti value'; a single-use check 'may not always be feasible in practice, e.g., when multiple servers behind a single endpoint have no shared state'.",
+      "checkedAgainst": "RFC 9449 section 11.1 (RFC text fetched from rfc-editor.org this session)"
+    },
+    {
+      "id": "L10-C07",
+      "verdict": "accurate",
+      "note": "Tours read at origin/feat/tours-4-5-10 (PR 23, commit 1b2fc21). lesson-10-names.md Roles and capabilities: read-totals needs role cashier or manager; void-sale and refund each need a capability of that name; the normal token holds roles [cashier] and cap [void-sale].",
+      "checkedAgainst": "docs/lesson-10-names.md (read)"
+    },
+    {
+      "id": "L10-C08",
+      "verdict": "accurate",
+      "note": "Tours read at origin/feat/tours-4-5-10 (PR 23, commit 1b2fc21). Section 4.3.2: a server MAY optionally request a client certificate. Section 4.4.3: the client sends CertificateVerify whenever it authenticates with a certificate. A client with no suitable certificate sends an empty Certificate (section 4.4.2), so 'then sends' is true only when it has one.",
+      "checkedAgainst": "RFC 8446 sections 4.3.2, 4.4.2, 4.4.3 (RFC text fetched from rfc-editor.org this session)"
+    }
+  ]
+}

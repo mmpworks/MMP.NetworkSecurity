@@ -1,0 +1,259 @@
+{
+  "steps": [
+    {
+      "id": "L7-S01",
+      "lesson": 7,
+      "title": "An old device meets a new world",
+      "text": [
+        "Some older devices can speak only TLS 1.1, or SSH. The modern servers they must reach speak TLS 1.3. This lesson puts the two side by side on one clock.",
+        "RFC 8996 formally retired TLS 1.1, so new systems should not use it. Old devices still exist, and the course shows what they gain and what stays exposed.",
+        "The top diagram is TLS 1.1. The bottom diagram is TLS 1.3, the same as lesson 5. The lab forces the weakest suite TLS 1.1 offers, because a default run would pick the best case.",
+        "Built to show the parts. Do not copy."
+      ],
+      "glossary": [],
+      "bind": { "kind": "concept" },
+      "highlight": ["diagram:lane=client", "diagram:lane=server"],
+      "claims": [
+        {
+          "id": "L7-C01",
+          "text": "RFC 8996 formally deprecates TLS 1.0 and TLS 1.1.",
+          "source": "RFC 8996, Abstract"
+        },
+        {
+          "id": "L7-C02",
+          "text": "The lab forces the suite TLS_RSA_WITH_AES_128_CBC_SHA, so the run shows the weak case.",
+          "source": "docs/lesson-tls11-names.md, Lanes and streams, Forced suite row (branch feat/s4-tls11); docs/prd.md, Teaching accuracy rules, rule 3"
+        }
+      ],
+      "unlock": { "mode": "ack" }
+    },
+    {
+      "id": "L7-S02",
+      "lesson": 7,
+      "title": "The TLS 1.1 hello",
+      "text": [
+        "The TLS 1.1 client opens with its ClientHello. It travels in the clear, as in TLS 1.3.",
+        "Find the suites list in the inspector. In this lab the list holds an RSA suite with AES in CBC mode and a SHA-1 based seal."
+      ],
+      "glossary": [],
+      "bind": { "kind": "event", "eventType": "tls11.message.sent", "match": { "actor": "client", "message": "ClientHello" } },
+      "highlight": ["inspector:field=suites", "inspector:field=clientVersion"],
+      "unlock": { "mode": "event" }
+    },
+    {
+      "id": "L7-S03",
+      "lesson": 7,
+      "title": "Count the round trips",
+      "text": [
+        "The server finishes its first flight with ServerHelloDone. The client cannot send data yet.",
+        "In TLS 1.1 the client needs two round trips before it can send data. The counters under each diagram come from the traces, and the lab invents no number.",
+        "Try it: press Run both. Both lanes advance on the same clock, so you can compare the two handshakes."
+      ],
+      "glossary": [],
+      "bind": { "kind": "event", "eventType": "tls11.message.sent", "match": { "actor": "server", "message": "ServerHelloDone" } },
+      "highlight": ["diagram:lane=server"],
+      "tryIt": {
+        "id": "L7-S03-T1",
+        "label": "Run both handshakes",
+        "action": { "type": "press-run" },
+        "expect": { "type": "ran" }
+      },
+      "claims": [
+        {
+          "id": "L7-C03",
+          "text": "In TLS 1.1 the client needs 2 round trips before it can send data; the lab counts them from the trace.",
+          "source": "docs/lesson-tls11-names.md, Message order, control run, note after the field table (branch feat/s4-tls11)"
+        }
+      ],
+      "unlock": { "mode": "action", "ref": "L7-S03-T1" }
+    },
+    {
+      "id": "L7-S04",
+      "lesson": 7,
+      "title": "The certificate crosses in the clear",
+      "text": [
+        "In TLS 1.1 the server sends its certificate with no seal. Anyone on the wire can read who the server is.",
+        "Try it: switch to the eavesdropper view. In TLS 1.3 (the lower diagram) the same message is sealed. Here it stays readable."
+      ],
+      "glossary": ["eavesdropper"],
+      "bind": { "kind": "event", "eventType": "tls11.message.sent", "match": { "actor": "server", "message": "Certificate" } },
+      "highlight": ["inspector:field=certificate.0"],
+      "tryIt": {
+        "id": "L7-S04-T1",
+        "label": "Switch to the eavesdropper view",
+        "action": { "type": "set-view", "value": "eavesdropper" },
+        "expect": { "type": "view", "value": "eavesdropper" }
+      },
+      "claims": [
+        {
+          "id": "L7-C04",
+          "text": "In TLS 1.3 all handshake messages after the ServerHello are encrypted; in the TLS 1.1 handshake the Certificate message is a clear record.",
+          "source": "RFC 8446, section 1.2 (Major Differences from TLS 1.2); docs/lesson-tls11-names.md, Message order table (clear record rows 1 to 7)"
+        }
+      ],
+      "unlock": { "mode": "action", "ref": "L7-S04-T1" }
+    },
+    {
+      "id": "L7-S05",
+      "lesson": 7,
+      "title": "The key travels in a box",
+      "text": [
+        "With the RSA suite, the client invents a secret, locks it with the server's RSA public key, and sends it in ClientKeyExchange. The server unlocks it with its private key.",
+        "That method is called RSA key transport. It has a long-term cost. An attacker can record the whole session today. If the server's key is stolen years later, the attacker can open the recording. This is record now, decrypt later.",
+        "The key exchange in lessons 3 and 5 does not have this problem, because each session uses fresh keys that nobody stores."
+      ],
+      "glossary": [],
+      "bind": { "kind": "event", "eventType": "tls11.message.sent", "match": { "actor": "client", "message": "ClientKeyExchange" } },
+      "highlight": ["inspector:field=encryptedPremaster", "secrets:row=client.tls11.premaster"],
+      "claims": [
+        {
+          "id": "L7-C05",
+          "text": "With non-Diffie-Hellman cipher suites, obtaining the server's private key is enough to decrypt any session, past or future, started with that server. Forward secrecy avoids this.",
+          "source": "RFC 7457, section 2.8 (Theft of RSA Private Keys)"
+        },
+        {
+          "id": "L7-C06",
+          "text": "In TLS 1.1 the RSA-encrypted premaster secret is sent in ClientKeyExchange.",
+          "source": "RFC 4346, section 7.4.7.1 (RSA Encrypted Premaster Secret Message)"
+        }
+      ],
+      "unlock": { "mode": "event" }
+    },
+    {
+      "id": "L7-S06",
+      "lesson": 7,
+      "title": "CBC with a fresh IV",
+      "text": [
+        "Now the data records. TLS 1.1 locks each record with AES in CBC mode, as in lesson 1. Each record carries its own explicit IV, which you can see in the iv field.",
+        "The explicit IV is new in TLS 1.1. It stops the BEAST attack, which used the predictable IV of TLS 1.0.",
+        "A fresh IV fixes one problem and leaves another. TLS 1.1 computes the seal first and then encrypts both the data and the seal. This is MAC-then-encrypt. It leaves the door open to padding oracle attacks such as Lucky Thirteen."
+      ],
+      "glossary": ["iv"],
+      "bind": { "kind": "event", "eventType": "tls11.message.sent", "match": { "actor": "client", "message": "ApplicationData" } },
+      "highlight": ["inspector:field=iv", "inspector:field=cipher"],
+      "claims": [
+        {
+          "id": "L7-C07",
+          "text": "TLS 1.1 replaced the implicit IV with an explicit IV to protect against CBC attacks that depended on knowing the IV of a record.",
+          "source": "RFC 4346, section 1.1 (Differences from TLS 1.0) and Appendix F.3 (Explicit IVs)"
+        },
+        {
+          "id": "L7-C08",
+          "text": "The BEAST attack uses the predictable initialization vector of the TLS 1.0 CBC implementation.",
+          "source": "RFC 7457, section 2.3 (BEAST)"
+        },
+        {
+          "id": "L7-C09",
+          "text": "MAC-then-encrypt in TLS 1.0 to 1.2 allows padding oracle attacks; Lucky Thirteen is a timing side channel version, and authenticated encryption or encrypt-then-MAC mitigates it. TLS 1.3 uses AEAD only.",
+          "source": "RFC 7457, section 2.4 (Padding Oracle Attacks; written in 2015, it says 'all current versions of TLS', which then meant TLS 1.0 to 1.2); RFC 8446, section 5.2 (all TLS 1.3 ciphers are AEAD)"
+        }
+      ],
+      "unlock": { "mode": "event" }
+    },
+    {
+      "id": "L7-S07",
+      "lesson": 7,
+      "title": "The record seal catches a flipped bit",
+      "text": [
+        "The receiver opens each record and checks the seal inside. The check is named record HMAC. It passes on the normal run.",
+        "Try it: flip one bit in the client's data record. The seal no longer fits and the check fails.",
+        "Bad padding gives the same failure code as a bad seal. That keeps the receiver from telling an attacker which of the two was wrong. This lab does not claim to resist Lucky Thirteen: managed code gives no timing guarantee."
+      ],
+      "glossary": [],
+      "bind": { "kind": "event", "eventType": "check.result", "match": { "message": "record HMAC" } },
+      "highlight": ["check:name=record HMAC"],
+      "tryIt": {
+        "id": "L7-S07-T1",
+        "label": "Flip one bit in the client's data record",
+        "action": { "type": "run-attack", "attackId": "L7-flip-record" },
+        "expect": { "type": "check", "name": "record HMAC", "result": "fail" }
+      },
+      "claims": [
+        {
+          "id": "L7-C10",
+          "text": "The lab engine computes the MAC on bad padding too, and managed code gives no timing guarantee, so the lab does not claim to resist Lucky Thirteen.",
+          "source": "docs/lesson-tls11-names.md, What the tour may say, last row (branch feat/s4-tls11); src/NetSec.Core/Tls11/Tls11Records.cs; RFC 4346, section 1.1 (padding errors use the bad_record_mac alert)"
+        }
+      ],
+      "unlock": { "mode": "action", "ref": "L7-S07-T1" }
+    },
+    {
+      "id": "L7-S08",
+      "lesson": 7,
+      "title": "The downgrade trick",
+      "text": [
+        "An attacker in the middle can edit the TLS 1.3 client's hello so it offers only TLS 1.1. A server that speaks both then agrees to the old version.",
+        "TLS 1.3 has a defense. A server that steps down to an older version writes a special mark, DOWNGRD, into its random bytes. A TLS 1.3 client checks for that mark.",
+        "Try it: run the attack. The client sees DOWNGRD and the check named downgrade sentinel fails.",
+        "Note who this helps. The downgrade sentinel helps only a client that speaks TLS 1.3. A TLS 1.1 device has no such check to make."
+      ],
+      "glossary": [],
+      "bind": { "kind": "event", "eventType": "tls.handshake.sent", "match": { "actor": "server", "message": "ServerHello" } },
+      "highlight": ["check:name=downgrade sentinel"],
+      "tryIt": {
+        "id": "L7-S08-T1",
+        "label": "Offer only TLS 1.1 to the server",
+        "action": { "type": "run-attack", "attackId": "L7-downgrade" },
+        "expect": { "type": "check", "name": "downgrade sentinel", "result": "fail" }
+      },
+      "claims": [
+        {
+          "id": "L7-C11",
+          "text": "A TLS 1.3 server that negotiates TLS 1.2 or below must set the last 8 bytes of its random to a fixed mark (the bytes spell DOWNGRD), and a TLS 1.3 client must check for it.",
+          "source": "RFC 8446, section 4.1.3 (Server Hello)"
+        },
+        {
+          "id": "L7-C12",
+          "text": "The sentinel helps only a client that speaks TLS 1.3; a TLS 1.1 client has nothing to check. A builder test pins this: the TLS 1.1 client completes against a server that writes DOWNGRD.",
+          "source": "docs/prd.md, Teaching accuracy rules, rule 2; docs/lesson-tls11-names.md, Attacks, closing paragraph (branch feat/s4-tls11)"
+        }
+      ],
+      "unlock": { "mode": "action", "ref": "L7-S08-T1" }
+    },
+    {
+      "id": "L7-S09",
+      "lesson": 7,
+      "title": "When the new server says no",
+      "text": [
+        "A modern server may refuse TLS 1.1 outright. Then the old device cannot connect at all.",
+        "Try it: connect the TLS 1.1 client to a server that speaks only TLS 1.3. The server answers with an alert, number 70, which means the protocol version is not supported. The check named protocol_version alert fails.",
+        "This is the real choice for an old device: a bridge in between that speaks both worlds, or no connection. Lesson 9 builds that bridge."
+      ],
+      "glossary": [],
+      "bind": { "kind": "event", "eventType": "tls11.message.sent", "match": { "actor": "client", "message": "ClientHello" } },
+      "highlight": ["check:name=protocol_version alert"],
+      "tryIt": {
+        "id": "L7-S09-T1",
+        "label": "Connect the TLS 1.1 client to a TLS 1.3 only server",
+        "action": { "type": "run-attack", "attackId": "L7-modern-server" },
+        "expect": { "type": "check", "name": "protocol_version alert", "result": "fail" }
+      },
+      "unlock": { "mode": "action", "ref": "L7-S09-T1" }
+    },
+    {
+      "id": "L7-S10",
+      "lesson": 7,
+      "title": "What stays exposed, and what was tested",
+      "text": [
+        "A TLS 1.1 device keeps three weak points: the RSA key transport, the MAC-then-encrypt records, and a downgrade attack it cannot detect. RC4, another old option, is banned outright by RFC 7465.",
+        "The lab shows these weak points on the desktop. The code is CF-compiled, run on the desktop CLR, never run on CE. The lab has not touched real CE hardware.",
+        "Built to show the parts. Do not copy."
+      ],
+      "glossary": [],
+      "bind": { "kind": "concept" },
+      "claims": [
+        {
+          "id": "L7-C13",
+          "text": "RC4 cipher suites are prohibited in TLS.",
+          "source": "RFC 7465 (Prohibiting RC4 Cipher Suites), title and Abstract"
+        },
+        {
+          "id": "L7-C14",
+          "text": "In this run, nothing has touched real Windows CE hardware. The engines are compiled for the CF runtime and run on the desktop CLR.",
+          "source": "docs/prd.md, Spike results table, row 'CE compiler, emulator, device'"
+        }
+      ],
+      "unlock": { "mode": "ack" }
+    }
+  ]
+}

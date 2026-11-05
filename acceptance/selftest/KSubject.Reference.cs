@@ -42,6 +42,12 @@ namespace Acceptance
         }
 
         public static byte[] Sha256(byte[] data) { return SHA256.HashData(data); }
+        public static void Resume(byte[] master, byte[] hashToClientFinished, byte[] nonce, out byte[] resMaster, out byte[] resumption)
+        {
+            resMaster = DeriveSecret(master, "res master", hashToClientFinished);
+            resumption = ExpandLabel(resMaster, "resumption", nonce, 32);
+        }
+
         public static byte[] HmacSha256(byte[] key, byte[] data) { return HMACSHA256.HashData(key, data); }
         public static byte[] X25519(byte[] scalar, byte[] u) { throw new NotRunException("SELFTEST_NO_REFERENCE", "X25519 has no BCL reference on this runtime"); }
     }

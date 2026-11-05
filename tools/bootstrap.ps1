@@ -1,7 +1,7 @@
 #requires -Version 7
 <#
 .SYNOPSIS
-  Builds every product piece from a fresh clone, in Release. native, Node, and the app join when their slices land.
+  Builds every product piece from a fresh clone, in Release. Node and the app join when their slices land.
 .EXAMPLE
   pwsh tools/bootstrap.ps1
   pwsh tools/bootstrap.ps1 -AsyncProxyRoot E:\dev\MMP.AsyncProxy
@@ -16,6 +16,10 @@ $root = Split-Path -Parent $PSScriptRoot
 if (-not (Test-Path (Join-Path $NetCFRefDir 'mscorlib.dll'))) { throw "CF 3.5 reference assemblies missing at $NetCFRefDir" }
 if (-not $AsyncProxyRoot) { $AsyncProxyRoot = Join-Path (Split-Path -Parent $root) 'MMP.AsyncProxy' }
 if (-not (Test-Path (Join-Path $AsyncProxyRoot 'src\MMP.AsyncProxy'))) { throw "MMP.AsyncProxy not found at $AsyncProxyRoot. Pass -AsyncProxyRoot." }
+
+Write-Host "== native\build.cmd"
+& cmd /c (Join-Path $root 'native\build.cmd')
+if ($LASTEXITCODE -ne 0) { throw "native build failed with exit code $LASTEXITCODE" }
 
 $props = @("-p:NetCFRefDir=$NetCFRefDir", "-p:AsyncProxyRoot=$AsyncProxyRoot")
 foreach ($project in 'src\NetSec.Core', 'src\NetSec.Core.NetCF', 'src\NetSec.CeDevice', 'src\NetSec.Host') {

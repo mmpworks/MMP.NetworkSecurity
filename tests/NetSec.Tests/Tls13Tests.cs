@@ -579,8 +579,10 @@ namespace NetSec.Tests
             public void Dispose()
             {
                 try { if (!P.HasExited) P.Kill(); } catch (InvalidOperationException) { }
+                P.WaitForExit(5000);
                 P.Dispose();
-                File.Delete(Log);
+                // The log is a temp file, and Windows can hold it for a moment after the process ends.
+                try { File.Delete(Log); } catch (IOException) { }
             }
         }
 

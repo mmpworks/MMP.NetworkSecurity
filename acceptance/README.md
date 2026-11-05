@@ -2,8 +2,8 @@
 
 Author: Echo. Date: 2026-11-05. Branch: `test/acceptance-suite`. Rule: D11. Builders never write under `acceptance/`.
 
-Conclusion: the suite has **M = 202 product clauses** (`clauses.json`). With no product built it reports **0 of 202 PASS, 0 FAIL, 202 NOT RUN**.
-Its 19 checks on itself all PASS. The suite is written against `docs/program-design.md` section 11 and the merged referees in `acceptance/referees`. Every group compiles against the contract stub on net10.0 and on net48 with the CF build of MMP.AsyncProxy.
+Conclusion: the suite has **M = 204 product clauses** (`clauses.json`). With no product built it reports **0 of 204 PASS, 0 FAIL, 204 NOT RUN**.
+Its 22 checks on itself all PASS. The suite is written against `docs/program-design.md` section 11 and the merged referees in `acceptance/referees`. Every group compiles against the contract stub on net10.0 and on net48 with the CF build of MMP.AsyncProxy.
 Disposition: merge this branch before S0 starts. Send the open items in section 7 to Richard and Jared.
 
 ## 1. Run it
@@ -25,11 +25,11 @@ Exit code 0 means every selected clause passed. Anything else exits 1.
 Command: `pwsh acceptance/run.ps1 -Clauses All -SelfTest` on this branch. Nothing under `src/` exists yet.
 
 ```
-[acceptance] 202 clauses selected of M = 202 (+ 19 self-checks in the file)
+[acceptance] 204 clauses selected of M = 204 (+ 22 self-checks in the file)
 [acceptance] group prim (net10): 32 clauses
   ... (one line for each group and build: dukpt, kschedule, tls13live, tls11, ssh, auth, nativeprod, native, bridge, host, keys, binproof, selftest, docs, e2e)
-[acceptance] 0 of 202 clauses PASS (0 FAIL, 202 NOT RUN); M = 202
-[acceptance] self-checks: 19 of 19 PASS
+[acceptance] 0 of 204 clauses PASS (0 FAIL, 204 NOT RUN); M = 204
+[acceptance] self-checks: 22 of 22 PASS
 ```
 
 | Assertion | M | PASS | FAIL | NOT RUN | Slice | Referee |
@@ -45,7 +45,7 @@ Command: `pwsh acceptance/run.ps1 -Clauses All -SelfTest` on this branch. Nothin
 | A9 | 4 | 0 | 0 | 4 | All | CF references and System.Reflection.Metadata |
 | A10 | 7 | 0 | 0 | 7 | S5 | live run, Go referees and taps |
 | A10a | 3 | 0 | 0 | 3 | S5 | Go tap |
-| A11 | 7 | 0 | 0 | 7 | S6 | Go tokenverify |
+| A11 | 9 | 0 | 0 | 9 | S6 | Go tokenverify and Go tlspeer |
 | A12 | 8 | 0 | 0 | 8 | S7 | cl.exe and a live run |
 | A13 | 15 | 0 | 0 | 15 | Each | Playwright |
 | A14 | 2 | 0 | 0 | 2 | Each | test over the tour files and a live Host |
@@ -55,10 +55,10 @@ Command: `pwsh acceptance/run.ps1 -Clauses All -SelfTest` on this branch. Nothin
 
 | Status and reason | Clauses |
 |---|---|
-| NOT RUN PRODUCT_MISSING | 201 |
+| NOT RUN PRODUCT_MISSING | 203 |
 | NOT RUN NOT_A_FRESH_RUN (`A13.fresh-clone.acceptance-unchanged`, needs `-Fresh`) | 1 |
 
-Self-checks (full text in the report): 19 of 19 PASS.
+Self-checks (full text in the report): 22 of 22 PASS.
 
 | Self-check | What it proves |
 |---|---|
@@ -102,7 +102,7 @@ A cut role is listed in `roles.json`. Its clauses report NOT RUN `ROLE_CUT:<role
 | A1 | Published vectors only (`vectors/SOURCES.md`). Hashes run one-shot and in 1, 7, 64 and 65 byte pieces. GCM has tamper cases and the NIST FAIL records. Ed25519 has flipped-signature and altered-message controls. DH refuses a peer value of 0, 1 or p-1 |
 | A2 | The BCL oracle runs in a separate process. 10,000 seeded inputs per primitive. The seed makes a failing round repeatable |
 | A3 | X9 vectors are fetched at run time and cross-checked by recomputation. PIN block decrypt under another PAN must not return the PIN. The erasure check searches every register for every earlier working key |
-| A4 | RFC 8448 values through `Tls13KeySchedule.Derive` (section 11). Keys, IVs and Finished keys come from the secrets `Derive` returned. The resumption master secret is out of reach because `Derive` takes no client Finished hash. The engine route is not usable: the glass client sends its own ClientHello, so its transcript differs |
+| A4 | RFC 8448 values through `Tls13KeySchedule.Derive` (section 11). Keys, IVs and Finished keys come from the secrets `Derive` returned. The resumption secrets need `Tls13KeySchedule.Resume` (ASSUMED, asked of Richard). Until it exists, `A4.rfc8448.exporter-and-resumption` is NOT RUN DERIVE_LACKS_RESUMPTION. The engine route is not usable: the glass client sends its own ClientHello, so its transcript differs |
 | A5, A6 | The group is the referee's word (`Peer Temp Key`, the Go `handshake` event). The certificates come from `TrainingPki.Export`, and `openssl verify` checks the leaf (wrong name and rogue-certificate controls). A6 compares the four labels that Go and OpenSSL both write, for the client random in `ProbeResult.KeyLog` |
 | A7 | Alert 70 only counts beside a control: the same client passes against the TLS 1.1 server, and `ProbeResult.AlertReceived` is 70 for the TLS 1.3-only server. The sentinel needs `OfferOnlyTls11`, a failed `TLS13_DOWNGRADE_SENTINEL`, and `DOWNGRD 00` in the server random, read from the `tap` log. The control run offers TLS 1.3 |
 | A8 | The referee prints the negotiated algorithms. The known_hosts line comes from `ssh-keygen -y` on the exported key file. The rogue host key comes from `ssh-keygen`. A changed host key gives `SSH_HOST_KEY_CHANGED` beside a control. ssh.exe uses the exported OpenSSH key file (it rejects PKCS#8 for Ed25519) |

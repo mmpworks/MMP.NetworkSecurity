@@ -60,7 +60,7 @@ namespace NetSec.Io
         public static IFuture<ProbeResult> Connect(ProbeRequest r)
         {
             if (r == null) throw new ArgumentNullException("r");
-            NeedBuilt(r);
+            if (r.Protocol == WireProtocol.Ssh) return SshProbe.Connect(r);
             return AsyncProxy.Run<ProbeResult>(delegate(Return<ProbeResult> ret) { return ConnectBody(r, ret); });
         }
 
@@ -68,18 +68,12 @@ namespace NetSec.Io
         public static ProbeListener Listen(ProbeRequest r)
         {
             if (r == null) throw new ArgumentNullException("r");
-            NeedBuilt(r);
+            if (r.Protocol == WireProtocol.Ssh) return SshProbe.Listen(r);
             LinkListener listener = new LinkListener(new IPEndPoint(IPAddress.Loopback, r.Port));
             ProbeListener result = new ProbeListener();
             result.Port = listener.Port;
             result.Result = AsyncProxy.Run<ProbeResult>(delegate(Return<ProbeResult> ret) { return ListenBody(r, listener, ret); });
             return result;
-        }
-
-        /// <summary>SSH arrives in S4. The suite maps this exception to NOT RUN.</summary>
-        static void NeedBuilt(ProbeRequest r)
-        {
-            if (r.Protocol == WireProtocol.Ssh) throw new NotImplementedException("the glass " + r.Protocol + " engine is not built yet");
         }
 
         static IEnumerable<IFuture> ConnectBody(ProbeRequest r, Return<ProbeResult> ret)
