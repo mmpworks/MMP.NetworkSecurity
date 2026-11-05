@@ -85,6 +85,15 @@ namespace NetSec.Tests
         }
 
         [Fact]
+        public void A_flipped_pin_block_passes_both_hops_and_only_the_bank_sees_it()
+        {
+            Run run = Go(AttackCatalog.Lesson9Unreleased.Single(a => a.AttackId == "L9-flip-pin-block"));
+            TraceEvent[] failed = run.Events.Where(e => e.Check != null && !e.Check.Passed).ToArray();
+            Assert.Equal(new[] { "bank" }, failed.Select(e => e.Actor).Distinct().ToArray());
+            Assert.Contains(run.Events, e => e.Actor == "server" && e.Hop == "hop2" && e.Type == "wire.sent" && e.Message == "ApplicationData");
+        }
+
+        [Fact]
         public void A_tampered_hop_1_never_reaches_the_bank()
         {
             Run run = Go(AttackCatalog.Lesson9Unreleased.Single(a => a.AttackId == "L9-tamper-hop1"));
