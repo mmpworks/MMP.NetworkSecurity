@@ -47,7 +47,7 @@
       "lesson": 10,
       "title": "The client shows its certificate",
       "text": [
-        "The client answers with its own certificate. It carries the name pump-reader-4 and a certificate key. This key is separate from the login key you meet in phase 2.",
+        "The client answers with its own certificate. It carries the name pump-reader-4 and the client's TLS key. This is not the login key of phase 2.",
         "The server checks it the way the client checked the server's in lesson 4: does it lead to a trusted root, is it in date, and does its signature verify.",
         "Anyone can copy a certificate, so the card alone proves nothing. The next step shows what does."
       ],
@@ -138,13 +138,12 @@
       "lesson": 10,
       "title": "Phase 2: a key that stays on the device",
       "text": [
-        "Mutual TLS proved the client holds the certificate key. Now the client logs in to get a token for its calls. The login uses a second key, the device key, enrolled ahead of time. Nothing in this lab ties it to the certificate.",
-        "The device key is a pair: a private key that stays on the device, and a public key that anyone may see. Find the private key in the secrets panel under the client lane.",
+        "Mutual TLS proved the client holds its TLS key. Now the client logs in to get a token for its calls. The login uses a different key, a device key made for the login. The lab does not link it to the certificate key.",
+        "The device key is a pair: a private key that stays on the device, and a public key that anyone may see.",
         "A signature with this key shows the signer holds it. It says nothing about who the signer is until someone has linked the public key to a person or a device."
       ],
       "glossary": [],
-      "bind": { "kind": "event", "eventType": "secret.derived", "match": { "actor": "client" } },
-      "highlight": ["secrets:row=client.auth.device-key"],
+      "bind": { "kind": "concept" },
       "claims": [
         {
           "id": "L10-C22",
@@ -152,7 +151,7 @@
           "source": "Jared's re-check of PR #20 (comment 6658016121): three seeds gave tlsKey 0a1626172713245c and three different loginKey values; src/NetSec.Core/Labs/Lesson10Auth.cs, lines 185-186 and 201"
         }
       ],
-      "unlock": { "mode": "event" }
+      "unlock": { "mode": "ack" }
     },
     {
       "id": "L10-S08",
@@ -160,11 +159,11 @@
       "title": "Login names a subject and a key",
       "text": [
         "To log in, the client tells the issuer two things: the subject it claims to be, and the public key it will sign with. The issuer is the part of the system that hands out tokens.",
-        "Nothing secret travels here. Anyone can claim any subject name, so the claim proves nothing yet."
+        "Nothing secret travels here. Anyone can claim any subject name, so the claim proves nothing yet. Find the device key's private half in the secrets panel under the client lane."
       ],
       "glossary": [],
       "bind": { "kind": "event", "eventType": "wire.sent", "match": { "actor": "client", "message": "LoginRequest" } },
-      "highlight": ["inspector:field=subject", "inspector:field=devicePublicKey"],
+      "highlight": ["inspector:field=subject", "inspector:field=devicePublicKey", "secrets:row=client.auth.device-key"],
       "unlock": { "mode": "event" }
     },
     {
@@ -251,7 +250,7 @@
       "text": [
         "A fresh signature is still not enough. The issuer also checks that the answer names the challenge it sent in this login. The check is named challenge issued.",
         "Without that check, an attacker could sign a challenge of their own choosing, or one recorded from an earlier login, and the issuer would accept it.",
-        "Try it: sign a challenge the issuer never sent. The signature is fine, the check fails, and no token is issued."
+        "Try it: sign a challenge the issuer never sent. The signature would verify, but the issuer fails the challenge issued check first, and no token is issued."
       ],
       "glossary": [],
       "bind": { "kind": "event", "eventType": "check.result", "match": { "message": "challenge issued" } },
@@ -266,7 +265,7 @@
         {
           "id": "L10-C12",
           "text": "The issuer compares the answered challenge with the one this login issued and refuses an unissued one with code CHALLENGE_NOT_ISSUED.",
-          "source": "docs/lesson-10-names.md, check table and Attacks, L10-unissued-challenge (main, commit 279e9a1); review of PR #20, Blocker 1"
+          "source": "docs/lesson-10-names.md, check table and Attacks, L10-unissued-challenge (main, commit 279e9a1); review of PR #20, Blocker 1; reader-a15a's run of the try-it: no signature check appears in that run, and challenge issued fails first"
         }
       ],
       "unlock": { "mode": "action", "ref": "L10-S12-T1" }
@@ -405,7 +404,7 @@
       "lesson": 10,
       "title": "Each proof works once",
       "text": [
-        "A thief who records one call could send the same proof again. The server defends in two ways. It rejects proofs older than 60 seconds, which is the check named proof age. It also remembers each proof's one-time id.",
+        "A thief who records one call could send the same proof again. The server defends in two ways. It rejects proofs dated more than 60 seconds from now, in either direction, which is the check named proof age. It also remembers each proof's one-time id.",
         "A real server must keep those used ids for the whole 60-second window, or an old proof could slip back in. This lab keeps them for one run only.",
         "The lab also issues no DPoP nonce. A server may add a nonce to shorten a proof's life, and RFC 9449 makes it optional.",
         "Try it: send ReadTotals again with the same proof. The server has seen that id, so the check named jti already used fails."
@@ -427,7 +426,7 @@
         },
         {
           "id": "L10-C16",
-          "text": "The lab accepts a proof whose iat is within 60 seconds, and it keeps the used proof ids for one run only. It issues no DPoP nonce.",
+          "text": "The lab accepts a proof whose iat is within 60 seconds of now, in either direction, and it keeps the used proof ids for one run only. It issues no DPoP nonce.",
           "source": "docs/lesson-10-names.md, check table (proof age; no nonce check is listed) (main, commit 279e9a1); src/NetSec.Core/Labs/Lesson10Auth.cs, Session._seen (a per-session dictionary of used challenges and proof ids)"
         },
         {
@@ -443,7 +442,7 @@
       "lesson": 10,
       "title": "Who you are is not what you may do",
       "text": [
-        "By now the server has checked the token and the proof. The calls run on their own connection, and the server reads no certificate there. It knows the call came from a holder of an enrolled key and a token the issuer signed. It still must decide whether this caller may do this action. That is the permission check.",
+        "By now the server has checked the token and the proof. The calls run on their own connection, and the server reads no certificate there. It knows the call carries a token the issuer signed and a proof from the key the token names. It still must decide whether this caller may do this action. That is the permission check.",
         "A role is a job title. The role cashier may read totals. A capability is a single right. The capability void-sale lets the holder void a sale, and the token carries it by name.",
         "Try it: call Refund. The token has the role cashier and the capability void-sale, but it has no refund capability. The check named permission check fails."
       ],
