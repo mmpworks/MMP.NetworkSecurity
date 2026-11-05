@@ -24,8 +24,8 @@
     },
     {
       "id": "L11-C04",
-      "verdict": "unverified",
-      "note": "Re-checked against tours at origin/feat/tours-6-11 commit 5b18067. Two parts are fine: FixedTimeEquals is marked NoInlining and NoOptimization in dotnet/runtime (fetched; comment: 'we want this method to be exactly as non-short-circuiting as written'), and the Learn page promises fixed time for it. The word 'Only' in 'Only CryptographicOperations.FixedTimeEquals is documented as fixed-time in .NET' is a claim about all of .NET documentation. I read one page and cannot show the absence elsewhere. 'Managed code in general has no constant-time guarantee' is a negative that no fetched page states in those words; the runtime comment is indirect support. Fix: drop 'Only' and write 'The .NET documentation promises fixed time for CryptographicOperations.FixedTimeEquals', and keep the second sentence as the lab's position, sourced to PRD rule 5 and the runtime comment. With that wording this claim is accurate.",
+      "verdict": "accurate",
+      "note": "Re-checked against tours at origin/feat/tours-6-11 commit d003b09. Sentence 1 now covers one documented API: the Learn Remarks promise fixed time for FixedTimeEquals. Sentence 2 is the lab's position. Tier: indirect (house rule PRD rule 5, plus the runtime source marking FixedTimeEquals NoInlining and NoOptimization so the JIT cannot change its timing). Sentence 3 is backed by the dudect README 'Further notes'.",
       "checkedAgainst": "Microsoft Learn FixedTimeEquals Remarks (fetched); dotnet/runtime CryptographicOperations.cs (fetched); docs/prd.md rule 5 (read)"
     },
     {
