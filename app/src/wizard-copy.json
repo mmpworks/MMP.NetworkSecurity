@@ -116,6 +116,7 @@
   "wizard.vault.audit.what": "A vault writes down every request, so you can see who asked for what. Each row holds a short code made from the row before it, so a changed row shows up.",
   "wizard.vault.audit.whole": "Every row fits the row before it.",
   "wizard.vault.audit.bad": "does not fit the row before it.",
+  "wizard.vault.audit.limits": "This check has no secret, so it misses three changes: an edit to the newest row, rows cut from the end, and a full rewrite of every row.",
   "wizard.vault.audit.caller-note": "These rows are the vault doing its normal work. They are not attacks.",
   "wizard.error.VAULT_AUDIT_FAILED": "The vault could not write down this request, so it refused it. Try again.",
   "wizard.error.VAULT_OP_REFUSED": "This key may not do that. A key's use is fixed when it is made."

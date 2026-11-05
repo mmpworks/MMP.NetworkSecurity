@@ -115,3 +115,39 @@ for (const theme of ['light', 'dark'] as const) {
     await shot(page, `06-audit-${theme}`)
   })
 }
+
+// The two paths below change vault.db the way a person with the file could, and as the acceptance suite does (acceptance/checks/vaultdb.py).
+const dbPath = () => path.join(process.env.NETSEC_SECURITY_DIR ?? '', 'vault', 'vault.db')
+async function withDb<T>(fn: (db: import('node:sqlite').DatabaseSync) => T): Promise<T> {
+  const { DatabaseSync } = await import('node:sqlite')
+  const db = new DatabaseSync(dbPath())
+  try { return fn(db) } finally { db.close() }
+}
+
+test('a failed audit write refuses the request, names VAULT_AUDIT_FAILED and says the learner can try again', async ({ page }) => {
+  await openVault(page)
+  await withDb(db => db.exec("CREATE TRIGGER IF NOT EXISTS ui_block_audit BEFORE INSERT ON audit BEGIN SELECT RAISE(ABORT, 'audit blocked by the UI spec'); END"))
+  try {
+    await page.getByTestId('vault-sign-run').click()
+    await expect(page.getByTestId('vault-fault-code')).toHaveText('VAULT_AUDIT_FAILED')
+    await expect(page.getByTestId('vault-fault')).toContainText('The vault could not write down this request, so it refused it. Try again.')
+    await expect(page.getByTestId('vault-fault-retry')).toBeVisible()
+    await shot(page, '07-audit-failed')
+  } finally { await withDb(db => db.exec('DROP TRIGGER IF EXISTS ui_block_audit')) }
+})
+
+test('the chain check names the row after an edited row, and both results name what the check misses', async ({ page }) => {
+  await openVault(page)
+  await page.getByTestId('vault-tab-audit').click()
+  await page.getByTestId('vault-audit-check').click()
+  await expect(page.getByTestId('vault-audit-chain')).toContainText('Every row fits the row before it.')
+  await expect(page.getByTestId('vault-audit-limits')).toContainText('an edit to the newest row')
+  await expect(page.getByTestId('vault-audit-limits')).toContainText('rows cut from the end')
+  await expect(page.getByTestId('vault-audit-limits')).toContainText('a full rewrite')
+  await withDb(db => db.exec("UPDATE audit SET detail = 'edited by the UI spec' WHERE seq = (SELECT seq FROM audit ORDER BY seq LIMIT 1 OFFSET 1)"))
+  await page.getByTestId('vault-audit-check').click()
+  await expect(page.getByTestId('vault-audit-chain')).toContainText('Row 3 does not fit the row before it.')
+  await expect(page.getByTestId('vault-audit-limits')).toContainText('an edit to the newest row')
+  await expect(page.getByTestId('vault-audit-limits')).toContainText('a full rewrite')
+  await shot(page, '08-audit-chain-broken')
+})
