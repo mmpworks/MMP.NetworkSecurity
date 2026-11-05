@@ -217,11 +217,9 @@ function onForked(f: any) {
   rec.parentId = String(f.parentId)
   rec.label = `attack: ${f.attackId ?? 'tamper'}`
   if (parent) { rec.lesson = parent.lesson; rec.seed = parent.seed }
-  ui.activeId = rec.id
+  // session.started already made the fork active. This frame can arrive after the learner pressed Next, so it never changes the active session.
   // An attack fork runs to its result, so the failing check shows without a second click.
   sock?.send({ type: 'session.run', sessionId: rec.id })
-  ui.viewUpTo = null
-  ui.selectedSeq = null
   wake()
 }
 
@@ -286,8 +284,9 @@ export function loadTrace(file: string) { if (file) sock?.send({ type: 'session.
 // ---- tour driver ----
 
 async function waitForSession(): Promise<boolean> {
-  for (let i = 0; i < 40 && !active.value; i++) { if (!(await nextActivity(500))) continue }
-  return !!active.value
+  const have = () => ui.sessions.some(x => x.id === tour.sessionId)
+  for (let i = 0; i < 40 && !have(); i++) { if (!(await nextActivity(500))) continue }
+  return have()
 }
 
 /** Moves the engine, one event at a time, until the bound event of step i is in the list. The engine then waits for the learner. */
@@ -303,14 +302,18 @@ async function enterStep(i: number) {
   tour.driving = true
   try {
     if (!(await waitForSession())) { tour.unreachable = 'The engine did not start a session'; return }
+    // The tour reads its own session, never the active one: an attack fork can be active while the learner moves on.
+    const ts = () => ui.sessions.find(x => x.id === tour.sessionId)
     const prev = Math.max(0, ...tour.bound.slice(0, i))
     for (let guard = 0; guard < 500; guard++) {
       // The first match at or after the previous step. A tour may teach in an order the engine did not emit, so a match before it also counts.
-      let idx = findBound(s, allEvents.value, prev)
-      if (idx < 0) idx = findBound(s, allEvents.value, 0)
+      const events = ts()?.events ?? []
+      let idx = findBound(s, events, prev)
+      if (idx < 0) idx = findBound(s, events, 0)
       if (idx >= 0) { tour.bound[i] = idx; ui.viewUpTo = s.pause === 'none' ? null : idx; ui.selectedSeq = null; markSeen(s); return }
-      if (active.value?.finished) { tour.unreachable = 'The session ended before the engine sent this message'; return }
-      stepEngine()
+      if (ts()?.finished) { tour.unreachable = 'The session ended before the engine sent this message'; return }
+      sock?.send({ type: 'session.step', sessionId: tour.sessionId })
+      ui.engine = 'stepping'
       if (!(await nextActivity(15000))) { fail('STEP_TIMEOUT', 'The engine sent nothing for 15 seconds.', true); tour.unreachable = 'The engine is not answering'; return }
       if (ui.error) { tour.unreachable = 'The engine reported an error'; return }
     }
