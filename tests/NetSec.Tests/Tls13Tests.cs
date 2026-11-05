@@ -578,7 +578,8 @@ namespace NetSec.Tests
 
             public void Dispose()
             {
-                try { if (!P.HasExited) P.Kill(); } catch (InvalidOperationException) { }
+                // Windows answers Access is denied when the process is already exiting. The wait below covers that case.
+                try { if (!P.HasExited) P.Kill(); } catch (InvalidOperationException) { } catch (System.ComponentModel.Win32Exception) { }
                 P.WaitForExit(5000);
                 P.Dispose();
                 // The log is a temp file, and Windows can hold it for a moment after the process ends.

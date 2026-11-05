@@ -92,3 +92,7 @@ Each correction goes here, newest slice last. Later slices read this file first.
 10. **A refused tunnel ends the lab's session with `SSH_TUNNEL_REFUSED`.** A real client could keep the session. The lab ends it, so the learner gets one named failure.
 11. **Step mode still has no read deadline for SSH.** A flipped length byte that still looks sensible makes the reader wait for bytes that never come. Free run ends in `LINK_DEADLINE`. In step mode the wait has no end, as S0 item 11 says. A length no packet may hold ends at once in `SSH_PACKET_LENGTH` on both modes.
 12. **The client's referee is Go, and the server's referee is `ssh.exe`.** Each referee is another SSH implementation. The `sshpeer` client mode has no independent peer, so no claim here rests on it.
+
+## Pump deadline test
+
+1. **The side whose deadline fires reports `LINK_DEADLINE`. The side that then reads the close reports `PEER_CLOSED_EARLY`, and that is its true outcome.** A test that names one side's code must fix the order with two deadlines. `LabPair.Named` drops the second code, so a lab reports the real failure in either order.
