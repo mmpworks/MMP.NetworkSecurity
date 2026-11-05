@@ -173,6 +173,7 @@ namespace Acceptance
                 File.WriteAllText(fork.File, "\n");
                 SendText(ws, D("type", "session.started", "sessionId", fork.Id, "transportKind", "glass", "trainingOnly", true, "sessionFile", fork.File, "showKeys", _showKeys));
                 SendText(ws, D("type", "session.forked", "sessionId", fork.Id, "parentId", parent.Id, "attackId", aid));
+                SendForeignSession(ws);
                 foreach (SessionEv e in fork.Events) SendText(ws, D("type", "trace", "event", Render(e, _showKeys)));
                 SendText(ws, D("type", "session.finished", "sessionId", fork.Id, "outcome", "rejected", "code", fork.FinishCode));
                 return true;

@@ -111,6 +111,7 @@ namespace Acceptance
                 {
                     bool frameShows;
                     lock (_gate) { frameShows = M("off-hex-in-frames") ? true : _showKeys; }
+                    SendForeignSession(ws);
                     foreach (SessionEv e in session.Events) SendText(ws, D("type", "trace", "event", Render(e, frameShows)));
                     SendText(ws, D("type", "session.finished", "sessionId", session.Id, "events", (double)session.Events.Count, "outcome", session.FinishCode == null ? "completed" : "failed", "code", session.FinishCode));
                     break;
@@ -153,6 +154,14 @@ namespace Acceptance
             SessionEv e = new SessionEv { Base = D("type", type, "eventId", "e" + n, "actor", stream, "streamId", s.Id + "/" + stream, "streamSeq", (double)n) };
             e.Secrets.AddRange(secrets);
             s.Events.Add(e);
+        }
+
+        /// <summary>The defect "foreign-finish-first": another session of the same Host ends on this connection before the run's own frames, with a trace event and a session.finished of its own.</summary>
+        void SendForeignSession(WebSocket ws)
+        {
+            if (!M("foreign-finish-first")) return;
+            SendText(ws, D("type", "trace", "event", D("type", "wire.sent", "eventId", "x1", "actor", "server", "streamId", "s-other/server", "streamSeq", 1.0, "wire", "00", "plain", "00")));
+            SendText(ws, D("type", "session.finished", "sessionId", "s-other", "events", 1.0, "outcome", "failed", "code", "FOREIGN_SESSION"));
         }
 
         /// <summary>The defect "builtin-half": one half of the lab keeps a built-in key in silence, so a wire event of a run on the learner's keys carries the built-in bytes of the types the lesson reads.</summary>
