@@ -3,7 +3,7 @@
 Author: Echo. Date: 2026-11-05. Branch: `test/acceptance-suite`. Rule: D11. Builders never write under `acceptance/`.
 
 Conclusion: the suite has **M = 202 product clauses** (`clauses.json`). With no product built it reports **0 of 202 PASS, 0 FAIL, 202 NOT RUN**.
-Its 18 checks on itself all PASS. Every group compiles against the contract stub on net10.0 and on net48 with the CF build of MMP.AsyncProxy.
+Its 19 checks on itself all PASS. The suite is written against `docs/program-design.md` section 11 and the merged referees in `acceptance/referees`. Every group compiles against the contract stub on net10.0 and on net48 with the CF build of MMP.AsyncProxy.
 Disposition: merge this branch before S0 starts. Send the open items in section 7 to Richard and Jared.
 
 ## 1. Run it
@@ -13,7 +13,7 @@ pwsh acceptance/run.ps1 -Clauses All                 # build what exists, run, w
 pwsh acceptance/run.ps1 -Clauses A1,A2               # ids, assertions, slices (S3), groups (tls13live) or prefixes (A5.client)
 pwsh acceptance/run.ps1 -Clauses All -Fresh          # clone HEAD beside MMP.AsyncProxy, run the clone's own script, diff acceptance/ against PIN
 pwsh acceptance/run.ps1 -Contract                    # compile every group against the contract stub; run nothing
-pwsh acceptance/run.ps1 -Clauses All -SelfTest       # add the 18 checks the suite runs on itself (not part of M)
+pwsh acceptance/run.ps1 -Clauses All -SelfTest       # add the 19 checks the suite runs on itself (not part of M)
 ```
 
 Set `AsyncProxyRoot` (parameter or environment variable) when the clone does not sit beside `MMP.AsyncProxy`. CF references: `E:\dev\tools\netcf35-ref`, never committed.
@@ -25,11 +25,11 @@ Exit code 0 means every selected clause passed. Anything else exits 1.
 Command: `pwsh acceptance/run.ps1 -Clauses All -SelfTest` on this branch. Nothing under `src/` exists yet.
 
 ```
-[acceptance] 202 clauses selected of M = 202 (+ 18 self-checks in the file)
+[acceptance] 202 clauses selected of M = 202 (+ 19 self-checks in the file)
 [acceptance] group prim (net10): 32 clauses
   ... (one line for each group and build: dukpt, kschedule, tls13live, tls11, ssh, auth, nativeprod, native, bridge, host, keys, binproof, selftest, docs, e2e)
 [acceptance] 0 of 202 clauses PASS (0 FAIL, 202 NOT RUN); M = 202
-[acceptance] self-checks: 18 of 18 PASS
+[acceptance] self-checks: 19 of 19 PASS
 ```
 
 | Assertion | M | PASS | FAIL | NOT RUN | Slice | Referee |
@@ -58,7 +58,7 @@ Command: `pwsh acceptance/run.ps1 -Clauses All -SelfTest` on this branch. Nothin
 | NOT RUN PRODUCT_MISSING | 201 |
 | NOT RUN NOT_A_FRESH_RUN (`A13.fresh-clone.acceptance-unchanged`, needs `-Fresh`) | 1 |
 
-Self-checks (full text in the report): 18 of 18 PASS.
+Self-checks (full text in the report): 19 of 19 PASS.
 
 | Self-check | What it proves |
 |---|---|
@@ -70,7 +70,8 @@ Self-checks (full text in the report): 18 of 18 PASS.
 | `SELF.absent-product-is-not-run`, `SELF.zero-checks-is-not-pass` | A missing type maps to NOT RUN PRODUCT_MISSING. A clause that ran zero checks is NOT RUN. Any other exception is FAIL |
 | `SELF.type-clause-bites` | The A16 type clause PASSes on a faithful stub and FAILs when the glass factory accepts any object |
 | `SELF.text-checks-bite` | On an empty tree every text clause is NOT RUN. A good tour passes. A bad tour fails the concept cap, the reading grade, the heap statement and tic-gate |
-| `SELF.openssl-referee-smoke`, `SELF.openssh-key-format`, `SELF.wire-parsers`, `SELF.binproof-detector` | The process control and the parsers read real OpenSSL, ssh.exe and CF binaries: group, protocol, key log, SSH clear packets, TLS hellos, CF mscorlib token |
+| `SELF.openssl-referee-smoke`, `SELF.openssh-key-format`, `SELF.wire-parsers`, `SELF.binproof-detector` | The process control and the parsers read real OpenSSL, ssh.exe, the Go `tap` and CF binaries: group, protocol, key log, SSH clear packets, TLS hellos, tap log with and without a flip, CF mscorlib token |
+| `SELF.referee-protocols` | The harness speaks the real referee programs: the BCL oracle JSON lines (including an unknown algorithm), `tokenverify` result events, and the `tlspeer` port line and handshake event |
 | `SELF.vector-provenance`, `SELF.clauses-json-matches-code` | Every vector group names its source. `clauses.json` equals the clause code |
 
 Other proofs I ran by hand and do not keep in the repo:
@@ -101,13 +102,13 @@ A cut role is listed in `roles.json`. Its clauses report NOT RUN `ROLE_CUT:<role
 | A1 | Published vectors only (`vectors/SOURCES.md`). Hashes run one-shot and in 1, 7, 64 and 65 byte pieces. GCM has tamper cases and the NIST FAIL records. Ed25519 has flipped-signature and altered-message controls. DH refuses a peer value of 0, 1 or p-1 |
 | A2 | The BCL oracle runs in a separate process. 10,000 seeded inputs per primitive. The seed makes a failing round repeatable |
 | A3 | X9 vectors are fetched at run time and cross-checked by recomputation. PIN block decrypt under another PAN must not return the PIN. The erasure check searches every register for every earlier working key |
-| A4 | RFC 8448 values on the pure key schedule. The engine route is not usable: the glass client sends its own ClientHello, so its transcript differs |
-| A5, A6 | The group is the referee's word (`Peer Temp Key`, Go `STATE`). The server certificate comes from `TrainingCa`, and `openssl verify` checks it (wrong name and expired controls). A6 compares five key log labels for the client random read from the wire |
-| A7 | Alert 70 only counts beside a control: the same client passes against the TLS 1.1 server. The sentinel needs a rewritten ClientHello, a failed `TLS13_DOWNGRADE_SENTINEL`, and `DOWNGRD 00` in the server random read from the wire. The control run has no rewrite |
-| A8 | The referee prints the negotiated algorithms. A changed host key gives `SSH_HOST_KEY_CHANGED` beside a control. ssh.exe uses an OpenSSH key file (it rejects PKCS#8 for Ed25519) |
+| A4 | RFC 8448 values through `Tls13KeySchedule.Derive` (section 11). Keys, IVs and Finished keys come from the secrets `Derive` returned. The resumption master secret is out of reach because `Derive` takes no client Finished hash. The engine route is not usable: the glass client sends its own ClientHello, so its transcript differs |
+| A5, A6 | The group is the referee's word (`Peer Temp Key`, the Go `handshake` event). The certificates come from `TrainingPki.Export`, and `openssl verify` checks the leaf (wrong name and rogue-certificate controls). A6 compares the four labels that Go and OpenSSL both write, for the client random in `ProbeResult.KeyLog` |
+| A7 | Alert 70 only counts beside a control: the same client passes against the TLS 1.1 server, and `ProbeResult.AlertReceived` is 70 for the TLS 1.3-only server. The sentinel needs `OfferOnlyTls11`, a failed `TLS13_DOWNGRADE_SENTINEL`, and `DOWNGRD 00` in the server random, read from the `tap` log. The control run offers TLS 1.3 |
+| A8 | The referee prints the negotiated algorithms. The known_hosts line comes from `ssh-keygen -y` on the exported key file. The rogue host key comes from `ssh-keygen`. A changed host key gives `SSH_HOST_KEY_CHANGED` beside a control. ssh.exe uses the exported OpenSSH key file (it rejects PKCS#8 for Ed25519) |
 | A9 | `System.Reflection.Metadata` reads the mscorlib token. A control shows the net10.0 build lacks the CF token, and the detector flags a planted CF binary and a copy of a CF reference. `skiplist.json` pins skips, each with a reason, and the clause also compares the net10.0 and net48 test sets |
-| A10, A10a | Run from outside: processes, two `tap` relays, `CE-READY` required. Trace-to-tap equality is bytes. The privacy scan needs a positive control: the bank trace must show the PIN key it derived, and the CE trace must show hop keys |
-| A11 | Each attack row runs beside its control, differs by one field, and matches `ExpectCode` and `ExpectCheck`. A token goes to the Go verifier, with a one-character change as the control |
+| A10, A10a | Run from outside: processes with `READY port=` and `RESULT`, two `tap` relays, `CE-READY` required. `wire.sent` events, joined by direction, equal the tap log bytes. The privacy scan needs a positive control: the bank trace must show the PIN key it derived, and the CE trace must show hop keys |
+| A11 | Each attack row runs beside its control, differs by one field, and matches `ExpectCode` and `ExpectCheck`. A token goes to the Go verifier `TOKEN_OK`, with a one-character change and an attacker-signed token as controls (`TOKEN_BAD_SIGNATURE`) |
 | A12 | The suite builds `native/netsec_ct.c` itself (C++ and C, `/W4 /WX`), P/Invokes it, and computes Welch t with a common 99th percentile crop. Threshold: leaky \|t\| > 4.5 and above 3 x constant-time \|t\| |
 | A13 | A fresh clone beside the sibling. The walk compares the step ids shown with the tour file. `acceptance/` is diffed against `PIN` |
 | A14, A15, A15a | The grade script and the concept cap are the suite's own. Dangling bindings are tested against a live Host. Accuracy rules 1 to 8 must appear in the named lessons. Reader verdicts must come from a reader who did not write the tour |
@@ -121,17 +122,17 @@ A cut role is listed in `roles.json`. Its clauses report NOT RUN `ROLE_CUT:<role
 | 2 | Contract stub plus `-Contract` mode | Proves the suite compiles against the signatures before any product exists |
 | 3 | A clause that passes while `src/NetSec.Core` is absent is FAIL `SUITE_BUG_VACUOUS_PASS` | Keeps "no product, no PASS" true by test and not by hope |
 | 4 | Ids end `.net10` or `.cf`, one clause per build | The PRD says "on both builds" |
-| 5 | A4 runs on a pure `Tls13KeySchedule` and not through the engine | RFC 8448's ClientHello differs from ours |
+| 5 | A4 runs on `Tls13KeySchedule.Derive` and not through the engine | RFC 8448's ClientHello differs from ours |
 | 6 | X9.24-3 vectors are made at run time and stay out of git | Licence checklist item 1. Dave decides if they may ever be committed |
 | 7 | SP 800-38A F.2.5 (CBC-AES256) left out | The PDF text scrambles that block. CBC with 128 and 192 bit keys, and AES-256 in ECB, CTR, GCM and FIPS 197, cover the core |
 | 8 | RSA and DH group 14 known answers come from OpenSSL 3.5.7, with python cross-checks | No free published RSA PKCS#1 vector set was at hand. The PRD names OpenSSL a referee |
 | 9 | TDES single-key CAVP files use one DES key three times. I added the 2-key and 3-key multi-block files | The KAT set alone would not test the EDE chain |
-| 10 | The CLI of `NetSec.Node` and `NetSec.CeDevice` that A10 needs is set in `CONTRACT.md` | The design gives the CE flags only |
+| 10 | Section 11 gives the process command lines. Where it is silent, `CONTRACT.md` marks the flag ASSUMED: `--seed` on a node, `--tamper-envelope`, the PIN pad result fields, `NETSEC_REAL_PEER`, `mode: step` then `session.run` | The design leaves these open and A10 needs them |
 | 11 | Ed25519 SSH keys are written as OpenSSH private key files | ssh.exe 9.5 rejects PKCS#8 |
 | 12 | Welch t uses a common 99th percentile crop | Raw t is dominated by scheduler outliers. Uncropped t is printed beside it |
 | 13 | `-Fresh` clones `HEAD` and runs the clone's own `run.ps1` | The third agent must run the code under review, not the code that launches it |
 | 14 | `PIN` holds the commit of the last sanctioned `acceptance/` state, and the diff skips `PIN` itself | A commit cannot name itself |
-| 15 | `A15a` needs `claims` in tour steps and verdict files by lesson | The design gives no place for claims |
+| 15 | `A15a` reads `claims [{text, source}]` at the top of each tour file (section 11), and also from a step, and verdict files by lesson | Section 11 names the shape, not the place |
 | 16 | `skiplist.json` is empty | No skip is justified yet |
 
 ## 6. NOT RUN reasons that are not PRODUCT_MISSING
@@ -142,7 +143,7 @@ These appear later by design, each named in the report: `REFEREE_MISSING`, `REFE
 
 ## 7. Open items
 
-1. **Referees.** Jared's `acceptance/referees/go` and `bcl` did not exist when this was written. `referee-contract.md` lists the command lines, output lines and the BCL line protocol the suite expects. Send it to Jared.
+1. **Referees.** Jared's `acceptance/referees/go` and `bcl` are merged. The suite reads their JSON events, the first-line port, the tap log format and the BCL oracle protocol from `acceptance/referees/README.md`. `SELF.referee-protocols` runs the real programs. The old `referee-contract.md` is deleted.
 2. **Contract.** `CONTRACT.md` lists the ASSUMED members, the process contract and the UI test ids. Send it to Richard and Nancy. A change goes back to the acceptance author.
 3. **Not run against real code.** The live protocol groups (A5 to A8), the bridge (A10), the Host (A16) and the Playwright specs have compiled and have run only in the no-product state. They could not meet a real engine, Go referee or UI. Expect a first red run to show a contract mismatch, not a bug in the product.
 4. **PIN.** Set after the last commit of this branch (see `git log -- acceptance/PIN`).
@@ -160,4 +161,4 @@ These appear later by design, each named in the report: `REFEREE_MISSING`, `REFE
 | `checks/docs_checks.py`, `tools/gen_clauses.py` | Text clauses and the clause list generator |
 | `vectors/` | `.nsv` vectors, `SOURCES.md`, fetch scripts, extractors (`fetch-x9.ps1` downloads the X9.24-3 PDF to `_cache` with a recorded SHA-256) |
 | `e2e/` | Playwright specs for A13 and the UI half of A16 (`npm ci` then `npx playwright test`; `run.ps1` does both) |
-| `CONTRACT.md`, `referee-contract.md` | What the suite needs from the build and from the referees |
+| `CONTRACT.md` | What the suite needs from the build. The referees are described in `referees/README.md` |

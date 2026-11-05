@@ -87,14 +87,14 @@ namespace NetSec.Crypto
 
     public sealed class MlKemPair
     {
-        public byte[] EncapsulationKey { get { throw new NotImplementedException(); } }     // ASSUMED name: FIPS 203 ek, 1184 bytes
-        public byte[] DecapsulationKey { get { throw new NotImplementedException(); } }     // ASSUMED name: FIPS 203 dk, 2400 bytes
+        public byte[] Ek { get { throw new NotImplementedException(); } }     // 
+        public byte[] Dk { get { throw new NotImplementedException(); } }     // 
     }
 
     public sealed class MlKemSealed
     {
-        public byte[] Ciphertext { get { throw new NotImplementedException(); } }           // ASSUMED name: 1088 bytes
-        public byte[] SharedSecret { get { throw new NotImplementedException(); } }         // ASSUMED name: 32 bytes
+        public byte[] Ciphertext { get { throw new NotImplementedException(); } }           // 
+        public byte[] SharedSecret { get { throw new NotImplementedException(); } }         // 
     }
 
     public static class MlKem768
@@ -106,7 +106,7 @@ namespace NetSec.Crypto
 
     public sealed class BigUInt
     {
-        public static BigUInt FromBigEndian(byte[] b) { throw new NotImplementedException(); }   // ASSUMED
+        public static BigUInt FromBytes(byte[] b) { throw new NotImplementedException(); }   // ASSUMED
         public byte[] ToBigEndian() { throw new NotImplementedException(); }                      // ASSUMED
     }
 

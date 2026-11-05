@@ -47,70 +47,25 @@ namespace Acceptance
             return t;
         }
     }
-
-    /// <summary>A TCP listener that the lab processes send their NDJSON trace to (the --trace port of CeDevice and Node).</summary>
-    public sealed class TraceCollector : IDisposable
+    /// <summary>The NDJSON file a lab process writes with --trace-file (design section 11). One trace object per line.</summary>
+    public static class TraceFile
     {
-        readonly TcpListener _l;
-        readonly Thread _t;
-        readonly List<TraceLine> _lines = new List<TraceLine>();
-        readonly List<string> _bad = new List<string>();
-        volatile bool _stop;
-        public int Port;
-
-        public TraceCollector()
+        public static TraceLine[] ReadAll(string path, List<string> unparsed)
         {
-            _l = new TcpListener(IPAddress.Loopback, 0);
-            _l.Start();
-            Port = ((IPEndPoint)_l.LocalEndpoint).Port;
-            _t = new Thread(Accept);
-            _t.IsBackground = true;
-            _t.Start();
-        }
-
-        void Accept()
-        {
-            while (!_stop)
+            List<TraceLine> r = new List<TraceLine>();
+            if (!File.Exists(path)) return r.ToArray();
+            using (FileStream fs = new FileStream(path, FileMode.Open, FileAccess.Read, FileShare.ReadWrite | FileShare.Delete))
+            using (StreamReader sr = new StreamReader(fs, Encoding.UTF8))
             {
-                TcpClient c;
-                try { c = _l.AcceptTcpClient(); } catch (SocketException) { return; } catch (ObjectDisposedException) { return; }
-                Thread r = new Thread(delegate ()
+                string line;
+                while ((line = sr.ReadLine()) != null)
                 {
-                    using (c)
-                    using (StreamReader sr = new StreamReader(c.GetStream(), Encoding.UTF8))
-                    {
-                        string line;
-                        try
-                        {
-                            while ((line = sr.ReadLine()) != null)
-                            {
-                                if (line.Trim().Length == 0) continue;
-                                try { TraceLine tl = TraceLine.Parse(line); lock (_lines) { _lines.Add(tl); } }
-                                catch (Exception ex) { lock (_bad) { _bad.Add(ex.Message + ": " + line.Substring(0, Math.Min(80, line.Length))); } }
-                            }
-                        }
-                        catch (IOException) { }
-                    }
-                });
-                r.IsBackground = true;
-                r.Start();
+                    if (line.Trim().Length == 0) continue;
+                    try { r.Add(TraceLine.Parse(line)); }
+                    catch (Exception ex) { if (unparsed != null) unparsed.Add(Path.GetFileName(path) + ": " + ex.Message + ": " + line.Substring(0, Math.Min(80, line.Length))); }
+                }
             }
+            return r.ToArray();
         }
-
-        public TraceLine[] Lines { get { lock (_lines) { return _lines.ToArray(); } } }
-        public string[] Unparsed { get { lock (_bad) { return _bad.ToArray(); } } }
-
-        public bool WaitFor(Predicate<TraceLine> test, int timeoutMs)
-        {
-            DateTime end = DateTime.UtcNow.AddMilliseconds(timeoutMs);
-            while (DateTime.UtcNow < end)
-            {
-                foreach (TraceLine t in Lines) if (test(t)) return true;
-                Thread.Sleep(50);
-            }
-            return false;
-        }
-
-        public void Dispose() { _stop = true; try { _l.Stop(); } catch (SocketException) { } }
     }
 }

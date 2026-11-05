@@ -3,7 +3,9 @@ using System.Collections.Generic;
 using System.IO;
 using System.Text;
 using MMP.AsyncProxy;
+using NetSec.Auth;
 using NetSec.Io;
+using NetSec.Pki;
 using NetSec.Keys;
 using NetSec.Labs;
 using NetSec.Platform;
@@ -109,25 +111,53 @@ namespace Acceptance
         public static string TokenUnderGo(Ctx c)
         {
             string tokenverify = Referees.GoTool(c, "tokenverify");
+            string dir = LivePki.Dir(c, "a11-token");
+            TrainingPki.Export(dir);                                  // writes issuer.pub (PEM SPKI), which the referee reads
+            string pubFile = Path.Combine(dir, "issuer.pub");
+            Check.True(File.Exists(pubFile), "TrainingPki.Export wrote no issuer.pub in " + dir);
             TrainingKeySource keys = new TrainingKeySource();
             ITrainingKey issuer = keys.Find(KeyIds.TokenIssuer);
-            string dir = LivePki.Dir(c, "a11-token");
-            string pubFile = Path.Combine(dir, "issuer.pub");
-            File.WriteAllText(pubFile, Hex.Encode(issuer.CopyPublic()) + "\n");
-            string token = NetSec.Auth.Token.IssueEdDsa(keys, KeyIds.TokenIssuer, "alice", new string[] { "reader" }, DateTime.UtcNow.AddHours(1));
+            string claims = "{\"sub\":\"alice\",\"roles\":[\"reader\"],\"exp\":" + (DateTimeOffset.UtcNow.ToUnixTimeSeconds() + 3600) + "}";
+            string token = NetSec.Auth.Token.Issue(issuer, claims);
             string[] parts = token.Split('.');
             Check.True(parts.Length == 3, "a compact JWS has three dot-separated parts, got " + parts.Length);
 
+            // The referee accepts the product's token, and the product accepts it too.
+            string good = Verify(tokenverify, pubFile, token, dir);
+            Check.Equal("tokenverify code for the product's token", "TOKEN_OK", good);
+            AuthDecision own = NetSec.Auth.Token.Verify(issuer.CopyPublic(), token, DateTime.UtcNow);
+            Check.True(own.Allowed, "the product refused its own token: " + own.Code);
+
+            // Control pair: one changed character in the claims part is refused by both.
+            char[] cl = parts[1].ToCharArray();
+            cl[2] = cl[2] == 'A' ? 'B' : 'A';
+            string tampered = parts[0] + "." + new string(cl) + "." + parts[2];
+            Check.Equal("tokenverify code for a changed claim", "TOKEN_BAD_SIGNATURE", Verify(tokenverify, pubFile, tampered, dir));
+            AuthDecision bad = NetSec.Auth.Token.Verify(issuer.CopyPublic(), tampered, DateTime.UtcNow);
+            Check.True(!bad.Allowed, "the product accepted a token whose claims changed");
+
+            // A token signed by the attacker key is refused by both.
+            ITrainingKey attacker = keys.Find(KeyIds.AttackerEd25519);
+            string forged = NetSec.Auth.Token.Issue(attacker, claims);
+            Check.Equal("tokenverify code for an attacker-signed token", "TOKEN_BAD_SIGNATURE", Verify(tokenverify, pubFile, forged, dir));
+            Check.True(!NetSec.Auth.Token.Verify(issuer.CopyPublic(), forged, DateTime.UtcNow).Allowed, "the product accepted a token signed by the attacker key");
+            return "tokenverify and the product agree on a good token, a changed claim, and an attacker-signed token";
+        }
+
+        /// <summary>Runs tokenverify and returns the code of its result event.</summary>
+        static string Verify(string tool, string pubFile, string token, string dir)
+        {
             string output;
-            int ok = Proc.Run(tokenverify, "-pub \"" + pubFile + "\" -token " + token, dir, 30000, out output);
-            Check.True(ok == 0 && output.Contains("OK"), "tokenverify refused the product's token (exit " + ok + "): " + output.Trim());
-            // Control pair: one changed character in the claims part must be refused.
-            char[] claims = parts[1].ToCharArray();
-            claims[2] = claims[2] == 'A' ? 'B' : 'A';
-            string tampered = parts[0] + "." + new string(claims) + "." + parts[2];
-            int bad = Proc.Run(tokenverify, "-pub \"" + pubFile + "\" -token " + tampered, dir, 30000, out output);
-            Check.True(bad != 0, "tokenverify accepted a token whose claims changed: " + output.Trim());
-            return "tokenverify accepts the product's EdDSA token and refuses a token with one changed claim character";
+            Proc.Run(tool, "-pub \"" + pubFile + "\" -token " + token, dir, 30000, out output);
+            foreach (string line in output.Split('\n'))
+            {
+                string t = line.Trim();
+                if (!t.StartsWith("{")) continue;
+                System.Collections.Generic.Dictionary<string, object> d = MiniJson.AsObject(MiniJson.Parse(t));
+                string code = MiniJson.Str(d, "code");
+                if (code != null) return code;
+            }
+            throw new FailException("tokenverify printed no result event: " + output.Trim());
         }
     }
 }
