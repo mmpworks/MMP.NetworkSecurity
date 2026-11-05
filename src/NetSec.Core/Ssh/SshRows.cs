@@ -8,7 +8,10 @@ namespace NetSec.Ssh
     /// <summary>The table rows both roles share: the messages RFC 4253 allows at any time, and the connection layer of RFC 4254.</summary>
     internal static class SshRows
     {
-        const long FirstWindow = 2097152, LowWindow = 1048576;
+        // Each channel holds at most FirstWindow bytes the code above has not read, and at most SendQueueLimit bytes the peer's window has not taken.
+        // With MaxChannels, that bounds this session: (2 + 4) MiB times 8 is 48 MiB, under the 64 MiB of DeviceProfile.Ce.
+        const long FirstWindow = 2097152, LowWindow = 1048576, SendQueueLimit = 4194304;
+        public const int MaxChannels = 8;
         const int OurMaxPacket = 32768;
         const int ExitNotFound = 127;
 
@@ -16,10 +19,10 @@ namespace NetSec.Ssh
         {
             for (int i = 0; i < states.Length; i++)
             {
-                rows.Add(new StepRow<SshSession>(prefix + ".ignore", states[i], SshMsg.Ignore, Nothing, states[i]));
-                rows.Add(new StepRow<SshSession>(prefix + ".debug", states[i], SshMsg.Debug, Nothing, states[i]));
-                rows.Add(new StepRow<SshSession>(prefix + ".unimplemented", states[i], SshMsg.Unimplemented, Nothing, states[i]));
-                rows.Add(new StepRow<SshSession>(prefix + ".ext-info", states[i], SshMsg.ExtInfo, Nothing, states[i]));
+                rows.Add(new StepRow<SshSession>(prefix + ".ignore", states[i], SshMsg.Ignore, AllowedAnyTime, states[i]));
+                rows.Add(new StepRow<SshSession>(prefix + ".debug", states[i], SshMsg.Debug, AllowedAnyTime, states[i]));
+                rows.Add(new StepRow<SshSession>(prefix + ".unimplemented", states[i], SshMsg.Unimplemented, AllowedAnyTime, states[i]));
+                rows.Add(new StepRow<SshSession>(prefix + ".ext-info", states[i], SshMsg.ExtInfo, AllowedAnyTime, states[i]));
                 rows.Add(new StepRow<SshSession>(prefix + ".disconnect", states[i], SshMsg.Disconnect, Disconnected, MachineStates.Closed));
             }
         }
@@ -40,6 +43,14 @@ namespace NetSec.Ssh
         }
 
         static StepDecision Nothing(SshSession s, InboundMessage m) { return StepDecision.Stay(); }
+
+        /// <summary>Draft-miller-sshm-strict-kex section 3.2: under strict KEX, only key exchange messages may come before the peer's NewKeys.</summary>
+        static StepDecision AllowedAnyTime(SshSession s, InboundMessage m)
+        {
+            if (s.StrictKex && !s.ReaderArmed)
+                return StepDecision.Fail(SshCodes.KexStrict, SshChecks.StrictKex, m.Name + " came during a strict key exchange");
+            return StepDecision.Stay();
+        }
 
         static StepDecision Disconnected(SshSession s, InboundMessage m)
         {
@@ -71,11 +82,14 @@ namespace NetSec.Ssh
                 case EngineCommandKind.Close:
                     return StepDecision.Advance(s.SealedPacket(SshNames.Disconnect, new ByteWriter().U8(SshMsg.Disconnect).U32(11).Prefixed("done").Prefixed("").ToArray()));
                 case EngineCommandKind.Exec:
-                    return StepDecision.Stay(OpenSession(s, c));
                 case EngineCommandKind.OpenChannel:
-                    return StepDecision.Stay(OpenTunnel(s, c));
+                    if (s.Channels.Count >= MaxChannels)
+                        return StepDecision.Fail(SshCodes.ChannelLimit, SshChecks.ChannelLimit, "this side holds " + s.Channels.Count + " open channels, the limit");
+                    return StepDecision.Stay(c.Kind == EngineCommandKind.Exec ? OpenSession(s, c) : OpenTunnel(s, c));
                 case EngineCommandKind.Send:
-                    return StepDecision.Stay(SendOrEnd(s, c));
+                    return SendOrEnd(s, c);
+                case EngineCommandKind.Consumed:
+                    return StepDecision.Stay(Grant(s, c));
                 default:
                     return StepDecision.Stay();
             }
@@ -115,18 +129,44 @@ namespace NetSec.Ssh
         }
 
         /// <summary>A send to a channel that has gone is no failure: a relay's last read can race the peer's close.</summary>
-        static StepEffect[] SendOrEnd(SshSession s, EngineCommand c)
+        static StepDecision SendOrEnd(SshSession s, EngineCommand c)
         {
             SshChannel channel;
-            if (!s.Channels.TryGetValue(c.Channel, out channel)) return new StepEffect[0];
+            if (!s.Channels.TryGetValue(c.Channel, out channel)) return StepDecision.Stay();
             List<StepEffect> effects = new List<StepEffect>();
             if (c.Bytes == null || c.Bytes.Length == 0) End(s, channel, effects);
             else
             {
                 channel.Queue.Add(c.Bytes);
                 Drain(s, channel, effects);
+                long queued = QueuedBytes(channel);
+                if (queued > SendQueueLimit)
+                    return StepDecision.Fail(SshCodes.ChannelQueueFull, SshChecks.ChannelQueue, "channel " + channel.Local + " holds " + queued + " bytes the peer's window has not taken");
             }
-            return effects.ToArray();
+            return StepDecision.Stay(effects.ToArray());
+        }
+
+        static long QueuedBytes(SshChannel channel)
+        {
+            long total = 0;
+            for (int i = 0; i < channel.Queue.Count; i++) total += channel.Queue[i].Length;
+            return total;
+        }
+
+        /// <summary>
+        /// The code above has read these bytes, so they may be granted back. A reader that stops takes no more of this memory: the peer runs out of
+        /// window and waits. Small grants wait until the window runs low, so the common short exchange sends no adjust.
+        /// </summary>
+        static StepEffect[] Grant(SshSession s, EngineCommand c)
+        {
+            SshChannel channel;
+            if (!s.Channels.TryGetValue(c.Channel, out channel)) return new StepEffect[0];
+            channel.ReadSinceGrant += c.Bytes.Length;
+            if (channel.OurWindow >= LowWindow || channel.ReadSinceGrant == 0) return new StepEffect[0];
+            long grant = channel.ReadSinceGrant;
+            channel.ReadSinceGrant = 0;
+            channel.OurWindow += grant;
+            return new StepEffect[] { s.SealedPacket(SshNames.ChannelWindowAdjust, new ByteWriter().U8(SshMsg.ChannelWindowAdjust).U32(channel.Remote).U32(grant).ToArray()) };
         }
 
         // ---------------------------------------------------------------- sending data inside the peer's window
@@ -154,7 +194,17 @@ namespace NetSec.Ssh
                     channel.Queue[0] = rest;
                 }
             }
+            NoteRoom(channel, effects);
             if (channel.CloseWhenDrained && channel.Queue.Count == 0) End(s, channel, effects);
+        }
+
+        /// <summary>Tells the code above when the queue starts to hold bytes and when it empties, so a relay can stop reading its target.</summary>
+        static void NoteRoom(SshChannel channel, List<StepEffect> effects)
+        {
+            bool waiting = channel.Queue.Count > 0;
+            if (waiting == channel.WaitingForWindow) return;
+            channel.WaitingForWindow = waiting;
+            effects.Add(Effect.Deliver(SshControl.Channel, SshControl.Encode(waiting ? SshControl.WindowFull : SshControl.WindowOpen, channel.Local, "")));
         }
 
         /// <summary>
@@ -219,18 +269,14 @@ namespace NetSec.Ssh
             StepDecision refused;
             SshChannel channel = Find(s, recipient, out refused);
             if (channel == null) return refused;
+            if (!channel.Confirmed)
+                return StepDecision.Fail(SshCodes.ChannelUnknown, SshChecks.ChannelKnown, "the peer sent data on channel " + channel.Local + " before it confirmed that channel");
+            if (data.Length > OurMaxPacket)
+                return StepDecision.Fail(SshCodes.ChannelWindow, SshChecks.ChannelWindow, "the peer sent " + data.Length + " bytes in one packet, and this side allows " + OurMaxPacket);
             if (data.Length > channel.OurWindow)
                 return StepDecision.Fail(SshCodes.ChannelWindow, SshChecks.ChannelWindow, "the peer sent " + data.Length + " bytes into a window of " + channel.OurWindow);
             channel.OurWindow -= data.Length;
-            List<StepEffect> effects = new List<StepEffect>();
-            effects.Add(Effect.Deliver(channel.Local, data));
-            if (channel.OurWindow < LowWindow)
-            {
-                long grant = FirstWindow - channel.OurWindow;
-                channel.OurWindow = FirstWindow;
-                effects.Add(s.SealedPacket(SshNames.ChannelWindowAdjust, new ByteWriter().U8(SshMsg.ChannelWindowAdjust).U32(channel.Remote).U32(grant).ToArray()));
-            }
-            return StepDecision.Stay(effects.ToArray());
+            return StepDecision.Stay(Effect.Deliver(channel.Local, data));
         }
 
         static StepDecision Eof(SshSession s, InboundMessage m)

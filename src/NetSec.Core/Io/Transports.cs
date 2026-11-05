@@ -58,9 +58,11 @@ namespace NetSec.Io
         public ITamperHook Tamper;
         public string TraceId, Hop, PeerName;
         public string SessionId, Actor;
-        // SSH only. Null KnownHosts means trust on first use. A server with no AllowTunnel refuses every tunnel.
+        // SSH only. Null KnownHosts ends in SSH_HOST_KEY_UNKNOWN unless TrustFirstUse says otherwise. Then GlassSshSession.LearnedKnownHostsLine
+        // holds the line to store, and the caller passes it back as KnownHosts on each later connect. A server with no AllowTunnel refuses every tunnel.
         public int PeerPort;
         public string KnownHosts;
+        public bool TrustFirstUse;
         public Func<string, int, bool> AllowTunnel;
         public Func<string, int, IFuture<IByteLink>> OpenTarget;
         // The contract keeps DeviceProfile in NetSec.Bridge. tools/layer_check.py allows this one upward name.
