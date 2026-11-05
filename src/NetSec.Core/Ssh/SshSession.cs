@@ -28,6 +28,9 @@ namespace NetSec.Ssh
         public string User;
         public ITrainingKey UserKey;
 
+        /// <summary>Stands in for an old peer: this side leaves the strict KEX marker out of its KexInit.</summary>
+        public bool NoStrictKex;
+
         /// <summary>The attack hook: sign with this key while naming UserKey. Null signs with UserKey.</summary>
         public ITrainingKey SignWith;
     }
@@ -41,6 +44,9 @@ namespace NetSec.Ssh
 
         /// <summary>Decides each direct-tcpip target. Null refuses every tunnel.</summary>
         public Func<string, int, bool> AllowTunnel;
+
+        /// <summary>Stands in for an old peer: this side leaves the strict KEX marker out of its KexInit.</summary>
+        public bool NoStrictKex;
 
         /// <summary>The attack hook: send an all-zero X25519 share.</summary>
         public bool SendZeroShare;
@@ -61,7 +67,7 @@ namespace NetSec.Ssh
     public static class SshControl
     {
         public const int Channel = -1;
-        public const int Authenticated = 1, ChannelReady = 2, TunnelRequested = 3, PeerEof = 4, HostKeyLearned = 5, WindowFull = 6, WindowOpen = 7;
+        public const int Authenticated = 1, ChannelReady = 2, TunnelRequested = 3, PeerEof = 4, HostKeyLearned = 5, WindowFull = 6, WindowOpen = 7, ChannelRefused = 8;
 
         public static byte[] Encode(int kind, int channel, string text)
         {
@@ -107,7 +113,7 @@ namespace NetSec.Ssh
         public EngineCommand Pending;
         public string User;
         public int NextLocalChannel, AuthRequests;
-        public bool PeerVersionSeen, ReaderArmed, IsOpen, StrictKex;
+        public bool PeerVersionSeen, ReaderArmed, IsOpen, StrictKex, MacPassShown;
 
         public SshSession(SshClientOptions client, string holder)
         {
@@ -120,6 +126,7 @@ namespace NetSec.Ssh
         }
 
         public bool IsClient { get { return Client != null; } }
+        public bool OffersStrictKex { get { return IsClient ? !Client.NoStrictKex : !Server.NoStrictKex; } }
 
         public string SentType { get { return "ssh.message.sent"; } }
         public string ReceivedType { get { return "ssh.message.received"; } }
