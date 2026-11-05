@@ -1,0 +1,235 @@
+{
+  "steps": [
+    {
+      "id": "L9-S01",
+      "lesson": 9,
+      "title": "An old device and a new server",
+      "text": [
+        "An old device can often speak only SSH. The bank's server speaks TLS 1.3 with a post-quantum key exchange. A gateway sits between them and speaks both.",
+        "This lesson follows one PIN from the PIN pad to the bank. It passes through four hands: the PIN pad, the old device (the CE), the gateway, and the server. The bank checks it last.",
+        "The question to keep in mind is this: what can each hand see, and what can each hand change? The bridge makes things safer, but it leaves some things exposed, and the last step lists them.",
+        "Built to show the parts. Do not copy."
+      ],
+      "glossary": [],
+      "bind": { "kind": "concept" },
+      "highlight": ["diagram:lane=ce", "diagram:lane=gateway", "diagram:lane=server"],
+      "unlock": { "mode": "ack" }
+    },
+    {
+      "id": "L9-S02",
+      "lesson": 9,
+      "title": "The PIN is locked first",
+      "text": [
+        "The PIN pad locks the PIN before it leaves. It packs the PIN with the card number into a {{term:pin-block}} and locks it with a DUKPT key from lesson 6.",
+        "The envelope holds three things: the card number and the {{term:ksn}} in the clear, and the locked PIN block.",
+        "The PIN pad does not hold a base key. A key was loaded into it ahead of time, the way a key loader would do it. The bank can derive the same key from the base key and the KSN."
+      ],
+      "glossary": ["pin-block", "ksn"],
+      "bind": { "kind": "event", "eventType": "pin.block.locked", "match": { "actor": "reader", "message": "PinEnvelope" } },
+      "highlight": ["inspector:field=pinBlock"],
+      "claims": [
+        {
+          "id": "L9-C01",
+          "text": "The envelope carries the card number and the KSN in the clear and the PIN block locked. The PIN pad reads no base key, and the key it uses was loaded ahead of time (InjectedInitialKey).",
+          "source": "docs/lesson-9-names.md, section 2 step 1 and section 5 item 4 (branch feat/lesson-9, commit 3e728c1)"
+        }
+      ],
+      "unlock": { "mode": "event" }
+    },
+    {
+      "id": "L9-S03",
+      "lesson": 9,
+      "title": "The old device takes the envelope",
+      "text": [
+        "The old device, the CE, takes the envelope from the PIN pad. It can read the card number and the KSN. It holds no key that opens the PIN block.",
+        "Be careful about what this shows. The boundary here is which code each role runs. It is no claim about what a program file can hide. The CE's program file still sits beside code that has the DUKPT keys, and the training keys in this course are public on purpose."
+      ],
+      "glossary": [],
+      "bind": { "kind": "event", "eventType": "ce.envelope.taken", "match": { "actor": "ce" } },
+      "highlight": ["diagram:lane=ce"],
+      "claims": [
+        {
+          "id": "L9-C02",
+          "text": "The CE's code path reads the card number and the KSN and holds no key that opens the PIN block. The boundary is which code each role runs; the training keys are public by design.",
+          "source": "docs/lesson-9-names.md, section 5 item 3 (branch feat/lesson-9, commit 3e728c1)"
+        }
+      ],
+      "unlock": { "mode": "event" }
+    },
+    {
+      "id": "L9-S04",
+      "lesson": 9,
+      "title": "Hop 1: the CE reaches the gateway over SSH",
+      "text": [
+        "The first hop runs from the CE to the gateway over SSH. The CE checks the gateway's host key against a line it already holds. The check is named known_hosts match.",
+        "That line was put on the device ahead of time, when it was provisioned. A device with no line stops with the error SSH_HOST_KEY_UNKNOWN, and a device with the wrong line stops too.",
+        "The same idea as lesson 8 applies: the pin is the proof, and the setup decides how good it is."
+      ],
+      "glossary": [],
+      "bind": { "kind": "event", "eventType": "ssh.message.sent", "match": { "actor": "ce", "message": "KexEcdhInit" } },
+      "highlight": ["diagram:lane=ce", "diagram:lane=gateway"],
+      "claims": [
+        {
+          "id": "L9-C03",
+          "text": "The CE holds a known_hosts line for its gateway before it connects. A real device gets this line when it is provisioned, and a device with no line stops at SSH_HOST_KEY_UNKNOWN.",
+          "source": "docs/lesson-9-names.md, section 5 item 1 (branch feat/lesson-9, commit 3e728c1); RFC 4251, section 4.1 (Host Keys)"
+        }
+      ],
+      "unlock": { "mode": "event" }
+    },
+    {
+      "id": "L9-S05",
+      "lesson": 9,
+      "title": "The envelope rides inside SSH",
+      "text": [
+        "The CE sends the envelope as SSH channel data. It travels sealed on hop 1, so a watcher on that wire sees noise.",
+        "Try it: flip one bit of that packet. The gateway checks the seal on every packet, so the check named packet MAC fails and hop 1 stops."
+      ],
+      "glossary": [],
+      "bind": { "kind": "event", "eventType": "wire.sent", "match": { "actor": "ce", "message": "ChannelData" } },
+      "highlight": ["check:name=packet MAC"],
+      "tryIt": {
+        "id": "L9-S05-T1",
+        "label": "Flip one bit on hop 1",
+        "action": { "type": "run-attack", "attackId": "L9-tamper-hop1" },
+        "expect": { "type": "check", "name": "packet MAC", "result": "fail" }
+      },
+      "unlock": { "mode": "action", "ref": "L9-S05-T1" }
+    },
+    {
+      "id": "L9-S06",
+      "lesson": 9,
+      "title": "Hop 2 opens at the first byte",
+      "text": [
+        "The moment the first byte arrives, the gateway opens a second hop to the server. It speaks TLS 1.3 with the hybrid key exchange from lesson 5.",
+        "Hop 2 is a separate connection with its own keys. The gateway ends one secure channel and starts another, and the envelope passes from one to the other."
+      ],
+      "glossary": [],
+      "bind": { "kind": "event", "eventType": "tls.handshake.sent", "match": { "actor": "gateway", "message": "ClientHello" } },
+      "highlight": ["diagram:lane=gateway", "diagram:lane=server"],
+      "unlock": { "mode": "event" }
+    },
+    {
+      "id": "L9-S07",
+      "lesson": 9,
+      "title": "What the gateway sees",
+      "text": [
+        "For a moment the envelope sits open in the gateway. The gateway sees everything except the PIN block: the card number, the KSN, and the trace id, all in the clear.",
+        "The PIN block stays locked. The gateway cannot open it, because it holds no DUKPT key. The picture shows a closed rectangle with the label gateway cannot open this.",
+        "This is the point of the bridge. The gateway ends SSH and starts TLS, and it still cannot read the PIN."
+      ],
+      "glossary": [],
+      "bind": { "kind": "event", "eventType": "gateway.envelope.relayed", "match": { "actor": "gateway" } },
+      "highlight": ["diagram:lane=gateway", "inspector:field=pinBlock"],
+      "claims": [
+        {
+          "id": "L9-C04",
+          "text": "The gateway sees the card number, the KSN and the trace id, all in clear inside SSH. It cannot open the PIN block.",
+          "source": "docs/lesson-9-names.md, section 5 item 5 and section 2 step 6 (branch feat/lesson-9, commit 3e728c1); docs/prd.md, Teaching accuracy rules, rule 1"
+        }
+      ],
+      "unlock": { "mode": "event" }
+    },
+    {
+      "id": "L9-S08",
+      "lesson": 9,
+      "title": "The envelope rides inside TLS",
+      "text": [
+        "The gateway sends the envelope to the server as TLS application data. It is sealed again on hop 2.",
+        "Try it: flip one bit of that record. The server checks the seal on every record, so the check named AEAD tag fails and hop 2 stops."
+      ],
+      "glossary": [],
+      "bind": { "kind": "event", "eventType": "tls.record.sent", "match": { "actor": "gateway", "message": "ApplicationData" } },
+      "highlight": ["check:name=AEAD tag"],
+      "tryIt": {
+        "id": "L9-S08-T1",
+        "label": "Flip one bit on hop 2",
+        "action": { "type": "run-attack", "attackId": "L9-tamper-hop2" },
+        "expect": { "type": "check", "name": "AEAD tag", "result": "fail" }
+      },
+      "unlock": { "mode": "action", "ref": "L9-S08-T1" }
+    },
+    {
+      "id": "L9-S09",
+      "lesson": 9,
+      "title": "The bank derives the key",
+      "text": [
+        "The server hands the envelope to the bank. The bank holds the base key. It derives the PIN key from the base key and the KSN, the way you saw in lesson 6.",
+        "Find the PIN key in the secrets panel under the bank. The CE and the gateway never held it."
+      ],
+      "glossary": [],
+      "bind": { "kind": "event", "eventType": "secret.derived", "match": { "actor": "bank" } },
+      "highlight": ["secrets:row=bank.dukpt.pin-key"],
+      "unlock": { "mode": "event" }
+    },
+    {
+      "id": "L9-S10",
+      "lesson": 9,
+      "title": "Only the bank sees a changed PIN block",
+      "text": [
+        "The bank checks a seal on the whole envelope. The check is named PIN block MAC at bank.",
+        "Try it: flip one bit of the locked PIN block inside the gateway, after SSH and before TLS. Both hop checks pass, because each hop sealed the bytes it was given. Only the bank sees the change, and the bank refuses.",
+        "This is the third layer. Each hop protects the wire it owns. Only the end-to-end seal protects the PIN from the hand in the middle."
+      ],
+      "glossary": [],
+      "bind": { "kind": "event", "eventType": "check.result", "match": { "message": "PIN block MAC at bank" } },
+      "highlight": ["check:name=PIN block MAC at bank", "inspector:field=pinBlock"],
+      "tryIt": {
+        "id": "L9-S10-T1",
+        "label": "Flip one bit of the locked PIN block in the gateway",
+        "action": { "type": "run-attack", "attackId": "L9-flip-pin-block" },
+        "expect": { "type": "check", "name": "PIN block MAC at bank", "result": "fail" }
+      },
+      "claims": [
+        {
+          "id": "L9-C05",
+          "text": "A flipped bit in the locked PIN block inside the gateway, after SSH and before TLS, passes both hop checks and is refused by the bank with code DUKPT_MAC_MISMATCH.",
+          "source": "docs/lesson-9-names.md, section 4, attack table and the paragraph below it (branch feat/lesson-9, commit 3e728c1)"
+        }
+      ],
+      "unlock": { "mode": "action", "ref": "L9-S10-T1" }
+    },
+    {
+      "id": "L9-S11",
+      "lesson": 9,
+      "title": "The reply the CE cannot check",
+      "text": [
+        "The bank sends a reply, and it travels back the same way. The CE relays it and shows accepted.",
+        "The reply is one result byte and a code, with no seal on it. The CE holds no key that could check it. So accepted means only that the reply said yes. A forged reply byte would read the same.",
+        "A real system signs the reply for the party that acts on it."
+      ],
+      "glossary": [],
+      "bind": { "kind": "event", "eventType": "ce.reply.relayed", "match": { "actor": "ce" } },
+      "highlight": ["diagram:lane=ce"],
+      "claims": [
+        {
+          "id": "L9-C06",
+          "text": "BankReply is one result byte and a code with no MAC. The CE has no key that could check it, so CE-RESULT ok:true means the reply said yes, and a forged reply byte reads the same.",
+          "source": "docs/lesson-9-names.md, section 5 item 2 (branch feat/lesson-9, commit 3e728c1)"
+        }
+      ],
+      "unlock": { "mode": "event" }
+    },
+    {
+      "id": "L9-S12",
+      "lesson": 9,
+      "title": "What the bridge gives, and what stays exposed",
+      "text": [
+        "The bridge makes things safer. The PIN stays locked from the PIN pad to the bank. A changed PIN block is caught at the bank. The old device never holds a key that opens it.",
+        "Some things stay exposed. The gateway reads the card number, the KSN and the trace id. The reply is not authenticated. The first hop is only as good as the host key line put on the device. The training keys here are public on purpose.",
+        "The lab shows these parts on the desktop. The code is CF-compiled, run on the desktop CLR, never run on CE. The lab has not touched real CE hardware.",
+        "Built to show the parts. Do not copy."
+      ],
+      "glossary": [],
+      "bind": { "kind": "concept" },
+      "claims": [
+        {
+          "id": "L9-C07",
+          "text": "In this run, nothing has touched real Windows CE hardware. The engines are compiled for the CF runtime and run on the desktop CLR.",
+          "source": "docs/prd.md, Spike results table, row 'CE compiler, emulator, device'"
+        }
+      ],
+      "unlock": { "mode": "ack" }
+    }
+  ]
+}
