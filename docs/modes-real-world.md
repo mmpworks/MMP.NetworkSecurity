@@ -4,35 +4,42 @@ Owner: Jared, for accuracy. Date: 2026-11-05. Base: `main` at `dfe9510`.
 
 ## Conclusion
 
-The course can teach how real setups work, on one PC, with no paid account. It cannot use a real production key, a public CA, or a real HSM. So "Real" must mean **real form**: a key a learner makes for this course, in the file format and with the tool a real deployment uses.
+The course can teach how real setups work, on one PC, with no paid account. It has no public CA and no real HSM. So "Real" means **real form**: a test key a learner makes for this course, in the file format and with the tool a real deployment uses.
+
+**Steve's ruling, 2026-11-05:** "I only ever use test keys... This is training." The course shows all keys in Real mode too. There is no hard stop on production keys. Each wizard carries one line instead (section 7).
 
 Recommendations:
 
-1. **Name three classes, and never merge them.** Mock (public training key), Learner (made by a wizard on this PC, real form), Production (refused). "Real" alone is the word a learner will misread.
-2. **A production key in a glass engine is a harm worth a hard stop.** Glass writes keys to its trace. Remove the import path for private keys, and refuse a BDK in any form. See section 7.
-3. **A key cannot both stay in the vault and appear in glass.** A glass engine needs the bytes (D5, `ITrainingKey`). A non-export vault key offers only operations (`IKeyHandle`). The wizard must make the learner choose, and the vault must record the choice. See section 4.
+1. **Name two modes and state what each is.** Mock is a public training key. Real is a test key made by a wizard on this PC, in real form. "Real" never means production.
+2. **Say on the screen that this course shows every key.** A real system does not. See section 7.
+3. **The vault still behaves like a vault, and the course then shows what a real one would hide.** The API refuses export of a non-export key. The course view shows the bytes, labelled as a thing a real vault never does. See section 4.
 4. **Each wizard ends at an outside referee, where one exists.** OpenSSL, Go and `ssh.exe` judge TLS, mutual TLS, SSH, tokens and DPoP (run, section 5). DUKPT, passkey and enrolment have no outside live referee, and the wizard must say so.
-5. **Keep DUKPT and the passkey on Mock in glass.** A learner vault may hold a practice BDK for a separate exercise. See sections 3.7 and 3.12.
+5. **Keep the passkey shape on Mock, since no real form exists here.** A test BDK can run in glass by the ruling, and the wizard must still say what a real BDK does. See sections 3.7 and 3.12.
 
 ### Top 5 things that would make a wizard inaccurate
 
 | # | Inaccuracy | The true statement |
 |---|---|---|
-| 1 | "Real key" on a key that a glass trace prints, or "non-export" on a key glass reads | A key the trace shows is a practice key. A non-export key never reaches glass |
+| 1 | Letting the view of a key imply that real systems show keys | Real systems hide them. This course shows them to teach, and it expects test keys. A real vault gives no such view of a non-export key |
 | 2 | A green check that means "trusted", when the wizard told the client what to trust | A local CA is trusted only by clients that were told to trust it. A self-signed certificate passes against itself (run). A public CA will not sign `localhost` |
 | 3 | A "BDK ceremony" or "TR-31 file" that looks like the real thing | A real BDK stays inside an HSM. X9.24 and TR-31 are paid, and this repo holds only the free vectors. Our form is a shape, with no claim of conformance |
 | 4 | Proof from our own code, or a failure that names the wrong cause | Our engine agreeing with our engine proves little. Today an RSA chain in glass fails with `CERT_SIGNATURE`, which reads as tampering (run) |
 | 5 | A SQLite vault described as a security boundary | The facade copies the **behaviour** of a vault. Its file, memory and process give no protection that an HSM gives |
 
-## 1. Three key classes
+## 1. Two modes
 
-| Class | Who makes it | Bytes visible | Goes in glass | Outside referee | Label to show |
+| Mode | Who makes the key | Bytes visible | Goes in glass | Outside referee | Label to show |
 |---|---|---|---|---|---|
 | Mock | The course. `TrainingKeySource`, public by design (D5) | Yes | Yes | Yes, as today | "Training key. Public on purpose." |
-| Learner | A wizard, on this PC, with `openssl` or `ssh-keygen`, or the vault | Depends on the choice in section 4 | Only if exportable | Yes, where section 5 says | "Your practice key. Made here, used only here." |
-| Production | Someone's real system | Must never enter | **Never** | Not applicable | Refused, section 7 |
+| Real | A wizard, on this PC, with `openssl` or `ssh-keygen`, or the vault. A test key | Yes, by Steve's ruling | Yes | Yes, where section 5 says | "Your test key, in the real format. This course shows every key, so use test keys only." |
 
-PRD D6 today: "Real-key routes for CE, SSH, and a DUKPT base key do not exist in this build". A16 fails a real `IKeyHandle` in glass by type. This phase changes that design, so those two lines must be rewritten together with it. I recommend keeping A16 as written.
+This ruling changes written decisions, and they must change together:
+
+| Text today | Change needed |
+|---|---|
+| PRD D6: "Real mode uses the OS transport (`SslStream`), shows metadata only, and writes no secret bytes" | Real mode here shows keys. If `SslStream` stays as a separate transport, name that one differently, so "Real" has one meaning |
+| PRD A16: "a scan of its trace and session file finds no secret bytes", and a real `IKeyHandle` fails in glass by type | Rewrite for the new meaning. `richard-modes` owns the design |
+| UX chip: "Never use it with real secrets" | Still true. It agrees with the ruling |
 
 ## 2. What I ran
 
@@ -104,7 +111,7 @@ Tags: **[S]** is a source I fetched this session (section 9). **[R]** is recolle
 | Who holds what | Server: RSA private key, which **decrypts every recorded session**. The client invents the premaster |
 | Tools and formats | `openssl genpkey -algorithm RSA`, PEM, PKCS#8. `s_client -tls1_1 -cipher AES128-SHA:@SECLEVEL=0` |
 | A learner can do | Make an RSA 2048 key and a leaf under an Ed25519 course root, because the engine floor is 2048 bits and the glass chain check needs Ed25519 (run). Reach it with OpenSSL only by lowering the level: `-tls1_1` at the default level gives "no protocols available" (run) |
-| Never pretend | That a successful run shows TLS 1.1 is acceptable. That SECLEVEL=0 is a normal setting. That a real key is safe here: with key transport, anyone holding the file can read old captures, and the course offers a key log besides |
+| Never pretend | That a successful run shows TLS 1.1 is acceptable. That SECLEVEL=0 is a normal setting. With key transport, anyone holding the key file can read old captures, which is what a real deployment risks and what this lesson shows |
 
 ### 3.3 Mutual TLS client certificate
 
@@ -153,8 +160,8 @@ TLS traffic keys and SSH session keys come from the handshake. Nobody provisions
 | Tools and formats | Payment HSMs, or a cloud service. Key blocks TR-31 and TR-34. None is free to a learner, and `openssl` has no DUKPT |
 | A learner can do | Run the repo's X9.24-3 vectors. Hold a practice BDK in the vault with no export, derive through a vault call, and watch the audit trail. Read the AWS commands as a description |
 | Never pretend | A real BDK never leaves an HSM in the clear [R for the rule's wording; the AWS guide shows export only inside key blocks [S]]. A file we write is not TR-31. "Key ceremony" with one person at one PC is not a ceremony, because dual control needs two people. Do not let a learner "load" a BDK as a value, because that action has no real form |
-| Conflict with lesson 6 | Lesson 6 shows the BDK, derived keys and registers as bytes (`Lesson06Dukpt.cs:205`). That is the point of the lesson, and it needs Mock. A vault BDK shows handles and a KCV, so it is a **different exercise**, not a mode of lesson 6 |
-| Payment data | Never accept a real card number or PIN in any field. The course makes no compliance claims (PRD rule 8). Default the card to the test number |
+| Lesson 6 | Lesson 6 shows the BDK, derived keys and registers as bytes (`Lesson06Dukpt.cs:205`). With a test BDK this stays true. The tour must add that a real HSM shows only a key id and a KCV |
+| Payment data | Default the card to the test number. The course makes no compliance claims (PRD rule 8) |
 
 ### 3.8 HMAC and MAC keys
 
@@ -239,14 +246,18 @@ Section 4 is the behaviour list. The rule for wizards: **an HSM is a machine tha
 3. Non-export here is a rule in our code. In an HSM it is a property of a device. Anyone can open the SQLite file and read the wrapped key.
 4. Sealing here protects the file at rest. It does not stop a program already running as the user.
 
-### The choice the wizard must force
+### Two views of one key
 
-| Choice | Key can go in glass | Key can pass to OpenSSL or `ssh.exe` | Audit shows |
-|---|---|---|---|
-| **Exportable practice key** | Yes, and the trace prints it | Yes, by file | An export row each time |
-| **Non-export key** | No: `IKeyHandle` fails by type (A16) | No file exists. So the proofs in section 5 cannot use it | Use rows only |
+Steve's ruling keeps both of these on screen, and the wizard must keep them apart:
 
-The proofs in section 5 need files. A non-export key can be proved only through an operation: sign a test value in the vault and verify the signature with `openssl pkeyutl -verify` against the exported **public** key. That is accurate to how a real signing key is tested, and I recommend it as the non-export proof. I did not run this row, though the same verify shape ran for tokens.
+| View | What it shows | What a real vault does |
+|---|---|---|
+| The vault API, as a program calls it | `Sign` works, and a read of a non-export key fails with `KEY_NOT_EXPORTABLE` | The same |
+| The course view | The key bytes, always, labelled "A real vault never shows you this. This course does, so you can see the parts" | No such view exists |
+
+Glass reads the key through the course view, and that read appears in the audit list as a course read, not as an export. Otherwise the audit list would teach that a non-export key was exported.
+
+The wizard's outside proofs in section 5 use files. For a non-export key, the accurate proof is the real one: sign a test value through the API, and verify it with `openssl pkeyutl -verify` against the **public** key. I did not run this row, though the same verify shape ran for tokens.
 
 ## 5. Which final step can prove a key, and against what
 
@@ -273,13 +284,13 @@ The proofs in section 5 need files. A non-export key can be proved only through 
 |---|---|---|
 | Lesson 4 step 1: "a training CA made for this course" | The CA is the learner's | Bind the sentence to the mode |
 | Lesson 4 step 4: "In this lab the chain has two cards" | A wizard CA with an intermediate has three. `docs/ux-design.md:281` already says three, which disagrees with the tour | Read the chain length from the trace |
-| Lesson 6 step 12: "All keys in this lab are made up, and anyone can read the base key in the source" | False for a vault BDK | Keep lesson 6 on Mock |
+| Lesson 6 step 12: "All keys in this lab are made up, and anyone can read the base key in the source" | "In the source" is false for a test BDK from a wizard | Bind the sentence to the mode |
 | Lesson 6 step 2: "like a key put in at a secure facility" | Fine on Mock. On a vault it must stay "like" | Keep |
 | Lesson 8 step 6: "because the client pinned it earlier" | False after `accept-new` on a first connect | Show the source of the pin |
-| Lesson 9 steps 1, 2, 11: the pad holds a loaded key, "the training keys in this course are public on purpose" | False with learner keys. `PinPadCore.InjectedInitialKey` is a fixed constant | Keep the DUKPT part on Mock |
+| Lesson 9 steps 1, 2, 11: the pad holds a loaded key, "the training keys in this course are public on purpose" | False with learner keys. `PinPadCore.InjectedInitialKey` is a fixed constant, so a test BDK also needs a matching loaded key | Bind the sentence to the mode, and derive the loaded key from the test BDK |
 | Lesson 9 step 3: "put on the device ahead of time, when it was provisioned" | False if the wizard learns the pin on first use | Require a prepared line |
 | Lesson 10 step 6: "issued under the same training root" | Learner root | Bind to the mode |
-| UX chip: "This engine shows its keys on purpose. Never use it with real secrets." | Stays true, and it is the rule. "Real mode" beside this text confuses | Rename, see section 1 |
+| UX chip: "This engine shows its keys on purpose. Never use it with real secrets." | Stays true, and it agrees with the ruling. "Real" beside it needs the wizard line | Keep the chip, and add the line in section 7 |
 
 Mechanical breaks that no tour text shows, each read from code:
 
@@ -292,35 +303,26 @@ Mechanical breaks that no tour text shows, each read from code:
 | TLS 1.3 glass key | `Tls13Rules.PeerSignature` needs Ed25519 | A leaf with another key type cannot prove itself in glass |
 | Host names | Lab pins `ssh.lab`. `TrainingPki.ServerName` is `localhost` | A wizard name must match, or the name check fails |
 
-## 7. A production key in a glass engine: hard stop
+## 7. Test keys only, and the wizard line
 
-**Yes, this is a harm worth a hard stop.**
+**Steve's ruling: no hard stop.** "I only ever use test keys... This is training." The course shows all keys in Real mode too. An earlier draft of this document recommended a hard stop, and that recommendation is withdrawn.
 
-| Harm | Evidence |
+**The line each wizard carries, on its first screen:**
+
+> This course shows every key, so it expects test keys. A real system keeps these hidden.
+
+Why the line is accurate, for a reader who asks:
+
+| Fact | Evidence |
 |---|---|
 | Glass writes secrets to the trace on purpose | `Effect.SecretAs(Derived, BaseKeyName, ...)` at `Lesson06Dukpt.cs:205`. `secret.derived` on SSH (`SshKex.cs:94`). TLS key log lines |
-| They persist and leave | `GET /api/sessions/{id}/keylog` in `NetSec.Host/Program.cs:57`. Session files and NDJSON trace files |
-| TLS 1.1 key transport | With a server's real RSA key, this tool plus a capture opens that server's old sessions |
-| No side-channel review | D6: "A teaching engine shows its keys and has had no side-channel review". PRD rule 5: managed code has no constant-time guarantee |
-| Lab tampering and forks | A lab re-runs and tampers on purpose, so a real key could sign bytes that a person did not intend |
+| They persist | `GET /api/sessions/{id}/keylog` in `NetSec.Host/Program.cs:57`. Session files and NDJSON trace files |
+| The engine has had no side-channel review | D6, and PRD rule 5: managed code has no constant-time guarantee |
 
-**The rule:**
+Two things stay as plain wizard behaviour, with no gate:
 
-1. **No import path for a private key or a symmetric key, in any class.** The wizard generates. This is the only rule that a check cannot get wrong.
-2. **Import public material only:** a root certificate for `-CAfile`, a `known_hosts` line. Even then, warn on a public CA root, because it teaches nothing here.
-3. **A BDK has no input field.** Nor does a PAN or PIN beyond the course's test values.
-4. **The gate is code, never a checkbox.** "I confirm this is not production" is not a control.
-
-If someone later insists on import, these deterministic refusals catch part of the risk. None proves a key is safe:
-
-| Check | Catches |
-|---|---|
-| The certificate chains to a root in the OS store | A production TLS certificate |
-| It carries a Signed Certificate Timestamp, OID `1.3.6.1.4.1.11129.2.4.2` (RFC 6962 [S]) | A publicly logged certificate |
-| A path under `~/.ssh/id_*`, or `/etc/ssh/ssh_host_*` | A learner's own daily SSH key |
-| The public half appears in the learner's `~/.ssh/authorized_keys` or `known_hosts` | A key in live use |
-
-A learner's own daily SSH key is the most likely accident, because `ssh-keygen` writes to that default path. The wizard must always pass `-f` with a course folder, and must refuse the default.
+1. The wizard passes `-f` with a course folder, because `ssh-keygen`'s default path is the learner's daily key. Writing a test key there would overwrite or confuse it.
+2. A card number field defaults to the test number. The course makes no compliance claims (PRD rule 8).
 
 ## 8. Limits of this document
 
@@ -330,7 +332,7 @@ A learner's own daily SSH key is the most likely accident, because `ssh-keygen` 
 4. Run rows are on this PC with OpenSSL 3.5.7 and OpenSSH on Windows. No browser, no ACME run, no real CA, nothing on CE.
 5. The reviewer is the same vendor as the builder. The anchors are the outside tools in section 2.
 
-**Disposition:** adopt the three classes, the no-import rule, and the facade table. Keep lessons 6 and 9's DUKPT parts and the passkey shape on Mock. Fix the glass chain refusal name before any wizard ships a non-Ed25519 option.
+**Disposition:** adopt the two modes, the wizard line, and the facade table. Keep the passkey shape on Mock. A Real BDK in lessons 6 and 9 is now possible by the ruling, because the course shows it, and section 3.7's real steps still apply. Fix the glass chain refusal name before any wizard ships a non-Ed25519 option.
 
 ## 9. Sources fetched this session
 
