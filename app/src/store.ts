@@ -54,6 +54,7 @@ export const ui = reactive({
   engine: 'idle' as 'idle' | 'running' | 'stepping' | 'waiting' | 'finished',
   shortcuts: false,
   follow: true,
+  inspectorTab: 'bytes' as 'bytes' | 'picture' | 'measures',
 })
 
 export const tour = reactive({
@@ -98,7 +99,7 @@ export const unlock = computed<Unlock>(() => {
   const events = allEvents.value
   const sinceTryIt = active.value?.id === tour.sessionId ? events.slice(tour.tryItStart) : events
   return evaluateUnlock(s, {
-    boundIndex: tour.bound[tour.stepIndex] ?? -1, events, view: ui.view, selectedSeq: ui.selectedSeq, actionDone: tour.actionDone, eventsSinceTryIt: sinceTryIt,
+    boundIndex: tour.bound[tour.stepIndex] ?? -1, events, view: ui.view, selectedSeq: ui.selectedSeq, actionDone: tour.actionDone, outcome: active.value?.parentId ? active.value.finished?.outcome ?? '' : '', eventsSinceTryIt: sinceTryIt,
   })
 })
 
@@ -304,7 +305,9 @@ async function enterStep(i: number) {
     if (!(await waitForSession())) { tour.unreachable = 'The engine did not start a session'; return }
     const prev = Math.max(0, ...tour.bound.slice(0, i))
     for (let guard = 0; guard < 500; guard++) {
-      const idx = findBound(s, allEvents.value, prev)
+      // The first match at or after the previous step. A tour may teach in an order the engine did not emit, so a match before it also counts.
+      let idx = findBound(s, allEvents.value, prev)
+      if (idx < 0) idx = findBound(s, allEvents.value, 0)
       if (idx >= 0) { tour.bound[i] = idx; ui.viewUpTo = s.pause === 'none' ? null : idx; ui.selectedSeq = null; markSeen(s); return }
       if (active.value?.finished) { tour.unreachable = 'The session ended before the engine sent this message'; return }
       stepEngine()
