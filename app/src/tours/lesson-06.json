@@ -159,7 +159,7 @@
         "Look at the held count after each sale. In this run it goes 32, then 31, 31, 30, 31. It does not fall at every sale, because a sale erases one register and can fill lower ones with new keys.",
         "Erasing a key in code does not prove the bytes left memory. A {{term:managed-heap}} can keep copies of an erased key, because the garbage collector moves live objects by copying them.",
         "In real systems the base key usually sits inside tamper-resistant hardware. This lab shows the idea on the desktop and protects no key that way.",
-        "The PIN digits have the same problem. The lab holds them in a string, and a string cannot be cleared, so the digits can stay on the managed heap as well."
+        "The PIN digits have the same problem. The lab holds them in a string, and a string cannot be cleared by normal code, so the digits can stay on the managed heap as well."
       ],
       "glossary": ["managed-heap"],
       "bind": { "kind": "event", "eventType": "measure.result", "match": { "actor": "reader", "message": "Reader registers" } },
@@ -182,7 +182,7 @@
         },
         {
           "id": "L6-C09",
-          "text": "The PIN digits stay on the managed heap because the code holds them in a string, which cannot be cleared. A .NET string is immutable: its value cannot be modified after it is created.",
+          "text": "The PIN digits stay on the managed heap because the code holds them in a string, which normal code cannot clear. A .NET string is immutable: its value cannot be modified after it is created.",
           "source": "docs/lesson-6-names.md, Facts the tour needs, item 1 (branch fix/dukpt-verdict); Microsoft Learn, String class, section 'Immutability and the StringBuilder class' (read 2026-11-05)"
         }
       ],
