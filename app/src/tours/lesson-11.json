@@ -90,7 +90,7 @@
       "claims": [
         {
           "id": "L11-C04",
-          "text": "Only CryptographicOperations.FixedTimeEquals is documented as fixed-time in .NET. Managed code in general has no constant-time guarantee. C++ results depend on the optimizer.",
+          "text": "The .NET documentation promises fixed time for CryptographicOperations.FixedTimeEquals. Managed code in general has no constant-time guarantee. C++ results depend on the optimizer.",
           "source": "docs/prd.md, Teaching accuracy rules, rule 5; docs/lesson-11-names.md, section 5 Statements, rows 1 and 2 (branch feat/s7); dotnet/runtime, CryptographicOperations.cs: FixedTimeEquals is marked NoInlining and NoOptimization (read 2026-11-05)"
         },
         {
