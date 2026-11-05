@@ -132,6 +132,7 @@ test('a failed audit write refuses the request, names VAULT_AUDIT_FAILED and say
     await expect(page.getByTestId('vault-fault-code')).toHaveText('VAULT_AUDIT_FAILED')
     await expect(page.getByTestId('vault-fault')).toContainText('The vault could not write down this request, so it refused it. Try again.')
     await expect(page.getByTestId('vault-fault-retry')).toBeVisible()
+    for (const theme of ['light', 'dark'] as const) { await setTheme(page, theme); await contrast(page, theme, 'audit failed refusal') }
     await shot(page, '07-audit-failed')
   } finally { await withDb(db => db.exec('DROP TRIGGER IF EXISTS ui_block_audit')) }
 })
@@ -150,4 +151,12 @@ test('the chain check names the row after an edited row, and both results name w
   await expect(page.getByTestId('vault-audit-limits')).toContainText('an edit to the newest row')
   await expect(page.getByTestId('vault-audit-limits')).toContainText('a full rewrite')
   await shot(page, '08-audit-chain-broken')
+})
+
+test('the broken-chain result and the limits line read at 4.5 to 1 in both themes', async ({ page }) => {
+  await openVault(page)
+  await page.getByTestId('vault-tab-audit').click()
+  await page.getByTestId('vault-audit-check').click()
+  await expect(page.getByTestId('vault-audit-chain')).toContainText('does not fit the row before it.')
+  for (const theme of ['light', 'dark'] as const) { await setTheme(page, theme); await contrast(page, theme, 'broken chain result') }
 })
