@@ -85,6 +85,7 @@ namespace NetSec.Tests
                     pump.Enqueue(new EngineCommand(EngineCommandKind.Send, 0, new byte[1], null));
                 }
             });
+            caller.IsBackground = true;
             caller.Start();
 
             int misordered = 0, last = 0;
