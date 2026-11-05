@@ -51,6 +51,12 @@
       "verdict": "accurate",
       "note": "Tours read at origin/feat/tours-6-11 (PR 18). tests/NetSec.Tests/DukptTests.cs on feat/s2-dukpt asserts 32 held keys at load and 31, 31, 30, 31 after sales 1 to 4. The names doc states the same run.",
       "checkedAgainst": "tests/NetSec.Tests/DukptTests.cs, test The_register_count_follows_the_counter (read); docs/lesson-6-names.md (read)"
+    },
+    {
+      "id": "L6-C09",
+      "verdict": "accurate",
+      "note": "Tours read at origin/fix/tour-6-pin-digits (PR 32). lesson-6-names.md Facts item 1 (fix/dukpt-verdict) says 'The PIN digits also stay on the heap, because the code holds them in a string, which cannot be cleared.' Code: PinBlock.cs takes and returns the PIN as a .NET string (EncryptFormat4, TryDecryptFormat4) and DukptBank keeps 'public string Pin'. Microsoft Learn, String class, 'Immutability and the StringBuilder class': 'A String object is called immutable (read-only), because its value cannot be modified after it has been created.' Note: Learn states immutability, not 'cannot be cleared'. The second follows for normal code; unsafe code can overwrite string memory. Suggest 'cannot be cleared by normal code'. Step L6-S11 reword ('The bank gets no PIN digits from it') matches names doc line 19: a refused sale has an empty plain.",
+      "checkedAgainst": "docs/lesson-6-names.md on local branch fix/dukpt-verdict (read); src/NetSec.Core/Dukpt/PinBlock.cs, DukptBank.cs on fix/dukpt-verdict (read); Microsoft Learn String class (page fetched)"
     }
   ]
 }
