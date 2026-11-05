@@ -37,7 +37,16 @@ CeProcess ce = new();
 HostGuard guard = new(token);
 LessonRows lessons = new();
 WizardTable wizardTable = WizardTable.Load(Path.Combine(AppContext.BaseDirectory, "wizard-flows.json"));
-SecurityStore security = new(SecurityStore.ResolveRoot(Environment.GetEnvironmentVariable, AppContext.BaseDirectory), wizardTable);
+SecurityStore security;
+try
+{
+    security = new(SecurityStore.ResolveRoot(Environment.GetEnvironmentVariable, AppContext.BaseDirectory), wizardTable);
+}
+catch (InvalidDataException e)
+{
+    Console.Error.WriteLine("HOST_SECURITY_FILE_BAD: " + e.Message);
+    return 2;
+}
 FlowRuns flowRuns = new(wizardTable, security, new FlowParts(security, Environment.GetEnvironmentVariable), Environment.GetFolderPath(Environment.SpecialFolder.UserProfile));
 
 app.Use(guard.Invoke);
@@ -221,7 +230,14 @@ namespace NetSec.Host
                 Fail(requestId, ready.Problems[0].Code, string.Join(" ", ready.Problems.Select(p => p.Detail)));
                 return;
             }
-            Begin(lesson, seed, Text(m, "mode") ?? "run", null, null, security.Credentials(), requestId, null);
+            CredentialSet credentials;
+            try { credentials = security.Credentials(LabCatalog.Needs(lesson)); }
+            catch (NetSecException e)
+            {
+                Fail(requestId, e.Error.Code, e.Error.Message);
+                return;
+            }
+            Begin(lesson, seed, Text(m, "mode") ?? "run", null, null, credentials, requestId, null);
         }
 
         void Attack(JsonElement m, string? requestId)

@@ -14,6 +14,7 @@ namespace NetSec.Pki
         const string RsaOid = "2a864886f70d010101", Ed25519Oid = "2b6570";
         const int RsaModulusBytes = 256;
         const int NullTag = 5;
+        const int LargestKeyFile = 1024 * 1024;
 
         public static ITrainingKey ReadPrivateKey(string path, string keyId)
         {
@@ -86,6 +87,7 @@ namespace NetSec.Pki
         {
             using (FileStream file = new FileStream(path, FileMode.Open, FileAccess.Read))
             {
+                if (file.Length > LargestKeyFile) throw Refuse(ErrorCodes.KeyFileFormat, "This file is too large to be a key.");
                 byte[] all = new byte[(int)file.Length];
                 int got = 0;
                 while (got < all.Length)

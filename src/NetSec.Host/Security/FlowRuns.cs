@@ -14,7 +14,7 @@ public sealed record RunRefusal(int Status, string Code, string Message);
 /// <summary>Applies what WizardMachine decides. The machine owns the moves. This class owns the side effects: keys placed, tools run, runs saved.</summary>
 public sealed class FlowRuns
 {
-    public const string StepStale = "WIZARD_STEP_STALE", RunNotFound = "WIZARD_RUN_NOT_FOUND", FlowUnknown = "WIZARD_FLOW_UNKNOWN", PartNotBuilt = "WIZARD_PART_NOT_BUILT";
+    public const string StepStale = "WIZARD_STEP_STALE", RunNotFound = "WIZARD_RUN_NOT_FOUND", FlowUnknown = "WIZARD_FLOW_UNKNOWN", PartNotBuilt = "WIZARD_PART_NOT_BUILT", TypeNotInFlow = "WIZARD_TYPE_NOT_IN_FLOW";
     public const string PathPersonal = "KEY_PATH_PERSONAL";
     const string CheckState = "Check", ReviewState = "Review";
 
@@ -60,7 +60,12 @@ public sealed class FlowRuns
     public RunReply? Find(string runId)
     {
         lock (_gate)
-            return _runs.TryGetValue(runId, out FlowRun? run) ? new RunReply(run, [], [], FactsOf(run)) : null;
+        {
+            if (!_runs.TryGetValue(runId, out FlowRun? run)) return null;
+            List<StepMessage> errors = [];
+            IReadOnlyList<object> facts = FactsOf(run, errors);
+            return new RunReply(run, errors, [], facts);
+        }
     }
 
     public (RunReply? Reply, RunRefusal? Refusal) Apply(string runId, string? eventName, int stepSeq, JsonElement data)
@@ -73,7 +78,8 @@ public sealed class FlowRuns
             if (decision.Row is null) return (null, new RunRefusal(409, decision.RefusedCode!, decision.RefusedMessage!));
 
             List<StepMessage> errors = [], warnings = [];
-            ApplyEffect(run, decision.Row, data, errors, warnings);
+            try { ApplyEffect(run, decision.Row, data, errors, warnings); }
+            catch (NetSecException e) { errors.Add(new StepMessage(e.Error.Code, e.Error.Message, null)); }
             string next = errors.Count == 0 ? decision.Row.To : run.State;
             FlowRun moved = run with
             {
@@ -83,13 +89,22 @@ public sealed class FlowRuns
                 Finished = _table.KindOf(next) == "done",
             };
             Save(moved);
-            return (new RunReply(moved, errors, warnings, FactsOf(moved)), null);
+            IReadOnlyList<object> facts = FactsOf(moved, errors);
+            return (new RunReply(moved, errors, warnings, facts), null);
         }
     }
 
-    IReadOnlyList<object> FactsOf(FlowRun run)
+    IReadOnlyList<object> FactsOf(FlowRun run, List<StepMessage> errors)
     {
-        if (run.State == ReviewState) return _table.Flow(run.FlowId)!.Types.Select(t => (object)_parts.Review(t)).ToList();
+        if (run.State == ReviewState)
+        {
+            try { return _table.Flow(run.FlowId)!.Types.Select(t => (object)_parts.Review(t)).ToList(); }
+            catch (NetSecException e)
+            {
+                errors.Add(new StepMessage(e.Error.Code, e.Error.Message, null));
+                return [];
+            }
+        }
         if (run.State == CheckState && _checkFacts.TryGetValue(run.RunId, out IReadOnlyList<object>? facts)) return facts;
         return [];
     }
@@ -121,11 +136,17 @@ public sealed class FlowRuns
             return;
         }
         Dictionary<string, string> chosen = paths.EnumerateObject().Where(p => p.Value.ValueKind == JsonValueKind.String).ToDictionary(p => p.Name, p => p.Value.GetString()!);
+        if (chosen.Count == 0)
+        {
+            errors.Add(new StepMessage(ErrorCodes.KeyFileUnreadable, "Choose a file for at least one key.", null));
+            return;
+        }
         foreach ((string typeId, string path) in chosen)
         {
             if (IsPersonal(path))
                 warnings.Add(new StepMessage(PathPersonal, "This file is in your own .ssh folder, so it may be a key you use every day. This course shows every key. Use a test key.", typeId));
-            ReadOne(typeId, path, errors);
+            if (Array.IndexOf(types, typeId) < 0) errors.Add(new StepMessage(TypeNotInFlow, $"{typeId} is not one of the keys this set makes.", typeId));
+            else ReadOne(typeId, path, errors);
         }
         if (errors.Count > 0) return;
         foreach (string typeId in types)
@@ -138,7 +159,9 @@ public sealed class FlowRuns
     /// <summary>A blank or malformed path is no personal path. ReadOne then names it as unreadable.</summary>
     bool IsPersonal(string path)
     {
-        try { return Path.GetFullPath(path).StartsWith(_personalSsh, StringComparison.OrdinalIgnoreCase); }
+        const string LongForm = @"\\?\";
+        string plain = path.StartsWith(LongForm, StringComparison.Ordinal) ? path[LongForm.Length..] : path;
+        try { return Path.GetFullPath(plain).StartsWith(_personalSsh, StringComparison.OrdinalIgnoreCase); }
         catch (ArgumentException) { return false; }
         catch (NotSupportedException) { return false; }
     }
@@ -150,7 +173,12 @@ public sealed class FlowRuns
             errors.Add(new StepMessage(PartNotBuilt, $"The course cannot read a file for {typeId} yet.", typeId));
             return;
         }
-        try { NetSec.Pki.KeyFileReader.ReadPrivateKey(path, typeId); }
+        try
+        {
+            NetSec.Keys.KeyAlgorithm algorithm = NetSec.Pki.KeyFileReader.ReadPrivateKey(path, typeId).Algorithm;
+            if (algorithm != FlowParts.ImportedAlgorithm(typeId))
+                errors.Add(new StepMessage(ErrorCodes.KeyAlgorithmNotInEngine, $"{typeId} takes an {FlowParts.ImportedAlgorithm(typeId)} key, and this key is {algorithm}.", typeId));
+        }
         catch (NetSecException e) { errors.Add(new StepMessage(e.Error.Code, e.Error.Message, typeId)); }
     }
 
@@ -162,7 +190,7 @@ public sealed class FlowRuns
         {
             foreach (string typeId in _table.Flow(run.FlowId)!.Types)
             {
-                CheckFact fact = _parts.Check(typeId, dir);
+                CheckFact fact = CheckOne(typeId, dir);
                 facts.Add(fact);
                 if (fact.Passed) _store.MarkChecked(typeId, fact.Judge, fact.Says);
                 else errors.Add(new StepMessage(fact.Code!, fact.Message!, typeId));
@@ -173,6 +201,13 @@ public sealed class FlowRuns
             if (Directory.Exists(dir)) Directory.Delete(dir, true);
         }
         _checkFacts[run.RunId] = facts;
+    }
+
+    /// <summary>A key that will not open is a failed check with its name, and the other types still get theirs.</summary>
+    CheckFact CheckOne(string typeId, string dir)
+    {
+        try { return _parts.Check(typeId, dir); }
+        catch (NetSecException e) { return new CheckFact(typeId, FlowParts.JudgeOf(typeId), FlowParts.SaysOf(typeId), "", "", false, e.Error.Code, e.Error.Message); }
     }
 
     void Save(FlowRun run)

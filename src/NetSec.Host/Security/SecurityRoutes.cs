@@ -80,7 +80,9 @@ public static class SecurityRoutes
     {
         if (Array.IndexOf(SecurityTypes.All, typeId) < 0) return Refuse(404, "SECURITY_TYPE_UNKNOWN", $"No security type has the id {typeId}.");
         TypeEntry e = store.Entry(typeId);
-        ITrainingKey? key = e.Mode == SecurityStore.ModeMine ? store.PlacedKey(typeId) : BuiltInKey(typeId);
+        ITrainingKey? key;
+        try { key = e.Mode == SecurityStore.ModeMine ? store.PlacedKey(typeId) : BuiltInKey(typeId); }
+        catch (NetSecException x) { return Refuse(409, x.Error.Code, x.Error.Message); }
         byte[]? publicPart = key?.CopyPublic();
         return Results.Json(new
         {

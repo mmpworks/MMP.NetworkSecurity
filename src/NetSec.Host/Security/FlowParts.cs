@@ -4,6 +4,7 @@ using System.Text;
 using NetSec.Auth;
 using NetSec.Bytes;
 using NetSec.Crypto;
+using NetSec.Errors;
 using NetSec.Keys;
 using NetSec.Pki;
 using NetSec.Platform;
@@ -28,8 +29,23 @@ public sealed class FlowParts(SecurityStore store, Func<string, string?> env)
 
     static readonly HashSet<string> ImportBuilt = [SecurityTypes.TokenIssuer, SecurityTypes.DeviceEnrolment];
 
+    // What OpenSSL says when it refuses each control. Any other failure proves nothing about the key, such as a tool that ran out of memory or timed out.
+    const string SignatureRefused = "Signature Verification Failure", ChainRefused = "verification failed";
+
     public static bool IsBuilt(string typeId) => Built.Contains(typeId);
     public static bool CanImport(string typeId) => ImportBuilt.Contains(typeId);
+
+    /// <summary>The engines read an imported token or device key as an Ed25519 seed.</summary>
+    public static KeyAlgorithm ImportedAlgorithm(string typeId) => KeyAlgorithm.Ed25519;
+
+    public static string JudgeOf(string typeId) => typeId == SecurityTypes.DeviceEnrolment ? JudgeNone : JudgeOpenSsl;
+
+    public static string SaysOf(string typeId) => typeId switch
+    {
+        SecurityTypes.DeviceEnrolment => SaysNoOutsideJudge,
+        SecurityTypes.TokenIssuer => SaysSignatureOnly,
+        _ => SaysAgainstRoot,
+    };
 
     public void Make(string typeId)
     {
@@ -44,7 +60,7 @@ public sealed class FlowParts(SecurityStore store, Func<string, string?> env)
     public ReviewFact Review(string typeId)
     {
         ITrainingKey? key = store.PlacedKey(typeId) ?? store.PlacedKey(SecurityTypes.RootCa);
-        return new ReviewFact(typeId, NameOf(typeId), ReadOnlyNotAfter, AlgorithmOf(typeId), key is null ? "" : SecurityStore.FingerprintOf(key.CopyPublic()));
+        return new ReviewFact(typeId, NameOf(typeId), ReadOnlyNotAfter, key is null ? "" : AlgorithmOf(key), key is null ? "" : SecurityStore.FingerprintOf(key.CopyPublic()));
     }
 
     public CheckFact Check(string typeId, string proofDirectory)
@@ -69,7 +85,7 @@ public sealed class FlowParts(SecurityStore store, Func<string, string?> env)
         _ => typeId,
     };
 
-    static string AlgorithmOf(string typeId) => typeId == SecurityTypes.Tls11Server ? "RSA-2048" : "Ed25519";
+    static string AlgorithmOf(ITrainingKey key) => key.Algorithm == KeyAlgorithm.Rsa2048 ? "RSA-2048" : "Ed25519";
 
     static string NewEd25519Pem()
     {
@@ -87,7 +103,7 @@ public sealed class FlowParts(SecurityStore store, Func<string, string?> env)
     /// <summary>The signature only. A11 and the suite's Go referee judge the claims from outside the product.</summary>
     CheckFact CheckToken(string dir)
     {
-        ITrainingKey key = store.PlacedKey(SecurityTypes.TokenIssuer)!;
+        ITrainingKey key = Placed(SecurityTypes.TokenIssuer);
         string[] parts = Token.Issue(key, "{\"iss\":\"https://pump.training/issuer\",\"aud\":\"https://pump.training/api\"}").Split('.');
         byte[] input = Encoding.ASCII.GetBytes(parts[0] + "." + parts[1]);
         File.WriteAllText(Path.Combine(dir, "issuer.pub"), TrainingPki.Pem("PUBLIC KEY", TrainingCa.Ed25519Spki(key.CopyPublic())));
@@ -98,13 +114,13 @@ public sealed class FlowParts(SecurityStore store, Func<string, string?> env)
         File.WriteAllBytes(Path.Combine(dir, "changed-input.bin"), changed);
 
         const string Arguments = "pkeyutl -verify -pubin -inkey issuer.pub -rawin -in signing-input.bin -sigfile signature.bin";
-        return Judged(SecurityTypes.TokenIssuer, SaysSignatureOnly, dir, Arguments, Arguments.Replace("signing-input", "changed-input"));
+        return Judged(SecurityTypes.TokenIssuer, SaysSignatureOnly, dir, Arguments, Arguments.Replace("signing-input", "changed-input"), SignatureRefused);
     }
 
     /// <summary>Our own check only: the key signs a challenge, and the public half verifies it. No outside tool can judge a passkey-shaped login.</summary>
     CheckFact CheckDevice()
     {
-        ITrainingKey key = store.PlacedKey(SecurityTypes.DeviceEnrolment)!;
+        ITrainingKey key = Placed(SecurityTypes.DeviceEnrolment);
         byte[] challenge = new byte[32];
         new OsRandom().Fill(challenge, 0, challenge.Length);
         const string Origin = "https://pump.training";
@@ -112,44 +128,47 @@ public sealed class FlowParts(SecurityStore store, Func<string, string?> env)
         return new CheckFact(SecurityTypes.DeviceEnrolment, JudgeNone, SaysNoOutsideJudge, "", "", passed, passed ? null : "CHECK_FAILED", passed ? null : "This key did not sign and verify a test challenge. Make the keys again.");
     }
 
-    CheckFact CheckRoot(string dir)
-    {
-        WriteChain(SecurityTypes.Tls13Server, dir);
-        File.WriteAllText(Path.Combine(dir, "other-root.pem"), TrainingPki.Pem("CERTIFICATE", new TrainingCa(KeyFileReader.Parse(NewEd25519Pem(), "other-root"), TrainingCa.RootName).RootCertificateDer));
-        return Judged(SecurityTypes.RootCa, SaysAgainstRoot, dir, "verify -CAfile root.pem leaf.pem", "verify -CAfile other-root.pem leaf.pem");
-    }
+    CheckFact CheckRoot(string dir) => CheckChain(SecurityTypes.RootCa, SecurityTypes.Tls13Server, dir);
 
+    /// <summary>The leaf must verify under the learner's root, and must not verify under another root of the same name.</summary>
     CheckFact CheckChain(string typeId, string leafType, string dir)
     {
         WriteChain(leafType, dir);
-        return Judged(typeId, SaysAgainstRoot, dir, "verify -CAfile root.pem leaf.pem", null);
+        File.WriteAllText(Path.Combine(dir, "other-root.pem"), TrainingPki.Pem("CERTIFICATE", new TrainingCa(KeyFileReader.Parse(NewEd25519Pem(), "other-root"), TrainingCa.RootName).RootCertificateDer));
+        return Judged(typeId, SaysAgainstRoot, dir, "verify -CAfile root.pem leaf.pem", "verify -CAfile other-root.pem leaf.pem", ChainRefused);
     }
+
+    /// <summary>The learner's key as placed, whatever the type's mode. A check must judge this key and never a built-in one.</summary>
+    ITrainingKey Placed(string typeId) => store.PlacedKey(typeId)
+        ?? throw new NetSecException(NetSecError.Of(ErrorCodes.SecurityTypeNotReady, $"{typeId} has no key placed. Run the flow {store.FlowOf(typeId)}."));
 
     void WriteChain(string leafType, string dir)
     {
-        CredentialSet set = store.Credentials();
-        TrainingCa ca = new(set);
+        TrainingCa ca = new(Placed(SecurityTypes.RootCa), TrainingCa.RootName);
         byte[] leaf = leafType switch
         {
-            SecurityTypes.Tls13Client => TrainingPki.ClientCertificate(ca, set.Find(KeyIds.ClientTlsEd25519)),
-            SecurityTypes.Tls11Server => ca.IssueServerCertificate(TrainingPki.ServerName, set.Find(KeyIds.ServerTls11Rsa).CopyPublic(), TrainingCa.DefaultNotBefore, TrainingCa.DefaultNotAfter),
-            _ => TrainingPki.ServerCertificate(ca, set.Find(KeyIds.ServerTlsEd25519)),
+            SecurityTypes.Tls13Client => TrainingPki.ClientCertificate(ca, Placed(SecurityTypes.Tls13Client)),
+            SecurityTypes.Tls11Server => ca.IssueServerCertificate(TrainingPki.ServerName, Placed(SecurityTypes.Tls11Server).CopyPublic(), TrainingCa.DefaultNotBefore, TrainingCa.DefaultNotAfter),
+            _ => TrainingPki.ServerCertificate(ca, Placed(SecurityTypes.Tls13Server)),
         };
         File.WriteAllText(Path.Combine(dir, "root.pem"), TrainingPki.Pem("CERTIFICATE", ca.RootCertificateDer));
         File.WriteAllText(Path.Combine(dir, "leaf.pem"), TrainingPki.Pem("CERTIFICATE", leaf));
     }
 
     /// <summary>A check must have a way to fail, so a second run with one thing changed must be refused by the same tool.</summary>
-    CheckFact Judged(string typeId, string says, string dir, string arguments, string? mustFail)
+    CheckFact Judged(string typeId, string says, string dir, string arguments, string mustFail, string refusal)
     {
         string? openssl = OpenSslPath();
         if (openssl is null) return new CheckFact(typeId, JudgeOpenSsl, says, "openssl " + arguments, "", false, "REFEREE_MISSING", "OpenSSL is not on this machine, so this key is saved and not yet checked. Set NETSEC_OPENSSL to its path.");
         (int code, string output) = Run(openssl, arguments, dir);
         string command = "openssl " + arguments;
+        if (code == CouldNotStart) return new CheckFact(typeId, JudgeOpenSsl, says, command, output, false, "REFEREE_MISSING", "OpenSSL could not start, so this key is saved and not yet checked. Set NETSEC_OPENSSL to its path.");
         if (code != 0) return new CheckFact(typeId, JudgeOpenSsl, says, command, output, false, "CHECK_FAILED", "OpenSSL did not accept this key. Make the keys again.");
-        if (mustFail is not null && Run(openssl, mustFail, dir).Code == 0)
-            return new CheckFact(typeId, JudgeOpenSsl, says, command, output, false, "CHECK_FAILED", "OpenSSL also accepted a changed input, so this check proves nothing.");
-        return new CheckFact(typeId, JudgeOpenSsl, says, command, output, true);
+        (int controlCode, string controlOutput) = Run(openssl, mustFail, dir);
+        string control = "openssl " + mustFail;
+        if (controlCode <= 0 || !controlOutput.Contains(refusal, StringComparison.Ordinal))
+            return new CheckFact(typeId, JudgeOpenSsl, says, command, output, false, "CHECK_FAILED", "OpenSSL did not refuse a changed input for the expected reason, so this check proves nothing.", control, controlOutput);
+        return new CheckFact(typeId, JudgeOpenSsl, says, command, output, true, null, null, control, controlOutput);
     }
 
     string? OpenSslPath()
@@ -160,16 +179,25 @@ public sealed class FlowParts(SecurityStore store, Func<string, string?> env)
         return File.Exists(Pinned) ? Pinned : null;
     }
 
+    const int CouldNotStart = -2, TimedOut = -1;
+
+    static Process? TryStart(ProcessStartInfo info)
+    {
+        try { return Process.Start(info); }
+        catch (System.ComponentModel.Win32Exception) { return null; }
+    }
+
     static (int Code, string Output) Run(string exe, string arguments, string dir)
     {
         ProcessStartInfo info = new(exe, arguments) { WorkingDirectory = dir, RedirectStandardOutput = true, RedirectStandardError = true, UseShellExecute = false };
-        using Process process = Process.Start(info)!;
+        using Process? process = TryStart(info);
+        if (process is null) return (CouldNotStart, "the tool could not start");
         Task<string> errors = process.StandardError.ReadToEndAsync();
         string output = process.StandardOutput.ReadToEnd();
         if (!process.WaitForExit(30_000))
         {
             process.Kill();
-            return (-1, "the tool did not finish in 30 s");
+            return (TimedOut, "the tool did not finish in 30 s");
         }
         return (process.ExitCode, (output + errors.Result).Trim());
     }

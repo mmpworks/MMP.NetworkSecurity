@@ -39,6 +39,9 @@ IF_NETCF = re.compile(r"^\s*#\s*(?:if|elif)\b.*\bNETCF\b", re.M)
 
 def problems_in(rel, folder, text):
     found = []
+    # A lab that makes its own key source falls back to built-in keys in silence. LabCredentials.Of in Labs.cs is the one place that may.
+    if folder == "Labs" and rel != "Labs/Labs.cs" and "new TrainingKeySource()" in text:
+        found.append("%s: a lab makes its own key source. Use LabCredentials.Of" % rel)
     for match in USING.finditer(text):
         name = match.group("name")
         if name.startswith("NetSec."):

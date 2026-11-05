@@ -49,7 +49,7 @@ namespace NetSec.Labs
             ITamperHook plan = LabPair.Plan(c);
             LabContext modern = new LabContext();
             modern.Seed = c.Seed; modern.SessionId = c.SessionId; modern.TraceId = c.TraceId; modern.Transports = c.Transports; modern.Gate = c.Gate;
-            modern.Sink = c.Sink; modern.Clock = c.Clock; modern.DeadlineMs = c.DeadlineMs;
+            modern.Sink = c.Sink; modern.Clock = c.Clock; modern.DeadlineMs = c.DeadlineMs; modern.Credentials = c.Credentials;
             modern.Random = LabPair.Fork(c);
 
             Tls11Engine client = Tls11Client(c, keys, plan);

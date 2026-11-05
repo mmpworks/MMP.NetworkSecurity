@@ -30,9 +30,13 @@ public sealed class SecurityStore
         Root = root;
         _modesPath = Path.Combine(root, "modes.json");
         _flowOf = table.Flows.SelectMany(f => f.Types.Select(t => (t, f.FlowId))).ToDictionary(p => p.t, p => p.FlowId);
-        _modes = File.Exists(_modesPath)
-            ? JsonSerializer.Deserialize<ModesFile>(File.ReadAllText(_modesPath), Json) ?? Empty()
-            : Empty();
+        _modes = File.Exists(_modesPath) ? ReadModes(_modesPath) : Empty();
+    }
+
+    static ModesFile ReadModes(string path)
+    {
+        try { return JsonSerializer.Deserialize<ModesFile>(File.ReadAllText(path), Json) ?? Empty(); }
+        catch (JsonException e) { throw new InvalidDataException($"{path} cannot be read: {e.Message} Fix the file, or delete it to start again with built-in keys.", e); }
     }
 
     static ModesFile Empty() => new(true, []);
@@ -126,8 +130,8 @@ public sealed class SecurityStore
         },
     }).ToArray();
 
-    /// <summary>The snapshot a session runs on: each own key whose mode is Mine. Every other type stays built-in.</summary>
-    public CredentialSet Credentials() => new(new TrainingKeySource(), SecurityTypes.All.Select(Open).OfType<Credential>().ToArray());
+    /// <summary>The snapshot a session runs on: each own key whose mode is Mine, among the types the lesson reads. A broken key in any other type cannot stop this lesson.</summary>
+    public CredentialSet Credentials(string[] typesTheLabReads) => new(new TrainingKeySource(), typesTheLabReads.Select(Open).OfType<Credential>().ToArray());
 
     /// <summary>The learner's key for a type, whatever its mode. Null when none is placed.</summary>
     public ITrainingKey? PlacedKey(string typeId)
@@ -140,7 +144,12 @@ public sealed class SecurityStore
     {
         TypeEntry e = Entry(typeId);
         if (e.Mode != ModeMine || e.Binding is null) return null;
-        ITrainingKey? key = PlacedKey(typeId);
+        ITrainingKey? key;
+        try { key = PlacedKey(typeId); }
+        catch (NetSec.Errors.NetSecException x)
+        {
+            throw new NetSec.Errors.NetSecException(NetSec.Errors.NetSecError.Of(NetSec.Errors.ErrorCodes.SecurityTypeNotReady, $"{typeId} cannot be read: {x.Error.Message} Run the flow {FlowOf(typeId)} again."));
+        }
         return new Credential(typeId, CredentialMode.Mine, e.Binding.Provider, e.Binding.Version, key is null ? "" : FingerprintOf(key.CopyPublic()), key);
     }
 
