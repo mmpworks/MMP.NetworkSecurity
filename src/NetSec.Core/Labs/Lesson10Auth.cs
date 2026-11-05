@@ -108,7 +108,7 @@ namespace NetSec.Labs
         /// <summary>The device's first connection. The bytes it echoes do not matter. The handshake is the point.</summary>
         static IFuture<LabResult> RunMutualTls(LabContext c, ITamperHook plan)
         {
-            ITrainingKeySource keys = new TrainingKeySource();
+            ITrainingKeySource keys = LabCredentials.Of(c);
             TrainingCa ca = new TrainingCa(keys);
             ITrainingKey serverKey = keys.Find(KeyIds.ServerTlsEd25519);
             DateTime now = AuthTime.FromUnix(LabNow);
@@ -178,7 +178,7 @@ namespace NetSec.Labs
 
         static IEnumerable<IFuture> Body(LabContext c, Return<LabResult> ret)
         {
-            ITrainingKey issuerKey = new TrainingKeySource().Find(KeyIds.TokenIssuer);
+            ITrainingKey issuerKey = LabCredentials.Of(c).Find(KeyIds.TokenIssuer);
             ITamperHook plan = LabPair.Plan(c);
 
             IFuture<LabResult> mutual = RunMutualTls(c, plan);
@@ -192,6 +192,8 @@ namespace NetSec.Labs
             // Enrolment happens ahead of the login, out of band. The issuer learns this device's public key, and the device keeps its seed.
             byte[] deviceSeed = new byte[SeedSize];
             LabPair.Fork(c).Fill(deviceSeed, 0, SeedSize);
+            ITrainingKey ownDevice = LabCredentials.Of(c).MineOrNull(SecurityTypes.DeviceEnrolment);
+            if (ownDevice != null) deviceSeed = ownDevice.CopyMaterial();
 
             Session client = new Session(LabPair.Fork(c));
             client.Remember(DeviceKeyName, deviceSeed);

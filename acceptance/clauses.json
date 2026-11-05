@@ -3155,6 +3155,17 @@
    "counts": false
   },
   {
+   "id": "SELF.a17-drive-takes-own-session",
+   "base": "SELF.a17-drive-takes-own-session",
+   "assertion": "SELF",
+   "group": "selftest",
+   "build": "host",
+   "slice": "S0",
+   "referee": "stand-ins built on the BCL, python cryptography and real OpenSSL runs",
+   "roles": [],
+   "counts": false
+  },
+  {
    "id": "SELF.a17-intermediate-referee-bites",
    "base": "SELF.a17-intermediate-referee-bites",
    "assertion": "SELF",

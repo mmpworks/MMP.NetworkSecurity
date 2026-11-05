@@ -47,7 +47,7 @@ public sealed class HostGuard(string token)
     {
         ctx.Response.Headers.AccessControlAllowOrigin = origin;
         ctx.Response.Headers.AccessControlAllowHeaders = "Authorization, Content-Type";
-        ctx.Response.Headers.AccessControlAllowMethods = "GET, POST, OPTIONS";
+        ctx.Response.Headers.AccessControlAllowMethods = "GET, POST, PUT, OPTIONS";
         ctx.Response.Headers.Vary = "Origin";
     }
 

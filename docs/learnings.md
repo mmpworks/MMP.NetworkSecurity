@@ -170,3 +170,11 @@ Each correction goes here, newest slice last. Later slices read this file first.
 ## Step gate
 
 1. **A step that finds no event waiting is held for the next event, and more such steps add nothing.** A lab can do slow work before its first event, so a step can arrive in that gap. The app no longer needs its 3 s resend.
+
+## V0, security modes
+
+1. **The suite's V0 clauses reach further than design 9.1 said.** `A17.readiness.types-disagree` runs `my-certificates` to `Verified`, and `A17.flow.login.walk` needs `device.enrolment`. So V0 makes all 7 types of those two flows. For the 5 certificate types, its check is `openssl verify` on the chain only. V4 adds the live handshake against a glass server, and until then the screen's `checked-against-root` rests on the chain alone.
+2. **A generated key needs no change to a lab beyond its key source.** `CredentialSet` is an `ITrainingKeySource`, so `new TrainingCa(set)` issues under the learner's root with the same names and dates. So lesson 10's whole key set works on own keys from the 12 rewired sites.
+3. **Lesson 10 never traced the issuer's public key.** The server only remembers it (`Lesson10Auth.cs:228`). A trace event there would move the engine stream and break the golden trace. So the Host writes one `key.public` event on its own stream, `<sessionId>/keys`, and that stream is not in the golden trace.
+4. **A pinned tool path can name a file that is gone.** `Process.Start` then throws. `OpenSslPath` checks the file, so the flow says `REFEREE_MISSING` and the key stays saved and unchecked. A test pins it.
+5. **The Show keys toggle stores its value and hides nothing until V3.** The UI must not offer it as working before then.

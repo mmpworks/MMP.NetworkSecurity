@@ -92,6 +92,7 @@ namespace Acceptance
                         }
                         session = new Session { Id = "s" + (++_next), Lesson = lesson, Seed = (int)MiniJson.Num(m, "seed", 20261105) };
                         BuildEvents(session, session.Seed);
+                        LeakBuiltIn(session);
                         session.FinishCode = ClockCode(lesson);
                         _sessions[session.Id] = session;
                         session.File = Path.Combine(Dir, "session-" + session.Id + ".ndjson");
@@ -110,6 +111,7 @@ namespace Acceptance
                 {
                     bool frameShows;
                     lock (_gate) { frameShows = M("off-hex-in-frames") ? true : _showKeys; }
+                    SendForeignSession(ws);
                     foreach (SessionEv e in session.Events) SendText(ws, D("type", "trace", "event", Render(e, frameShows)));
                     SendText(ws, D("type", "session.finished", "sessionId", session.Id, "events", (double)session.Events.Count, "outcome", session.FinishCode == null ? "completed" : "failed", "code", session.FinishCode));
                     break;
@@ -152,6 +154,42 @@ namespace Acceptance
             SessionEv e = new SessionEv { Base = D("type", type, "eventId", "e" + n, "actor", stream, "streamId", s.Id + "/" + stream, "streamSeq", (double)n) };
             e.Secrets.AddRange(secrets);
             s.Events.Add(e);
+        }
+
+        /// <summary>The defect "foreign-finish-first": another session of the same Host ends on this connection before the run's own frames, with a trace event and a session.finished of its own.</summary>
+        void SendForeignSession(WebSocket ws)
+        {
+            if (!M("foreign-finish-first")) return;
+            SendText(ws, D("type", "trace", "event", D("type", "wire.sent", "eventId", "x1", "actor", "server", "streamId", "s-other/server", "streamSeq", 1.0, "wire", "00", "plain", "00")));
+            SendText(ws, D("type", "session.finished", "sessionId", "s-other", "events", 1.0, "outcome", "failed", "code", "FOREIGN_SESSION"));
+        }
+
+        /// <summary>The defect "builtin-half": one half of the lab keeps a built-in key in silence, so a wire event of a run on the learner's keys carries the built-in bytes of the types the lesson reads.</summary>
+        void LeakBuiltIn(Session s)
+        {
+            string[] need;
+            if (!M("builtin-half") || !LessonTypes.TryGetValue(s.Lesson, out need)) return;
+            bool mine = false;
+            foreach (string id in need) if (Active(_types[id])) mine = true;
+            if (!mine) return;
+            StringBuilder leak = new StringBuilder();
+            foreach (string id in need) leak.Append(Hex.Encode(BuiltInFull(id)));
+            foreach (SessionEv e in s.Events)
+                if (e.Base.ContainsKey("wire"))
+                {
+                    e.Base["wire"] = (string)e.Base["wire"] + leak;
+                    return;
+                }
+            if (s.Events.Count > 0) s.Events[s.Events.Count - 1].Base["wire"] = leak.ToString();      // a lesson with no wire event: the last event gets one
+        }
+
+        byte[] BuiltInFull(string typeId)
+        {
+            using (SHA256 sha = SHA256.Create())
+            {
+                byte[] all = sha.ComputeHash(Encoding.ASCII.GetBytes("builtin:" + typeId));
+                return typeId.StartsWith("dukpt.") || typeId.StartsWith("lab.") ? Hex.Slice(all, 0, 16) : all;
+            }
         }
 
         byte[] BuiltInKey(string typeId)

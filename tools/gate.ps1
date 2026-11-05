@@ -78,6 +78,7 @@ switch ($Slice) {
 
 # ---------------------------------------------------------------- base gate
 Step 'layer_check' { python tools/layer_check.py src/NetSec.Core }
+Step 'secret_guard' { python -I tools/secret_guard.py }
 Step 'dotnet build src/NetSec.Core' { dotnet build src/NetSec.Core -c Release --nologo -v q }
 Step 'dotnet build src/NetSec.Core.NetCF' { dotnet build src/NetSec.Core.NetCF -c Release --nologo -v q $cf }
 Step 'dotnet test net10.0' { dotnet test tests/NetSec.Tests -c Release -f net10.0 $cf --nologo --logger trx --results-directory "$trx-net10" @hang }

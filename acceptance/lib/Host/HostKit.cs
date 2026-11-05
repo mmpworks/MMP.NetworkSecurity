@@ -131,6 +131,8 @@ namespace Acceptance
         public string SessionId, TransportKind, SessionFile;
         public bool TrainingOnly, ShowKeys;
         public bool ShowKeysReported;
+        /// <summary>Frames that belonged to another session on the same connection (a finish, a trace, or an error that names a session other than this run's). They are counted and left out of Events, Finished and Error.</summary>
+        public int ForeignFrames;
         public List<object> Security;
         public List<Dictionary<string, object>> Events = new List<Dictionary<string, object>>();
         public List<string> Frames = new List<string>();
@@ -163,6 +165,25 @@ namespace Acceptance
             return Drive(h, "{\"type\":\"session.attack\",\"requestId\":\"r1\",\"sessionId\":\"" + parentSessionId + "\",\"attackId\":\"" + attackId + "\",\"mode\":\"run\"}", false);
         }
 
+        /// <summary>
+        /// True when a frame that ends or fills a run names a session other than the run's. A finish, a trace event or an error for another session must never end this run:
+        /// the run reads the first session.started as its own, and takes only frames of that id. Before that frame arrives nothing of a run exists, so a finish or trace is foreign.
+        /// </summary>
+        static bool IsForeign(string ownId, string kind, Dictionary<string, object> m)
+        {
+            if (kind != "session.finished" && kind != "trace" && kind != "error" && kind != "session.forked") return false;
+            string id = MiniJson.Str(m, "sessionId");
+            if (id == null && kind == "trace")
+            {
+                string stream = MiniJson.Str(MiniJson.Obj(m, "event"), "streamId") ?? "";
+                int slash = stream.IndexOf('/');
+                if (slash > 0) id = stream.Substring(0, slash);
+            }
+            if (kind == "session.forked") return false;                          // a fork frame names two sessions and is not read by the callers
+            if (ownId == null) return kind != "error" || id != null;             // nothing of this run exists before session.started, except a refusal of the start itself
+            return id != null && id != ownId;
+        }
+
         static SessionRun Drive(HostProc h, string startJson, bool sendRun)
         {
             SessionRun run = new SessionRun();
@@ -189,6 +210,7 @@ namespace Acceptance
                     run.Frames.Add(text);
                     Dictionary<string, object> m = MiniJson.AsObject(MiniJson.Parse(text));
                     string kind = MiniJson.Str(m, "type") ?? MiniJson.Str(m, "kind");
+                    if (kind != "session.started" && IsForeign(run.SessionId, kind, m)) { run.ForeignFrames++; continue; }
                     if (kind == "session.started")
                     {
                         run.Started = m;
@@ -206,6 +228,8 @@ namespace Acceptance
                 }
                 try { ws.CloseOutputAsync(WebSocketCloseStatus.NormalClosure, "done", CancellationToken.None).Wait(3000); } catch (Exception) { }
             }
+            string log = Environment.GetEnvironmentVariable("ACC_DRIVE_LOG");
+            if (!string.IsNullOrEmpty(log) && run.ForeignFrames > 0) File.AppendAllText(log, run.ForeignFrames + " foreign frames in a run of " + (startJson.Length > 120 ? startJson.Substring(0, 120) : startJson) + Environment.NewLine);
             return run;
         }
 

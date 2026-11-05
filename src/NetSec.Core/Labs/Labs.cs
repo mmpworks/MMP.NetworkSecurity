@@ -6,6 +6,7 @@ using MMP.AsyncProxy;
 using NetSec.Crypto;
 using NetSec.Errors;
 using NetSec.Io;
+using NetSec.Keys;
 using NetSec.Machine;
 using NetSec.Pki;
 using NetSec.Platform;
@@ -73,6 +74,8 @@ namespace NetSec.Labs
         public IClock Clock;
         public IRandomSource Random;
         public AttackDefinition Attack;
+        /// <summary>The keys of this run. Null means the built-in keys.</summary>
+        public CredentialSet Credentials;
         /// <summary>The read deadline of each pump. Zero means LabPair.DeadlineMs. A test sets a short one.</summary>
         public int DeadlineMs;
     }
@@ -105,8 +108,33 @@ namespace NetSec.Labs
         }
     }
 
+    public static class LabCredentials
+    {
+        public static CredentialSet Of(LabContext c) { return c.Credentials ?? CredentialSet.BuiltIn(new TrainingKeySource()); }
+    }
+
     public static class LabCatalog
     {
+        static readonly string[] TlsTypes = { SecurityTypes.RootCa, SecurityTypes.Tls13Server, SecurityTypes.TlsTrust };
+
+        /// <summary>The security types a lesson reads (docs/modes-design.md section 1.7). Lessons 0, 3, and 11 read none.</summary>
+        public static string[] Needs(int lesson)
+        {
+            switch (lesson)
+            {
+                case 1: return new string[] { SecurityTypes.LabAesKey };
+                case 2: return new string[] { SecurityTypes.LabSealKey };
+                case 4:
+                case 5: return (string[])TlsTypes.Clone();
+                case 6: return new string[] { SecurityTypes.DukptBdk, SecurityTypes.DukptPad };
+                case 7: return new string[] { SecurityTypes.RootCa, SecurityTypes.Tls11Server, SecurityTypes.Tls13Server, SecurityTypes.TlsTrust };
+                case 8: return new string[] { SecurityTypes.SshHostEd25519, SecurityTypes.SshHostRsa, SecurityTypes.SshKnownHosts, SecurityTypes.SshClient };
+                case 9: return new string[] { SecurityTypes.SshHostEd25519, SecurityTypes.SshKnownHosts, SecurityTypes.SshClient, SecurityTypes.RootCa, SecurityTypes.Tls13Server, SecurityTypes.TlsTrust, SecurityTypes.DukptBdk, SecurityTypes.DukptPad };
+                case 10: return new string[] { SecurityTypes.RootCa, SecurityTypes.Tls13Server, SecurityTypes.Tls13Client, SecurityTypes.TlsTrust, SecurityTypes.TokenIssuer, SecurityTypes.DeviceEnrolment };
+                default: return new string[0];
+            }
+        }
+
         /// <summary>The lab for a lesson number, or null when the lesson is not built yet.</summary>
         public static ILab Find(int lesson)
         {
