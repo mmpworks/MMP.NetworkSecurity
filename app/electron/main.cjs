@@ -1,7 +1,7 @@
 // Electron's main process. It starts NetSec.Host with a fresh session token, opens one window, and ends the Host on exit.
 // Set NETSEC_HOST=external to skip spawning and use a Host you started yourself (then set NETSEC_PORT and NETSEC_TOKEN too).
 const { app, BrowserWindow } = require('electron')
-const { spawn, execFile } = require('node:child_process')
+const { spawn, execFileSync } = require('node:child_process')
 const crypto = require('node:crypto')
 const fs = require('node:fs')
 const http = require('node:http')
@@ -9,7 +9,7 @@ const path = require('node:path')
 
 const PORT = Number(process.env.NETSEC_PORT) || 5180
 const TOKEN = process.env.NETSEC_TOKEN || crypto.randomBytes(24).toString('hex')
-const HOST_DLL = path.resolve(__dirname, '..', '..', 'src', 'NetSec.Host', 'bin', 'Release', 'net10.0', 'NetSec.Host.dll')
+const HOST_DLL = process.env.NETSEC_HOST_DLL || path.resolve(__dirname, '..', '..', 'src', 'NetSec.Host', 'bin', 'Release', 'net10.0', 'NetSec.Host.dll')
 let host = null
 
 // A dead stdout pipe throws EPIPE from the main process. Swallow the stream error and skip the write (same fix as the pump simulator).
@@ -36,7 +36,8 @@ function stopHost() {
   if (!host || !host.pid) return
   const pid = host.pid
   host = null
-  execFile('taskkill', ['/PID', String(pid), '/T', '/F'], () => {})
+  // Synchronous, because Electron can exit before an async taskkill starts and leave the Host running.
+  try { execFileSync('taskkill', ['/PID', String(pid), '/T', '/F'], { stdio: 'ignore' }) } catch (e) { /* already gone */ }
 }
 
 function waitForHost(timeoutMs = 60000) {

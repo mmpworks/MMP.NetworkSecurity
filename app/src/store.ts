@@ -33,7 +33,8 @@ export interface SessionRec {
 
 export const addr = resolveHostAddress()
 export const hostState = ref<'connecting' | 'connected' | 'offline'>('connecting')
-export const lessons = ref<LessonRow[]>(DEFAULT_TITLES.map((title, i) => ({ lesson: i + 1, title, built: false, lanes: [], attacks: [] })))
+const TOY_LESSON: LessonRow = { lesson: 0, title: 'Start here', built: true, lanes: ['client', 'server'], attacks: [{ attackId: 'L0-flip-wire-byte', label: 'Flip a byte on the wire', expectCheck: 'echo compare', expectCode: 'ECHO_MISMATCH' }] }
+export const lessons = ref<LessonRow[]>([TOY_LESSON, ...DEFAULT_TITLES.map((title, i) => ({ lesson: i + 1, title, built: false, lanes: [], attacks: [] }))])
 export const cePanel = ref<{ label: string; state: string } | null>(null)
 
 export const ui = reactive({
@@ -125,13 +126,12 @@ async function refreshHostData() {
   try {
     const body = await hostGet(addr, '/api/lessons')
     const rows: any[] = Array.isArray(body) ? body : body?.lessons ?? []
-    // Lesson 0 is the warm-up. It shows only when the Host lists it.
-    const numbers = [...(rows.some(x => x.lesson === 0) ? [0] : []), ...DEFAULT_TITLES.map((_, i) => i + 1)]
-    lessons.value = numbers.map(n => {
-      const r = rows.find(x => x.lesson === n)
-      const title = n === 0 ? 'Warm-up' : DEFAULT_TITLES[n - 1]
+    // Lesson 0 is the toy. The rail always shows it as "Start here" and never asks the Host's list (the list holds lessons 1 to 11).
+    lessons.value = [0, ...DEFAULT_TITLES.map((_, i) => i + 1)].map(n => {
+      const r = n === 0 ? undefined : rows.find(x => x.lesson === n)
+      if (n === 0) return TOY_LESSON
       return {
-        lesson: n, title: r?.title || title, built: !!r?.built, lanes: Array.isArray(r?.lanes) ? r.lanes.map(String) : [],
+        lesson: n, title: r?.title || DEFAULT_TITLES[n - 1], built: !!r?.built, lanes: Array.isArray(r?.lanes) ? r.lanes.map(String) : [],
         attacks: Array.isArray(r?.attacks) ? r.attacks.map((a: any) => (typeof a === 'string' ? { attackId: a, label: a } : { attackId: String(a.attackId ?? a.id), label: String(a.label ?? a.attackId ?? a.id), expectCheck: a.expectCheck, expectCode: a.expectCode })) : [],
       }
     })
