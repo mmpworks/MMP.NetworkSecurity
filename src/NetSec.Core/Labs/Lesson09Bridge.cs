@@ -109,6 +109,7 @@ namespace NetSec.Labs
             o.Sink = sink;
             o.Gate = c.Gate;
             o.Tamper = plan;
+            o.Clock = c.Clock;
             o.SessionId = c.SessionId;
             o.TraceId = traceId;
             return o;

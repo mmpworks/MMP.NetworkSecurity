@@ -257,6 +257,9 @@ namespace NetSec.Bridge
         public IStepGate Gate;
         public ITamperHook Tamper;
 
+        /// <summary>Null means the real clock, for a process. A lab passes its own.</summary>
+        public IClock Clock;
+
         /// <summary>Null means "bridge", for a process that serves whoever connects.</summary>
         public string SessionId;
 
@@ -288,7 +291,7 @@ namespace NetSec.Bridge
             ITraceSink sink = late ?? o.Sink;
             string session = o.SessionId ?? Session;
             GlassTransportFactory factory = new GlassTransportFactory(o.Keys);
-            TraceStream notes = new TraceStream(session + "/gateway/bridge", session, o.TraceId, null, "gateway", new MonotonicClock());
+            TraceStream notes = new TraceStream(session + "/gateway/bridge", session, o.TraceId, null, "gateway", o.Clock ?? new MonotonicClock());
 
             TransportRequest ssh = new TransportRequest();
             ssh.Protocol = WireProtocol.Ssh;
@@ -298,6 +301,7 @@ namespace NetSec.Bridge
             ssh.Random = o.Random;
             ssh.Sink = sink;
             ssh.Gate = o.Gate;
+            ssh.Clock = o.Clock;
             ssh.Tamper = o.Tamper;
             ssh.TraceId = o.TraceId;
             ssh.Hop = Hop1;
@@ -340,6 +344,7 @@ namespace NetSec.Bridge
             tls.Random = o.NextHopRandom ?? o.Random;
             tls.Sink = sink;
             tls.Gate = o.Gate;
+            tls.Clock = o.Clock;
             tls.Tamper = o.Tamper;
             tls.TraceId = o.TraceId;
             tls.Hop = Hop2;
@@ -387,6 +392,7 @@ namespace NetSec.Bridge
             tls.Random = o.Random;
             tls.Sink = late ?? o.Sink;
             tls.Gate = o.Gate;
+            tls.Clock = o.Clock;
             tls.Tamper = o.Tamper;
             tls.TraceId = o.TraceId;
             tls.Hop = Hop2;
@@ -436,7 +442,7 @@ namespace NetSec.Bridge
         GlassSshSession _session;
         IByteLink _tunnel;
 
-        public GlassSshLink(IPEndPoint endpoint, ITrainingKeySource keys, SshSuite suite, IRandomSource random, ITraceSink sink, string traceId, string sessionId, IStepGate gate, ITamperHook tamper)
+        public GlassSshLink(IPEndPoint endpoint, ITrainingKeySource keys, SshSuite suite, IRandomSource random, ITraceSink sink, string traceId, string sessionId, IStepGate gate, ITamperHook tamper, IClock clock)
         {
             _endpoint = endpoint;
             _factory = new GlassTransportFactory(keys);
@@ -450,6 +456,7 @@ namespace NetSec.Bridge
             _request.SessionId = sessionId ?? traceId;
             _request.Gate = gate;
             _request.Tamper = tamper;
+            _request.Clock = clock;
             _request.Hop = BridgeHopServers.Hop1;
             _request.Actor = "ce";
             _request.PeerActor = "gateway";
