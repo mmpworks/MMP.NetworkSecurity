@@ -229,3 +229,29 @@ export function timingOf(events: readonly TraceEvent[], upTo: number): TimingVie
   }
   return view
 }
+
+// ---- lesson 9: the onion ----
+
+export interface OnionLayer { n: 1 | 2 | 3; name: string; state: 'absent' | 'closed' | 'open' | 'broken' }
+export interface Onion { layers: OnionLayer[]; gatewayNote: string }
+
+/** Three wrappers around one PIN. Each layer binds to one event (docs/lesson-9-names.md section 3). A layer reads `open` when the party that removes it has acted. */
+export function onionOf(events: readonly TraceEvent[], upTo: number): Onion {
+  const seen = events.filter(e => e.seq <= upTo)
+  const has = (f: (e: TraceEvent) => boolean) => seen.some(f)
+  const locked = has(e => e.type === 'pin.block.locked')
+  const ssh = has(e => e.type === 'wire.sent' && e.hop === 'hop1' && e.message === 'ChannelData')
+  const tls = has(e => e.type === 'wire.sent' && e.hop === 'hop2' && e.message === 'ApplicationData')
+  const relayed = seen.find(e => e.type === 'gateway.envelope.relayed')
+  const bankActed = has(e => e.actor === 'bank')
+  const pinCheck = seen.find(e => e.check?.name === 'PIN block MAC at bank')
+  const pinState = !locked ? 'absent' : pinCheck?.check?.result === 'fail' ? 'broken' : pinCheck?.check?.result === 'pass' ? 'open' : 'closed'
+  return {
+    layers: [
+      { n: 1, name: 'PIN block, locked by DUKPT', state: pinState },
+      { n: 2, name: 'inside SSH (hop 1)', state: !ssh ? 'absent' : relayed ? 'open' : 'closed' },
+      { n: 3, name: 'inside TLS 1.3 (hop 2)', state: !tls ? 'absent' : bankActed ? 'open' : 'closed' },
+    ],
+    gatewayNote: relayed?.detail ?? '',
+  }
+}
