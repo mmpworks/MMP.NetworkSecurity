@@ -21,6 +21,12 @@
       "verdict": "accurate",
       "note": "ux-design.md section 2 moment 2: protected rows turn to amber noise labelled unreadable. Code: ByteInspector.vue hides only fields with visibleToWire false in the Eavesdropper view; other fields and arrows keep their readable state.",
       "checkedAgainst": "docs/ux-design.md section 2 moment 2 (read); app/src/components/ByteInspector.vue, SequenceDiagram.vue (read)"
+    },
+    {
+      "id": "L0-C04",
+      "verdict": "accurate",
+      "note": "Tours read at main 6e0c1e5 (PR 60 merged); lab run at main 6e0c1e5. Lab run: EchoHello plainHex 01000b68656c6c6f2c2070697065 and EchoReply 02000b68656c6c6f2c2070697065. The frame is a type byte, a 2-byte length (000b) and the body; type 1 for the hello and 2 for the reply; everything else is equal.",
+      "checkedAgainst": "src/NetSec.Core/Machine/EchoEngine.cs (read); lab run, lesson 0"
     }
   ],
   "textRead": {
@@ -35,9 +41,11 @@
         "severity": "medium",
         "wrong": "Compare the two arrows. The byte counts match, and so do the bytes. ... The two lists are the same.",
         "right": "Compare the two arrows. The byte counts match. The bytes match except the first one: 01 marks the hello and 02 marks the reply.",
-        "evidence": "Lab run, lesson 0: EchoHello plainHex 01000b68656c6c6f2c2070697065, EchoReply plainHex 02000b68656c6c6f2c2070697065."
+        "evidence": "Lab run, lesson 0: EchoHello plainHex 01000b68656c6c6f2c2070697065, EchoReply plainHex 02000b68656c6c6f2c2070697065.",
+        "status": "fixed, re-read ok at 6e0c1e5"
       }
     ],
-    "notes": []
+    "notes": [],
+    "problemsOpen": 0
   }
 }

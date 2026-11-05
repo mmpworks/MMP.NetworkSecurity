@@ -43,7 +43,7 @@
     {
       "id": "L5-C07",
       "verdict": "accurate",
-      "note": "Tours read at origin/feat/tours-4-5-10 (PR 23, commit 1b2fc21). Section 7.1: key derivation uses HKDF-Extract and HKDF-Expand through Derive-Secret over Transcript-Hash of the messages so far.",
+      "note": "Tours read at main 6e0c1e5 (PR 60 merged); lab run at main 6e0c1e5. Reworded: early, handshake and master secrets, then traffic secrets that mix in the transcript hash. RFC 8446 section 7.1: early, handshake and master secrets take no transcript hash; the traffic secrets and the exporter secret do. Lab secret order matches: early_secret, handshake_secret, c_hs_traffic, s_hs_traffic, master_secret, then c_ap_traffic, s_ap_traffic, exp_master.",
       "checkedAgainst": "RFC 8446 section 7.1 (RFC text fetched from rfc-editor.org this session)"
     },
     {
@@ -81,6 +81,12 @@
       "verdict": "accurate",
       "note": "Tours read at origin/feat/tours-4-5-10 (PR 23, commit 1b2fc21). docs/prd.md Teaching accuracy rules, rule 4: 'The hybrid protects key exchange only. Certificates stay classical.'",
       "checkedAgainst": "docs/prd.md rule 4 (read)"
+    },
+    {
+      "id": "L5-C14",
+      "verdict": "accurate",
+      "note": "Tours read at main 6e0c1e5 (PR 60 merged); lab run at main 6e0c1e5. Lab run: the ClientHello supported_groups extension holds one group, 0x11ec (X25519MLKEM768), and key_share holds one share of 1,216 bytes for it; two cipher suites (1301, 1302).",
+      "checkedAgainst": "lab run, lesson 5; docs/lessons-4-5-names.md (read earlier)"
     }
   ],
   "textRead": {
@@ -95,23 +101,27 @@
         "severity": "low",
         "wrong": "The ClientHello lists the lock suites it can use, the groups it can use for key exchange, and a key share for the group it expects to win.",
         "right": "The ClientHello lists the lock suites it can use, the one group it offers for key exchange (the hybrid), and a key share for that group.",
-        "evidence": "Lab run: supported_groups extension holds one group, 0x11ec (X25519MLKEM768); two cipher suites (1301, 1302)."
+        "evidence": "Lab run: supported_groups extension holds one group, 0x11ec (X25519MLKEM768); two cipher suites (1301, 1302).",
+        "status": "fixed, re-read ok at 6e0c1e5"
       },
       {
         "step": "L5-S04",
         "severity": "medium",
         "wrong": "The rungs come in order: the handshake secret first, then the traffic secrets for the handshake, then the master secret and the traffic secrets for the real data.",
         "right": "The rungs come in order: the early secret, the handshake secret, the traffic secrets for the handshake, the master secret, and then the traffic secrets for the real data, which appear after the server Finished.",
-        "evidence": "Lab run, secret.derived order: early_secret, handshake_secret, c_hs_traffic, s_hs_traffic, master_secret, then c_ap_traffic, s_ap_traffic, exp_master."
+        "evidence": "Lab run, secret.derived order: early_secret, handshake_secret, c_hs_traffic, s_hs_traffic, master_secret, then c_ap_traffic, s_ap_traffic, exp_master.",
+        "status": "fixed, re-read ok at 6e0c1e5"
       },
       {
         "step": "L5-S04",
         "severity": "medium",
         "wrong": "Each rung comes from the one above it plus a hash of the messages so far. Change an earlier message and every rung below it changes too.",
         "right": "Each rung comes from the one above it. The traffic secrets also mix in a hash of the messages so far, so changing an earlier message changes those traffic secrets.",
-        "evidence": "RFC 8446 section 7.1: early, handshake and master secrets use no transcript hash; only the traffic secrets and the exporter secret do."
+        "evidence": "RFC 8446 section 7.1: early, handshake and master secrets use no transcript hash; only the traffic secrets and the exporter secret do.",
+        "status": "fixed, re-read ok at 6e0c1e5"
       }
     ],
-    "notes": []
+    "notes": [],
+    "problemsOpen": 0
   }
 }
