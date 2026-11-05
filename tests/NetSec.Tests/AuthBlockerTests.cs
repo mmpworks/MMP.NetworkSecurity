@@ -134,6 +134,24 @@ namespace NetSec.Tests
             Assert.Equal("DPOP_BAD_JWK", d.Code);
         }
 
+        static string ProofWith(string headerExtra)
+        {
+            byte[] pub = Ed25519.PublicFrom(Device);
+            string header = "{\"typ\":\"dpop+jwt\",\"alg\":\"EdDSA\",\"jwk\":{\"crv\":\"Ed25519\",\"kty\":\"OKP\",\"x\":\"" + Base64Url.Encode(pub) + "\"}" + headerExtra + "}";
+            string claims = "{\"jti\":\"id-1\",\"htm\":\"POST\",\"htu\":\"" + Url + "\",\"iat\":1000,\"ath\":\"" + Base64Url.Encode(Sha256(AccessToken)) + "\"}";
+            return SignRaw(Device, header, claims);
+        }
+
+        [Fact]
+        public void A_proof_with_a_crit_header_is_refused_beside_a_control()
+        {
+            string jkt = DpopProof.Thumbprint(Ed25519.PublicFrom(Device));
+            Assert.True(DpopProof.Check(ProofWith(""), "POST", Url, 1000, AccessToken, jkt).Allowed);
+            AuthDecision d = DpopProof.Check(ProofWith(",\"crit\":[\"x\"],\"x\":1"), "POST", Url, 1000, AccessToken, jkt);
+            Assert.False(d.Allowed);
+            Assert.Equal("DPOP_MALFORMED", d.Code);
+        }
+
         static byte[] Sha256(string text)
         {
             byte[] bytes = Encoding.UTF8.GetBytes(text);
@@ -179,6 +197,70 @@ namespace NetSec.Tests
             LabResult r = Login("device-key-hex", "0100000000000000000000000000000000000000000000000000000000000000");
             Assert.False(r.Completed, "the small-order key got a token");
             Assert.Equal("DEVICE_NOT_ENROLLED", r.FailedCode);
+        }
+
+        static TraceEvent[] Events(AttackDefinition attack, out LabResult result)
+        {
+            ListSink sink = new ListSink();
+            LabContext c = new LabContext { SessionId = "s1", TraceId = "s1", Seed = 7, Gate = new FreeRunGate(), Sink = sink, Clock = new FixedClock(1), Random = new SeededRandom(7), Attack = attack };
+            IFuture<LabResult> run = new Lesson10Auth().Run(c);
+            Assert.True(run.Wait(60000), "the lab did not finish in 60 s");
+            result = run.Result;
+            return sink.Events;
+        }
+
+        /// <summary>
+        /// R = B, S = 1 verifies under the small-order key for any message, with no private key. The enrolment check stops that key. This is the
+        /// same forgery with the enrolled key in the request, so the signature check is what must stop it, end to end.
+        /// </summary>
+        [Fact]
+        public void A_forged_signature_on_the_enrolled_key_gets_no_token()
+        {
+            byte[] forged = Hex.Decode("5866666666666666666666666666666666666666666666666666666666666666" + "0100000000000000000000000000000000000000000000000000000000000000");
+            byte[] anyChallenge = new byte[32];
+            Assert.True(Challenge.Verify(Hex.Decode("0100000000000000000000000000000000000000000000000000000000000000"), anyChallenge, "https://pump.training", forged).Allowed);
+
+            // The same seed issues the same challenge, so the control run gives the bytes this login will issue.
+            LabResult control;
+            TraceEvent[] seen = Events(null, out control);
+            Assert.True(control.Completed);
+            byte[] challengeFrame = seen.First(e => e.Type == "wire.sent" && e.Message == "Challenge").Wire;
+            byte[] challenge = challengeFrame.Skip(Frame.HeaderSize).ToArray();
+
+            TamperPlan swap = new TamperPlan { Kind = "swap-field", Message = "ChallengeResponse", Replacement = Frame.Build(3, challenge.Concat(forged).ToArray()) };
+            LabResult attacked;
+            TraceEvent[] events = Events(new AttackDefinition { AttackId = "test", Lesson = 10, Kind = "swap-field", Plan = swap, Options = new LabOption[0] }, out attacked);
+            Assert.False(attacked.Completed);
+            Assert.Equal("CHALLENGE_BAD_SIGNATURE", attacked.FailedCode);
+            Assert.Equal("challenge signature", attacked.FailedCheck);
+            Assert.DoesNotContain(events, e => e.Type == "wire.sent" && e.Message == "TokenIssued");
+        }
+
+        /// <summary>The tour binds to these names, so a change here must reach the tour.</summary>
+        [Fact]
+        public void The_mutual_tls_phase_emits_the_event_types_the_tour_binds_to()
+        {
+            LabResult result;
+            TraceEvent[] events = Events(null, out result);
+            Assert.True(result.Completed);
+            string[] Sent(string actor) => events.Where(e => e.Type == "tls.handshake.sent" && e.Actor == actor).Select(e => e.Message).ToArray();
+            Assert.Equal(new[] { "ServerHello", "EncryptedExtensions", "CertificateRequest", "Certificate", "CertificateVerify", "Finished" }, Sent("server"));
+            Assert.Equal(new[] { "ClientHello", "Certificate", "CertificateVerify", "Finished" }, Sent("client"));
+            Assert.All(events.Where(e => e.Type == "tls.handshake.sent"), e => Assert.EndsWith("/auth-mtls", e.StreamId));
+            Assert.Contains(events, e => e.Type == "tls.handshake.received" && e.Actor == "server" && e.Message == "CertificateVerify");
+            Assert.Contains(events, e => e.Type == "check.result" && e.Actor == "server" && e.Message == "certificate_required alert" && e.Check.Passed);
+            Assert.Contains(events, e => e.Type == "check.result" && e.Actor == "server" && e.Message == "bad_certificate alert" && e.Check.Passed);
+        }
+
+        [Theory]
+        [InlineData("L10-remove-client-cert", "certificate_required alert")]
+        [InlineData("L10-corrupt-client-cert", "bad_certificate alert")]
+        public void A_refused_client_certificate_fails_its_check_on_the_server(string attackId, string check)
+        {
+            LabResult result;
+            TraceEvent[] events = Events(AttackCatalog.Lesson10Unreleased.Single(a => a.AttackId == attackId), out result);
+            Assert.False(result.Completed);
+            Assert.Contains(events, e => e.Type == "check.result" && e.Actor == "server" && e.Message == check && !e.Check.Passed);
         }
 
         [Fact]

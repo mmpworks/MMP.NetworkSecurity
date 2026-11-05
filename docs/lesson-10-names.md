@@ -89,6 +89,17 @@ The lab starts with one TLS 1.3 handshake, on streams `client/auth-mtls` and `se
 
 The server sends `CertificateRequest` between `EncryptedExtensions` and `Certificate`. The client sends `Certificate` and `CertificateVerify` before its `Finished`.
 
+| Event type | `actor` | `message` |
+|---|---|---|
+| `tls.handshake.sent` | `server` | `ServerHello`, `EncryptedExtensions`, `CertificateRequest`, `Certificate`, `CertificateVerify`, `Finished` |
+| `tls.handshake.sent` | `client` | `ClientHello`, `Certificate`, `CertificateVerify`, `Finished` |
+| `tls.handshake.received` | receiver | as above |
+| `tls.record.sent`, `tls.record.received` | sender, receiver | `ApplicationData`, the one line each way |
+| `tls.alert.sent` | the side that refused | `Alert` |
+| `wire.sent`, `wire.received` | sender, receiver | the bytes, on stream `<streamId>/wire` |
+
+A test pins the handshake rows: `The_mutual_tls_phase_emits_the_event_types_the_tour_binds_to`. `Certificate` comes from both actors, so a bind needs `actor` in its `match`.
+
 | Attack | One change | Code | Check | Alert |
 |---|---|---|---|---|
 | `L10-remove-client-cert` | The client answers with an empty list | `TLS13_CERT_REQUIRED` | `certificate_required alert` | 116 |
