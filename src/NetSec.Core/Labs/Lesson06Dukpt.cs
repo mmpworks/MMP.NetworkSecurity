@@ -64,14 +64,14 @@ namespace NetSec.Labs
         {
             public readonly DukptPinPad Pad;
             public readonly string Scenario;
-            public byte[] LoadedKey;
+            public readonly byte[] InitialKeyTraceCopy;
             public int SalesSent;
             public byte[] FirstSale;
 
-            public ReaderSession(IRandomSource random, DukptPinPad pad, byte[] loadedKey, string scenario) : base(random)
+            public ReaderSession(IRandomSource random, DukptPinPad pad, byte[] initialKeyTraceCopy, string scenario) : base(random)
             {
                 Pad = pad;
-                LoadedKey = loadedKey;
+                InitialKeyTraceCopy = initialKeyTraceCopy;
                 Scenario = scenario;
             }
         }
@@ -85,13 +85,12 @@ namespace NetSec.Labs
 
             public BankSession(IRandomSource random, byte[] baseKey) : base(random) { BaseKey = baseKey; }
 
-            /// <summary>The received event shows the PIN the bank opens, or nothing when the frame fails. The rule makes the checks.</summary>
+            /// <summary>The received event shows the PIN the bank opens, or nothing when the sale fails a check. The rule acts on the same checks.</summary>
             public override byte[] PlainOf(InboundMessage message)
             {
                 if (message.Type != SaleType || message.Body.Length != SaleBodySize) return new byte[0];
-                byte[] key = DukptBank.DeriveWorkingKey(BaseKey, Part(message.Body, 0, KsnSize), PinUsage, KeyType);
-                string pin;
-                return PinBlock.TryDecryptFormat4(key, Part(message.Body, KsnSize, PinBlockSize), Pan, out pin) ? Encoding.UTF8.GetBytes(pin) : new byte[0];
+                PinSale sale = DukptBank.CheckPinSale(BaseKey, Ledger, Part(message.Body, 0, KsnSize), Part(message.Body, KsnSize, PinBlockSize), Pan, KeyType);
+                return sale.Code == null ? Encoding.UTF8.GetBytes(sale.Pin) : new byte[0];
             }
         }
 
@@ -102,12 +101,22 @@ namespace NetSec.Labs
             if (c == null) throw new ArgumentNullException("c");
             ITamperHook plan = LabPair.Plan(c);
             byte[] bdk = new TrainingKeySource().Find(KeyIds.DukptBdk128).CopyMaterial();
-            byte[] initial = DukptBank.DeriveInitialKey(bdk, InitialKeyId);
-            ReaderSession readerSession = new ReaderSession(LabPair.Fork(c), new DukptPinPad(initial, InitialKeyId), initial, LabPair.Option(c, OptionScenario));
+            byte[] traceCopy;
+            DukptPinPad pad = LoadReader(DukptBank.DeriveInitialKey(bdk, InitialKeyId), out traceCopy);
+            ReaderSession readerSession = new ReaderSession(LabPair.Fork(c), pad, traceCopy, LabPair.Option(c, OptionScenario));
             BankSession bankSession = new BankSession(LabPair.Fork(c), bdk);
             FrameEngine<ReaderSession> reader = new FrameEngine<ReaderSession>(ReaderTable, readerSession, Start0, LabPair.Stream(c, "reader", "dukpt"), "bank", plan);
             FrameEngine<BankSession> bank = new FrameEngine<BankSession>(BankTable, bankSession, Start0, LabPair.Stream(c, "bank", "dukpt"), "reader", plan);
             return LabPair.Run(c, reader, bank, plan);
+        }
+
+        /// <summary>Loads the reader's registers and clears the given array, so the lab's "erased" event states what the code did. The trace keeps its own copy, on purpose.</summary>
+        public static DukptPinPad LoadReader(byte[] initialKey, out byte[] traceCopy)
+        {
+            traceCopy = (byte[])initialKey.Clone();
+            DukptPinPad pad = new DukptPinPad(initialKey, InitialKeyId);
+            Array.Clear(initialKey, 0, initialKey.Length);
+            return pad;
         }
 
         static readonly StepTable<ReaderSession> ReaderTable = new StepTable<ReaderSession>(
@@ -121,14 +130,12 @@ namespace NetSec.Labs
 
         // ---------------------------------------------------------------- reader
 
-        /// <summary>The pad's constructor already loaded the registers. The session drops its copy of the initial key here, and the trace shows both facts.</summary>
+        /// <summary>LoadReader already loaded the registers and cleared the initial key. The trace shows both facts here.</summary>
         static StepDecision ReaderLoad(ReaderSession s, InboundMessage m)
         {
-            byte[] initial = s.LoadedKey;
-            s.LoadedKey = null;
             StepEffect[] load =
             {
-                Effect.SecretAs(Derived, InitialKeyName, "reader", InitialKeyName, initial, BaseKeyName),
+                Effect.SecretAs(Derived, InitialKeyName, "reader", InitialKeyName, s.InitialKeyTraceCopy, BaseKeyName),
                 Effect.Note(Erased, InitialKeyName),
                 Effect.Measure(RegistersMeasure, Registers(s), null),
             };
@@ -187,7 +194,7 @@ namespace NetSec.Labs
 
         static string Registers(ReaderSession s)
         {
-            return "held=" + s.Pad.HeldKeys().Length + ";next=" + s.Pad.NextCounter;
+            return "held=" + s.Pad.HeldCount + ";next=" + s.Pad.NextCounter;
         }
 
         // ---------------------------------------------------------------- bank
@@ -199,36 +206,28 @@ namespace NetSec.Labs
                 Effect.SecretAs(Derived, InitialKeyName, "bank", InitialKeyName, DukptBank.DeriveInitialKey(s.BaseKey, InitialKeyId), BaseKeyName));
         }
 
-        /// <summary>Checks the KSN, derives the key, opens the block. The row closes the engine on the last sale and stays for the others.</summary>
+        /// <summary>Opens the sale, which records its KSN only if the sale passes. The row closes the engine on the last sale and stays for the others.</summary>
         static StepDecision BankSale(BankSession s, InboundMessage m)
         {
             if (m.Body.Length != SaleBodySize)
                 return StepDecision.Fail(ErrorCodes.MessageRefused, "message shape", "a Sale holds " + SaleBodySize + " bytes, and this one holds " + m.Body.Length);
             byte[] ksn = Part(m.Body, 0, KsnSize);
-            if (!s.Ledger.TryRecord(ksn))
-                return StepDecision.Fail(ErrorCodes.DukptKsnReplay, ReplayCheck, "KSN " + Hex.Encode(ksn) + " was used in an earlier sale");
-
-            uint counter = CounterOf(ksn);
-            byte[] key = DukptBank.DeriveWorkingKey(s.BaseKey, ksn, PinUsage, KeyType);
-            string pin;
-            if (!PinBlock.TryDecryptFormat4(key, Part(m.Body, KsnSize, PinBlockSize), Pan, out pin))
-                return StepDecision.Fail(ErrorCodes.DukptPinBlockFormat, FormatCheck, "counter " + counter + ": the opened block has the wrong shape");
+            PinSale sale = DukptBank.OpenPinSale(s.BaseKey, s.Ledger, ksn, Part(m.Body, KsnSize, PinBlockSize), Pan, KeyType);
+            if (sale.Code == ErrorCodes.DukptKsnReplay)
+                return StepDecision.Fail(sale.Code, ReplayCheck, "KSN " + Hex.Encode(ksn) + " was used in an earlier sale");
+            if (sale.Code != null)
+                return StepDecision.Fail(sale.Code, FormatCheck, "counter " + sale.Counter + ": the opened block has the wrong shape");
 
             s.SalesApproved++;
             int answer = s.SalesApproved == Sales ? DoneType : ApprovedType;
             StepEffect[] effects =
             {
                 Effect.Check(ReplayCheck, ErrorCodes.DukptKsnReplay),
-                Effect.SecretAs(Derived, PinKeyName(counter), "bank", PinKeyName(counter), key, BaseKeyName, "ksn"),
+                Effect.SecretAs(Derived, PinKeyName(sale.Counter), "bank", PinKeyName(sale.Counter), sale.Key, BaseKeyName, "ksn"),
                 Effect.Check(FormatCheck, ErrorCodes.DukptPinBlockFormat),
                 Effect.SendProtected(Names[answer], new byte[0], Frame.Build(answer, new byte[0]), Frame.Fields(0)),
             };
             return answer == DoneType ? StepDecision.Advance(effects) : StepDecision.Stay(effects);
-        }
-
-        static uint CounterOf(byte[] ksn)
-        {
-            return ((uint)ksn[8] << 24) | ((uint)ksn[9] << 16) | ((uint)ksn[10] << 8) | ksn[11];
         }
 
         static string PinKeyName(ulong counter) { return "dukpt.pinKey." + counter; }

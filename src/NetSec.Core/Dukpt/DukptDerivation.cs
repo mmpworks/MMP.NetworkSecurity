@@ -78,6 +78,13 @@ namespace NetSec.Dukpt
             return ksn;
         }
 
+        public static uint CounterOf(byte[] ksn)
+        {
+            if (ksn == null) throw new ArgumentNullException("ksn");
+            if (ksn.Length != KsnSize) throw new ArgumentException("A KSN holds 12 bytes.", "ksn");
+            return ((uint)ksn[8] << 24) | ((uint)ksn[9] << 16) | ((uint)ksn[10] << 8) | ksn[11];
+        }
+
         public static DukptKeyType TypeOf(byte[] key)
         {
             if (key == null) throw new ArgumentNullException("key");

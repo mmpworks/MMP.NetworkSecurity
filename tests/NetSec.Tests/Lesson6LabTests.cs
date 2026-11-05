@@ -126,6 +126,13 @@ namespace NetSec.Tests
         }
 
         [Fact]
+        public void A_refused_replay_shows_no_pin_in_the_received_event()
+        {
+            string[] plains = Go(Attack("L6-replay-sale")).Of("dukpt.message.received", "bank").Select(e => System.Text.Encoding.UTF8.GetString(e.Plain ?? new byte[0])).ToArray();
+            Assert.Equal(new[] { "1234", "" }, plains);
+        }
+
+        [Fact]
         public void A_flip_matches_the_control_until_the_tamper()
         {
             TraceEvent control = Go(null, 9).Of("dukpt.message.sent", "reader")[0];

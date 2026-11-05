@@ -1,6 +1,9 @@
 using System;
 using System.Collections.Generic;
+using System.Runtime.CompilerServices;
 using NetSec.Errors;
+
+[assembly: InternalsVisibleTo("NetSec.Tests")]
 
 namespace NetSec.Dukpt
 {
@@ -26,7 +29,7 @@ namespace NetSec.Dukpt
     {
         const int RegisterCount = 32;
 
-        /// <summary>The limit on 1 bits in a counter. It caps the bank's derivation work. Counters past it are skipped. The value 16 is recalled from X9.24-3, which is paid. The free vectors do not state it.</summary>
+        /// <summary>The limit on 1 bits in a counter this pad issues, which caps the bank's work for an honest reader. Counters past it are skipped. The bank itself derives for any KSN. The value 16 is recalled from X9.24-3, which is paid. The free vectors do not state it.</summary>
         const int MaxOneBits = 16;
 
         readonly byte[] _initialKeyId;
@@ -43,8 +46,32 @@ namespace NetSec.Dukpt
             FillRegistersBelow(RegisterCount, initialKey, 0);
         }
 
+        /// <summary>A pad part way through its life: one register, for the given counter. The end of the counter range takes about 2^31 sales to reach, so a test starts here.</summary>
+        internal DukptPinPad(byte[] derivationKey, byte[] initialKeyId, uint counter)
+        {
+            DukptDerivation.TypeOf(derivationKey);
+            DukptDerivation.RequireInitialKeyId(initialKeyId);
+            _initialKeyId = (byte[])initialKeyId.Clone();
+            int bit = LowestOneBit(counter);
+            _registers[bit] = (byte[])derivationKey.Clone();
+            _registerCounters[bit] = counter;
+            _nextCounter = counter;
+        }
+
         /// <summary>The counter value the next key request uses.</summary>
         public ulong NextCounter { get { return _nextCounter; } }
+
+        /// <summary>The number of key registers held now. It copies no key.</summary>
+        public int HeldCount
+        {
+            get
+            {
+                int held = 0;
+                for (int i = 0; i < RegisterCount; i++)
+                    if (_registers[i] != null) held++;
+                return held;
+            }
+        }
 
         /// <summary>Gives the working key for the next counter, then erases the derivation key it came from. Each call uses a new counter.</summary>
         public DukptUse Next(DukptKeyUsage u, DukptKeyType t)

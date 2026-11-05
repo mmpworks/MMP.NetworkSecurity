@@ -1,6 +1,7 @@
 using System;
 using System.Collections.Generic;
 using NetSec.Bytes;
+using NetSec.Errors;
 
 namespace NetSec.Dukpt
 {
@@ -22,26 +23,56 @@ namespace NetSec.Dukpt
             if (ksn.Length != DukptDerivation.KsnSize) throw new ArgumentException("A KSN holds 12 bytes.", "ksn");
             byte[] initialKeyId = new byte[DukptDerivation.InitialKeyIdSize];
             Buffer.BlockCopy(ksn, 0, initialKeyId, 0, initialKeyId.Length);
-            uint counter = ((uint)ksn[8] << 24) | ((uint)ksn[9] << 16) | ((uint)ksn[10] << 8) | ksn[11];
+            uint counter = DukptDerivation.CounterOf(ksn);
 
             byte[] initial = DukptDerivation.InitialKey(bdk, initialKeyId);
             byte[] derivationKey = DukptDerivation.WalkDown(initial, initialKeyId, counter, 32);
             return DukptDerivation.Working(derivationKey, initialKeyId, counter, u, t);
         }
+
+        /// <summary>Makes the bank's checks on one PIN sale and changes nothing, so a trace can show the outcome before the rule acts.</summary>
+        public static PinSale CheckPinSale(byte[] bdk, KsnLedger ledger, byte[] ksn, byte[] block, string pan, DukptKeyType t)
+        {
+            PinSale sale = new PinSale();
+            sale.Counter = DukptDerivation.CounterOf(ksn);
+            if (ledger.Contains(ksn))
+            {
+                sale.Code = ErrorCodes.DukptKsnReplay;
+                return sale;
+            }
+            sale.Key = DeriveWorkingKey(bdk, ksn, DukptKeyUsage.PinEncryption, t);
+            if (!PinBlock.TryDecryptFormat4(sale.Key, block, pan, out sale.Pin)) sale.Code = ErrorCodes.DukptPinBlockFormat;
+            return sale;
+        }
+
+        /// <summary>
+        /// Checks one PIN sale and records its KSN only if the sale passes. A forged block under the next KSN then leaves that KSN free for the real sale.
+        /// A caller with more checks, such as a MAC, makes them before this call.
+        /// </summary>
+        public static PinSale OpenPinSale(byte[] bdk, KsnLedger ledger, byte[] ksn, byte[] block, string pan, DukptKeyType t)
+        {
+            PinSale sale = CheckPinSale(bdk, ledger, ksn, block, pan, t);
+            if (sale.Code == null) ledger.Record(ksn);
+            return sale;
+        }
     }
 
-    /// <summary>The KSNs a bank has seen. A repeat means a replayed sale.</summary>
+    /// <summary>The outcome of the bank's checks on one PIN sale. Code is null when the sale passed.</summary>
+    public sealed class PinSale
+    {
+        public string Code;
+        public uint Counter;
+        public byte[] Key;
+        public string Pin;
+    }
+
+    /// <summary>The KSNs of the sales a bank has accepted. A repeat means a replayed sale.</summary>
     public sealed class KsnLedger
     {
         readonly Dictionary<string, bool> _seen = new Dictionary<string, bool>();
 
-        /// <summary>True when this KSN is new. False when it was seen before.</summary>
-        public bool TryRecord(byte[] ksn)
-        {
-            string key = Hex.Encode(ksn);
-            if (_seen.ContainsKey(key)) return false;
-            _seen.Add(key, true);
-            return true;
-        }
+        public bool Contains(byte[] ksn) { return _seen.ContainsKey(Hex.Encode(ksn)); }
+
+        public void Record(byte[] ksn) { _seen[Hex.Encode(ksn)] = true; }
     }
 }
