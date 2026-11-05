@@ -62,6 +62,21 @@ export async function hostGet(addr: HostAddress, path: string): Promise<any> {
   return r.json()
 }
 
+export interface HostReply { status: number; body: any }
+
+/** POST or PUT with a JSON body. An error status still returns its body, so the caller reads the Host's error code. */
+export async function hostSend(addr: HostAddress, method: 'POST' | 'PUT', path: string, payload?: unknown): Promise<HostReply> {
+  const r = await fetch(`http://127.0.0.1:${addr.port}${path}`, {
+    method,
+    headers: { Authorization: `Bearer ${addr.token}`, 'Content-Type': 'application/json' },
+    body: payload === undefined ? undefined : JSON.stringify(payload),
+  })
+  const text = await r.text()
+  let body: any = null
+  try { body = text ? JSON.parse(text) : null } catch { body = { code: 'HOST_BAD_REPLY', message: text.slice(0, 200) } }
+  return { status: r.status, body }
+}
+
 export interface HostSocket {
   send(frame: Record<string, unknown>): void
   close(): void
