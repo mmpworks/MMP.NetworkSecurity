@@ -34,7 +34,7 @@ public static class SecurityRoutes
         app.MapGet("/api/security/types/{typeId}/key", (string typeId) => KeyReply(store, typeId));
         app.MapGet("/api/security/readiness", (int lesson) =>
         {
-            LabDecision d = SecurityReadiness.Decide(LabCatalog.Needs(lesson), store.States());
+            LabDecision d = store.Decide(LabCatalog.Needs(lesson));
             return Results.Json(new { mayRun = d.MayRun, problems = d.Problems.Select(p => new { typeId = p.TypeId, code = p.Code, detail = p.Detail }) });
         });
         app.MapGet("/api/security/show-keys", () => Results.Json(new { on = store.ShowKeys }));

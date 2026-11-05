@@ -26,7 +26,7 @@ public static class VaultRoutes
         app.MapPost(Exercise + "audit-check", () => Answer(() =>
         {
             AuditChecked c = exercise.AuditCheck();
-            return new { rows = c.Rows.Select(RowOf), firstBadSeq = c.FirstBadSeq, code = c.Code };
+            return new { rows = c.Rows.Select(RowOf), firstBadSeq = c.FirstBadSeq, code = c.Code, limits = c.Limits };
         }));
     }
 
@@ -49,13 +49,13 @@ public static class VaultRoutes
         seq = r.Seq, at = r.At, caller = r.Caller, op = r.Op, name = r.Name, version = r.Version, result = r.Result, detail = r.Detail, prev_hash = r.PrevHash,
     };
 
-    /// <summary>A refusal is HTTP 409 with its code. An audit row that cannot be written is HTTP 503, because the vault, not the ask, is at fault.</summary>
+    /// <summary>A refusal is HTTP 409 with its code. An audit row that cannot be written, or a bad master.key, is HTTP 503: the vault, not the ask, is at fault.</summary>
     static IResult Answer<T>(Func<T> call)
     {
         try { return Results.Json(call(), Json); }
         catch (VaultException e)
         {
-            int status = e.Code == VaultCodes.AuditFailed ? StatusCodes.Status503ServiceUnavailable : StatusCodes.Status409Conflict;
+            int status = e.Code is VaultCodes.AuditFailed or VaultCodes.MasterKeyBad ? StatusCodes.Status503ServiceUnavailable : StatusCodes.Status409Conflict;
             return Results.Json(new { code = e.Code, message = e.Message, retryable = e.Code == VaultCodes.AuditFailed, requestId = Guid.NewGuid().ToString("N") }, statusCode: status);
         }
     }

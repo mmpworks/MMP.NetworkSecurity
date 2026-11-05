@@ -225,7 +225,7 @@ namespace NetSec.Host
             int lesson = Number(m, "lesson", -1);
             int seed = Number(m, "seed", RandomSeed());
             // GEM:decide-at-authoritative-boundary: the one place a lesson may refuse a key, before any event. A lab never falls back to built-in keys in silence.
-            LabDecision ready = SecurityReadiness.Decide(LabCatalog.Needs(lesson), security.States());
+            LabDecision ready = security.Decide(LabCatalog.Needs(lesson));
             if (!ready.MayRun)
             {
                 Fail(requestId, ready.Problems[0].Code, string.Join(" ", ready.Problems.Select(p => p.Detail)));

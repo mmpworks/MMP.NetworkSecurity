@@ -22,7 +22,23 @@ public sealed class SecurityStore
     public const string CallerFlow = "host/flow";
     public const string CallerMoveV0 = "host/move-v0-file";
 
-    public LabDecision Decide(string[] typesTheLabReads) => SecurityReadiness.Decide(typesTheLabReads, States());
+    /// <summary>
+    /// The one readiness answer, used by GET /api/security/readiness and by session.start alike. After the state rules pass,
+    /// each vault key the lesson reads is probed, so a changed row or master.key is refused here by name rather than later at the export.
+    /// </summary>
+    public LabDecision Decide(string[] typesTheLabReads)
+    {
+        LabDecision byState = SecurityReadiness.Decide(typesTheLabReads, States());
+        if (!byState.MayRun) return byState;
+        TypeProblem[] vault = typesTheLabReads
+            .Select(t => (Type: t, Entry: Entry(t)))
+            .Where(p => p.Entry.Mode == ModeMine && p.Entry.Binding?.Provider == ProviderVault)
+            .Select(p => (p.Type, Code: Vault.Probe(p.Type, p.Entry.Binding!.Version)))
+            .Where(p => p.Code is not null)
+            .Select(p => new TypeProblem(p.Type, p.Code!, $"{p.Type} version {Entry(p.Type).Binding!.Version} does not open in the vault ({p.Code}). Run the flow {FlowOf(p.Type)} again."))
+            .ToArray();
+        return vault.Length == 0 ? byState : new LabDecision(vault);
+    }
 
     /// <summary>The types whose keys live in the vault (slice V1: the my-login flow). The others stay key files until their slice moves them.</summary>
     static readonly HashSet<string> VaultTypes = [SecurityTypes.TokenIssuer, SecurityTypes.DeviceEnrolment];
@@ -47,6 +63,7 @@ public sealed class SecurityStore
         _modesPath = Path.Combine(root, "modes.json");
         _flowOf = table.Flows.SelectMany(f => f.Types.Select(t => (t, f.FlowId))).ToDictionary(p => p.t, p => p.FlowId);
         _modes = File.Exists(_modesPath) ? ReadModes(_modesPath) : Empty();
+        MoveV0KeyFiles();
     }
 
     static ModesFile ReadModes(string path)
@@ -115,9 +132,33 @@ public sealed class SecurityStore
     }
 
     /// <summary>The key goes in as a new version of the vault key named for the type. The key's policy was set when the first version went in, and stays.</summary>
-    void PlaceInVault(string typeId, byte[] seed)
+    /// <summary>
+    /// A folder made before slice V1 holds the my-login keys as key.pem files. On first start each one moves into the vault, under the caller
+    /// host/move-v0-file so the audit list names the move, and the file goes once the vault holds it. A checked key stays checked: the bytes are the same.
+    /// A file that will not read, or a vault that will not take it, stays where it is, and the type shows its problem by name as before.
+    /// </summary>
+    void MoveV0KeyFiles()
     {
-        string caller = "host/flow-" + FlowOf(typeId);
+        foreach (string typeId in VaultTypes)
+        {
+            TypeEntry e = Entry(typeId);
+            if (e.Mode != ModeMine || e.Binding is not { Provider: ProviderFile, KeyFile: { } file } || StateOf(typeId) == StateBroken) continue;
+            string full = FullPath(file);
+            bool wasChecked = e.CheckedVersion == e.Binding.Version;
+            try { PlaceInVault(typeId, KeyFileReader.ReadPrivateKey(full, typeId).CopyMaterial(), CallerMoveV0); }
+            catch (NetSec.Errors.NetSecException) { continue; }
+            lock (_gate)
+            {
+                TypeEntry moved = EntryOf(_modes, typeId);
+                if (wasChecked) Put(typeId, moved with { CheckedVersion = moved.Binding!.Version });
+            }
+            File.Delete(full);
+        }
+    }
+
+    void PlaceInVault(string typeId, byte[] seed, string? caller = null)
+    {
+        caller ??= "host/flow-" + FlowOf(typeId);
         int version = Vaulted(() =>
         {
             if (!Vault.Exists(typeId)) Vault.CreateKey(typeId, FlowKeyPolicy, caller);
@@ -175,7 +216,7 @@ public sealed class SecurityStore
     public ITrainingKey? PlacedKey(string typeId, string caller = CallerFlow)
     {
         KeyBinding? b = Entry(typeId).Binding;
-        if (b?.Provider == ProviderVault) return new SeedKey(typeId, Vaulted(() => Vault.Export(typeId, caller)));
+        if (b?.Provider == ProviderVault) return new SeedKey(typeId, Vaulted(() => Vault.Export(typeId, caller, b.Version)));
         return b?.KeyFile is null ? null : KeyFileReader.ReadPrivateKey(FullPath(b.KeyFile), typeId);
     }
 

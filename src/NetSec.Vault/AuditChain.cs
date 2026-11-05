@@ -5,7 +5,11 @@ namespace NetSec.Vault;
 
 /// <summary>
 /// GEM:seeded-hash-linked-custody-chain — each audit row stores the hash of the row before it, so a changed row breaks the link to the next one.
-/// The first row links to a fixed seed. This finds an edit; it does not stop one, and the newest row has no row after it to show its change.
+/// The first row links to a fixed seed. The chain has no secret, by design, so it finds an edit and cannot stop one. It misses three changes:
+/// 1. an edit to the newest row, because no row after it holds its hash;
+/// 2. rows cut from the end, because the rows left still link;
+/// 3. a full rewrite of every row, because anyone can compute every hash again from the seed.
+/// A keyed chain (an HMAC under a secret) would catch 3 only while the secret stays secret. The course screens name all three (VaultExercise.ChainLimits).
 /// </summary>
 public static class AuditChain
 {
