@@ -14,7 +14,7 @@ certificates, tokens, and permissions.
 
 1. Steve wants to learn these techniques by seeing the bytes.
 2. Fuel-site hardware runs Windows CE. Steve states that the CE device has only SSH and possibly TLS 1.1.
-   The course must show how an old device and a new server meet safely.
+   The course must show how an old device and a new server meet, what that protects, and what stays exposed.
 
 ## Spike results (2026-11-04, run on this machine)
 
@@ -55,18 +55,26 @@ certificates, tokens, and permissions.
 | D2 | Primitives and protocol engines are hand-written and glass-box | Spike: Schannel hides secrets and CF lacks the primitives |
 | D3 | Socket loops run on MMP.AsyncProxy (sibling project reference) | Steve's request. AsyncProxy already has a CF build |
 | D4 | Every engine step emits a trace event with bytes, parsed fields, and the secrets in use | "See the traffic" is the product |
-| D5 | Training keys sit behind `IKeySource`. Transports sit behind a factory: glass-box or OS | Steve's request to swap for real keys later |
-| D6 | Real secrets use the OS transport (`SslStream`). The glass-box engine carries a TRAINING ONLY label | A teaching engine shows its keys and has had no side-channel review |
-| D7 | The CE lab is SSH-2 plus TLS 1.1. A gateway bridges to the modern server | Steve's CE fact, 2026-11-04 |
+| D5 | Keys come in two types. `ITrainingKey` can export bytes. `IKeyHandle` offers operations and never exports. The glass-box factory accepts only `ITrainingKey`, so a real key cannot enter it by type | Steve's request to swap for real keys later. Red team F6 |
+| D6 | Real mode uses the OS transport (`SslStream`), shows metadata only, and writes no secret bytes. The glass-box engine carries a TRAINING ONLY label. Real-key routes for CE, SSH, and a DUKPT base key do not exist in this build (open item) | A teaching engine shows its keys and has had no side-channel review |
+| D7 | The CE lab is SSH-2 plus TLS 1.1. A gateway bridges to the modern server. Engines are sans-IO (bytes in, bytes out, no sockets) behind `IDeviceLink`, with three links: GlassSsh, ExternalForward (`ssh.exe -L`), GlassTls11 | Steve's CE fact, 2026-11-04. The sentence has several readings, and this design stays right under each |
 | D8 | C++ is a small native library (constant-time and leaky compare, timing lab). The code stays plain C-compatible so a CE compiler can take it later | Steve's "where needed in unmanaged space" |
 | D9 | Electron + Vue 3 + Vuetify + Playwright, the same shell as MMP.GasPumpSimulator. Host is a .NET 10 minimal API + WebSocket | Known working stack. Lesson: spawn detached and handle EPIPE |
-| D10 | Referees are outside the code under test: OpenSSL, Go `crypto/tls`, Go `x/crypto/ssh`, `ssh.exe`, .NET 10 BCL, published vectors | Independent anchor |
+| D10 | Referees are outside the code under test: OpenSSL, Go `crypto/tls`, Go `x/crypto/ssh`, `ssh.exe`, a Go TCP tap, .NET 10 BCL, published vectors | Independent anchor |
+| D11 | The test suite that grades the build lives in `acceptance/`. A separate agent writes it before S0. Builders never write there. A third agent runs it from a fresh clone and diffs `acceptance/` against the pinned commit | Red team F2. A builder can edit the tests it commits |
+| D12 | Each slice ships its own lesson, tour, attacks, and e2e. `main` runs after every merge. The home page shows built and unbuilt lessons from the run results | Red team F10. Half a run must still be a usable course |
+| D13 | DUKPT runs in separate PIN-pad and bank-HSM processes. The CE process and the gateway relay ciphertext only | Red team F8. X9.24-3 places the keys in secure devices at each end |
+| D14 | The Host checks `Origin` and requires a session token on HTTP and WebSocket | Red team F6. A browser page can open a loopback socket |
 
 ## Assumptions to confirm with Steve
 
 1. **CE SSH algorithms.** Unknown. Build both `curve25519-sha256` + `aes128-ctr` + `hmac-sha2-256` and the older `diffie-hellman-group14-sha1` + `aes128-cbc` + `hmac-sha1`.
 2. **CE version.** Unknown. Target is CF 3.5, per the fence in MMP.AsyncProxy.
-3. **SSH role.** Assume the CE device is the SSH client that opens a tunnel out to the gateway. Build the server side too, so either direction can be shown.
+3. **SSH role.** Assume the CE device is the SSH client that opens a tunnel out to the gateway. Build the server side if time allows, so either direction can be shown.
+4. **The one question for Steve on waking:** what runs on the box, and who starts the SSH? Readings: our code is the SSH client; an SSH binary on the box forwards a local port to our code; SSH is only how we reach the box for testing; the box is an SSH server only.
+5. **DUKPT type at the site.** Unknown. AES DUKPT is built. Older hardware may use TDES DUKPT (recollection, unverified).
+6. **TLS 1.1 on CE.** Unknown whether code can select it. CF `System.dll` has `ServicePointManager`, and a search found no `SecurityProtocolType`.
+7. **"Real keys".** Assume test credentials and vendor test keys.
 
 ## Lessons
 
@@ -86,32 +94,34 @@ Every lesson has attack buttons. Each attack names the check that caught it.
 
 ## Acceptance assertions (written before any code)
 
-Each is checked by a command. Results go in `docs/_runs/`. Every count is reported as N of M.
+Each clause is one check. `acceptance/run.ps1` runs them from a fresh clone and writes `docs/_runs/`. Results are reported as N of M per clause, and M comes from `acceptance/clauses.json`.
 
 | ID | Assertion | Anchor | Owning slice |
 |---|---|---|---|
-| A1 | AES, SHA-1, SHA-256, SHA-384, MD5, HMAC, CMAC, HKDF, GCM, X25519, Ed25519 pass the published vectors on both builds | Published vectors | S1 |
+| A1 | AES (ECB, CBC, CTR, GCM), SHA-1, SHA-256, SHA-384, MD5, HMAC, CMAC, HKDF, X25519, Ed25519, RSA, TDES, DH group14 pass published vectors on both builds | Published vectors | S1, S4 |
 | A2 | 10,000 random inputs for AES, HMAC, HKDF, and GCM match the .NET 10 BCL. 200 ML-KEM-768 rounds interoperate with .NET 10 `MLKem` in both directions | .NET 10 BCL | S1 |
-| A3 | AES DUKPT matches the X9.24-3-2017 published vectors for AES-128 and AES-256 base keys. Reader and bank sides agree for 1,000 sales. Old keys are gone from reader state | x9.org vectors | S2 |
+| A3 | AES DUKPT matches the X9.24-3-2017 published vectors for AES-128 and AES-256 base keys. PIN-pad and bank sides agree for 1,000 sales. Used keys are absent from PIN-pad state. The tour states that a managed heap can keep copies | x9.org vectors | S2 |
 | A4 | Key schedule secrets match the RFC 8448 trace byte for byte | RFC 8448 | S3 |
-| A5 | Glass client and server each complete TLS 1.3 against OpenSSL 3.5.7 and Go `crypto/tls`, with X25519 and with X25519MLKEM768. The referee reports the group | OpenSSL, Go | S3 |
+| A5 | Glass client completes TLS 1.3 against OpenSSL 3.5.7 and Go `crypto/tls`, with X25519 and with X25519MLKEM768. Glass server does the same if built. The referee reports the group. Clause count states which roles exist | OpenSSL, Go | S3 |
 | A6 | The key log from our client equals the OpenSSL server key log for the same session | OpenSSL | S3 |
-| A7 | Glass client completes TLS 1.1 against OpenSSL `-tls1_1`. A modern server refuses it. The TLS 1.3 downgrade sentinel is detected | OpenSSL, Go | S4 |
-| A8 | Glass SSH client works against a Go `x/crypto/ssh` server, including one exec and one tunnel. Windows `ssh.exe` works against our server. A changed host key is refused | Go, `ssh.exe` | S4 |
-| A9 | The shared code compiles against `E:\dev\tools\netcf35-ref` with `LangVersion 3`. The same test suite passes with the CF binaries on net48. Skips are named | CF references | All |
-| A10 | End to end: a CF-binary process sends a DUKPT-locked PIN block through SSH to the gateway, then TLS 1.3 hybrid to the server. The server recovers the PIN block. The trace spans both hops. A tamper at each hop fails by name | Live run, observed from outside the app | S5 |
-| A11 | Mutual TLS, tokens, DPoP replay, passkey-shaped challenge, role and capability checks: each has a passing case and at least one failing attack. Our token verifies under a Go or .NET verifier | Go or .NET | S6 |
-| A12 | The C++ library builds with `cl.exe`, loads from .NET 10 and from CF binaries on net48, and the timing lab shows leaky vs constant-time as measured numbers | `cl.exe`, live run | S7 |
-| A13 | The Electron app starts from a clean checkout. Playwright walks every step of every tour. Every lesson is reachable. Screenshots are saved | Playwright | S8 |
-| A14 | Every tour step binds to a live trace event or is marked as a concept step. A test fails on a dangling binding | Test over the tour files | S8 |
-| A15 | All tour text scores Flesch-Kincaid grade 8.9 or lower by script, and passes `tic-gate.py` | Script | S8 |
-| A16 | A test swaps `IKeySource` from training keys to a file source, and the labs still pass. The UI labels the glass-box engine TRAINING ONLY | Test, Playwright | S2, S8 |
+| A7 | Glass client completes TLS 1.1 against OpenSSL `-tls1_1`, for a named RSA key transport suite and a named ECDHE CBC suite. The same client gets alert 70 from a modern server. A TLS 1.3 client detects the `DOWNGRD` sentinel from OpenSSL | OpenSSL | S4 |
+| A8 | Glass SSH client runs one exec and one tunnel against a Go `x/crypto/ssh` server, on the modern suite and on the legacy suite (group14-sha1, aes128-cbc, hmac-sha1, old RSA host key). A changed host key gives a named error, beside a passing control. Windows `ssh.exe` works against our server if built | Go, `ssh.exe` | S4 |
+| A9 | The shared code compiles against `E:\dev\tools\netcf35-ref` with `LangVersion 3`. Each CF binary references the CF mscorlib key token. The same suite passes with CF binaries on net48. Skips match the pinned list in `acceptance/`, each with a reason. `git ls-files` finds no CF binary | CF references | All |
+| A10 | End to end: PIN-pad, CE, gateway, server, and bank-HSM are separate processes, with the CE process built from CF binaries. A locked PIN block travels through SSH, then TLS 1.3 hybrid. The bank recovers it. Hop servers run once as Go `x/crypto/ssh` and Go `crypto/tls`, and once as our Gateway. One run goes through `ssh.exe -L`. A tamper at each hop gives a named error beside a passing control. CE and gateway memory traces hold no key and no clear PIN | Live run, Go referees | S5 |
+| A10a | A Go TCP tap on each hop records bytes. Tap bytes equal trace bytes. Randoms differ across two runs | Go tap | S3, S5 |
+| A11 | Mutual TLS, tokens, DPoP replay, and role checks each have a passing control and an attack that differs by one field and gets a named rejection. Our token verifies under a Go or .NET verifier. Passkey-shaped challenge and capabilities are cut first if time runs out | Go or .NET | S6 |
+| A12 | The C++ library builds with `cl.exe` and loads from .NET 10 and from CF binaries on net48. The timing lab takes 100,000 samples per case, and the leaky compare separates from constant-time by a stated threshold on a Welch t statistic. The tour states that managed code has no constant-time guarantee | `cl.exe`, live run | S7 |
+| A13 | The Electron app starts from a fresh temp clone beside sibling `MMP.AsyncProxy` and `E:\dev\tools\netcf35-ref`. Playwright walks every step of every built lesson against a live Host, never a recorded fixture. Screenshots are saved | Playwright | Each slice |
+| A14 | Every tour step binds to a live trace event or is marked as a concept step. At most 30% of a lesson's steps are concept steps. A test fails on a dangling binding | Test over the tour files | Each slice |
+| A15 | All tour text scores Flesch-Kincaid grade 8.9 or lower by script, and passes `tic-gate.py` | Script | Each slice |
+| A15a | Each security claim in a tour cites a source section, and an agent that did not write it reads it for accuracy | Accuracy reader | Each slice |
+| A16 | A real `IKeyHandle` given to the glass-box factory fails by type. Real mode runs `SslStream`, and a scan of its trace and session file finds no secret bytes. The UI labels the glass-box engine TRAINING ONLY. The UI and reports use the wording "CF-compiled, run on the desktop CLR, never run on CE" | Test, Playwright | S2, S8 |
 
 ## Slices (build order)
 
 | Slice | Content |
 |---|---|
-| S0 | Skeleton: two builds of one source tree, AsyncProxy reference, trace model, Host, Electron shell, tour engine, one live lesson end to end |
+| S0 | Skeleton: `acceptance/` first, two builds of one source tree, AsyncProxy reference, trace model, Host, Electron shell, tour engine, one live lesson end to end. Spike: a CF-compiled exe runs a socket loop on net48 |
 | S1 | Primitives and ML-KEM |
 | S2 | Keys seam and DUKPT |
 | S3 | TLS 1.3 engine and hybrid |
@@ -119,9 +129,29 @@ Each is checked by a command. Results go in `docs/_runs/`. Every count is report
 | S5 | Gateway and the bridge |
 | S6 | Authentication and permissions |
 | S7 | C++ library and timing lab |
-| S8 | All tours, attack buttons, e2e, polish, and a final red team |
+| S8 | Polish across lessons, real-mode switch, and a final red team |
 
 Later slices read `docs/learnings.md`. Each correction goes there.
+
+Cut order if time runs out: passkey and capabilities; glass TLS 1.3 server role; SSH server role; C# 3 for code that never reaches CE. Keep DUKPT, HMAC, TLS 1.3 client, and SSH client.
+
+## Teaching accuracy rules (the tours must state these)
+
+1. The gateway sees everything except the PIN block. The bridge makes things safer, and the tour lists what stays exposed.
+2. The downgrade sentinel helps only a client that speaks TLS 1.3. A TLS 1.1-only device has nothing to check.
+3. TLS 1.1 CBC: the explicit IV stops BEAST. MAC-then-encrypt leaves padding oracles (Lucky13). RC4 is banned by RFC 7465. RSA key transport lets an attacker record now and decrypt after a key theft. The lab forces the weak suite, because a default run picks the best case.
+4. The hybrid protects key exchange only. Certificates stay classical.
+5. Managed code has no constant-time guarantee. C++ results depend on the optimizer.
+6. A passkey-shaped challenge is not WebAuthn.
+7. Each lab carries the label: "Built to show the parts. Do not copy."
+8. The course makes no compliance claims.
+
+## Licence checklist
+
+1. Keep X9 vectors behind a fetch script with SHA-256 and provenance.
+2. Keep CF references out of the repo. A9 checks this.
+3. Add third-party notices for Electron and Chromium.
+4. Draw our own picture for the ECB lab.
 
 ## Non-goals
 
@@ -134,7 +164,7 @@ Later slices read `docs/learnings.md`. Each correction goes there.
 ## Boundary
 
 - **Free:** create and push the private repo, branches, PRs, merge own green PRs, pinned Go modules from the Go proxy, the x9.org vector PDF as data, loopback sockets, training keys.
-- **Needs Steve:** make the repo public, publish anything, install system-wide software or services, buy anything, use any real key.
+- **Needs Steve:** make the repo public (ask Dave about X9 material and export rules first), publish anything, install system-wide software or services, buy anything, use any real key.
 - **Failure routing:**
   - A build or test fails: fix it, or record the gap and move to the next slice. Never delete or skip a test to get green.
   - A hook or gate refuses: stop that step and report it. Never route around it.
@@ -150,8 +180,8 @@ Later slices read `docs/learnings.md`. Each correction goes there.
 
 ## Kill condition
 
-The work ends when A1 to A16 each have a recorded result, or at 2026-11-05 00:00 local, whichever comes first.
-The closing report states N of 16 with the command output in `docs/_runs/`, and names every assertion not met.
+The work ends when every clause in `acceptance/clauses.json` has a recorded result, or at 2026-11-05 09:00 local, whichever comes first.
+The first line of the closing report is one PowerShell command that opens the app. The report states N of M per clause, with the command output in `docs/_runs/`, and names every clause not met.
 
 ## Closest prior art
 
