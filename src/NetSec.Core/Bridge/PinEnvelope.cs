@@ -78,6 +78,10 @@ namespace NetSec.Bridge
     {
         const int RandomSize = 8;
 
+        // What a key loader puts in the lab's pad. The bank derives the same key from the base key, and a test pins that. This key opens one pad's sales only (D13).
+        public const string InjectedKeyId = "1234567890123456";
+        public const string InjectedInitialKey = "0df82e94fec64fb6ba47e98887af157d";
+
         /// <summary>Locks one PIN under the next counter's keys. The pad erases the derivation key inside NextTogether.</summary>
         public static PadSale Sell(DukptPinPad pad, string traceId, string pin, string pan, IRandomSource random)
         {
@@ -114,12 +118,14 @@ namespace NetSec.Bridge
             try { envelope = PinEnvelope.Parse(envelopeBytes); }
             catch (ParseFailure failure) { return Refuse(null, ErrorCodes.EnvelopeMalformed, MacCheck, failure.Message); }
 
+            // The trace id sits inside the bytes the MAC covers. A refusal before the MAC passes keeps it out of the bank's trace, and names it only as a claim.
+            string claimed = " The envelope claims trace id " + envelope.TraceId + ".";
             byte[] macKey;
             try { macKey = DukptBank.DeriveWorkingKey(bdk, envelope.Ksn, DukptKeyUsage.MacGeneration, DukptKeyType.Aes128); }
-            catch (ArgumentException failure) { return Refuse(envelope.TraceId, ErrorCodes.DukptMacMismatch, MacCheck, failure.Message); }
-            catch (NetSecException failure) { return Refuse(envelope.TraceId, ErrorCodes.DukptMacMismatch, MacCheck, failure.Error.Message); }
+            catch (ArgumentException failure) { return Refuse(null, ErrorCodes.DukptMacMismatch, MacCheck, failure.Message + claimed); }
+            catch (NetSecException failure) { return Refuse(null, ErrorCodes.DukptMacMismatch, MacCheck, failure.Error.Message + claimed); }
             if (!Cmac.Verify(new AesKey(macKey), envelope.Covered, envelope.Mac))
-                return Refuse(envelope.TraceId, ErrorCodes.DukptMacMismatch, MacCheck, "the MAC does not fit this envelope");
+                return Refuse(null, ErrorCodes.DukptMacMismatch, MacCheck, "the MAC does not fit this envelope." + claimed);
             if (ledger.Contains(envelope.Ksn))
                 return Refuse(envelope.TraceId, ErrorCodes.DukptKsnReplay, ReplayCheck, "the bank has seen this KSN before");
 

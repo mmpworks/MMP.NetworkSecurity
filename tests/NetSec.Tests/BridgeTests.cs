@@ -9,6 +9,7 @@ using NetSec.Errors;
 using NetSec.Io;
 using NetSec.Keys;
 using NetSec.Platform;
+using NetSec.Trace;
 using Xunit;
 
 namespace NetSec.Tests
@@ -21,6 +22,85 @@ namespace NetSec.Tests
 
         static DukptPinPad NewPad() => new DukptPinPad(DukptBank.DeriveInitialKey(Bdk, KeyId), KeyId);
         static PadSale Sell(DukptPinPad pad = null) => PinPadCore.Sell(pad ?? NewPad(), "t1", Pin, Pan, new SeededRandom(5));
+
+        [Fact]
+        public void The_key_loaded_into_the_pad_is_the_one_the_bank_derives()
+        {
+            Assert.Equal(PinPadCore.InjectedInitialKey, Hex.Encode(DukptBank.DeriveInitialKey(Bdk, Hex.Decode(PinPadCore.InjectedKeyId))));
+        }
+
+        [Fact]
+        public void A_refusal_before_the_mac_passes_keeps_the_claimed_trace_id_out_of_the_decision()
+        {
+            byte[] flipped = (byte[])Sell().Envelope.Bytes.Clone();
+            flipped[flipped.Length - 1] ^= 1;
+            BankDecision d = BankHsmCore.Decide(Bdk, new KsnLedger(), flipped);
+            Assert.False(d.Ok);
+            Assert.Null(d.TraceId);
+            Assert.Contains("claims trace id", d.Detail);
+        }
+
+        sealed class OneLink : IByteLink
+        {
+            public int Writes;
+            public bool Closed;
+            public IFuture<int> Read(byte[] b, int off, int n) => Futures.FromResult(0);
+            public IFuture Write(byte[] b, int off, int n) { Writes++; return Futures.Completed; }
+            public void Close() { Closed = true; }
+        }
+
+        [Fact]
+        public void A_tunnel_with_no_bytes_opens_nothing_on_the_next_hop()
+        {
+            int opens = 0;
+            FirstWriteOpensLink link = new FirstWriteOpensLink(() => { opens++; return Futures.FromResult<IByteLink>(new OneLink()); });
+            IFuture<int> read = link.Read(new byte[4], 0, 4);
+            Assert.False(read.IsCompleted);
+            link.Close();
+            Assert.True(read.Wait(5000));
+            Assert.Equal(0, read.Result);
+            Assert.Equal(0, opens);
+        }
+
+        [Fact]
+        public void The_first_write_opens_the_next_hop_once_and_the_close_reaches_it()
+        {
+            int opens = 0;
+            OneLink inner = new OneLink();
+            FirstWriteOpensLink link = new FirstWriteOpensLink(() => { opens++; return Futures.FromResult<IByteLink>(inner); });
+            Assert.True(link.Write(new byte[1], 0, 1).Wait(5000));
+            Assert.True(link.Write(new byte[1], 0, 1).Wait(5000));
+            Assert.Equal(1, opens);
+            Assert.Equal(2, inner.Writes);
+            link.Close();
+            for (int i = 0; i < 500 && !inner.Closed; i++) System.Threading.Thread.Sleep(10);
+            Assert.True(inner.Closed);
+        }
+
+        [Fact]
+        public void A_late_sink_holds_events_and_writes_them_in_order_under_the_id_it_learns()
+        {
+            ListSink inner = new ListSink();
+            LateTraceSink late = new LateTraceSink(inner);
+            TraceStream stream = new TraceStream("s/gateway/ssh", "s", null, "hop1", "gateway", new FixedClock(1));
+            late.Write(stream.Stamp(new TraceEventDraft { Type = "wire.sent", Wire = new byte[] { 1 } }));
+            late.Write(stream.Stamp(new TraceEventDraft { Type = "wire.sent", Wire = new byte[] { 2 } }));
+            Assert.Empty(inner.Events);
+            late.Learn("t1");
+            late.Write(stream.Stamp(new TraceEventDraft { Type = "wire.sent", Wire = new byte[] { 3 } }));
+            Assert.Equal(new[] { "t1", "t1", "t1" }, inner.Events.Select(e => e.TraceId).ToArray());
+            Assert.Equal(new byte[] { 1, 2, 3 }, inner.Events.Select(e => e.Wire[0]).ToArray());
+        }
+
+        [Fact]
+        public void A_late_sink_that_never_learns_still_writes_what_it_holds()
+        {
+            ListSink inner = new ListSink();
+            LateTraceSink late = new LateTraceSink(inner);
+            late.Write(new TraceStream("s", "s", null, "hop1", "gateway", new FixedClock(1)).Stamp(new TraceEventDraft { Type = "check.result" }));
+            late.Flush();
+            Assert.Null(Assert.Single(inner.Events).TraceId);
+        }
 
         [Fact]
         public void The_bank_recovers_the_clear_field_the_pad_locked()
