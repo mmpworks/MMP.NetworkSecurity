@@ -44,6 +44,8 @@
     { "id": "constant-time", "term": "constant-time", "short": "Code meant to take the same time whatever the secret data is." },
     { "id": "histogram", "term": "histogram", "short": "A chart that counts how many timings fell in each range." },
     { "id": "t-statistic", "term": "t statistic", "short": "A number that compares two groups of timings. A large size means they differ by more than noise." },
-    { "id": "optimizer", "term": "optimizer", "short": "The part of a compiler that rewrites code to run faster. It can change timing." }
+    { "id": "optimizer", "term": "optimizer", "short": "The part of a compiler that rewrites code to run faster. It can change timing." },
+    { "id": "ed25519", "term": "Ed25519", "short": "A modern way to sign things. Its keys are short and the signatures are small." },
+    { "id": "pem", "term": "PEM file", "short": "A text file that holds a key or a certificate between two marker lines." }
   ]
 }
