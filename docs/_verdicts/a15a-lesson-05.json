@@ -18,8 +18,8 @@
     },
     {
       "id": "L5-C03",
-      "verdict": "inaccurate",
-      "note": "Tour read at origin/fix/tour-4-5-limits commit 14af058 (PR 87, open); lab run at origin/fix/s3-tls-blockers b5d6641. The first sentence holds: after L5-replace-key-share the sides' x25519_shared differ (8ce3da34... against 919b9f5d...) and the first sealed record fails the AEAD tag. The second sentence is too strong: 'A flip of any byte of either hello gives the same failure'. The committed sweep (Tls13FlipSweepTests, hybrid hellos, 315 offsets tested, ML-KEM values sampled every 37th) gives TLS13_AEAD_TAG for 245 flips and another named result or a stall for 70: PARSE_TRUNCATED 33, TLS13_ILLEGAL_PARAMETER 9, TLS13_VERSION_REFUSED 9, TLS13_NO_COMMON_GROUP 4, TLS13_HRR_UNSUPPORTED 4, TLS13_NO_COMMON_SIGNATURE 4, UNEXPECTED_MESSAGE 4, TLS13_MESSAGE_TOO_LONG 2, Stalled 1. The shared-secret statement holds: flipping the ClientHello random (offset 6) or the ServerHello random leaves x25519_shared equal on both sides (919b9f5d... both) and still ends in the AEAD tag. Fix: 'Most bytes of either hello give the same AEAD tag failure (245 of the 315 flips tested); the rest fail at once with a parse or parameter check. Only the shared secret tells the AEAD cases apart.' Same fix in the names doc item 1.",
+      "verdict": "accurate",
+      "note": "Re-read at origin/fix/tour-4-5-limits commit 9a20d46 (PR 87, open). Now reads 'A flip in most bytes of either hello gives the same failure (245 of the 315 flips tested) ... the others fail at once with a parse or parameter check. Only x25519_shared tells the cases apart.' Matches the sweep tally (AEAD tag 245 of 315; others named or stalled) and my shared-secret runs. Tour read at origin/fix/tour-4-5-limits commit 14af058 (PR 87, open); lab run at origin/fix/s3-tls-blockers b5d6641. The first sentence holds: after L5-replace-key-share the sides' x25519_shared differ (8ce3da34... against 919b9f5d...) and the first sealed record fails the AEAD tag. The second sentence is too strong: 'A flip of any byte of either hello gives the same failure'. The committed sweep (Tls13FlipSweepTests, hybrid hellos, 315 offsets tested, ML-KEM values sampled every 37th) gives TLS13_AEAD_TAG for 245 flips and another named result or a stall for 70: PARSE_TRUNCATED 33, TLS13_ILLEGAL_PARAMETER 9, TLS13_VERSION_REFUSED 9, TLS13_NO_COMMON_GROUP 4, TLS13_HRR_UNSUPPORTED 4, TLS13_NO_COMMON_SIGNATURE 4, UNEXPECTED_MESSAGE 4, TLS13_MESSAGE_TOO_LONG 2, Stalled 1. The shared-secret statement holds: flipping the ClientHello random (offset 6) or the ServerHello random leaves x25519_shared equal on both sides (919b9f5d... both) and still ends in the AEAD tag. Fix: 'Most bytes of either hello give the same AEAD tag failure (245 of the 315 flips tested); the rest fail at once with a parse or parameter check. Only the shared secret tells the AEAD cases apart.' Same fix in the names doc item 1.",
       "checkedAgainst": "lab run, lesson 5, ad hoc flips of ClientHello and ServerHello offset 6; Tls13FlipSweepTests run (2 tests passed) at b5d6641; docs/lessons-4-5-names.md on fix/s3-tls-blockers b5d6641 (read)"
     },
     {
@@ -102,13 +102,13 @@
     },
     {
       "id": "L5-C17",
-      "verdict": "inaccurate",
+      "verdict": "accurate",
       "checkedAgainst": "Tls13FlipSweepTests (x25519 test) run at b5d6641; RFC 8446 section 5.1",
-      "note": "Tour read at origin/fix/tour-4-5-limits commit 14af058 (PR 87, open); lab run at origin/fix/s3-tls-blockers b5d6641. 'A flipped length field can wait instead of fail' holds (Stalled 15 in the sweep, on length bytes). 'Each other byte of a handshake gets a named check at once' is too strong: the sweep tally for the x25519 handshake is 4 Completed (flips of the record header's legacy version bytes, which RFC 8446 section 5.1 says a receiver ignores) and 15 Stalled, and sealed bytes were sampled every 7th, not each. Everything else got a named result: AEAD tag 436, CERT_SIGNATURE 209, CERT_PARSE 89, PARSE_TRUNCATED 75, CERTVERIFY_BAD 70, FINISHED_MISMATCH 64, CHAIN_NO_ANCHOR 44, and 8 more kinds. Fix: 'Almost every other byte of a handshake gets a named check at once; the record's version bytes are ignored by design, and sealed bytes were sampled.'"
+      "note": "Re-read at origin/fix/tour-4-5-limits commit 9a20d46 (PR 87, open). Now reads 'Almost every other byte of a handshake gets a named check at once; the record's version bytes are ignored by design (RFC 8446 section 5.1)', and adds the sweep's 245 of 315 and the stall. RFC 8446 section 5.1: legacy_record_version 'is deprecated and MUST be ignored for all purposes'. Tour read at origin/fix/tour-4-5-limits commit 14af058 (PR 87, open); lab run at origin/fix/s3-tls-blockers b5d6641. 'A flipped length field can wait instead of fail' holds (Stalled 15 in the sweep, on length bytes). 'Each other byte of a handshake gets a named check at once' is too strong: the sweep tally for the x25519 handshake is 4 Completed (flips of the record header's legacy version bytes, which RFC 8446 section 5.1 says a receiver ignores) and 15 Stalled, and sealed bytes were sampled every 7th, not each. Everything else got a named result: AEAD tag 436, CERT_SIGNATURE 209, CERT_PARSE 89, PARSE_TRUNCATED 75, CERTVERIFY_BAD 70, FINISHED_MISMATCH 64, CHAIN_NO_ANCHOR 44, and 8 more kinds. Fix: 'Almost every other byte of a handshake gets a named check at once; the record's version bytes are ignored by design, and sealed bytes were sampled.'"
     }
   ],
   "textRead": {
-    "readAt": "tour PR 87 head 14af058 against the lab at fix/s3-tls-blockers b5d6641 (14 steps)",
+    "readAt": "tour PR 87 head 9a20d46 against the lab at fix/s3-tls-blockers b5d6641 (14 steps)",
     "method": "Every sentence of every step text read against the lab. The lab ran in-process (NetSec.Core: LabCatalog, Lesson10Auth, TimingAttackLab), once as a control and once for every try-it attack row; trace events, secrets, field lists and check names were compared with the words. Code was read where the trace did not show the fact. Statements about the UI (colours, panels) and about lesson 9 (not built) were not run.",
     "stepsRead": 14,
     "stepsWithProblems": 3,
@@ -144,12 +144,13 @@
         "wrong": "A flip in any byte of either hello gives the same AEAD tag failure, because each hello is part of the transcript the keys come from.",
         "right": "A flip in most bytes of either hello gives the same AEAD tag failure (245 of the 315 flips tested), because each hello is part of the transcript the keys come from. The others fail at once with a parse or parameter check.",
         "evidence": "Tls13FlipSweepTests tally for the hybrid hellos; status: open",
-        "status": "open"
+        "status": "fixed, re-read ok at 9a20d46"
       }
     ],
     "notes": [
-      "New text at PR 87 read and run: S03 (the 'any byte' sentence is the open problem; the shared-secret sentence holds), S12 ('Most other flipped bytes ... A flipped length is the one that can wait': hedged with 'most', holds), S13 (sealed close_notify; clear alert refused; TRUNCATED), S14 (no KeyUpdate, no record limit). All 8 event binds in lesson 5 still hit, and L5-S13 binds the control run's sealed close_notify."
+      "New text at PR 87 read and run: S03 (the 'any byte' sentence is the open problem; the shared-secret sentence holds), S12 ('Most other flipped bytes ... A flipped length is the one that can wait': hedged with 'most', holds), S13 (sealed close_notify; clear alert refused; TRUNCATED), S14 (no KeyUpdate, no record limit). All 8 event binds in lesson 5 still hit, and L5-S13 binds the control run's sealed close_notify.",
+      "Fixes read at 9a20d46: S03 'most bytes ... 245 of the 315 flips tested ... the others fail at once with a parse or parameter check'; S12 'Almost every other flipped byte ... fails at once with a named check. The record's version bytes are ignored by design, and a flipped length can wait'. Both match the sweep."
     ],
-    "problemsOpen": 1
+    "problemsOpen": 0
   }
 }
