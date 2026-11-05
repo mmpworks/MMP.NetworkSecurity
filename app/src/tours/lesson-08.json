@@ -42,7 +42,7 @@
       "text": [
         "Each side sends a KexInit packet. It lists the algorithms it can use for key exchange, host key signatures, locking, and sealing.",
         "The two sides pick the first match. If the lists share nothing, the check named algorithm match fails and the talk ends.",
-        "This round uses the modern set: curve25519-sha256, ssh-ed25519, aes128-ctr, and hmac-sha2-256."
+        "This round uses the set the lab calls Modern: curve25519-sha256, ssh-ed25519, aes128-ctr, and hmac-sha2-256. Modern only means newer than the legacy set. It has no encrypt-then-MAC mode, and it is not the best SSH can do."
       ],
       "glossary": [],
       "bind": { "kind": "event", "eventType": "ssh.message.sent", "match": { "actor": "client", "message": "KexInit" } },
@@ -52,12 +52,43 @@
           "id": "L8-C02",
           "text": "Each side sends a list of supported algorithms in KEXINIT, and the algorithms are chosen from those lists by a fixed rule.",
           "source": "RFC 4253, section 7.1 (Algorithm Negotiation)"
+        },
+        {
+          "id": "L8-C17",
+          "text": "The name Modern means newer than the legacy suite. The suite has no encrypt-then-MAC mode, and it is no claim of the best SSH can do.",
+          "source": "docs/lesson-ssh-names.md, What the tour must state, item 6 (branch fix/ssh-verdict, PR #51)"
         }
       ],
       "unlock": { "mode": "event" }
     },
     {
       "id": "L8-S04",
+      "lesson": 8,
+      "title": "Strict key exchange",
+      "text": [
+        "The two sides now say whether they run strict key exchange. In this lab both rounds show it on.",
+        "Strict KEX answers an attack called Terrapin (CVE-2023-48795). An attacker removes a packet from the start of the protected stream, and the two sides can end up with some security features turned down without noticing.",
+        "A peer that does not offer strict KEX leaves it off, and the event then says off. These two suites still stop the prefix attack in that case, because the seal covers the plain text and a deleted packet moves the cipher stream. An injected Ignore packet can still kill such a session."
+      ],
+      "glossary": [],
+      "bind": { "kind": "event", "eventType": "ssh.kex.strict", "match": { "actor": "client" } },
+      "highlight": ["check:name=strict kex"],
+      "claims": [
+        {
+          "id": "L8-C15",
+          "text": "Terrapin (CVE-2023-48795) lets an attacker bypass integrity checks so that some packets from the start of the handshake are omitted, which can downgrade or disable security features.",
+          "source": "NVD, CVE-2023-48795, description (read 2026-11-05)"
+        },
+        {
+          "id": "L8-C16",
+          "text": "Both lab rounds run strict KEX because the glass client and server both offer it. A peer that does not offer it leaves it off. The lab's two suites still stop the prefix attack then (0 of 4,000 accepted on each suite in Jared's sweep), because the MAC covers the plain text. An injected Ignore can still kill such a session.",
+          "source": "docs/lesson-ssh-names.md, What the tour must state, item 7, and Events, ssh.kex.strict row (branch fix/ssh-verdict, PR #51)"
+        }
+      ],
+      "unlock": { "mode": "event" }
+    },
+    {
+      "id": "L8-S05",
       "lesson": 8,
       "title": "The server signs the exchange",
       "text": [
@@ -69,7 +100,7 @@
       "bind": { "kind": "event", "eventType": "wire.sent", "match": { "actor": "server", "message": "KexEcdhReply" } },
       "highlight": ["inspector:field=hostKey", "inspector:field=serverShare", "inspector:field=exchangeSignature"],
       "tryIt": {
-        "id": "L8-S04-T1",
+        "id": "L8-S05-T1",
         "label": "Flip one byte of the exchange signature",
         "action": { "type": "run-attack", "attackId": "L8-flip-exchange-signature" },
         "expect": { "type": "check", "name": "exchange signature", "result": "fail" }
@@ -81,10 +112,10 @@
           "source": "RFC 8731, section 3 (Key Exchange Methods)"
         }
       ],
-      "unlock": { "mode": "action", "ref": "L8-S04-T1" }
+      "unlock": { "mode": "action", "ref": "L8-S05-T1" }
     },
     {
-      "id": "L8-S05",
+      "id": "L8-S06",
       "lesson": 8,
       "title": "A share that makes a weak secret",
       "text": [
@@ -96,7 +127,7 @@
       "bind": { "kind": "event", "eventType": "check.result", "match": { "message": "x25519 result not zero" } },
       "highlight": ["check:name=x25519 result not zero"],
       "tryIt": {
-        "id": "L8-S05-T1",
+        "id": "L8-S06-T1",
         "label": "Send an all-zero X25519 share",
         "action": { "type": "run-attack", "attackId": "L8-zero-share" },
         "expect": { "type": "check", "name": "x25519 result not zero", "result": "fail" }
@@ -108,22 +139,22 @@
           "source": "RFC 7748, section 6.1 (Curve25519); RFC 8731, section 3 (Key Exchange Methods)"
         }
       ],
-      "unlock": { "mode": "action", "ref": "L8-S05-T1" }
+      "unlock": { "mode": "action", "ref": "L8-S06-T1" }
     },
     {
-      "id": "L8-S06",
+      "id": "L8-S07",
       "lesson": 8,
       "title": "Whose key is this?",
       "text": [
         "The host key card shows the server's key and its fingerprint, a short hash of the key. The client compares the key with the one it saved from an earlier visit. The check is named known_hosts match.",
-        "A host key is trusted because the client pinned it earlier. On the very first connect there is nothing to compare, so the first connect has no proof at all. The fingerprint card is the moment to check the key another way, such as asking the server's owner.",
+        "A host key is trusted because the client pinned it earlier. With no pinned key, this client refuses by default. A caller can choose trust on first use, and then must store the key. On that very first connect there is nothing to compare, so the first connect has no proof at all. The fingerprint card is the moment to check the key another way, such as asking the server's owner.",
         "Try it: have the server present a different key. The saved key stays the same, the match fails, and the client stops."
       ],
       "glossary": [],
       "bind": { "kind": "event", "eventType": "ssh.hostkey.seen", "match": { "actor": "client" } },
       "highlight": ["check:name=known_hosts match"],
       "tryIt": {
-        "id": "L8-S06-T1",
+        "id": "L8-S07-T1",
         "label": "Present a different host key",
         "action": { "type": "run-attack", "attackId": "L8-change-host-key" },
         "expect": { "type": "check", "name": "known_hosts match", "result": "fail" }
@@ -133,31 +164,43 @@
           "id": "L8-C05",
           "text": "SSH has no infrastructure for distributing host keys. A client may accept a host key the first time it connects, save it, and compare it on later connections; connecting without first verifying the key is open to a man-in-the-middle attack.",
           "source": "RFC 4251, section 4.1 (Host Keys) and section 9.3.4 (Man-in-the-middle)"
+        },
+        {
+          "id": "L8-C19",
+          "text": "With no pinned key the client refuses by default (SSH_HOST_KEY_UNKNOWN). Trust on first use is an explicit choice, and the caller must store the key.",
+          "source": "docs/lesson-ssh-names.md, Events, ssh.hostkey.first-use row (branch fix/ssh-verdict, PR #51)"
         }
       ],
-      "unlock": { "mode": "action", "ref": "L8-S06-T1" }
+      "unlock": { "mode": "action", "ref": "L8-S07-T1" }
     },
     {
-      "id": "L8-S07",
+      "id": "L8-S08",
       "lesson": 8,
       "title": "The lock switches on",
       "text": [
-        "Both sides send NewKeys, and everything after it is sealed. SSH locks the packet length too, so an eavesdropper cannot even see where one packet ends and the next begins.",
+        "Both sides send NewKeys, and everything after it is sealed. SSH hides the length field inside the sealed packet. TCP segments and timing can still show packet sizes, so a watcher may still guess where packets end.",
         "Try it: switch to the eavesdropper view. Each packet shows only noise and a seal."
       ],
       "glossary": ["eavesdropper"],
       "bind": { "kind": "event", "eventType": "keys.installed", "match": { "actor": "client" } },
       "highlight": ["inspector:field=encryptedPacket", "inspector:field=mac"],
       "tryIt": {
-        "id": "L8-S07-T1",
+        "id": "L8-S08-T1",
         "label": "Switch to the eavesdropper view",
         "action": { "type": "set-view", "value": "eavesdropper" },
         "expect": { "type": "view", "value": "eavesdropper" }
       },
-      "unlock": { "mode": "action", "ref": "L8-S07-T1" }
+      "claims": [
+        {
+          "id": "L8-C18",
+          "text": "SSH encrypts the whole packet except the MAC, including the length field. TCP segments and timing can still show packet sizes.",
+          "source": "RFC 4253, section 6 (Binary Packet Protocol: the packet, excluding the MAC, is encrypted); docs/lesson-ssh-names.md, Fields, Protected packet row, and Richard's note of 2026-11-05 that the tour must not say an eavesdropper sees no packet boundary"
+        }
+      ],
+      "unlock": { "mode": "action", "ref": "L8-S08-T1" }
     },
     {
-      "id": "L8-S08",
+      "id": "L8-S09",
       "lesson": 8,
       "title": "Every packet carries a seal",
       "text": [
@@ -168,15 +211,15 @@
       "bind": { "kind": "event", "eventType": "check.result", "match": { "message": "packet MAC" } },
       "highlight": ["check:name=packet MAC"],
       "tryIt": {
-        "id": "L8-S08-T1",
+        "id": "L8-S09-T1",
         "label": "Flip one byte of a protected packet",
         "action": { "type": "run-attack", "attackId": "L8-flip-packet" },
         "expect": { "type": "check", "name": "packet MAC", "result": "fail" }
       },
-      "unlock": { "mode": "action", "ref": "L8-S08-T1" }
+      "unlock": { "mode": "action", "ref": "L8-S09-T1" }
     },
     {
-      "id": "L8-S09",
+      "id": "L8-S10",
       "lesson": 8,
       "title": "Now the client proves who it is",
       "text": [
@@ -189,7 +232,7 @@
       "bind": { "kind": "event", "eventType": "ssh.message.sent", "match": { "actor": "client", "message": "UserauthSigned" } },
       "highlight": ["check:name=userauth signature verify"],
       "tryIt": {
-        "id": "L8-S09-T1",
+        "id": "L8-S10-T1",
         "label": "Sign with the wrong private key",
         "action": { "type": "run-attack", "attackId": "L8-wrong-user-key" },
         "expect": { "type": "check", "name": "userauth signature verify", "result": "fail" }
@@ -201,15 +244,16 @@
           "source": "RFC 4252, section 7 (Public Key Authentication Method: publickey)"
         }
       ],
-      "unlock": { "mode": "action", "ref": "L8-S09-T1" }
+      "unlock": { "mode": "action", "ref": "L8-S10-T1" }
     },
     {
-      "id": "L8-S10",
+      "id": "L8-S11",
       "lesson": 8,
       "title": "Run one command",
       "text": [
         "With the client accepted, it opens a channel and asks the server to run a command. This is the exec request.",
-        "The lab's server does not start a process. It answers from a fixed table of two commands, echo and whoami, so the lesson cannot be used to run anything."
+        "The lab's server does not start a process. It answers from a fixed table of two commands, echo and whoami, so the lesson cannot be used to run anything.",
+        "A channel holds no more than its window of unread bytes. The window opens again only when the reader reads, so a stalled reader makes the sender wait."
       ],
       "glossary": [],
       "bind": { "kind": "event", "eventType": "ssh.message.sent", "match": { "actor": "client", "message": "ChannelRequestExec" } },
@@ -224,12 +268,17 @@
           "id": "L8-C08",
           "text": "The lab's SSH server has a fixed table of two commands, echo and whoami, and starts no process.",
           "source": "docs/lesson-ssh-names.md, What the tour must state, item 5 (branch feat/s4-ssh); docs/program-design.md, section 2.6, SSH-2 paragraph"
+        },
+        {
+          "id": "L8-C20",
+          "text": "A channel holds no more than its window of unread bytes. The window opens again only when the reader reads, so a stalled reader makes the sender wait.",
+          "source": "RFC 4254, section 5.2 (Data Transfer: the window size specifies how many bytes the other party can send before it must wait for the window to be adjusted); docs/lesson-ssh-names.md, item 8"
         }
       ],
       "unlock": { "mode": "event" }
     },
     {
-      "id": "L8-S11",
+      "id": "L8-S12",
       "lesson": 8,
       "title": "A tunnel through the server",
       "text": [
@@ -241,7 +290,7 @@
       "bind": { "kind": "event", "eventType": "ssh.message.sent", "match": { "actor": "client", "message": "ChannelOpenTunnel" } },
       "highlight": ["check:name=tunnel allow list"],
       "tryIt": {
-        "id": "L8-S11-T1",
+        "id": "L8-S12-T1",
         "label": "Ask for a tunnel to a target off the list",
         "action": { "type": "run-attack", "attackId": "L8-refused-tunnel" },
         "expect": { "type": "check", "name": "tunnel allow list", "result": "fail" }
@@ -253,10 +302,10 @@
           "source": "RFC 4254, section 7.2 (TCP/IP Forwarding Channels); docs/lesson-ssh-names.md, tunnel allow list row (actor server, branch fix/ssh-followups)"
         }
       ],
-      "unlock": { "mode": "action", "ref": "L8-S11-T1" }
+      "unlock": { "mode": "action", "ref": "L8-S12-T1" }
     },
     {
-      "id": "L8-S12",
+      "id": "L8-S13",
       "lesson": 8,
       "title": "The old suite for the old device",
       "text": [
@@ -269,7 +318,7 @@
       "bind": { "kind": "event", "eventType": "ssh.weak.exchange-hash", "match": { "actor": "client" } },
       "highlight": ["check:name=exchange signature"],
       "tryIt": {
-        "id": "L8-S12-T1",
+        "id": "L8-S13-T1",
         "label": "Flip one byte of the legacy RSA signature",
         "action": { "type": "run-attack", "attackId": "L8-legacy-flip-signature" },
         "expect": { "type": "check", "name": "exchange signature", "result": "fail" }
@@ -296,10 +345,10 @@
           "source": "RFC 6194, section 3.3 (HMAC-SHA-1)"
         }
       ],
-      "unlock": { "mode": "action", "ref": "L8-S12-T1" }
+      "unlock": { "mode": "action", "ref": "L8-S13-T1" }
     },
     {
-      "id": "L8-S13",
+      "id": "L8-S14",
       "lesson": 8,
       "title": "What was tested, and what was not",
       "text": [

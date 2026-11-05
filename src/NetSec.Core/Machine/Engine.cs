@@ -5,7 +5,7 @@ using NetSec.Trace;
 namespace NetSec.Machine
 {
     public enum EngineStatus { Handshaking, Open, Closed, Failed }
-    public enum EngineCommandKind { Send, Close, PeerClosed, OpenChannel, Exec }
+    public enum EngineCommandKind { Send, Close, PeerClosed, OpenChannel, Exec, Consumed }
 
     public sealed class EngineCommand
     {
@@ -82,6 +82,19 @@ namespace NetSec.Machine
         EngineOutput Start();
         EngineOutput Feed(byte[] b, int off, int n);
         EngineOutput Command(EngineCommand c);
+    }
+
+    /// <summary>What Probe reads from a TLS engine after a run. One session loop then serves each TLS version.</summary>
+    public interface ITlsEngine : IProtocolEngine
+    {
+        bool ReachedOpen { get; }
+        string VersionName { get; }
+        string SuiteName { get; }
+        string GroupName { get; }
+
+        /// <summary>The alert number the peer sent, or -1.</summary>
+        int AlertReceived { get; }
+        string[] KeyLogLines { get; }
     }
 
     public enum TamperPoint { Plain, Wire }

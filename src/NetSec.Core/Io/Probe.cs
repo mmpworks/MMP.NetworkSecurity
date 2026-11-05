@@ -8,6 +8,7 @@ using NetSec.Keys;
 using NetSec.Machine;
 using NetSec.Pki;
 using NetSec.Platform;
+using NetSec.Tls11;
 using NetSec.Tls13;
 using NetSec.Trace;
 
@@ -62,7 +63,6 @@ namespace NetSec.Io
         {
             if (r == null) throw new ArgumentNullException("r");
             if (r.Protocol == WireProtocol.Ssh) return SshProbe.Connect(r);
-            NeedBuilt(r);
             return AsyncProxy.Run<ProbeResult>(delegate(Return<ProbeResult> ret) { return ConnectBody(r, ret); });
         }
 
@@ -71,18 +71,11 @@ namespace NetSec.Io
         {
             if (r == null) throw new ArgumentNullException("r");
             if (r.Protocol == WireProtocol.Ssh) return SshProbe.Listen(r);
-            NeedBuilt(r);
             LinkListener listener = new LinkListener(new IPEndPoint(IPAddress.Loopback, r.Port));
             ProbeListener result = new ProbeListener();
             result.Port = listener.Port;
             result.Result = AsyncProxy.Run<ProbeResult>(delegate(Return<ProbeResult> ret) { return ListenBody(r, listener, ret); });
             return result;
-        }
-
-        /// <summary>TLS 1.1 and SSH arrive in S4. The suite maps this exception to NOT RUN.</summary>
-        static void NeedBuilt(ProbeRequest r)
-        {
-            if (r.Protocol != WireProtocol.Tls13) throw new NotImplementedException("the glass " + r.Protocol + " engine is not built yet");
         }
 
         static IEnumerable<IFuture> ConnectBody(ProbeRequest r, Return<ProbeResult> ret)
@@ -94,7 +87,8 @@ namespace NetSec.Io
                 ret.Value = LinkFailure(connected.IsFaulted ? connected.Exception.Message : "connect canceled");
                 yield break;
             }
-            foreach (IFuture step in RunSession(r, connected.Result, Tls13Engine.CreateClient(ClientOptions(r)), ret)) yield return step;
+            ITlsEngine engine = r.Protocol == WireProtocol.Tls11 ? (ITlsEngine)Tls11Client(r) : Tls13Engine.CreateClient(ClientOptions(r));
+            foreach (IFuture step in RunSession(r, connected.Result, engine, ret)) yield return step;
         }
 
         static IEnumerable<IFuture> ListenBody(ProbeRequest r, LinkListener listener, Return<ProbeResult> ret)
@@ -107,10 +101,11 @@ namespace NetSec.Io
                 ret.Value = LinkFailure(accepted.IsFaulted ? accepted.Exception.Message : "accept canceled");
                 yield break;
             }
-            foreach (IFuture step in RunSession(r, accepted.Result, Tls13Engine.CreateServer(ServerOptions(r)), ret)) yield return step;
+            ITlsEngine engine = r.Protocol == WireProtocol.Tls11 ? (ITlsEngine)Tls11Server(r) : Tls13Engine.CreateServer(ServerOptions(r));
+            foreach (IFuture step in RunSession(r, accepted.Result, engine, ret)) yield return step;
         }
 
-        static IEnumerable<IFuture> RunSession(ProbeRequest r, IByteLink link, Tls13Engine engine, Return<ProbeResult> ret)
+        static IEnumerable<IFuture> RunSession(ProbeRequest r, IByteLink link, ITlsEngine engine, Return<ProbeResult> ret)
         {
             bool isClient = engine.Peer == "server";
             ListSink events = new ListSink();
@@ -133,7 +128,7 @@ namespace NetSec.Io
 
             ProbeResult result = new ProbeResult();
             result.Completed = engine.ReachedOpen && run.Result.Error == null;
-            result.Version = engine.ReachedOpen ? "TLSv1.3" : null;
+            result.Version = engine.ReachedOpen ? engine.VersionName : null;
             result.Suite = engine.SuiteName;
             result.Group = engine.GroupName;
             result.AlertReceived = engine.AlertReceived > 0 ? engine.AlertReceived : 0;
@@ -153,6 +148,33 @@ namespace NetSec.Io
         {
             if (isClient) return sent == null || received.Count >= sent.Length;
             return received.Contains(10);
+        }
+
+        static Tls11Options Tls11Common(ProbeRequest r, string actor)
+        {
+            Tls11Options o = new Tls11Options();
+            // No suite named means the weak one, because a default run would otherwise pick the best case.
+            o.Suite = r.Suite == null ? Tls11CipherSuite.RsaAes128CbcSha : Tls11CipherSuite.Find(r.Suite);
+            if (o.Suite == null) throw new ArgumentException("no TLS 1.1 suite has the name " + r.Suite, "r");
+            o.Random = r.Seed == 0 ? (IRandomSource)new OsRandom() : new SeededRandom(r.Seed);
+            o.Stream = new TraceStream(ProbeSession + "/" + actor + "/tls11", ProbeSession, ProbeSession, null, actor, new MonotonicClock());
+            o.Tamper = r.Tamper;
+            return o;
+        }
+
+        static Tls11Engine Tls11Client(ProbeRequest r)
+        {
+            Tls11Options o = Tls11Common(r, "client");
+            o.PeerName = r.PeerName;
+            Tls11Training.TrustTrainingRoot(o, new TrainingKeySource(), DateTime.UtcNow);
+            return Tls11Engine.CreateClient(o);
+        }
+
+        static Tls11Engine Tls11Server(ProbeRequest r)
+        {
+            Tls11Options o = Tls11Common(r, "server");
+            Tls11Training.UseTrainingServerKey(o, new TrainingKeySource());
+            return Tls11Engine.CreateServer(o);
         }
 
         static Tls13Options CommonOptions(ProbeRequest r, string actor, string peer)
@@ -217,11 +239,11 @@ namespace NetSec.Io
         sealed class CloseWhenDone
         {
             readonly EnginePump _pump;
-            readonly Tls13Engine _engine;
+            readonly ITlsEngine _engine;
             readonly bool _closeAtOpen;
             int _closed;
 
-            public CloseWhenDone(EnginePump pump, Tls13Engine engine, bool closeAtOpen)
+            public CloseWhenDone(EnginePump pump, ITlsEngine engine, bool closeAtOpen)
             {
                 _pump = pump; _engine = engine; _closeAtOpen = closeAtOpen;
             }

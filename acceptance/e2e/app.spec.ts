@@ -48,6 +48,11 @@ for (let n = 1; n <= 11; n++) {
       return;
     }
     const ids: string[] = tourSteps(n).map((s: any) => s.id);
+    // Time budget, from measured walks (e759e8a, live Host): lessons 1 to 4 take about 15 s; lesson 5 takes 43 s, of which 30 s is the lab's own
+    // read deadline in step L5-S12 (a wall-clock timer, so machine load does not stretch it). Under load the other steps ran about 5 times slower.
+    // A hang is found per step: Next must enable within 45 s of its step (30 s deadline plus slack), and the failure names the step.
+    // The whole walk gets 60 s plus 20 s for each step, so slow machines do not fail a walk that moves, and a stalled step still ends the walk at 45 s.
+    test.setTimeout(60_000 + 20_000 * ids.length);
     expect(ids.length, `tour steps in app/src/tours/lesson-${String(n).padStart(2, '0')}.json`).toBeGreaterThan(0);
     await openApp(page);
     await page.getByTestId(`lesson-item-${n}`).click();
@@ -58,6 +63,7 @@ for (let n = 1; n <= 11; n++) {
     const dir = path.join(OUT, `lesson-${n}`);
     fs.mkdirSync(dir, { recursive: true });
     const visited: string[] = [];
+    const stepMs: string[] = [];
     for (let i = 0; i < ids.length + 5; i++) {
       await expect(page.getByTestId('tour-step-id')).not.toHaveText('', { timeout: 30_000 });
       const id = ((await page.getByTestId('tour-step-id').textContent()) ?? '').trim();
@@ -71,11 +77,20 @@ for (let n = 1; n <= 11; n++) {
       }
       // A disabled Next always names its reason (ux-design.md section 3.2). If it never enables, the reason goes into the failure.
       const reason = page.getByTestId('next-reason');
-      await expect(next, `Next never enabled at step ${id}; reason shown: ${(await reason.textContent().catch(() => '')) ?? ''}`).toBeEnabled({ timeout: 45_000 });
+      // The reason text is read AFTER the wait, with a short timeout. The element exists only while Next is disabled, so a read with the
+      // default timeout blocks until the whole test times out when Next is already enabled. That hid the step id behind "Test timeout".
+      const stepStart = Date.now();
+      try { await expect(next).toBeEnabled({ timeout: 45_000 }); }
+      catch {
+        const why = await reason.textContent({ timeout: 1000 }).catch(() => '');
+        throw new Error(`Next never enabled at step ${id}; reason shown: ${why ?? ''}`);
+      }
+      stepMs.push(`${id}=${Date.now() - stepStart}ms`);
       if (id === ids[ids.length - 1]) break;
       await next.click();
     }
     expect(visited, `the steps the app showed against the tour file`).toEqual(ids);
+    test.info().annotations.push({ type: 'walk-time', description: `lesson ${n}: ${ids.length} steps; wait for Next per step: ${stepMs.join(' ')}` });
   });
 }
 

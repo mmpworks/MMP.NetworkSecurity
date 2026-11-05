@@ -19,6 +19,12 @@ namespace NetSec.Ssh
         public const string ChannelWindow = "SSH_CHANNEL_WINDOW";
         public const string RekeyUnsupported = "SSH_REKEY_UNSUPPORTED";
         public const string PeerDisconnect = "SSH_PEER_DISCONNECT";
+        public const string HostKeyRevoked = "SSH_HOST_KEY_REVOKED";
+        public const string ChannelQueueFull = "SSH_CHANNEL_QUEUE_FULL";
+        public const string ChannelLimit = "SSH_CHANNEL_LIMIT";
+        public const string AuthTries = "SSH_AUTH_TRIES";
+        public const string SequenceExhausted = "SSH_SEQUENCE_EXHAUSTED";
+        public const string KexStrict = "SSH_KEX_STRICT";
     }
 
     /// <summary>The names a tour and a test bind to. docs/lesson-ssh-names.md lists them.</summary>
@@ -41,6 +47,11 @@ namespace NetSec.Ssh
         public const string ChannelWindow = "channel window";
         public const string NoRekey = "no rekey in this lab";
         public const string PeerStayed = "peer stayed until the end";
+        public const string ChannelQueue = "channel send queue";
+        public const string ChannelLimit = "channel limit";
+        public const string AuthTries = "userauth tries";
+        public const string Sequence = "sequence number";
+        public const string StrictKex = "strict kex";
     }
 
     /// <summary>Message numbers of RFC 4253 section 12, RFC 4252 section 6 and RFC 4254 section 9.</summary>
