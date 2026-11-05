@@ -12,7 +12,7 @@ Recommendations:
 
 1. **Name two modes and state what each is.** Mock is a public training key. Real is a test key made by a wizard on this PC, in real form. "Real" never means production.
 2. **Say on the screen that this course shows its keys.** A real system does not. See section 7.
-3. **A non-export key stays unread, even here.** It shows its fingerprint and refuses export, with Show keys on. Engines get operations only, and the Host shows exportable bytes. See section 4 and `docs/modes-design.md` section 6.3.
+3. **A non-export key stays unread, and it runs only in the separate vault exercise.** It shows its fingerprint and refuses export with `VAULT_EXPORT_REFUSED`, even with Show keys on. See section 4.
 4. **Each wizard ends at an outside referee, where one exists.** OpenSSL, Go and `ssh.exe` judge TLS, mutual TLS, SSH, tokens and DPoP (run, section 5). DUKPT, passkey and enrolment have no outside live referee, and the wizard must say so.
 5. **Keep the passkey shape on Mock, since no real form exists here.** A test BDK can run in glass by the ruling, and the wizard must still say what a real BDK does. See sections 3.7 and 3.12.
 
@@ -31,14 +31,14 @@ Recommendations:
 | Mode | Who makes the key | Bytes visible | Goes in glass | Outside referee | Label to show |
 |---|---|---|---|---|---|
 | Mock | The course. `TrainingKeySource`, public by design (D5) | Yes | Yes | Yes, as today | "Training key. Public on purpose." |
-| Real | A wizard, on this PC, with `openssl` or `ssh-keygen`, or the vault. A test key | Yes when exportable, through the Host, by Steve's ruling. A non-export key shows its fingerprint | As operations only (`docs/modes-design.md` O1) | Yes, where section 5 says | "Your test key, in the real format. This course shows its keys, so use test keys only." |
+| Real | A wizard, on this PC, with `openssl` or `ssh-keygen`, or the vault. A test key | Yes when exportable, through the Host, by Steve's ruling. A non-export key shows its fingerprint | Exportable keys, as Steve's option C and `docs/modes-design.md` set out. A non-export key runs only in the separate vault exercise | Yes, where section 5 says | "Your test key, in the real format. This course shows its keys, so use test keys only." |
 
 This ruling changes written decisions, and they must change together:
 
 | Text today | Change needed |
 |---|---|
 | PRD D6: "Real mode uses the OS transport (`SslStream`), shows metadata only, and writes no secret bytes" | Adopted by `richard-modes`: "Real" means keys only, and `SslStream` is the "OS transport" |
-| PRD A16: "a scan of its trace and session file finds no secret bytes", and a real `IKeyHandle` fails in glass by type | The scan stays for the OS transport, because Schannel gives no secret bytes. D5's last sentence changes: a real key enters glass as operations only. `richard-modes` owns this (`docs/modes-design.md`) |
+| PRD A16: "a scan of its trace and session file finds no secret bytes", and a real `IKeyHandle` fails in glass by type | The scan stays for the OS transport, because Schannel gives no secret bytes. How a real key enters glass follows Steve's choice of option C. `richard-modes` owns this (`docs/modes-design.md`) |
 | UX chip: "Never use it with real secrets" | Still true. It agrees with the ruling |
 
 ## 2. What I ran
@@ -248,12 +248,14 @@ Section 4 is the behaviour list. The rule for wizards: **an HSM is a machine tha
 
 ### What shows on screen
 
-This follows the lead's ruling, in `docs/modes-design.md` section 6.3. An earlier draft of this section showed the bytes of a non-export key in a "course view". That was wrong: a non-export key that shows its bytes teaches that the word means nothing.
+This follows the lead's ruling. An earlier draft of this section showed the bytes of a non-export key in a "course view". That was wrong: a non-export key that shows its bytes teaches that the word means nothing.
 
-| Key | With Show keys on | Engine use | What a real vault does |
+| Key | With Show keys on | Where it runs | What a real vault does |
 |---|---|---|---|
-| Exportable | The Host fetches the bytes through `Export`, which writes an audit row, and shows them | Operations only | Export is possible only if set at creation, and it is audited |
-| Non-export | Its fingerprint, with the line "This key cannot be read. A real HSM would refuse too." `Export` fails with `VAULT_EXPORT_REFUSED` | Operations only | The same refusal |
+| Exportable | The Host fetches the bytes through `Export`, which writes an audit row, and shows them | The labs | Export is possible only if set at creation, and it is audited |
+| Non-export | Its fingerprint only, with this line: "The course refuses to show it. A real HSM would refuse too. These files could still open it here." `Export` fails with `VAULT_EXPORT_REFUSED` | Only the separate vault exercise | The same refusal, and no file a user could open |
+
+The last sentence of that line matters for accuracy. The refusal is a rule in our code, and the SQLite file on this PC could still open the key. In an HSM, the refusal is a property of a device.
 
 The wizard's outside proofs in section 5 use files, so they fit an exportable key. For a non-export key, the accurate proof is the real one: sign a test value through the API, and verify it with `openssl pkeyutl -verify` against the **public** key. I did not run this row, though the same verify shape ran for tokens.
 
