@@ -71,6 +71,20 @@ namespace NetSec.Tests
             Assert.Equal(BankHsmCore.ReplayCheck, again.Check);
         }
 
+        /// <summary>The MAC holds and the block is bad, so only the format check refuses it. The real sale under the same KSN must still pass.</summary>
+        [Fact]
+        public void An_envelope_refused_at_the_format_check_does_not_burn_its_ksn()
+        {
+            KsnLedger ledger = new KsnLedger();
+            PinEnvelope good = Sell().Envelope;
+            byte[] macKey = DukptBank.DeriveWorkingKey(Bdk, good.Ksn, DukptKeyUsage.MacGeneration, DukptKeyType.Aes128);
+            byte[] badBlock = (byte[])good.LockedBlock.Clone();
+            badBlock[0] ^= 1;
+            BankDecision refused = BankHsmCore.Decide(Bdk, ledger, PinEnvelope.Build("t1", Pan, good.Ksn, badBlock, macKey).Bytes);
+            Assert.Equal(ErrorCodes.DukptPinBlockFormat, refused.Code);
+            Assert.True(BankHsmCore.Decide(Bdk, ledger, good.Bytes).Ok);
+        }
+
         [Fact]
         public void An_envelope_refused_at_the_mac_does_not_burn_its_ksn()
         {

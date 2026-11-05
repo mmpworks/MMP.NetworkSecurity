@@ -42,10 +42,14 @@ Each correction goes here, newest slice last. Later slices read this file first.
 4. **Lesson 6 has no MAC on the wire, by the UX row.** A flipped PIN block must reach `PIN block format check`, and a MAC would catch it first. `DUKPT_MAC_MISMATCH` stays for S5.
 5. **`held` does not fall on every sale.** A sale erases one register and can fill lower ones with child keys: 32 after the load, then 31, 31, 30, 31. UX moment 5 says "the reader column shrinks". The lab reports the true count, and the tour must not promise a steady fall.
 6. **The one-bit limit of 16 is from recollection of X9.24-3, which is paid.** The free vectors do not state it. Both sides agree past it in `DukptTests`, because the bank walks any counter.
-7. **`DUKPT_COUNTER_EXHAUSTED` has no test.** The pad would need about 2^31 sales to reach it.
+7. **`DUKPT_COUNTER_EXHAUSTED` needs a pad that starts late.** Sales alone need about 2^31 calls to reach it. An internal constructor starts a pad at counter `0xFFFF0000`, and `NetSec.Tests` sees it through `InternalsVisibleTo`.
 8. **`PumpTests.A_flipped_length_byte_...` raced.** Two 300 ms deadlines, so the client could close first, and the server then reported `PEER_CLOSED_EARLY`. It failed 1 of 2 gate runs. The server's deadline now comes first. A test with two deadlines must say which one ends first.
 9. **The lab's reader session holds no base key.** Only `BankSession` holds it, and a test scans the reader's trace for it. S5 keeps this shape across processes (D13).
 10. **A test under `#if NET` in `tests/NetSec.Tests` turns A9 red.** `A9.cf.same-suite-passes-on-net48-skips-pinned` compares the net10.0 and net48 test sets. PR #13 did this and blocked every lane. A BCL-only check goes in `tests/NetSec.Host.Tests`, which runs on net10.0 only. Run `pwsh acceptance/run.ps1 -Clauses A9` on every PR that adds a test.
+11. **Record a KSN only after the sale passes every check (Jared's review of PR #22).** A ledger that records first lets a forged block under the next KSN burn it, and the real sale then gets `DUKPT_KSN_REPLAY`. `DukptBank.OpenPinSale` holds this order for lesson 6, and `BankHsmCore.Decide` holds it for S5, after its MAC check. The S5 bank had the same defect for a block with a valid MAC and a bad shape. `KsnLedger` now has `Contains` and `Record`, with no combined call, so a caller must choose the point of the record.
+12. **A trace event states what the code did.** The lab reported `dukpt.initial` as erased and only dropped a reference. `Lesson06Dukpt.LoadReader` now clears the array before the event, and the trace holds its own declared copy. The managed-heap caveat never excuses skipping the clear.
+13. **Do not clone keys to count them.** `HeldKeys` makes uncleared copies, so the lab reads `HeldCount`. Use `HeldKeys` only where a caller needs the bytes.
+14. **Open question: strength of a derived key.** `DukptDerivation.Working` lets an AES-128 derivation key make an AES-256 working key. A reviewer recalls a rule against a derived key stronger than its parent. X9.24-3 is paid, so this is unverified, and the code does not refuse it.
 
 ## S3
 
