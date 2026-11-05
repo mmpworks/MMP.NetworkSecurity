@@ -24,9 +24,9 @@
     },
     {
       "id": "L11-C04",
-      "verdict": "accurate",
-      "note": "Tours read at origin/feat/tours-6-11 (PR 18). Tier: indirect. The C++ half is supported by the dudect README, 'Further notes' (compiler version and flags matter; an O0 build leaks where an O2 build does not detect it). The managed half is a negative statement and no page says it in those words. Best indirect evidence, fetched: the .NET runtime source marks its own FixedTimeEquals NoInlining and NoOptimization, with the comment 'we want this method to be exactly as non-short-circuiting as written', and the Learn page promises fixed time only for that method. That shows the JIT can change timing of code that is not so marked. docs/prd.md rule 5 is a house rule, not an outside source. Suggest adding the dotnet/runtime CryptographicOperations.cs comment as the source and wording the claim as 'only FixedTimeEquals is documented as fixed-time'.",
-      "checkedAgainst": "docs/prd.md rule 5 (read); dudect README Further notes (fetched); dotnet/runtime CryptographicOperations.cs on GitHub main (fetched); Microsoft Learn FixedTimeEquals (fetched)"
+      "verdict": "unverified",
+      "note": "Re-checked against tours at origin/feat/tours-6-11 commit 5b18067. Two parts are fine: FixedTimeEquals is marked NoInlining and NoOptimization in dotnet/runtime (fetched; comment: 'we want this method to be exactly as non-short-circuiting as written'), and the Learn page promises fixed time for it. The word 'Only' in 'Only CryptographicOperations.FixedTimeEquals is documented as fixed-time in .NET' is a claim about all of .NET documentation. I read one page and cannot show the absence elsewhere. 'Managed code in general has no constant-time guarantee' is a negative that no fetched page states in those words; the runtime comment is indirect support. Fix: drop 'Only' and write 'The .NET documentation promises fixed time for CryptographicOperations.FixedTimeEquals', and keep the second sentence as the lab's position, sourced to PRD rule 5 and the runtime comment. With that wording this claim is accurate.",
+      "checkedAgainst": "Microsoft Learn FixedTimeEquals Remarks (fetched); dotnet/runtime CryptographicOperations.cs (fetched); docs/prd.md rule 5 (read)"
     },
     {
       "id": "L11-C05",
@@ -48,9 +48,9 @@
     },
     {
       "id": "L11-C08",
-      "verdict": "inaccurate",
-      "note": "Tours read at origin/feat/tours-6-11 (PR 18). Hedge dropped. The README answer reads 'Absolutely not. The test implemented is perhaps the simplest form of leakage detection.' The claim says 'it is the simplest form'. Fix: write 'is perhaps the simplest form'. Section name 'Questions' and the question text are right.",
-      "checkedAgainst": "dudect README, Questions (fetched this session)"
+      "verdict": "accurate",
+      "note": "Re-checked against tours at origin/feat/tours-6-11 commit 5b18067. Claim now reads 'the dudect authors call their test perhaps the simplest form of leakage detection'. README, Questions: 'Absolutely not. The test implemented is perhaps the simplest form of leakage detection.' Hedge kept.",
+      "checkedAgainst": "dudect README, Questions (fetched)"
     }
   ]
 }

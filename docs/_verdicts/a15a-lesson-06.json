@@ -36,15 +36,15 @@
     },
     {
       "id": "L6-C06",
-      "verdict": "inaccurate",
-      "note": "Tours read at origin/feat/tours-6-11 (PR 18). The fact is true, but the cited section is wrong. 'What happens during a garbage collection' lists phases (mark, relocate, compact) and says the compacting phase 'moves objects that have survived'. The words 'memory-copying function to compact the reachable objects in memory' are under 'Memory release'. Learn also says compaction happens only when a collection finds a significant number of unreachable objects, and that large objects are usually not compacted. Fix: cite 'Memory release' for the copy sentence and 'What happens during a garbage collection' for the compacting phase. Add 'can' if the text says every collection copies.",
-      "checkedAgainst": "Microsoft Learn, Fundamentals of garbage collection (page fetched this session; primary vendor documentation)"
+      "verdict": "accurate",
+      "note": "Re-checked against tours at origin/feat/tours-6-11 commit 5b18067. Source now names 'Memory release'. That section reads 'it uses a memory-copying function to compact the reachable objects in memory'. Learn also says compaction happens only when a collection finds many unreachable objects; the tour text says the heap 'can keep copies', which fits.",
+      "checkedAgainst": "Microsoft Learn, Fundamentals of garbage collection, Memory release (fetched)"
     },
     {
       "id": "L6-C07",
-      "verdict": "unverified",
-      "note": "Tours read at origin/feat/tours-6-11 (PR 18). ANSI X9.24-3-2017 is a paid standard and I could not read it. docs/prd.md D13 does state 'X9.24-3 places the keys in secure devices at each end', so the PRD says it, but the PRD is the author's own reading. The public IFSF working document on AES DUKPT (ifsf.org, 2018) was fetched and has no sentence on secure devices. A search found no free copy of the standard or its Annex B vectors on x9.org. Disposition: keep as unverified, or have Steve buy X9.24-3, or soften the text to 'DUKPT keeps its keys in tamper-resistant hardware' with the Wikipedia Keys section (BDK usually stored in a TRSM or HSM) as the source.",
-      "checkedAgainst": "docs/prd.md D13 (read); IFSF working document ifsf.org 2018-09-04 (fetched); Wikipedia Keys section (fetched); ANSI X9.24-3-2017 not fetched (paid)"
+      "verdict": "accurate",
+      "note": "Re-checked against tours at origin/feat/tours-6-11 commit 5b18067. Tier: secondary. Claim reworded to the Wikipedia Keys section: 'The BDK is usually stored inside a tamper-resistant security module (TRSM), or hardware security module (HSM).' The two tour sentences (S09, S13) now say 'usually', which matches. The X9.24-3 claim itself is gone, so the paid-standard gap no longer blocks.",
+      "checkedAgainst": "Wikipedia, Derived unique key per transaction, Keys section (article source fetched)"
     },
     {
       "id": "L6-C08",
