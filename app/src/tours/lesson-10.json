@@ -193,7 +193,7 @@
       "claims": [
         {
           "id": "L10-C22",
-          "text": "The client certificate holds a fixed key (KeyIds.ClientTlsEd25519). The login key is a different seed drawn for each run and enrolled by the lab. The call phase runs on another connection and reads no certificate.",
+          "text": "The client certificate holds a fixed key (KeyIds.ClientTlsEd25519). The login key is drawn from the run's seed (the same seed gives the same key) and enrolled by the lab. The call phase runs on another connection and reads no certificate.",
           "source": "Jared's re-check of PR #20 (comment 6658016121): three seeds gave tlsKey 0a1626172713245c and three different loginKey values; src/NetSec.Core/Labs/Lesson10Auth.cs, lines 185-186 and 201"
         },
         {
