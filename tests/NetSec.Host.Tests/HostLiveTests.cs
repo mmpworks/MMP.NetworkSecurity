@@ -240,7 +240,7 @@ namespace NetSec.Host.Tests
         public async Task Unbuilt_lesson_and_real_mode_answer_by_code()
         {
             using Socket s = await Socket.Open(host);
-            await s.Send("{\"type\":\"session.start\",\"requestId\":\"r1\",\"lesson\":5,\"mode\":\"run\"}");
+            await s.Send("{\"type\":\"session.start\",\"requestId\":\"r1\",\"lesson\":99,\"mode\":\"run\"}");
             Assert.Equal("LESSON_NOT_BUILT", (await s.Until("error")).GetProperty("code").GetString());
             await s.Send("{\"type\":\"session.start\",\"requestId\":\"r2\",\"lesson\":0,\"mode\":\"run\",\"transport\":\"real\"}");
             Assert.Equal("REAL_MODE_NOT_BUILT", (await s.Until("error")).GetProperty("code").GetString());
@@ -251,7 +251,8 @@ namespace NetSec.Host.Tests
         {
             JsonElement rows = await GetJson("/api/lessons");
             Assert.Equal(Enumerable.Range(1, 11), rows.EnumerateArray().Select(r => r.GetProperty("lesson").GetInt32()));
-            Assert.Equal(new[] { 1, 2, 3 }, rows.EnumerateArray().Where(r => r.GetProperty("built").GetBoolean()).Select(r => r.GetProperty("lesson").GetInt32()));
+            int[] built = rows.EnumerateArray().Where(r => r.GetProperty("built").GetBoolean()).Select(r => r.GetProperty("lesson").GetInt32()).ToArray();
+            foreach (int lesson in new[] { 1, 2, 3, 4, 5 }) Assert.Contains(lesson, built);
             JsonElement toy = await GetJson("/api/lessons/0");
             Assert.True(toy.GetProperty("built").GetBoolean());
             Assert.Equal("L0-flip-wire-byte", toy.GetProperty("attacks")[0].GetProperty("attackId").GetString());

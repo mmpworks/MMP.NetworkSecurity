@@ -36,8 +36,30 @@ Each correction goes here, newest slice last. Later slices read this file first.
 
 ## S2
 
-1. **`openssl genpkey -outform DER` on OpenSSL 3.5.7 wrote a traditional `RSAPrivateKey`, not PKCS#8.** CONTRACT rule 5 needs `PrivateKeyInfo`. Run `openssl pkcs8 -topk8 -nocrypt` after it. The net10 test `An_rsa_key_is_pkcs8_with_its_matching_spki` pins the format.
+1. **`openssl genpkey -outform DER` on OpenSSL 3.5.7 wrote a traditional `RSAPrivateKey`, not PKCS#8.** CONTRACT rule 5 needs `PrivateKeyInfo`. Run `openssl pkcs8 -topk8 -nocrypt` after it. `An_rsa_key_is_pkcs8_with_its_matching_spki` pins the format on both builds.
 2. **`TrainingKeySource.Find` throws `TRAINING_KEY_UNKNOWN` for an unknown id.** It never returns null. A symmetric key's `CopyPublic` gives an empty array.
+3. **`DukptPinPad.Next` uses a new counter on each call (CONTRACT.md).** The S5 `PinEnvelope` holds one KSN, a PIN block, and a MAC. So S5 needs both keys under one counter and must add a method to the pad that returns several working keys for one counter. The derivation already allows it: `DukptDerivation.Working` takes the usage per call.
+4. **Lesson 6 has no MAC on the wire, by the UX row.** A flipped PIN block must reach `PIN block format check`, and a MAC would catch it first. `DUKPT_MAC_MISMATCH` stays for S5.
+5. **`held` does not fall on every sale.** A sale erases one register and can fill lower ones with child keys: 32 after the load, then 31, 31, 30, 31. UX moment 5 says "the reader column shrinks". The lab reports the true count, and the tour must not promise a steady fall.
+6. **The one-bit limit of 16 is from recollection of X9.24-3, which is paid.** The free vectors do not state it. Both sides agree past it in `DukptTests`, because the bank walks any counter.
+7. **`DUKPT_COUNTER_EXHAUSTED` has no test.** The pad would need about 2^31 sales to reach it.
+8. **`PumpTests.A_flipped_length_byte_...` raced.** Two 300 ms deadlines, so the client could close first, and the server then reported `PEER_CLOSED_EARLY`. It failed 1 of 2 gate runs. The server's deadline now comes first. A test with two deadlines must say which one ends first.
+9. **The lab's reader session holds no base key.** Only `BankSession` holds it, and a test scans the reader's trace for it. S5 keeps this shape across processes (D13).
+10. **A test under `#if NET` in `tests/NetSec.Tests` turns A9 red.** `A9.cf.same-suite-passes-on-net48-skips-pinned` compares the net10.0 and net48 test sets. PR #13 did this and blocked every lane. A BCL-only check goes in `tests/NetSec.Host.Tests`, which runs on net10.0 only. Run `pwsh acceptance/run.ps1 -Clauses A9` on every PR that adds a test.
+
+## S3
+
+1. **Decision: the read deadline counts only while the gate holds no event.** This closes S0 item 11. `EnginePump` restarts its clock while `StepGate.IsHolding` is true, so a learner can read one event for an hour. A read that stays open with nothing at the gate has no one left to wake it, and `LINK_DEADLINE` ends it, in free run and in step mode. `LabPair` now passes 30 s on both gates. A gate with no `IGateState` keeps the plain deadline. S5: `RemoteStepGate` must implement `IGateState`, or a node process in step mode gets a deadline that ignores the learner.
+2. **`X25519.Mult` all-zero results are refused in `KeyExchange`, on both roles.** The code is `TLS13_X25519_ZERO`. S4 still owes the same check in the SSH exchange.
+3. **A rule keeps a value with `Effect.Store(Action)`.** The rule returns the closure and the interpreter runs it, so the rule stays free of side effects. `Effect.Secret` plus `Remember` from lessons 1 to 3 holds byte arrays only. TLS keeps a suite and a parsed certificate too. It emits no trace event.
+4. **A protocol with more than one kind of message uses `Effect.SendAs` and the 6-argument `InboundMessage`.** The trace type then names the kind: `tls.handshake.sent`, `tls.record.sent`, `tls.alert.sent`.
+5. **A key share or ML-KEM ciphertext tamper is caught by the AEAD tag, not by Finished.** `ux-design.md` section 8 names `transcript hash` and `Finished verify_data`. The two sides hold different keys, so the first sealed record fails first. `docs/lessons-4-5-names.md` holds the corrected rows. A Finished flip must happen at the Plain tamper point, because a Wire flip fails the tag first.
+6. **`ProbeRequest.Tamper` keeps its contract type `NetSec.Labs.TamperPlan`, which sits above `Io`.** `tools/layer_check.py` now names it as the second full-name exception, and it fails on any other `NetSec.Labs` name in `Io`.
+7. **Lesson 4 and 5 attack rows use fixed byte offsets.** `Tls13Lab` lists the layout beside each constant. A change to the ClientHello extension order or the server name moves them, and `Every_attack_in_the_catalog_is_caught_by_its_named_check_beside_the_control` fails.
+8. **The record-length attack must flip the last record of a flight.** A larger length on an earlier record is filled by the records after it, and the receiver then fails the tag and never waits.
+9. **`Probe` throws `NotImplementedException` for TLS 1.1 and SSH until S4.** The suite maps that to NOT RUN. A7 and A8 stay NOT RUN for that reason, and S4 removes `Probe.NeedBuilt`.
+10. **The glass client offers no CCS and an empty session id, and tolerates a CCS from the peer.** OpenSSL and Go accept this. The glass server echoes the client's session id and sends no CCS.
+11. **`EncryptedExtensions` has no `group unchanged` check.** Design section 2.6 lists one. The group check runs at ServerHello, against the one group the client offered, so a second check at `ee` would always pass and show the learner nothing.
 ## S7
 
 1. **Timing cases taken one after the other measure the machine, and they do not measure the compare.** This machine has 24 logical CPUs. A whole-case sample of the constant-time compare moved its mean between about 12 and 19 ticks from run to run. Sequential constant-time |t| ran from 3.7 to 230, and a control with two identical cases reached 89. So `TimingLab.Interleaved` takes turns of 100 samples between its two cases, and the lab uses it. `TimingLab.Sample` stays sequential because the contract names it.

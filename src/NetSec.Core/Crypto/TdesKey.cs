@@ -5,6 +5,11 @@ namespace NetSec.Crypto
     /// <summary>
     /// Triple DES, SP 800-67: encrypt with key 1, decrypt with key 2, encrypt with key 3.
     /// A 16-byte key is keys 1 and 2, and key 3 repeats key 1. A 24-byte key is all three.
+    /// When key 1 equals key 2, or key 2 equals key 3, the middle step cancels a neighbour and the result is single DES.
+    /// This class accepts such keys, because the published single-key CAVP vectors use one DES key three times.
+    /// NIST SP 800-131A Rev. 2, Table 1: two-key TDEA encryption is disallowed, three-key TDEA encryption is disallowed
+    /// after 2023, and decryption with either is legacy use. TDES is here because A1 requires it, and the PRD names older
+    /// DUKPT hardware as a possible user (unverified).
     /// </summary>
     public sealed class TdesKey
     {

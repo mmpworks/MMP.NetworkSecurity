@@ -5,6 +5,17 @@ namespace NetSec.Crypto
     /// <summary>HMAC, RFC 2104: H((key xor opad) + H((key xor ipad) + data)).</summary>
     public static class Hmac
     {
+        /// <summary>
+        /// True when tag is the full HMAC of data. Use this and never a plain compare, which can stop at the first wrong byte.
+        /// A tag of another length gives false. A truncated tag is out of scope here.
+        /// </summary>
+        public static bool Verify(Func<IHash> h, byte[] key, byte[] data, byte[] tag)
+        {
+            Arg.NotNull(tag, "tag");
+            byte[] expected = Compute(h, key, data);
+            return tag.Length == expected.Length && ConstantTime.Equal(expected, 0, tag, 0, expected.Length);
+        }
+
         public static byte[] Compute(Func<IHash> h, byte[] key, byte[] data)
         {
             Arg.NotNull(h, "h");

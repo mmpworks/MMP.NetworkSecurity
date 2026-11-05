@@ -8,6 +8,13 @@
     { "id": "wire", "term": "wire", "short": "The path that carries bytes between two programs." },
     { "id": "trace", "term": "trace", "short": "A list of everything that happened, in order." },
     { "id": "event", "term": "trace event", "short": "One line in the trace. It records one step, such as bytes sent." },
+    { "id": "signature", "term": "signature", "short": "A value made with a private key. Anyone with the public key can check it." },
+    { "id": "certificate", "term": "certificate", "short": "A signed card that ties a name to a public key." },
+    { "id": "ca", "term": "CA", "short": "Certificate authority. A signer that clients agree to trust." },
+    { "id": "trust-anchor", "term": "trust anchor", "short": "A root certificate the client trusts from the start. Other trust grows from it." },
+    { "id": "handshake", "term": "handshake", "short": "The opening talk where two programs agree on keys and check each other." },
+    { "id": "token", "term": "token", "short": "A signed note that says who the holder is and what the holder may do." },
+    { "id": "dpop", "term": "DPoP", "short": "A fresh signed proof sent with a token. It shows the sender holds the token's key." },
     { "id": "eavesdropper", "term": "eavesdropper", "short": "Someone who listens to the wire but takes no part in the talk." },
     { "id": "plaintext", "term": "plaintext", "short": "Data that anyone can read." },
     { "id": "ciphertext", "term": "ciphertext", "short": "Data scrambled by a key. It looks like random noise." },
@@ -27,6 +34,16 @@
     { "id": "key-share", "term": "key share", "short": "The public half of a key exchange. It is safe to send in the open." },
     { "id": "ml-kem", "term": "ML-KEM", "short": "A key exchange built on lattice math, meant to resist quantum computers." },
     { "id": "hybrid", "term": "hybrid", "short": "A key exchange that runs two methods together. An attacker must break both." },
-    { "id": "quantum-computer", "term": "quantum computer", "short": "A new kind of computer that could break some of today's locks, such as X25519." }
+    { "id": "quantum-computer", "term": "quantum computer", "short": "A new kind of computer that could break some of today's locks, such as X25519." },
+    { "id": "dukpt", "term": "DUKPT", "short": "A scheme where every sale gets its own key, made from a base key and a counter." },
+    { "id": "bdk", "term": "BDK", "short": "The base derivation key. A bank keeps it and uses it to rebuild each reader's keys." },
+    { "id": "ksn", "term": "KSN", "short": "Key serial number. It holds the reader's id and a counter, and travels with each sale." },
+    { "id": "pin-block", "term": "PIN block", "short": "A PIN packed with the card number into a fixed-size block, then locked." },
+    { "id": "replay", "term": "replay", "short": "Sending a copy of an old message again, hoping the receiver accepts it." },
+    { "id": "managed-heap", "term": "managed heap", "short": "Memory that the .NET runtime controls. It may move and copy objects on its own." },
+    { "id": "constant-time", "term": "constant-time", "short": "Code meant to take the same time whatever the secret data is." },
+    { "id": "histogram", "term": "histogram", "short": "A chart that counts how many timings fell in each range." },
+    { "id": "t-statistic", "term": "t statistic", "short": "A number that compares two groups of timings. A large size means they differ by more than noise." },
+    { "id": "optimizer", "term": "optimizer", "short": "The part of a compiler that rewrites code to run faster. It can change timing." }
   ]
 }
