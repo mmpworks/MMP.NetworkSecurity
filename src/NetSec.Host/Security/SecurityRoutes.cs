@@ -62,6 +62,7 @@ public static class SecurityRoutes
     static object TypeRow(SecurityStore store, string id)
     {
         TypeEntry e = store.Entry(id);
+        bool verified = store.StateOf(id) == SecurityStore.StateVerified;
         return new
         {
             typeId = id,
@@ -70,6 +71,8 @@ public static class SecurityRoutes
             state = store.StateOf(id),
             providerKind = e.Binding?.Provider ?? "builtin",
             version = e.Binding?.Version ?? 0,
+            judge = verified ? e.Judge : null,
+            says = verified ? e.Says : null,
         };
     }
 

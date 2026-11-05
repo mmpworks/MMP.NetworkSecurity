@@ -6,7 +6,7 @@ using NetSec.Pki;
 namespace NetSec.Host.Security;
 
 public sealed record KeyBinding(string Provider, int Version, string? KeyFile, string? KeyHash);
-public sealed record TypeEntry(string Mode, KeyBinding? Binding, int CheckedVersion);
+public sealed record TypeEntry(string Mode, KeyBinding? Binding, int CheckedVersion, string? Judge = null, string? Says = null);
 public sealed record ModesFile(bool ShowKeys, Dictionary<string, TypeEntry> Types);
 
 /// <summary>modes.json and the key files under .security/. Each write replaces the whole value and the file, so a reader never sees half a change.</summary>
@@ -103,12 +103,12 @@ public sealed class SecurityStore
         }
     }
 
-    public void MarkChecked(string typeId)
+    public void MarkChecked(string typeId, string judge, string says)
     {
         lock (_gate)
         {
             TypeEntry e = EntryOf(_modes, typeId);
-            if (e.Binding is not null) Put(typeId, e with { CheckedVersion = e.Binding.Version });
+            if (e.Binding is not null) Put(typeId, e with { CheckedVersion = e.Binding.Version, Judge = judge, Says = says });
         }
     }
 

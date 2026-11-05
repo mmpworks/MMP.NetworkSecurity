@@ -142,10 +142,25 @@ public class WizardMachineTests
     {
         using Rig rig = new();
         rig.Store.PlaceKey(SecurityTypes.TokenIssuer, "first");
-        rig.Store.MarkChecked(SecurityTypes.TokenIssuer);
+        rig.Store.MarkChecked(SecurityTypes.TokenIssuer, "openssl", "checked-signature-only");
         Assert.Equal(SecurityStore.StateVerified, rig.Store.StateOf(SecurityTypes.TokenIssuer));
         File.WriteAllText(Path.Combine(rig.Store.Root, "files", SecurityTypes.TokenIssuer, "v1", "key.pem"), "changed");
         Assert.Equal(SecurityStore.StateBroken, rig.Store.StateOf(SecurityTypes.TokenIssuer));
+    }
+
+    [Fact]
+    public void A_check_records_who_judged_each_type_for_as_long_as_that_version_lasts()
+    {
+        using Rig rig = new();
+        FlowRun run = rig.Runs.Start("my-login")!.Run;
+        run = Move(rig.Runs, run, "next", NoData).Run;
+        run = Move(rig.Runs, run, "make", NoData).Run;
+        run = Move(rig.Runs, run, "next", NoData).Run;
+        Move(rig.Runs, run, "check", NoData);
+        Assert.Equal("openssl", rig.Store.Entry(SecurityTypes.TokenIssuer).Judge);
+        Assert.Equal("checked-signature-only", rig.Store.Entry(SecurityTypes.TokenIssuer).Says);
+        Assert.Equal("none", rig.Store.Entry(SecurityTypes.DeviceEnrolment).Judge);
+        Assert.Equal("no-outside-judge", rig.Store.Entry(SecurityTypes.DeviceEnrolment).Says);
     }
 
     [Fact]

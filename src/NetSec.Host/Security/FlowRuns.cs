@@ -164,7 +164,7 @@ public sealed class FlowRuns
             {
                 CheckFact fact = _parts.Check(typeId, dir);
                 facts.Add(fact);
-                if (fact.Passed) _store.MarkChecked(typeId);
+                if (fact.Passed) _store.MarkChecked(typeId, fact.Judge, fact.Says);
                 else errors.Add(new StepMessage(fact.Code!, fact.Message!, typeId));
             }
         }
