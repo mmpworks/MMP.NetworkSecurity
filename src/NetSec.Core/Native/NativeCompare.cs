@@ -16,7 +16,7 @@ namespace NetSec.Native
             catch (Exception e)
             {
                 if (!MeansMissingLibrary(e)) throw;
-                NetSecError error = NetSecError.Of(ErrorCodes.NativeLibMissing, "netsec_ct.dll did not load. Run native\\build.cmd, and put the DLL beside the program. " + e.Message);
+                NetSecError error = NetSecError.Of(ErrorCodes.NativeLibMissing, "netsec_ct.dll did not load. Install the C++ tools of Visual Studio 2022, then run native\\build.cmd and build the program again. " + e.Message);
                 error.CheckName = CheckName;
                 throw new NetSecException(error);
             }

@@ -14,9 +14,16 @@
     <ProjectReference Include="..\NetSec.Core\NetSec.Core.csproj" />
   </ItemGroup>
 
-  <!-- Lesson 11 loads this DLL by name. Without it the lesson ends in NATIVE_LIB_MISSING. native\build.cmd makes it. -->
-  <ItemGroup>
-    <None Include="..\..\native\bin\x64\netsec_ct.dll" Condition="Exists('..\..\native\bin\x64\netsec_ct.dll')" Link="netsec_ct.dll" CopyToOutputDirectory="PreserveNewest" Visible="false" />
-  </ItemGroup>
+  <!-- Lesson 11 loads netsec_ct.dll by name, so it must sit beside NetSec.Host.dll. Every route to the Host builds this project: the gate, acceptance/run.ps1
+       and tools/open-app.ps1. So the DLL gets made here, once, when it is missing. With no C compiler the build still passes, this line says so, and lesson 11
+       ends in NATIVE_LIB_MISSING while every other lesson works. -->
+  <PropertyGroup>
+    <NativeLibrary>$(MSBuildThisFileDirectory)..\..\native\bin\x64\netsec_ct.dll</NativeLibrary>
+  </PropertyGroup>
+  <Target Name="PutNativeLibraryBesideHost" AfterTargets="Build">
+    <Exec Condition="!Exists('$(NativeLibrary)')" Command="&quot;$(MSBuildThisFileDirectory)..\..\native\build.cmd&quot;" IgnoreExitCode="true" IgnoreStandardErrorWarningFormat="true" />
+    <Copy Condition="Exists('$(NativeLibrary)')" SourceFiles="$(NativeLibrary)" DestinationFolder="$(OutDir)" SkipUnchangedFiles="true" />
+    <Message Condition="!Exists('$(NativeLibrary)')" Importance="high" Text="NetSec.Host: NATIVE_LIB_NOT_BUILT: native\build.cmd did not make netsec_ct.dll. Lesson 11 will end in NATIVE_LIB_MISSING. Every other lesson works. Fix: install the C++ tools of Visual Studio 2022, then build again." />
+  </Target>
 
 </Project>
