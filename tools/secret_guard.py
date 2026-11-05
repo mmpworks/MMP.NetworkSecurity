@@ -35,7 +35,8 @@ def git_paths(*args):
 
 
 def problem_with(path):
-    if FORBIDDEN_PATH.search(path) and not path.startswith(GOLDEN_FOLDER):
+    golden_trace = path.startswith(GOLDEN_FOLDER) and path.endswith(".ndjson")
+    if FORBIDDEN_PATH.search(path) and not golden_trace:
         return path + ": a path that holds keys or session data is tracked or staged"
     if path in ALLOW_LIST or not os.path.isfile(path) or os.path.getsize(path) > LARGEST_SCANNED:
         return None
