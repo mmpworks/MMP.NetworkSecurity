@@ -51,6 +51,7 @@ namespace Acceptance
             Dictionary<string, object> s = D("runId", r.RunId, "flowId", r.FlowId, "state", r.State, "kind", KindOf(r.State), "stepSeq", (double)r.Seq,
                 "allowed", allowed, "errors", new List<object>(r.Errors.ToArray()), "facts", new List<object>(r.Facts.ToArray()));
             if (r.State == "Intro") s["copy"] = Strs("wizard.common.test-keys-only");
+            if (r.State == "ReadBack") s["facts"] = ReadBackFacts(r);
             return s;
         }
 
@@ -63,11 +64,45 @@ namespace Acceptance
             Write(ctx, 200, D("runId", r.RunId, "step", StepJson(r)));
         }
 
-        static string JudgeOf(string typeId)
+        string JudgeOf(string typeId)
         {
             if (typeId.StartsWith("ssh.")) return "ssh.exe";
+            if (typeId.StartsWith("dukpt.") && M("dukpt-judge-claimed")) return "openssl";
             if (typeId.StartsWith("dukpt.") || typeId == "device.enrolment") return "none";
             return "openssl";
+        }
+
+        static string NameOf(string typeId)
+        {
+            switch (typeId)
+            {
+                case "pki.root-ca": return "MMP.NetworkSecurity training root";
+                case "tls13.server": case "tls11.server": return "localhost";
+                case "tls13.client": return "pump-reader-4";
+                default: return typeId;
+            }
+        }
+
+        static string AlgorithmOf(string typeId)
+        {
+            if (typeId == "tls11.server" || typeId == "ssh.host-rsa") return "RSA-2048";
+            if (typeId.StartsWith("dukpt.") || typeId.StartsWith("lab.")) return "AES-128";
+            return "Ed25519";
+        }
+
+        List<object> ReadBackFacts(FlowRun r)
+        {
+            List<object> facts = new List<object>();
+            string[] types = FlowTypesOf(r.FlowId);
+            int n = M("readback-drops-type") ? types.Length - 1 : types.Length;
+            for (int i = 0; i < n; i++)
+            {
+                string id = types[i];
+                using (System.Security.Cryptography.SHA256 sha = System.Security.Cryptography.SHA256.Create())
+                    facts.Add(D("typeId", id, "name", NameOf(id), "notAfter", "2049-12-31", "algorithm", AlgorithmOf(id),
+                        "fingerprint", "SHA256:" + Convert.ToBase64String(sha.ComputeHash(System.Text.Encoding.ASCII.GetBytes(r.RunId + id))).TrimEnd('=')));
+            }
+            return facts;
         }
 
         string SaysOf(string typeId)
@@ -174,7 +209,7 @@ namespace Acceptance
             foreach (string id in FlowTypesOf(r.FlowId))
             {
                 TypeState t = _types[id];
-                t.Mode = "Mine"; t.Bound = true; t.Verified = false; t.Version++;
+                t.Mode = "Mine"; t.Bound = true; t.Verified = false; if (!M("version-not-bumped") || t.Version == 0) t.Version++;
                 bool hidden;
                 r.KeepHidden.TryGetValue(id, out hidden);
                 // Exportable is set when the vault key is made, and it is one-way: a later run cannot turn a hidden key back into a showing one.

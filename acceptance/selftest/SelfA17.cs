@@ -38,6 +38,21 @@ namespace Acceptance
             new Case("A17.vault.tampered-row-refused", V1Clauses.TamperedRowRefused, "tamper-ignored"),
             new Case("A17.vault.audit-failure-refuses", V1Clauses.AuditFailureRefuses, "audit-failure-ignored"),
             new Case("A17.vault.exportable-is-one-way", V1Clauses.ExportableIsOneWay, "exportable-flips"),
+            new Case("A17.flow.certificates.walk", WalkClauses.Certificates, "readback-drops-type", "says-trusted", "back-after-check", "version-not-bumped", "no-judge-facts"),
+            new Case("A17.flow.ssh.walk", WalkClauses.Ssh, "readback-drops-type", "version-not-bumped"),
+            new Case("A17.flow.payment.known-answer-walk", WalkClauses.Payment, "dukpt-judge-claimed", "readback-drops-type"),
+            new Case("A17.flow.lesson-keys.walk", WalkClauses.LessonKeys, "readback-drops-type"),
+            new Case("A17.payment.known-answer-vectors-through-flow-code", WalkClauses.PaymentKnownAnswer, "dukpt-pad-constant"),
+            new Case("A17.referee.lesson-keys-openssl-mac", LessonKeysReferee.LessonKeysOpensslMac, "mac-wrong-key"),
+            new Case("A17.lesson-1.my-keys", MyKeysClauses.L1, "mine-run-differs"),
+            new Case("A17.lesson-2.my-keys", MyKeysClauses.L2, "mine-run-differs"),
+            new Case("A17.lesson-4.my-keys", MyKeysClauses.L4, "mine-run-differs"),
+            new Case("A17.lesson-5.my-keys", MyKeysClauses.L5, "mine-run-differs"),
+            new Case("A17.lesson-6.my-keys", MyKeysClauses.L6, "mine-run-differs"),
+            new Case("A17.lesson-7.my-keys", MyKeysClauses.L7, "mine-run-differs"),
+            new Case("A17.lesson-8.my-keys", MyKeysClauses.L8, "mine-run-differs"),
+            new Case("A17.lesson-9.my-keys", MyKeysClauses.L9, "mine-run-differs"),
+            new Case("A17.lesson-10.my-keys", MyKeysClauses.L10, "mine-run-differs", "no-key-in-use"),
         };
 
         static string Outcome(Body b, Ctx c)

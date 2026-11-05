@@ -250,7 +250,7 @@ namespace Acceptance
 
         // ------------------------------------------------------------ /api/security
 
-        Dictionary<string, object> TypeJson(TypeState t) { return D("typeId", t.TypeId, "mode", t.Mode, "state", t.State); }
+        Dictionary<string, object> TypeJson(TypeState t) { return D("typeId", t.TypeId, "mode", t.Mode, "state", t.State, "version", (double)t.Version); }
 
         Dictionary<string, object> SecurityJson()
         {
@@ -264,7 +264,11 @@ namespace Acceptance
         {
             if (Active(t) && t.Seed != null) return t.Seed;
             if (t.TypeId == "token.issuer") return _builtinIssuer.Seed;
-            using (SHA256 sha = SHA256.Create()) return sha.ComputeHash(Encoding.ASCII.GetBytes("builtin:" + t.TypeId));
+            using (SHA256 sha = SHA256.Create())
+            {
+                byte[] all = sha.ComputeHash(Encoding.ASCII.GetBytes("builtin:" + t.TypeId));
+                return t.TypeId.StartsWith("dukpt.") || t.TypeId.StartsWith("lab.") ? Hex.Slice(all, 0, 16) : all;
+            }
         }
 
         static bool Active(TypeState t) { return t.Mode == "Mine" && t.Bound; }

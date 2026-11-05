@@ -143,9 +143,21 @@ namespace Acceptance
         void Add(Session s, string stream, string type, params RawSecret[] secrets)
         {
             int n = s.Events.Count + 1;
-            SessionEv e = new SessionEv { Base = D("type", type, "eventId", "e" + n, "streamId", s.Id + "/" + stream, "streamSeq", (double)n) };
+            SessionEv e = new SessionEv { Base = D("type", type, "eventId", "e" + n, "actor", stream, "streamId", s.Id + "/" + stream, "streamSeq", (double)n) };
             e.Secrets.AddRange(secrets);
             s.Events.Add(e);
+        }
+
+        byte[] BuiltInKey(string typeId)
+        {
+            using (SHA256 sha = SHA256.Create()) return Hex.Slice(sha.ComputeHash(Encoding.ASCII.GetBytes("builtin:" + typeId)), 0, 16);
+        }
+
+        void AddWire(Session s, string stream, string type, string message, byte[] wire, byte[] plain)
+        {
+            Add(s, stream, type);
+            SessionEv e = s.Events[s.Events.Count - 1];
+            e.Base["message"] = message; e.Base["wire"] = Hex.Encode(wire); e.Base["plain"] = Hex.Encode(plain);
         }
 
         void BuildEvents(Session s, int seed)
@@ -168,8 +180,39 @@ namespace Acceptance
             }
             switch (lesson)
             {
-                case 1: Add(s, "client", "aes.encrypt", Raw("aes.key", "client", KeyBytes(_types["lab.aes-key"]))); break;
-                case 2: Add(s, "client", "seal.tag", Raw("seal.key", "client", KeyBytes(_types["lab.seal-key"]))); break;
+                case 1:
+                    {
+                        byte[] aes = KeyBytes(_types["lab.aes-key"]);
+                        Add(s, "client", "aes.key", Raw("aes.key", "client", aes));
+                        byte[] picture = new byte[4096];
+                        for (int i = 0; i < picture.Length; i++) picture[i] = (byte)(i % 7);
+                        byte[] used = M("mac-wrong-key") ? BuiltInKey("lab.aes-key") : aes;
+                        byte[] cipher;
+                        using (System.Security.Cryptography.Aes a = System.Security.Cryptography.Aes.Create())
+                        {
+                            a.Key = used; a.Mode = System.Security.Cryptography.CipherMode.ECB; a.Padding = System.Security.Cryptography.PaddingMode.PKCS7;
+                            cipher = a.CreateEncryptor().TransformFinalBlock(picture, 0, picture.Length);
+                        }
+                        AddWire(s, "client", "wire.sent", "PictureEcb", Hex.Concat(new byte[] { 3, 0, 0, 0 }, cipher), picture);
+                        break;
+                    }
+                case 2:
+                    {
+                        byte[] seal = KeyBytes(_types["lab.seal-key"]);
+                        Add(s, "client", "seal.key", Raw("seal.key", "client", seal));
+                        byte[] used = M("mac-wrong-key") ? BuiltInKey("lab.seal-key") : seal;
+                        byte[] message = Encoding.UTF8.GetBytes("Pay the pump owner 20 dollars.");
+                        byte[] hmac;
+                        using (System.Security.Cryptography.HMACSHA256 hm = new System.Security.Cryptography.HMACSHA256(used)) hmac = hm.ComputeHash(message);
+                        string msgFile = Path.Combine(Dir, "seal-msg-" + (++_next) + ".bin"), o;
+                        File.WriteAllBytes(msgFile, message);
+                        Proc.Run(_openssl, "mac -cipher AES-128-CBC -macopt hexkey:" + Hex.Encode(used) + " -in \"" + msgFile + "\" CMAC", Dir, 30000, out o);
+                        byte[] cmac = Hex.Decode(o.Trim());
+                        byte[] len = new byte[] { 0, (byte)message.Length };
+                        AddWire(s, "client", "wire.sent", "HmacSealed", Hex.Concat(new byte[] { 3, 0, 0, 0 }, len, message, hmac), message);
+                        AddWire(s, "client", "wire.sent", "CmacSealed", Hex.Concat(new byte[] { 4, 0, 0, 0 }, len, message, cmac), message);
+                        break;
+                    }
                 case 3:
                     byte[] shared = Seeded(seed, 3, 1, 32);
                     Add(s, "client", "kex.shared", Raw("kex.shared", "client", shared));
@@ -180,13 +223,18 @@ namespace Acceptance
                     for (int i = 1; i <= 4; i++) Add(s, "client", "tls.secret", Raw("tls.secret" + i, "client", Seeded(seed, lesson, i, 32)));
                     break;
                 case 6:
-                    Add(s, "pad", "dukpt.sale", Raw("dukpt.sale-key", "pad", Seeded(seed, 6, 1, 16)));
+                    byte[] bdk = M("dukpt-pad-constant") ? Hex.Slice(Seeded(seed, 6, 9, 16), 0, 16) : KeyBytes(_types["dukpt.bdk"]);
+                    byte[] ikid = Encoding.ASCII.GetBytes("MMPTRAIN");
+                    Add(s, "bank", "dukpt.key.derived", Raw("dukpt.bdk", "bank", bdk));
+                    Add(s, "bank", "dukpt.key.derived", Raw("dukpt.initial", "bank", DukptReference.InitialKey(bdk, ikid)));
+                    for (uint sale = 1; sale <= 4; sale++)
+                        Add(s, "bank", "dukpt.key.derived", Raw("dukpt.pinKey." + sale, "bank", DukptReference.WorkingKey(bdk, ikid, sale, 0x1000, 16)));
                     break;
                 case 8: Add(s, "client", "ssh.keys", Raw("ssh.session-key", "client", Seeded(seed, 8, 1, 32))); break;
                 case 10:
                     KeyPair signer = M("token-wrong-key") ? _builtinIssuer : ActiveIssuer();
                     long now = DateTimeOffset.UtcNow.ToUnixTimeSeconds();
-                    string token = Sign(signer, "{\"iss\":\"lab\",\"sub\":\"learner\",\"iat\":" + now + ",\"exp\":" + (now + 300) + "}");
+                    string token = Sign(signer, "{\"iss\":\"https://pump.training/issuer\",\"aud\":\"https://pump.training/api\",\"sub\":\"learner\",\"iat\":" + now + ",\"exp\":" + (now + 300) + "}");
                     KeyPair shown = M("pub-in-trace-wrong") ? _builtinIssuer : ActiveIssuer();
                     byte[] tokenBytes = Encoding.ASCII.GetBytes(token), pub = Hex.Decode(shown.PublicHex);
                     Add(s, "issuer", "auth.token-issued", Raw("auth.token", "issuer", tokenBytes), Raw("auth.issuer-public", "issuer", pub),
@@ -198,6 +246,9 @@ namespace Acceptance
                 case 11: Add(s, "target", "timing.lab.started", Raw("lab-secret", "target", Seeded(seed, 11, 1, 4))); break;
                 default: Add(s, "lab", "lesson.step"); break;
             }
+            if (M("mine-run-differs") && s.Events.Count > 1)
+                foreach (string id in (LessonTypes.ContainsKey(lesson) ? LessonTypes[lesson] : new string[0]))
+                    if (Active(_types[id])) { s.Events.RemoveAt(s.Events.Count - 1); break; }
         }
     }
 }

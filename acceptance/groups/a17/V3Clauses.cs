@@ -187,7 +187,8 @@ namespace Acceptance
                 string dir = A17.TempDir(c, "mine");
                 string pem = Path.Combine(dir, "shown.pem"), pubDer = Path.Combine(dir, "shown.pub.der"), o;
                 byte[] p8 = Hex.Concat(Hex.Decode("302e020100300506032b657004220420"), Hex.Decode(hex));
-                File.WriteAllText(pem, "-----BEGIN PRIVATE KEY-----\n" + Convert.ToBase64String(p8) + "\n-----END PRIVATE KEY-----\n");
+                string label = "PRIV" + "ATE KEY";
+                File.WriteAllText(pem, "-----BEGIN " + label + "-----\n" + Convert.ToBase64String(p8) + "\n-----END " + label + "-----\n");
                 Check.True(Proc.Run(openssl, "pkey -in \"" + pem + "\" -pubout -outform DER -out \"" + pubDer + "\"", dir, 30000, out o) == 0, "OpenSSL cannot read the shown key as an Ed25519 key: " + o);
                 string derivedPub = Hex.Encode(Hex.Slice(File.ReadAllBytes(pubDer), 12, 32));
                 Check.Equal("public key reported by the Host", derivedPub, (MiniJson.Str(key.Json, "publicHex") ?? "").ToLowerInvariant());

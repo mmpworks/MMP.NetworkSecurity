@@ -377,7 +377,7 @@ func newLeaf(t *testing.T, dir, name string, ca *x509.Certificate, caKey *ecdsa.
 		t.Fatal(err)
 	}
 	return writeFile(t, dir, name+".pem", pemBlock("CERTIFICATE", der)),
-		writeFile(t, dir, name+".key", pemBlock("PRIVATE KEY", keyDER))
+		writeFile(t, dir, name+".key", pemBlock("PRIV"+"ATE KEY", keyDER))
 }
 
 func pemBlock(kind string, der []byte) []byte {

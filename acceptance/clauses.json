@@ -1378,8 +1378,8 @@
    "counts": true
   },
   {
-   "id": "A16.ui.os-transport-label-in-real-mode",
-   "base": "A16.ui.os-transport-label-in-real-mode",
+   "id": "A16.ui.os-transport-label-and-hidden-secrets",
+   "base": "A16.ui.os-transport-label-and-hidden-secrets",
    "assertion": "A16",
    "group": "e2e",
    "build": "host",
@@ -1411,10 +1411,43 @@
    "counts": true
   },
   {
+   "id": "A17.cold.lesson-10-fresh-clone",
+   "base": "A17.cold.lesson-10-fresh-clone",
+   "assertion": "A17",
+   "group": "a17",
+   "build": "host",
+   "slice": "V0",
+   "referee": "test over HTTP and WebSocket, OpenSSL, ssh.exe, Go referees; known-answer where no outside referee exists",
+   "roles": [],
+   "counts": true
+  },
+  {
    "id": "A17.copy.grade-and-tics",
    "base": "A17.copy.grade-and-tics",
    "assertion": "A17",
    "group": "docs",
+   "build": "host",
+   "slice": "V0",
+   "referee": "test over HTTP and WebSocket, OpenSSL, ssh.exe, Go referees; known-answer where no outside referee exists",
+   "roles": [],
+   "counts": true
+  },
+  {
+   "id": "A17.flow.certificates.walk",
+   "base": "A17.flow.certificates.walk",
+   "assertion": "A17",
+   "group": "a17",
+   "build": "host",
+   "slice": "V0",
+   "referee": "test over HTTP and WebSocket, OpenSSL, ssh.exe, Go referees; known-answer where no outside referee exists",
+   "roles": [],
+   "counts": true
+  },
+  {
+   "id": "A17.flow.lesson-keys.walk",
+   "base": "A17.flow.lesson-keys.walk",
+   "assertion": "A17",
+   "group": "a17",
    "build": "host",
    "slice": "V0",
    "referee": "test over HTTP and WebSocket, OpenSSL, ssh.exe, Go referees; known-answer where no outside referee exists",
@@ -1433,8 +1466,140 @@
    "counts": true
   },
   {
+   "id": "A17.flow.payment.known-answer-walk",
+   "base": "A17.flow.payment.known-answer-walk",
+   "assertion": "A17",
+   "group": "a17",
+   "build": "host",
+   "slice": "V0",
+   "referee": "test over HTTP and WebSocket, OpenSSL, ssh.exe, Go referees; known-answer where no outside referee exists",
+   "roles": [],
+   "counts": true
+  },
+  {
+   "id": "A17.flow.ssh.walk",
+   "base": "A17.flow.ssh.walk",
+   "assertion": "A17",
+   "group": "a17",
+   "build": "host",
+   "slice": "V0",
+   "referee": "test over HTTP and WebSocket, OpenSSL, ssh.exe, Go referees; known-answer where no outside referee exists",
+   "roles": [],
+   "counts": true
+  },
+  {
    "id": "A17.import.warns-on-personal-ssh-path",
    "base": "A17.import.warns-on-personal-ssh-path",
+   "assertion": "A17",
+   "group": "a17",
+   "build": "host",
+   "slice": "V0",
+   "referee": "test over HTTP and WebSocket, OpenSSL, ssh.exe, Go referees; known-answer where no outside referee exists",
+   "roles": [],
+   "counts": true
+  },
+  {
+   "id": "A17.lesson-1.my-keys",
+   "base": "A17.lesson-1.my-keys",
+   "assertion": "A17",
+   "group": "a17",
+   "build": "host",
+   "slice": "V0",
+   "referee": "test over HTTP and WebSocket, OpenSSL, ssh.exe, Go referees; known-answer where no outside referee exists",
+   "roles": [],
+   "counts": true
+  },
+  {
+   "id": "A17.lesson-10.my-keys",
+   "base": "A17.lesson-10.my-keys",
+   "assertion": "A17",
+   "group": "a17",
+   "build": "host",
+   "slice": "V0",
+   "referee": "test over HTTP and WebSocket, OpenSSL, ssh.exe, Go referees; known-answer where no outside referee exists",
+   "roles": [],
+   "counts": true
+  },
+  {
+   "id": "A17.lesson-2.my-keys",
+   "base": "A17.lesson-2.my-keys",
+   "assertion": "A17",
+   "group": "a17",
+   "build": "host",
+   "slice": "V0",
+   "referee": "test over HTTP and WebSocket, OpenSSL, ssh.exe, Go referees; known-answer where no outside referee exists",
+   "roles": [],
+   "counts": true
+  },
+  {
+   "id": "A17.lesson-4.my-keys",
+   "base": "A17.lesson-4.my-keys",
+   "assertion": "A17",
+   "group": "a17",
+   "build": "host",
+   "slice": "V0",
+   "referee": "test over HTTP and WebSocket, OpenSSL, ssh.exe, Go referees; known-answer where no outside referee exists",
+   "roles": [],
+   "counts": true
+  },
+  {
+   "id": "A17.lesson-5.my-keys",
+   "base": "A17.lesson-5.my-keys",
+   "assertion": "A17",
+   "group": "a17",
+   "build": "host",
+   "slice": "V0",
+   "referee": "test over HTTP and WebSocket, OpenSSL, ssh.exe, Go referees; known-answer where no outside referee exists",
+   "roles": [],
+   "counts": true
+  },
+  {
+   "id": "A17.lesson-6.my-keys",
+   "base": "A17.lesson-6.my-keys",
+   "assertion": "A17",
+   "group": "a17",
+   "build": "host",
+   "slice": "V0",
+   "referee": "test over HTTP and WebSocket, OpenSSL, ssh.exe, Go referees; known-answer where no outside referee exists",
+   "roles": [],
+   "counts": true
+  },
+  {
+   "id": "A17.lesson-7.my-keys",
+   "base": "A17.lesson-7.my-keys",
+   "assertion": "A17",
+   "group": "a17",
+   "build": "host",
+   "slice": "V0",
+   "referee": "test over HTTP and WebSocket, OpenSSL, ssh.exe, Go referees; known-answer where no outside referee exists",
+   "roles": [],
+   "counts": true
+  },
+  {
+   "id": "A17.lesson-8.my-keys",
+   "base": "A17.lesson-8.my-keys",
+   "assertion": "A17",
+   "group": "a17",
+   "build": "host",
+   "slice": "V0",
+   "referee": "test over HTTP and WebSocket, OpenSSL, ssh.exe, Go referees; known-answer where no outside referee exists",
+   "roles": [],
+   "counts": true
+  },
+  {
+   "id": "A17.lesson-9.my-keys",
+   "base": "A17.lesson-9.my-keys",
+   "assertion": "A17",
+   "group": "a17",
+   "build": "host",
+   "slice": "V0",
+   "referee": "test over HTTP and WebSocket, OpenSSL, ssh.exe, Go referees; known-answer where no outside referee exists",
+   "roles": [],
+   "counts": true
+  },
+  {
+   "id": "A17.payment.known-answer-vectors-through-flow-code",
+   "base": "A17.payment.known-answer-vectors-through-flow-code",
    "assertion": "A17",
    "group": "a17",
    "build": "host",
@@ -1466,8 +1631,30 @@
    "counts": true
   },
   {
+   "id": "A17.referee.lesson-keys-openssl-mac",
+   "base": "A17.referee.lesson-keys-openssl-mac",
+   "assertion": "A17",
+   "group": "a17",
+   "build": "host",
+   "slice": "V0",
+   "referee": "test over HTTP and WebSocket, OpenSSL, ssh.exe, Go referees; known-answer where no outside referee exists",
+   "roles": [],
+   "counts": true
+  },
+  {
    "id": "A17.referee.token-issuer-go",
    "base": "A17.referee.token-issuer-go",
+   "assertion": "A17",
+   "group": "a17",
+   "build": "host",
+   "slice": "V0",
+   "referee": "test over HTTP and WebSocket, OpenSSL, ssh.exe, Go referees; known-answer where no outside referee exists",
+   "roles": [],
+   "counts": true
+  },
+  {
+   "id": "A17.repo.no-key-tracked",
+   "base": "A17.repo.no-key-tracked",
    "assertion": "A17",
    "group": "a17",
    "build": "host",
@@ -1547,6 +1734,17 @@
    "base": "A17.ui.no-word-real",
    "assertion": "A17",
    "group": "docs",
+   "build": "host",
+   "slice": "V0",
+   "referee": "test over HTTP and WebSocket, OpenSSL, ssh.exe, Go referees; known-answer where no outside referee exists",
+   "roles": [],
+   "counts": true
+  },
+  {
+   "id": "A17.ui.show-keys-switch",
+   "base": "A17.ui.show-keys-switch",
+   "assertion": "A17",
+   "group": "e2e",
    "build": "host",
    "slice": "V0",
    "referee": "test over HTTP and WebSocket, OpenSSL, ssh.exe, Go referees; known-answer where no outside referee exists",
@@ -2775,6 +2973,28 @@
   {
    "id": "SELF.a17-clauses-pass-and-bite",
    "base": "SELF.a17-clauses-pass-and-bite",
+   "assertion": "SELF",
+   "group": "selftest",
+   "build": "host",
+   "slice": "S0",
+   "referee": "stand-ins built on the BCL, python cryptography and real OpenSSL runs",
+   "roles": [],
+   "counts": false
+  },
+  {
+   "id": "SELF.a17-cold-clause-bites",
+   "base": "SELF.a17-cold-clause-bites",
+   "assertion": "SELF",
+   "group": "selftest",
+   "build": "host",
+   "slice": "S0",
+   "referee": "stand-ins built on the BCL, python cryptography and real OpenSSL runs",
+   "roles": [],
+   "counts": false
+  },
+  {
+   "id": "SELF.a17-repo-guard-bites",
+   "base": "SELF.a17-repo-guard-bites",
    "assertion": "SELF",
    "group": "selftest",
    "build": "host",
