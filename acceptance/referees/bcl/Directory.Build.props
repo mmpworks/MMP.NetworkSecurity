@@ -1,0 +1,4 @@
+<Project>
+  <!-- This file stops MSBuild from walking up the tree. The referee keeps its own
+       settings when the repo root later adds a Directory.Build.props for the product. -->
+</Project>

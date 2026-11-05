@@ -1,5 +1,4 @@
 # MMP.NetworkSecurity: program design
-
 Author: Richard. Date: 2026-11-04. Status: ready to build. Inputs: `docs/prd.md` (with D11 to D14), `docs/ux-design.md`.
 ## Conclusion
 1. One C# 3 source folder, `src/NetSec.Core`, compiles into two binaries with one assembly name: net10.0 and CF 3.5.
@@ -15,9 +14,8 @@ Style: modular monolith plus lab node processes. The arithmetic is in the PRD: o
 |---|---|---|
 | `ilspycmd` on `netcf35-ref` | Absent: `BigInteger`, `Span`, `HMAC`, `SHA256`, `SHA512`, `Aes`, `HashSet`, `DateTimeOffset`, `ThreadStatic`, `Assembly.GetReferencedAssemblies`, `Encoding.GetString(byte[])`. Present: `Stopwatch`, `RandomNumberGenerator.Create`, `DllImportAttribute`, `Socket.Begin{Connect,Accept,Send,Receive}`, `GC.GetTotalMemory`, `ThreadPool.SetMaxThreads` | No BCL math. Use the 3-argument `GetString`. Binary proof runs from outside the exe |
 | Throwaway CF exe (socket, AsyncProxy, `DllImport`, `Stopwatch`), default SDK config | **Printed nothing, exit 0.** The SDK writes `supportedRuntime v2.0.50727` | Silent false success. Section 6 fixes the config, and the Host requires a ready line |
-| Same exe, `App.config` with `v4.0`, `GenerateSupportedRuntime=false` | `ok hello pool=True/25/25 ptr=8 clr=4.0.30319.42000` | This closes the S0 spike in the PRD. Pointers are 64-bit |
+| Same exe, `App.config` with `v4.0`, `GenerateSupportedRuntime=false` | `ok hello pool=True/25/25 ptr=8 clr=4.0.30319.42000` | The S0 spike passes for `BeginReceive` through AsyncProxy. Connect and Accept in the spike were blocking calls, and `BeginSend`, `BeginConnect`, `BeginAccept` are only compile-checked. S0 commits a test that runs all four. Pointers are 64-bit |
 | Same source, net10.0, `LangVersion 3`, AsyncProxy `netstandard2.0` | `ok hello pool=True/25/25 clr=10.0.14` | C# 3 iterators and sockets work on both builds |
-| `openssl ciphers -v 'ALL:@SECLEVEL=0'` | `AES128-SHA` (Kx=RSA), `ECDHE-RSA-AES128-SHA` listed | A7 suite names |
 | PATH | `openssl` also resolves to FireDaemon. Git Bash `ssh` is `/usr/bin/ssh`. `cl` is off PATH | Referees use pinned paths (section 9) |
 
 Consultation. Gems used: `server-replaces-never-merges`, `fail-soft-must-count`, `paths-plain-at-the-boundary`, `decide-at-authoritative-boundary`, `plain-sentence-error-surface`. No gem covers a sans-IO table engine, so it is a candidate after S4. Catalog: closest shape is a multi-step process with independent failure per step. Taken: name each step's failure. Rejected: queues and caches. "Sans-IO" as a pattern name (`rustls`, `h11`) is recollection, unverified this session.
@@ -31,10 +29,8 @@ Consultation. Gems used: `server-replaces-never-merges`, `fail-soft-must-count`,
 | `src/NetSec.Host` | net10.0, C# 14 | Minimal API, WebSocket, sessions, process control, `OsTransportFactory` |
 | `native/` | C-compatible C++ | `netsec_ct.dll` (section 7) |
 | `app/` | Electron, Vue 3, Vuetify | UI per `ux-design.md`. Tours in `app/src/tours/` |
-| `acceptance/referees/bcl` | net10.0, C# 14 | Line oracle on stdin and stdout, so net48 tests reach `MLKem` and `AesGcm` with no skip |
-| `acceptance/referees/go` | Go 1.26, `x/crypto` v0.58.0 | `tlspeer`, `sshpeer`, `gogateway`, `tap`, `tokenverify` |
 | `tests/NetSec.Tests` | net10.0, net48, C# latest | Builder unit suite. net48 uses `HintPath` to CF binaries, as in MMP.AsyncProxy |
-| `acceptance/` | net10.0, net48, pwsh | D11. Separate author. **Builders never write here.** `run.ps1`, `clauses.json`, pinned skip list |
+| `acceptance/` | net10.0, net48, pwsh | D11. Separate authors. **Builders never write here.** `run.ps1`, `clauses.json`, pinned skip list, `referees/bcl` (oracle, so net48 reaches `MLKem` with no skip), `referees/go` (`tlspeer`, `sshpeer`, `gogateway`, `tap`, `tokenverify`) |
 | `tools/` | pwsh, python | `gate.ps1`, `layer_check.py`, `tour_lint.py`, `lessons_status.py` |
 
 Root `Directory.Build.props`: `ShouldUnsetParentConfigurationAndPlatform=false`, `Nullable=disable`, `ImplicitUsings=disable`, `TreatWarningsAsErrors=true`, `AsyncProxyRoot` (default `..\MMP.AsyncProxy`). `LangVersion` stays per project. `.gitignore` keeps `bin/`, `obj/`, and CF binaries out (A9). MMP.AsyncProxy stays unchanged.
@@ -49,14 +45,13 @@ Folders inside `NetSec.Core`. Dependencies point down the table. `tools/layer_ch
 | `Keys`, `Pki` | `ITrainingKey`, `IKeyHandle`, `TrainingKeySource`, `Der`, `Certificate`, `TrainingCa`, `ChainCheck` | `Crypto` |
 | `Machine` | `StepTable`, `StepDecision`, `IProtocolEngine`, `ITamperHook` | `Trace`, `Errors` |
 | `Tls13`, `Tls11`, `Ssh` | `CreateClient(options)`, `CreateServer(options)` returning `IProtocolEngine` | `Machine`, `Crypto`, `Pki`, `Keys` |
-| `Dukpt` | `DukptPinPad`, `DukptBank`, `PinBlock` | `Crypto` |
-| `Auth` | `Token`, `DpopProof`, `Challenge`, `AccessRules` | `Crypto`, `Keys` |
-| `Io` | `IByteLink`, `SocketLink`, `MemoryLink`, `EnginePump`, `IStepGate`, `ITransportFactory`, `GlassTransportFactory`, `TransportPolicy`. The only AsyncProxy and socket use | all above |
+| `Dukpt`, `Auth` | `DukptPinPad`, `DukptBank`, `PinBlock`, `Token`, `DpopProof`, `Challenge`, `AccessRules` | `Crypto`, `Keys` |
+| `Io` | `Probe`, `IByteLink`, `SocketLink`, `MemoryLink`, `EnginePump`, `IStepGate`, `ITransportFactory`, `GlassTransportFactory`, `TransportPolicy`. The only AsyncProxy and socket use | all above |
 | `Bridge` | `PinEnvelope`, `IDeviceLink`, `PinPadCore`, `CeDeviceFlow`, `GatewayCore`, `ServerCore`, `BankHsmCore`, `DeviceProfile`, `BudgetJudge` | all above |
 | `Native` | `NativeCompare`, `ManagedCompare`, `TimingLab`, `TimingJudge` | `Errors`, `Trace` |
 | `Labs` | `ILab`, `LabCatalog`, `AttackCatalog`. One file per lesson | all above |
 ## 2. Key types and signatures
-All C# 3. These public signatures are the contract `acceptance/` compiles against. A parse failure throws `ParseFailure` inside an engine and leaves `Feed` as an `EngineOutput` error.
+All C# 3. Section 11 lists what `acceptance/` calls. A parse failure throws `ParseFailure` inside an engine and leaves `Feed` as an `EngineOutput` error.
 ### 2.1 Trace event (D4)
 ```csharp
 public sealed class TraceEvent {            // Immutable. Byte arrays are copied at construction.
@@ -78,6 +73,8 @@ public interface ITraceSink { void Write(TraceEvent e); }   // NullSink, ListSin
 public static class TraceJson { public static string ToLine(TraceEvent e); }   // One writer for both builds
 ```
 The Host adds the session-wide `seq` at ingest (UX section 0). `Fields` come from `ByteReader` calls that record name, offset, and length, so the decoder and the parser cannot drift. `Gloss` is a key into `app/src/field-gloss.json`, so English stays out of the CF binary and A15 scans one place.
+
+**UX section 0 is confirmed, including `visibleToWire`.** An engine sets `visibleToWire` per field: true for clear headers and clear handshake fields, false for anything inside protected bytes. `TraceJson` writes the UX names: `secrets[].hex`, `check {id, name, result, code, detail}` with `result` as `pass` or `fail`, and `waiting {actor}`. The Host stamps `seq` and `seed`. Actor names stay as in the UX: the PIN-pad is `reader`, and the bank-HSM is `bank`. Amendments: added `eventId`, `streamId`, `streamSeq`, `message`, `step`, `schema`; `check.id` is new; `fields[].gloss` is a key rather than English. In real mode `plain` and `secrets` are always empty. The pump also emits type `wire.sent` with the bytes it wrote to the socket after tampering. It skips the gate, and A10a compares it to the tap.
 ### 2.2 Keys and transports (D5, D6, D7)
 ```csharp
 public interface ITrainingKey { string KeyId {get;} KeyAlgorithm Algorithm {get;} byte[] CopyMaterial(); byte[] CopyPublic(); }
@@ -99,6 +96,7 @@ public interface IDeviceLink { string Kind {get;} IFuture Open(); IFuture Send(b
 ```
 The factory takes its key source at construction and `TransportRequest` carries no key. So `IKeyHandle` has no route into glass (D5). `Core` holds no `IKeyHandle` implementation. Real mode is `OsTransportFactory` in the Host: `SslStream`, TLS only, emitting metadata fields (protocol, suite, group name) and no secret bytes (D6, A16). Real-key routes for CE, SSH, and DUKPT do not exist. `TransportPolicy` refuses TLS 1.3 under `CeProfile` with `CE_TRANSPORT_UNAVAILABLE`. `TrainingKeySource` derives each key as SHAKE256(`"MMP.NetworkSecurity training"` + keyId). The RSA keys are literal hex made once by OpenSSL. All of it reads in source.
 ### 2.3 Crypto primitives
+A name in a list after `;` has the modifiers and return type of the first name. `MlKemPair {Ek, Dk}`, `MlKemSealed {Ciphertext, SharedSecret}`, `BigUInt.FromBytes(byte[])` (big-endian).
 ```csharp
 public interface IHash { int DigestSize {get;} int BlockSize {get;} void Update(byte[] b,int off,int n); byte[] Finish(); IHash Clone(); }
 public static class Hashes { IHash Md5(); Sha1(); Sha256(); Sha384(); Sha512(); Sha3_256(); Sha3_512(); }
@@ -155,22 +153,18 @@ Each row is one `StepRow`. Each code is a stable string in `ErrorCodes`. Server 
 **TLS 1.3 client.** One group per run in `supported_groups` and `key_share`: `x25519` or `X25519MLKEM768` (0x11EC). Suites: `TLS_AES_128_GCM_SHA256`, `TLS_AES_256_GCM_SHA384`. Signature: `ed25519` only, because the training CA issues Ed25519 certificates and both referees accept them. Rows `tls13.c.*`:
 | Step | From | Message | Check, failure code | To |
 |---|---|---|---|---|
-| `hello` | Start | (Start) | none. Key shares, Absorb, Send | WaitServerHello |
 | `sh` | WaitServerHello | ServerHello | `TLS13_DOWNGRADE_SENTINEL`, `TLS13_VERSION_REFUSED`, `TLS13_HRR_UNSUPPORTED`. Secrets, InstallKeys | WaitEE |
 | `ee` | WaitEE | EncryptedExtensions | group unchanged | WaitCertOrReq |
 | `creq` | WaitCertOrReq | CertificateRequest | none. Mark client auth | WaitCert |
 | `cert` | WaitCertOrReq, WaitCert | Certificate | `CHAIN_NO_ANCHOR`, `CERT_VALIDITY`, `CERT_NAME`, `CERT_SIGNATURE` | WaitCertVerify |
 | `cv` | WaitCertVerify | CertificateVerify | `TLS13_CERTVERIFY_BAD` | WaitFinished |
 | `fin` | WaitFinished | Finished | `TLS13_FINISHED_MISMATCH`. App secrets, Send Finished, InstallKeys | Open |
-| `ticket` | Open | NewSessionTicket | none. Note (ignored) | Open |
-| `keyupdate` | Open | KeyUpdate | `TLS13_KEYUPDATE_UNSUPPORTED` | Failed |
 
-Record failure: `TLS13_AEAD_TAG`. Dummy `change_cipher_spec` gives a Note. `Tls13KeySchedule` is pure, so A4 runs on it alone. `KeyLog.Line(label, clientRandom, secret)` writes NSS format for A6.
+Record failure: `TLS13_AEAD_TAG`. Dummy `change_cipher_spec` and `NewSessionTicket` give a Note. `KeyUpdate` gives `TLS13_KEYUPDATE_UNSUPPORTED`. `Tls13KeySchedule` is pure, so A4 runs on it alone. `KeyLog.Line(label, clientRandom, secret)` writes NSS format for A6.
 
 **TLS 1.1 client.** Named suites: `TLS_RSA_WITH_AES_128_CBC_SHA` (record now, decrypt after key theft), `TLS_ECDHE_RSA_WITH_AES_128_CBC_SHA` on X25519. The lab forces the weak suite per accuracy rule 3. Explicit IV, MD5 and SHA-1 PRF, MAC then encrypt. Rows `tls11.c.*`:
 | Step | From | Message | Check, failure code | To |
 |---|---|---|---|---|
-| `hello` | Start | (Start) | none | WaitServerHello |
 | `sh` | WaitServerHello | ServerHello or alert 70 | `TLS11_ALERT_PROTOCOL_VERSION` | WaitCert |
 | `cert` | WaitCert | Certificate | chain codes above | WaitSkeOrDone |
 | `ske` | WaitSkeOrDone | ServerKeyExchange | `TLS11_SKE_SIGNATURE` | WaitDone |
@@ -186,8 +180,7 @@ Record failure: `TLS11_RECORD_MAC`, same code for bad padding. `GlassTls11Link` 
 | `version` | Start | Version line | `SSH_VERSION` | WaitKexInit |
 | `kexinit` | WaitKexInit | KEXINIT | `SSH_NO_COMMON_ALG` | WaitKexReply |
 | `kexreply` | WaitKexReply | KEX_ECDH_REPLY, KEXDH_REPLY | `SSH_HOST_KEY_CHANGED`, `SSH_EXCHANGE_SIGNATURE` | WaitNewKeys |
-| `newkeys` | WaitNewKeys | NEWKEYS | none. InstallKeys | WaitServiceAccept |
-| `service` | WaitServiceAccept | SERVICE_ACCEPT | none | WaitAuth |
+| `newkeys` | WaitNewKeys | NEWKEYS, then SERVICE_ACCEPT | none. InstallKeys | WaitAuth |
 | `auth` | WaitAuth | USERAUTH_SUCCESS, FAILURE, PK_OK | `SSH_AUTH_REFUSED` | Authenticated |
 | `chan.*` | Authenticated | CHANNEL_* | `SSH_CHANNEL_UNKNOWN`, `SSH_TUNNEL_REFUSED` | Authenticated |
 
@@ -225,9 +218,8 @@ The CF references have no `BigInteger` and no `Span` (verified above). The net10
 
 1. **Names follow the standard.** `MlKem768` internals carry FIPS 203 names: `KPke.Encrypt`, `SamplePolyCbd`, `SampleNtt`, `ByteEncode`, `Compress`. Parameters are one data row, so 512 and 1024 stay cheap to add.
 2. **Arithmetic is the one mutation exception.** `Fe25519`, `Ge25519`, `Poly` write into caller-owned arrays, private to `Crypto`. Everything public returns new arrays. DUKPT registers mutate by design, because erasure is the point. The tour states a managed heap can keep copies (A3).
-3. **Nothing claims constant time** outside `native/` and `ManagedCompare`, and accuracy rule 5 limits that claim.
-4. **DH exponent.** `x` is 512 random bits, which cuts a device's work about 4 times. The peer value must be in `[2, p-2]`.
-5. **PRD addition.** Ed25519 needs SHA-512, and ML-KEM needs SHA-3 and SHAKE. A1 omits them. Builder tests carry them. The acceptance author should add clauses.
+3. **DH exponent.** `x` is 512 random bits, which cuts a device's work about 4 times. The peer value must be in `[2, p-2]`.
+4. **PRD addition.** Ed25519 needs SHA-512, and ML-KEM needs SHA-3 and SHAKE. A1 omits them. Builder tests carry them. The acceptance author should add clauses.
 
 Complexity hotspots: `BigUInt.DivRem`, `ByteEncode`, the SSH channel window, record reassembly. Each gets a small type and a comment on how the logic works.
 ## 5. Host contract
@@ -243,7 +235,7 @@ Bind `127.0.0.1:5180` only (`NETSEC_PORT` overrides). D14: allow-listed `Origin`
 WebSocket `/ws`, JSON text frames, UX command names. One change to the UX text: `session.attack` also accepts `{attackId}`.
 | Client to Host | Host to client |
 |---|---|
-| `session.start {requestId, lesson, seed, mode, transport: glass or real}` | `session.started {requestId, sessionId, seed, transportKind, trainingOnly}` |
+| `session.start {requestId, lesson, seed, mode, transport: glass or real}` | `session.started {requestId, sessionId, seed, transportKind, trainingOnly, sessionFile}` |
 | `session.step`, `session.run`, `session.pause` | `trace {sessionId, seq, event}` |
 | `session.attack {requestId, sessionId, attackId}` or `{atSeq, kind, offset, xor}` | `session.forked {sessionId, parentId, attackId}` |
 | `session.load {file}`, `session.save {sessionId}` | `session.finished {sessionId, outcome, code, check}` |
@@ -253,17 +245,11 @@ WebSocket `/ws`, JSON text frames, UX command names. One change to the UX text: 
 |---|---|
 | Lesson rail, home page | `LabCatalog` row plus `built`. Unbuilt lessons show and say so (D12) |
 | Tour step, `bind.kind: event` | First `trace` whose `event.type` and `match` fit. `match` tests `actor`, `message`, `step` |
-| Tour step, `concept` | No event. A test caps these at 30% per lesson (A14) |
 | Attack button | `AttackCatalog` row. Starts a forked session with the same seed |
 | TRAINING ONLY chip | `session.started.trainingOnly`, true when `factory.Kind == "glass"` |
-| Secrets panel | `event.secrets[]`. Empty in real mode |
-| CE label | The A16 wording: "CF-compiled, run on the desktop CLR, never run on CE" |
 
-Additions to UX section 0: `eventId`, `streamId`, `streamSeq`, `message`, `step`, `schema`. `check` gains `id`. `fields[].gloss` is a key. `SessionManager` keeps the last 20 sessions in memory, capped at 20,000 events each, and appends NDJSON to `%LOCALAPPDATA%\MMP.NetworkSecurity\sessions\`. Per-client outbound is a bounded channel with drop-oldest and a visible `droppedEvents` counter.
-```csharp
-public interface ILab { string LabId {get;} IFuture<LabResult> Run(LabContext context); }
-public sealed class LabContext { int Seed; ITransportFactory Transports; IStepGate Gate; ITraceSink Sink; IClock Clock; IRandomSource Random; AttackDefinition Attack; }
-```
+`SessionManager` keeps the last 20 sessions in memory, capped at 20,000 events each, and appends NDJSON to `%LOCALAPPDATA%\MMP.NetworkSecurity\sessions\`. Per-client outbound is a bounded channel with drop-oldest and a visible `droppedEvents` counter.
+`ILab { string LabId; IFuture<LabResult> Run(LabContext c); }`. `LabContext` carries seed, transports, gate, sink, clock, random, attack.
 ## 6. The CE-side process and the bridge
 `NetSec.CeDevice.exe`: same flags as `MMP.AsyncProxy.NetCF.csproj`, plus `OutputType=Exe`, `GenerateSupportedRuntime=false`, and this `App.config`:
 ```xml
@@ -276,14 +262,7 @@ Command line: `--pinpad P --gateway G --trace T --trace-id ID --link glass-ssh|e
 | Keys | Holds SSH client keys only. No DUKPT type is reachable from `CeDeviceFlow` (D13) |
 | Trace | NDJSON over TCP to the Host trace port. A real board has a socket and may have no stdout, so a later device uses the same ports |
 | Result | Final stdout line `CE-RESULT {json}`, exit code 0 or 1 |
-| Threads | Main thread parked on an event. Links run as iterators |
-```csharp
-public sealed class DeviceProfile {         // Immutable data
-  public static readonly DeviceProfile Ce = new DeviceProfile("CeProfile", 25, 64 * 1024 * 1024, new WireProtocol[] { WireProtocol.Ssh, WireProtocol.Tls11 }, 2);
-  public static readonly DeviceProfile Modern = ...;
-}
-public static class BudgetJudge { public static BudgetVerdict Judge(DeviceProfile p, BudgetSample s); }
-```
+`DeviceProfile.Ce` is immutable data: name `CeProfile`, pool 25, 64 MB, SSH and TLS 1.1, 2 dedicated threads. `BudgetJudge.Judge(profile, sample)` is pure.
 **Budget.** The Host samples the CE process from outside every 250 ms, per `ce-budget.md`: threads, private bytes, working set. `CE-RESULT` reports `GC.GetTotalMemory`. `BudgetJudge` gates what transfers to a board: pool cap accepted, dedicated threads at most 2, managed heap under 64 MB. The rest is a number labelled `desktop CLR, 64-bit, does not transfer`.
 
 **Binary proof, from outside.** A test reads the exe and DLLs with `System.Reflection.Metadata` and asserts `mscorlib` token `969db8053d3322ac`. `GET /api/ce` returns `{ running, pid, exePath, mscorlibToken, clr, ptr, label, profile, budget, link, ports }`. `--ce external` makes the Host skip the spawn and wait on the ports, which is the seam for a real board.
@@ -308,16 +287,7 @@ NSCT_API int NSCT_CALL nsct_sample(int which, const unsigned char *a, const unsi
                                    unsigned int *out_ticks, unsigned int samples, unsigned int *out_freq);
 ```
 `nsct_sample` times each compare inside native code with `QueryPerformanceCounter`, so P/Invoke cost stays out of each sample. `nsct_compare_ct` accumulates through a `volatile`, and accuracy rule 5 says the result depends on the optimizer.
-```csharp
-internal static class NetSecCtNative {      // One file, both builds. Default calling convention, blittable arguments.
-  [DllImport("netsec_ct.dll")] internal static extern uint nsct_abi_version();
-  [DllImport("netsec_ct.dll")] internal static extern int nsct_compare_leaky(byte[] a, byte[] b, uint n);
-  [DllImport("netsec_ct.dll")] internal static extern int nsct_compare_ct(byte[] a, byte[] b, uint n);
-  [DllImport("netsec_ct.dll")] internal static extern int nsct_sample(int which, byte[] a, byte[] b, uint n, uint[] ticks, uint samples, out uint freq);
-}
-public static class TimingLab { public static TimingCase Sample(CompareKind kind, int bufferSize, int samples, int diffPosition); }
-public static class TimingJudge { public static TimingVerdict Judge(TimingCase firstByteDiff, TimingCase lastByteDiff); }   // Pure Welch t
-```
+`NetSecCtNative` holds one `[DllImport("netsec_ct.dll")]` per export: one file, both builds, default calling convention, blittable arguments. `TimingLab.Sample(kind, bufferSize, samples, diffPosition)` and the pure `TimingJudge.Judge(first, last)` (Welch t) sit above it.
 A12 run: 100,000 samples per case on a 4,096-byte buffer, first-byte difference against last-byte difference. Stated threshold: leaky passes at `|t| > 4.5` and `|t|` above 3 times the constant-time `|t|`. A missing library maps to `NATIVE_LIB_MISSING`. Build (x86 uses `vcvars32.bat` and `bin\x86`):
 ```
 "C:\Program Files\Microsoft Visual Studio\2022\Community\VC\Auxiliary\Build\vcvars64.bat" && ^
@@ -328,24 +298,20 @@ cl /nologo /W4 /WX /O2 /TC /c native\netsec_ct.c /Fonative\bin\x64\c_check.obj
 Each slice ships its lesson, tour, attacks, and e2e (D12), merges to a running `main`, reads `docs/learnings.md`, and closes on its gate. Only the acceptance author writes `acceptance/`. All slices also keep A9, A13, A14, A15, A15a green for the lessons built so far.
 | Slice | Delivers, lessons | Closes | Owner | Parallel, no file overlap |
 |---|---|---|---|---|
-| Pre | `acceptance/`, `clauses.json`, signatures from section 2 | none | Echo | None. Comes first (D11) |
-| S0 | Both builds of `Bytes`, `Errors`, `Trace`, `Machine`, `Io`. `EchoEngine` through `EnginePump`. Host with D14. Shell, tour engine, one live toy lesson. CF exe in the build | Partial A9, A13 | Richard | Nancy: `app/`. Heather: toy tour. Echo: `tests/` harness, `layer_check.py` |
-| S1 | `Crypto` to ML-KEM and BigUInt, `Platform`. Lessons 1, 2, 3 (key agreement half) | A1, A2 | Richard A: hashes, AES, TDES, modes, GCM, HMAC, CMAC, HKDF, Keccak. Richard B: 25519, BigUInt, RSA, DH, ML-KEM | Echo: vector fetch, `referees/bcl`. Jared: crypto review. Heather, Nancy: lessons 1 to 3 |
+| Pre | `acceptance/`, `clauses.json`, against section 11 | none | Echo | Jared: `acceptance/referees/` (D11) |
+| S0 | Both builds of `Bytes`, `Errors`, `Trace`, `Machine`, `Io`. `EchoEngine` through `EnginePump`. Host with D14. Shell, tour engine, one live toy lesson. CF exe socket-loop test (all four Begin pairs) | Partial A9, A13 | Richard | Nancy: `app/`. Heather: toy tour. Echo: `tests/` harness, `layer_check.py` |
+| S1 | `Crypto` to ML-KEM and BigUInt, `Platform`. Lessons 1, 2, 3 (key agreement half) | A1, A2 | Richard A: hashes, AES, TDES, modes, GCM, HMAC, CMAC, HKDF, Keccak. Richard B: 25519, BigUInt, RSA, DH, ML-KEM | Jared: crypto review. Heather, Nancy: lessons 1 to 3 |
 | S2 | `Keys`, `Dukpt`. Lesson 6 | A3, A16 type half | Richard | Heather, Nancy: lesson 6 |
-| S3 | `Pki`, `Tls13`. Lessons 3, 4, 5. `tap` | A4, A5, A6, A10a | Richard | Jared: `tlspeer`, `tap`. Heather, Nancy: lessons 4, 5 |
-| S4 | `Tls11`, `Ssh` client, then server roles. Lessons 7, 8 | A7, A8, A1 remainder | Richard A: `Tls11`. Richard B: `Ssh` | Jared: `sshpeer`. Heather, Nancy: lessons 7, 8 |
-| S5 | `Bridge`, `CeDevice`, `Node`. Lesson 9 | A10, A10a | Richard | Jared: `gogateway`, `tlspeer -relay`. Nancy: onion, CE panel. Heather: lesson 9 |
-| S6 | `Auth`, mTLS rows. Lesson 10 | A11 | Richard | Jared: `tokenverify`. Heather, Nancy: lesson 10 |
+| S3 | `Pki`, `Tls13`. Lessons 3, 4, 5. `tap` | A4, A5, A6, A10a | Richard | Heather, Nancy: lessons 4, 5 |
+| S4 | `Tls11`, `Ssh` client, then server roles. Lessons 7, 8 | A7, A8, A1 remainder | Richard A: `Tls11`. Richard B: `Ssh` | Heather, Nancy: lessons 7, 8 |
+| S5 | `Bridge`, `CeDevice`, `Node`. Lesson 9 | A10, A10a | Richard | Nancy: onion, CE panel. Heather: lesson 9 |
+| S6 | `Auth`, mTLS rows. Lesson 10 | A11 | Richard | Heather, Nancy: lesson 10 |
 | S7 | `native/`, `Native`. Lesson 11 | A12 | Richard. Jared reviews the C | Can start after S0. Touches only `LabCatalog` in shared files |
 | S8 | Real-mode switch, polish, final red team | A16 | Nancy, Richard (`OsTransportFactory`) | Iolo: red team of the closing report. Echo: third-agent fresh-clone run |
 
 Order under time pressure: S0, S1, S2, S3, S7, S4, S5, S6, S8. Cut order is the PRD's. A cut role makes the matching clause NOT RUN, by name.
 ## 9. Gate commands
-Run from `E:\dev\MMP.NetworkSecurity`. `$cf = -p:NetCFRefDir=E:\dev\tools\netcf35-ref`. Referee pins, asserted by version string:
-```
-NETSEC_OPENSSL = C:\Program Files\Git\mingw64\bin\openssl.exe    # "OpenSSL 3.5.7"
-NETSEC_SSH     = C:\Windows\System32\OpenSSH\ssh.exe             # "OpenSSH_for_Windows_9.5p2"
-```
+Run from `E:\dev\MMP.NetworkSecurity`. `$cf = -p:NetCFRefDir=E:\dev\tools\netcf35-ref`. Referee pins, asserted by version string: `NETSEC_OPENSSL` = `C:/Program Files/Git/mingw64/bin/openssl.exe` (`OpenSSL 3.5.7`), `NETSEC_SSH` = `C:/Windows/System32/OpenSSH/ssh.exe` (`OpenSSH_for_Windows_9.5p2`).
 Base gate, in every slice. `pwsh tools/gate.ps1 -Slice Sn -Clauses A1,A2` runs this and the extras, and writes `docs/_runs/<date>-Sn.md`:
 ```
 python tools/layer_check.py src/NetSec.Core
@@ -374,8 +340,7 @@ python tools/lessons_status.py docs/_runs
 Referee commands the suites spawn:
 ```
 openssl s_server -accept 0 -tls1_3 -groups X25519MLKEM768 -cert srv.pem -key srv.key -keylogfile k.log -naccept 1        # A5, A6
-openssl s_server -accept 0 -tls1_1 -cipher AES128-SHA:@SECLEVEL=0 -cert rsa.pem -key rsa.key -naccept 1                 # A7 RSA suite
-openssl s_server -accept 0 -tls1_1 -cipher ECDHE-RSA-AES128-SHA:@SECLEVEL=0 -cert rsa.pem -key rsa.key -naccept 1       # A7 ECDHE suite
+openssl s_server -accept 0 -tls1_1 -cipher <AES128-SHA or ECDHE-RSA-AES128-SHA>:@SECLEVEL=0 -cert rsa.pem -key rsa.key   # A7 named suites
 openssl s_server -accept 0 -tls1_3 -cert srv.pem -key srv.key -naccept 1                                                # A7 alert 70
 openssl s_server -accept 0 -cipher ALL:@SECLEVEL=0 -cert rsa.pem -key rsa.key -naccept 1                                # A7 sentinel: 1.3-capable server, client hello rewritten to 1.1
 tlspeer -mode server -groups x25519mlkem768 -cert srv.pem -key srv.key                                                  # A5, prints ConnectionState group
@@ -385,14 +350,50 @@ ssh.exe -F NUL -o BatchMode=yes -o UserKnownHostsFile=<file> -i <key> -L P:127.0
 tap -listen 127.0.0.1:A -to 127.0.0.1:B -log hop.hex [-flip-at N]                                                       # A10, A10a
 tokenverify -pub issuer.pub -token <jws>                                                                                # A11
 ```
-A10 runs from outside the app: start nodes behind two `tap` relays, start the CE exe, require `CE-READY`, and check `hop1.hex` starts `SSH-2.0-`, `hop2.hex` holds group 0x11EC, the clear PIN block is in neither hop, tap bytes equal trace bytes (A10a), the bank value equals the input, and both hops share one `traceId`. Then repeat with `-flip-at` per hop and an envelope flip at the gateway, expecting `SSH_PACKET_MAC`, `TLS13_AEAD_TAG`, `DUKPT_MAC_MISMATCH` beside a passing control.
+A10 runs from outside the app, with the steps in section 11. Expected tamper codes: `SSH_PACKET_MAC`, `TLS13_AEAD_TAG`, `DUKPT_MAC_MISMATCH`, each beside a passing control.
 
 Electron spawns the Host detached, handles `EPIPE` as in the MMP.GasPumpSimulator `main.cjs`, and ends the tree with `taskkill /T`. `e2e/start.spec.ts` launches real Electron with `_electron.launch`. Lesson walks run against `vite preview` on 4180 and a live Host on 5180, one worker.
 ## 10. Open questions, with the default taken
 | # | Question | Default |
 |---|---|---|
 | 1 | A10 says "CE and gateway memory traces hold no key". Glass SSH shows its session keys by design | "No key" means no DUKPT key and no BDK. Hop keys stay visible. The acceptance author must write the clause this way |
-| 2 | CE exe as x86 for 32-bit pointers | x64 now. `PlatformTarget` is a property, and `native/` can build x86 |
-| 3 | HelloRetryRequest | Named failure. One added row later |
-| 4 | Hybrid share order (RFC 10024) | ML-KEM first, then X25519. OpenSSL and Go decide (D10) |
-| 5 | Vector source for ISO 9564 format 4 | None known to be free. Anchor is the A10 round trip. The report says so |
+| 2 | Hybrid share order (RFC 10024) | ML-KEM first, then X25519. OpenSSL and Go decide (D10) |
+| 3 | Vector source for ISO 9564 format 4 | None known to be free. Anchor is the A10 round trip. The report says so |
+## 11. Acceptance seams (D11)
+`acceptance/` calls only what this section and the sections it names list. The names hold from S0. A builder who needs a change asks the acceptance author and never edits `acceptance/`. `pwsh tools/bootstrap.ps1` builds everything from a fresh clone, with `-p:AsyncProxyRoot` as an override. Outputs: `src/NetSec.Core/bin/Release/net10.0/`, `src/NetSec.Core.NetCF/bin/Release/net35/`, `src/NetSec.CeDevice/bin/Release/net35/NetSec.CeDevice.exe`, `src/NetSec.Node/bin/Release/net10.0/NetSec.Node.exe`, `src/NetSec.Host/bin/Release/net10.0/NetSec.Host.exe`, `native/bin/x64/netsec_ct.dll`. The net48 suite references both CF DLLs by `HintPath`. Option classes use public fields, for object initializers.
+```csharp
+public static class Probe {                  // Namespace NetSec.Io. One socket, one engine, both builds.
+  public static IFuture<ProbeResult> Connect(ProbeRequest r);
+  public static ProbeListener Listen(ProbeRequest r);   // ProbeListener { int Port; IFuture<ProbeResult> Result; }. Binds now, port 0 allowed
+}
+public sealed class ProbeRequest { WireProtocol Protocol; string Host; int Port; KexGroup Group; string Suite; SshSuite SshSuite; string PeerName; string KnownHostsFile;
+  bool OfferOnlyTls11; string ClientKeyId; string ExecCommand; string TunnelTo; byte[] Send; TamperPlan Tamper; int Seed; }   // Seed 0 means OsRandom
+public sealed class ProbeResult { bool Completed; string Code, CheckName, Version, Suite, Group; int AlertReceived; string[] KeyLog; byte[] Received; TraceEvent[] Events; }
+public static class TrainingPki { public static void Export(string directory); }   // PEM and OpenSSH files named in section 9
+public static class Tls13KeySchedule { public static Tls13Secrets Derive(Func<IHash> h, byte[] shared, byte[] helloHash, byte[] serverFinishedHash); }   // Fields named per RFC 8446
+public sealed class DukptPinPad { DukptPinPad(byte[] initialKey, byte[] initialKeyId); DukptUse Next(DukptKeyUsage u, DukptKeyType t); byte[][] HeldKeys(); }   // DukptUse { Ksn, Key }
+public static class DukptBank { byte[] DeriveInitialKey(byte[] bdk, byte[] initialKeyId); DeriveWorkingKey(byte[] bdk, byte[] ksn, DukptKeyUsage u, DukptKeyType t); }
+public static class Token { string Issue(ITrainingKey k, string claimsJson); AuthDecision Verify(byte[] pub, string jws, DateTime now); }   // DpopProof, Challenge, AccessRules return AuthDecision too
+public sealed class AuthDecision { bool Allowed; string Code, CheckName; }
+public sealed class TimingVerdict { double LeakyT, ConstantT, Threshold; bool Separated; }
+```
+| Clause | Seam |
+|---|---|
+| A1, A2 | Section 2.3. TDES vectors use `TdesKey` blocks. `MlKem768` is deterministic from `d`, `z`, `m` |
+| A3 | `DukptPinPad`, `DukptBank`. `HeldKeys` returns copies, for the absence check. The tour line is in `app/src/tours/lesson-06.json` |
+| A4 | `Tls13KeySchedule.Derive` |
+| A5, A6 | `TrainingPki.Export`, then `Probe.Connect` or `Probe.Listen` against the section 9 referees. `ProbeResult.Group`, `KeyLog` |
+| A7 | `Probe`, `Suite` by IANA name. `AlertReceived == 70`. `OfferOnlyTls11` with a TLS 1.3 client gives `TLS13_DOWNGRADE_SENTINEL` |
+| A8 | `Probe`, `SshSuite`, `ExecCommand`, `TunnelTo`, `KnownHostsFile`. `Received` holds the exec output. `Code` gives `SSH_HOST_KEY_CHANGED` |
+| A9 | Build outputs above. `System.Reflection.Metadata` on each CF binary. `git ls-files`. `BuildId.Target` is `net10` or `netcf35` |
+| A10, A10a | Processes below. Compare each direction's `wire.sent` bytes, joined, to the tap log for that direction. Run twice with no seed, and compare randoms |
+| A11 | `Token`, `DpopProof`, `Challenge`, `AccessRules`. mTLS through `Probe` with `ClientKeyId`. `tokenverify` reads `Token.Issue` output |
+| A12 | `native/build.cmd`. `NativeCompare.AbiVersion()`, `TimingLab`, `TimingJudge` |
+| A13 | Host CLI below, `data-testid` names in UX section 6, `GET /api/lessons` `built` |
+| A14, A15, A15a | `app/src/tours/lesson-NN.json`, UX section 3.1, plus `claims [{text, source}]`. A14 runs each lesson over the WebSocket with `session.run` and matches each `bind` |
+| A16 | Reflection: no public member of `GlassTransportFactory` accepts `IKeyHandle`, and its only constructor takes `ITrainingKeySource`. `session.start {transport: real}`, then scan events and `sessionFile` for key bytes. `training-only-label` testid |
+
+Processes. Each prints `READY port=<p>` first and a final `RESULT {json}` line, and takes `--trace-file <path>`, so a suite needs no Host. Frames on every plain link: 4-byte big-endian length, then bytes.
+1. `NetSec.Node.exe --role bankhsm --listen 0`; `--role server --listen 0 --bank P`; `--role gateway --listen 0 --server P --link ssh|tls11`; `--role pinpad --listen 0 --pin 1234 --pan <digits>`. Bank `RESULT` holds `pinBlockHex`, `code`, `check`.
+2. `NetSec.CeDevice.exe` per section 6, with `--trace-file`. It prints `CE-READY` and `CE-RESULT`.
+3. `NetSec.Host.exe --port P --token T [--ce external]`. Origin and token rules are in section 5.
