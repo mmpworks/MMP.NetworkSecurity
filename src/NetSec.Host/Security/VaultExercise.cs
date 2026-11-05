@@ -5,9 +5,9 @@ using NetSec.Vault;
 
 namespace NetSec.Host.Security;
 
-public sealed record ExerciseSigned(string KeyName, int Version, string InputHex, string SignatureHex, string PublicKeyHex, string Command, string Output, string Code);
+public sealed record ExerciseSigned(string KeyName, int Version, string InputHex, string SignatureHex, string PublicKeyHex, string Command, string Output, string Code, string ControlCommand = "", string ControlOutput = "");
 public sealed record ExerciseDerived(string KeyName, int Version, string Label, string OutputHex, string Code);
-public sealed record AuditChecked(AuditRow[] Rows, long FirstBadSeq, string Code);
+public sealed record AuditChecked(AuditRow[] Rows, long FirstBadSeq, string Code, string Limits = "");
 
 /// <summary>
 /// The vault exercise (docs/modes-design.md section 4.3): sign, derive, refuse, audit, on two keys that never leave the vault.

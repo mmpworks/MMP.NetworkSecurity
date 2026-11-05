@@ -97,7 +97,9 @@ public sealed class SqliteVault : IVault
         Use(name, VaultOps.Derive, caller, p => p.Allows(VaultOps.Derive) ? null : $"{name} may not derive. A key's usage is fixed when it is made.",
             secret => HKDF.DeriveKey(HashAlgorithmName.SHA256, secret, SecretBytes, [], input));
 
-    public byte[] Export(string name, string caller) =>
+    public string? Probe(string name, int? version) => null;
+
+    public byte[] Export(string name, string caller, int? version = null) =>
         Use(name, VaultOps.Export, caller, p => p.Exportable ? null : $"{VaultCodes.ExportRefused}: {name} was made non-exportable, as an HSM key is.", secret => secret);
 
     /// <summary>

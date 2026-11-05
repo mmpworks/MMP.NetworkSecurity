@@ -128,6 +128,68 @@ public sealed class VaultTests : IDisposable
     }
 
     [Fact]
+    public void Two_vault_objects_on_one_folder_keep_one_chain()
+    {
+        _vault.CreateKey("exercise/signing", Signing, "test");
+        _vault.Generate("exercise/signing", "test");
+        SqliteVault second = new(_dir);
+        System.Threading.Tasks.Parallel.For(0, 400, new System.Threading.Tasks.ParallelOptions { MaxDegreeOfParallelism = 8 },
+            i => (i % 2 == 0 ? _vault : second).Sign("exercise/signing", [(byte)i], "writer-" + (i % 2)));
+        AuditRow[] rows = _vault.Audit(0, 1000);
+        Assert.Equal(402, rows.Length);
+        Assert.Equal(rows.Length, rows.Select(r => r.PrevHash).Distinct().Count());
+        Assert.Equal(0, AuditChain.FirstBadSeq(rows));
+    }
+
+    [Theory]
+    [InlineData(16)]
+    [InlineData(7)]
+    public void A_master_key_of_the_wrong_length_is_refused_by_name(int length)
+    {
+        string dir = Path.Combine(_dir, "short-" + length);
+        Directory.CreateDirectory(dir);
+        File.WriteAllBytes(Path.Combine(dir, "master.key"), RandomNumberGenerator.GetBytes(length));
+        SqliteVault vault = new(dir);
+        vault.CreateKey("token.issuer", FlowKey, "test");
+        VaultException e = Assert.Throws<VaultException>(() => vault.Import("token.issuer", RandomNumberGenerator.GetBytes(32), "test"));
+        Assert.Equal(VaultCodes.MasterKeyBad, e.Code);
+        Assert.Contains(length + " bytes", e.Message);
+    }
+
+    [Fact]
+    public void A_key_with_no_version_is_refused_and_the_refusal_is_a_row()
+    {
+        _vault.CreateKey("token.issuer", FlowKey, "test");
+        Assert.Equal(VaultCodes.KeyUnknown, Assert.Throws<VaultException>(() => _vault.Export("token.issuer", "host/lab-10")).Code);
+        AuditRow last = _vault.Audit(0, 100).Last();
+        Assert.Equal(("export", "refused", "host/lab-10"), (last.Op, last.Result, last.Caller));
+    }
+
+    [Fact]
+    public void Export_gives_the_version_asked_for()
+    {
+        byte[] first = RandomNumberGenerator.GetBytes(32), second = RandomNumberGenerator.GetBytes(32);
+        _vault.CreateKey("token.issuer", FlowKey, "test");
+        _vault.Import("token.issuer", first, "test");
+        _vault.Import("token.issuer", second, "test");
+        Assert.Equal(first, _vault.Export("token.issuer", "host/lab-10", 1));
+        Assert.Equal(second, _vault.Export("token.issuer", "host/lab-10"));
+        Assert.Equal((int?)1, _vault.Audit(0, 100)[^2].Version);
+    }
+
+    [Fact]
+    public void Probe_names_a_key_that_no_longer_opens_and_writes_no_row()
+    {
+        _vault.CreateKey("token.issuer", FlowKey, "test");
+        _vault.Generate("token.issuer", "test");
+        Assert.Null(_vault.Probe("token.issuer", 1));
+        int rows = _vault.Audit(0, 100).Length;
+        Sql("UPDATE key_versions SET wrapped = zeroblob(length(wrapped))");
+        Assert.Equal(VaultCodes.UnwrapFailed, _vault.Probe("token.issuer", 1));
+        Assert.Equal(rows, _vault.Audit(0, 100).Length);
+    }
+
+    [Fact]
     public void The_wrapped_row_opens_with_the_master_key_and_name_hash_version_as_the_layout_the_suite_assumes()
     {
         byte[] seed = RandomNumberGenerator.GetBytes(32);

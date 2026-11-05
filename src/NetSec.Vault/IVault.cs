@@ -19,7 +19,8 @@ public interface IVault
     /// <summary>HKDF-SHA256 with the input as the info. VAULT_OP_REFUSED unless the key allows derive.</summary>
     byte[] Derive(string name, byte[] input, string caller);
     /// <summary>The bytes of the newest version. VAULT_EXPORT_REFUSED for a non-exportable key. Audited with the caller.</summary>
-    byte[] Export(string name, string caller);
+    byte[] Export(string name, string caller, int? version = null);
+    string? Probe(string name, int? version);
     AuditRow[] Audit(long afterSeq, int limit);
 }
 
@@ -32,6 +33,7 @@ public static class VaultCodes
     public const string KeyUnknown = "VAULT_KEY_UNKNOWN";
     public const string KeyExists = "VAULT_KEY_EXISTS";
     public const string BadMaterial = "VAULT_BAD_MATERIAL";
+    public const string MasterKeyBad = "VAULT_MASTER_KEY_BAD";
 }
 
 public static class VaultOps

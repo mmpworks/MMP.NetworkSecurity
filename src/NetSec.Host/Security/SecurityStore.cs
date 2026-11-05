@@ -20,6 +20,9 @@ public sealed class SecurityStore
 
     /// <summary>The caller name a flow's own review and check use when they read a key out of the vault.</summary>
     public const string CallerFlow = "host/flow";
+    public const string CallerMoveV0 = "host/move-v0-file";
+
+    public LabDecision Decide(string[] typesTheLabReads) => SecurityReadiness.Decide(typesTheLabReads, States());
 
     /// <summary>The types whose keys live in the vault (slice V1: the my-login flow). The others stay key files until their slice moves them.</summary>
     static readonly HashSet<string> VaultTypes = [SecurityTypes.TokenIssuer, SecurityTypes.DeviceEnrolment];
