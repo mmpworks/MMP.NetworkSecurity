@@ -9,10 +9,10 @@ import { sec, words } from './security'
 export type VaultScreen = 'sign-derive' | 'refuse' | 'audit'
 export interface VaultKey { name: string; algorithm: string; exportable: boolean; allowedOps: string[]; provenance: string; versions: number; fingerprint: string; hidden: string; publicHex: string }
 export interface AuditRow { seq: number; at: string; caller: string; op: string; name: string; version: number | null; result: string; detail: string; prevHash: string }
-export interface SignReply { keyName: string; version: number; inputHex: string; signatureHex: string; publicKeyHex: string; command: string; output: string; code: string }
+export interface SignReply { keyName: string; version: number; inputHex: string; signatureHex: string; publicKeyHex: string; command: string; output: string; controlCommand: string; controlOutput: string; code: string }
 export interface DeriveRow { label: string; outputHex: string; fingerprint: string; version: number }
 export interface Refusal { code: string; message: string; retryable: boolean; requestId: string }
-export interface ChainReply { rows: number; firstBadSeq: number; code: string }
+export interface ChainReply { rows: number; firstBadSeq: number; code: string; limits: string }
 
 export const vault = reactive({
   open: false,
@@ -83,7 +83,7 @@ export function showScreen(s: VaultScreen) { vault.screen = s; vault.fault = nul
 export async function signText(text: string) {
   vault.signChecked = false
   const r = await call('/api/security/vault/exercise/sign', { text })
-  if (r.ok) vault.sign = { keyName: str(r.body.keyName), version: Number(r.body.version ?? 0), inputHex: str(r.body.inputHex), signatureHex: str(r.body.signatureHex), publicKeyHex: str(r.body.publicKeyHex), command: str(r.body.command), output: str(r.body.output), code: str(r.body.code) }
+  if (r.ok) vault.sign = { keyName: str(r.body.keyName), version: Number(r.body.version ?? 0), inputHex: str(r.body.inputHex), signatureHex: str(r.body.signatureHex), publicKeyHex: str(r.body.publicKeyHex), command: str(r.body.command), output: str(r.body.output), controlCommand: str(r.body.controlCommand), controlOutput: str(r.body.controlOutput), code: str(r.body.code) }
   await loadVaultKeys()
 }
 
@@ -123,7 +123,7 @@ export async function showAudit() {
 export async function checkChain() {
   const r = await call('/api/security/vault/exercise/audit-check', {})
   if (!r.ok) return
-  vault.chain = { rows: list(r.body.rows).length || Number(r.body.rows ?? 0), firstBadSeq: Number(r.body.firstBadSeq ?? 0), code: str(r.body.code) }
+  vault.chain = { rows: list(r.body.rows).length || Number(r.body.rows ?? 0), firstBadSeq: Number(r.body.firstBadSeq ?? 0), code: str(r.body.code), limits: str(r.body.limits) }
   await showAudit()
 }
 

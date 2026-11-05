@@ -48,6 +48,9 @@ test('screen 1: the test-keys line comes first, a message is signed and checked 
   await page.getByTestId('vault-sign-check').click()
   await expect(page.getByTestId('prove-command')).toContainText('openssl')
   await expect(page.getByTestId('prove-output')).not.toHaveText('')
+  await expect(page.getByTestId('vault-sign-control-command')).toContainText('openssl')
+  await expect(page.getByTestId('vault-sign-control-output')).toContainText('Signature Verification Failure')
+  await expect(page.getByTestId('vault-sign-code')).toHaveText('OK')
   await shot(page, '02-sign')
   await expect(page.getByTestId('vault-derive-note')).toHaveText('A typed label stands in for a key serial number. This is the idea behind DUKPT. It is not DUKPT.')
   await page.getByTestId('vault-derive-label').fill('pump-reader-4')
@@ -159,4 +162,17 @@ test('the broken-chain result and the limits line read at 4.5 to 1 in both theme
   await page.getByTestId('vault-audit-check').click()
   await expect(page.getByTestId('vault-audit-chain')).toContainText('does not fit the row before it.')
   for (const theme of ['light', 'dark'] as const) { await setTheme(page, theme); await contrast(page, theme, 'broken chain result') }
+})
+
+test('a damaged master key file refuses the call and names VAULT_MASTER_KEY_BAD', async ({ page }) => {
+  const key = path.join(process.env.NETSEC_SECURITY_DIR ?? '', 'vault', 'master.key')
+  const saved = fs.readFileSync(key)
+  await openVault(page)
+  fs.writeFileSync(key, Buffer.alloc(10))
+  try {
+    await page.getByTestId('vault-sign-run').click()
+    await expect(page.getByTestId('vault-fault-code')).toHaveText('VAULT_MASTER_KEY_BAD')
+    await expect(page.getByTestId('vault-fault')).toContainText("The vault's master key file is damaged")
+    for (const theme of ['light', 'dark'] as const) { await setTheme(page, theme); await contrast(page, theme, 'master key refusal') }
+  } finally { fs.writeFileSync(key, saved) }
 })

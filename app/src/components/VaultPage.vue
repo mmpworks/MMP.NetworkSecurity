@@ -68,6 +68,11 @@ const short = (h: string) => (h.length > 16 ? `${h.slice(0, 8)}...${h.slice(-8)}
         <template v-if="vault.signChecked">
           <code class="wiz-cmd" data-testid="prove-command">{{ vault.sign.command }}</code>
           <pre class="wiz-out" data-testid="prove-output">{{ vault.sign.output }}</pre>
+          <template v-if="vault.sign.controlCommand">
+            <p class="muted" data-testid="vault-sign-control-note">{{ words('wizard.vault.sign.control') }}</p>
+            <code class="wiz-cmd" data-testid="vault-sign-control-command">{{ vault.sign.controlCommand }}</code>
+            <pre class="wiz-out" data-testid="vault-sign-control-output">{{ vault.sign.controlOutput }}</pre>
+          </template>
           <p class="muted" data-testid="vault-sign-code">{{ vault.sign.code }}</p>
         </template>
       </div>
