@@ -9,10 +9,10 @@ Inputs: `docs/modes-design.md` (sections 1, 2, 6, 8, 10), `docs/ux-design.md`, S
 2. **The learner starts from a goal, not from a list of key types.** The five goal buttons are in section 1.4. "I want to run lesson 10 with my own keys" still works: the Host lists the flows that lesson needs, in dependency order.
 3. **Every screen answers five questions in the same order:** what is this, why does it exist in the real world, what do I do now, what does success look like, and what do I do if it fails. One decision per screen, with a recommended default already selected.
 4. **The last step of every wizard is "prove it works".** It shows the real command and the real output of a separate tool (OpenSSL, `ssh.exe`) in everyday words, and states whether the proof came from an outside tool or from this course's own code.
-5. **The first slice is `token.issuer` (family F6, `modes-design.md` slice M0).** Section 4 walks its eight screens with the words on each. In the flows it is one part of flow 4. Section 5 lists the other 14 types. Section 5.1 adds a separate vault exercise screen.
+5. **The first slice is `token.issuer` (family F6, `modes-design.md` slice M0).** Section 4 walks `flow-signin`, where it is one part, screen by screen with the words on each. Section 5 lists the other four flows. Section 5.5 adds a separate vault exercise of 3 screens.
 6. **The wizards say true things that are easy to skip.** A public CA will not sign `localhost`. A self-signed certificate is not a chain. A key typed here is a test key, and this course shows it on screen. Section 8 lists each statement and where it appears.
 7. **Labels never say "Real".** A switched-on type reads `My test key`. A green state never reads as "trusted": it reads `Checked by OpenSSL against the root you gave it`. Where no outside tool can judge (card keys, device keys), the screen says so, and the state reads `Saved, no outside check`. The course never checks its own key and calls it proof.
-8. **Disposition:** ready for review by Steve, Richard, and Echo. Echo can write acceptance clauses from the test ids in section 9. Section 12 holds the open questions. The design has 70 screens (section 9.3).
+8. **Disposition:** ready for review by Steve, Richard, and Echo. Echo can write acceptance clauses from the test ids in section 9. Section 12 holds the open questions. The design has 36 screens in all, and 5 on the default path of any flow (section 1.4).
 
 Steve's words, 2026-11-05: "When we are out of Mock mode for a given security type, we need wizards to walk us through the configuration and registration of the keys and certificates. When all is configured, then the training can be run with real data. The wizards need to be humanized and the UX be a logical flow so as not to assume any knowledge on the user's part." And: use test keys only, and a "Show keys" toggle.
 
@@ -74,7 +74,7 @@ State words map to the Host's states (`modes-design.md` 2.2):
 | `Verified` with an outside judge | `Checked by OpenSSL against the root you gave it` (the judge and the thing it checked against change per type) | `Change` |
 | `Verified` with judge `none` (card keys, device keys) | `Saved, no outside check`, amber, never green | `Change` |
 | `Broken` | `Broken: <one-sentence cause>` | `Fix it` |
-| A wizard is open | `Setup paused at step 3 of 8` | `Continue setup` |
+| A wizard is open | `Setup paused at step 3 of 5` | `Continue setup` |
 
 ### 1.3 How a learner arrives from a lesson
 
@@ -90,51 +90,48 @@ The lesson rail shows a small key badge on a lesson whose types are not ready (`
 
 ### 1.4 The five flows
 
-Steve chose five grouped "make my set" flows over fifteen separate wizards. A flow walks the learner through one group of keys and certificates in one sitting. It asks each shared question once (names, key kind, source) and applies the answer to every part. The 15-row map in 1.2 stays as the detail view: its `Set up` and `Change` buttons open the flow at that row's part.
+Steve chose five grouped "make my set" flows. Each flow has a **default path of five screens**. On the default path the Host makes the whole set with safe defaults, the learner reads what it made, and an outside tool checks it. Everything else (your own names, your own dates, your own files) sits behind one branch, `Change the defaults or use my own files`, on the second screen. The 15-row map in 1.2 stays as the detail view: its `Set up` and `Change` buttons open the flow at that row's part.
 
 | # | Goal button (plain words) | Makes (type ids) | Lessons | Flow id |
 |---|---|---|---|---|
-| 1 | Make my web security set | `pki.root-ca`, `tls.trust`, `tls13.server`, `tls13.client`. Optional: `tls11.server` | 4, 5, 7, 9, 10 | `flow-tls` |
-| 2 | Make my remote login set | `ssh.host-ed25519`, `ssh.client`, `ssh.known-hosts`. Optional: `ssh.host-rsa` | 8, 9 | `flow-ssh` |
-| 3 | Type in my card PIN keys | `dukpt.bdk`, `dukpt.pad` | 6, 9 | `flow-dukpt` |
+| 1 | Make my web security set | `pki.root-ca`, `tls.trust`, `tls13.server`, `tls13.client`, `tls11.server` | 4, 5, 7, 9, 10 | `flow-tls` |
+| 2 | Make my remote login set | `ssh.host-ed25519`, `ssh.host-rsa`, `ssh.client`, `ssh.known-hosts` | 8, 9 | `flow-ssh` |
+| 3 | Enter my card PIN keys (key entry) | `dukpt.bdk`, `dukpt.pad` | 6, 9 | `flow-dukpt` |
 | 4 | Make my sign-in set | `token.issuer`, `device.enrolment` (named "Device key entry") | 10 | `flow-signin` |
 | 5 | Make my data keys | `lab.aes-key`, `lab.seal-key` | 1, 2 | `flow-data` |
 
-Every flow opens with the same first screen, before any choice. The words:
+#### The default path (the same five screens in every flow)
 
-> **This course shows every key, so use test keys. A real system keeps these hidden.**
+| # | Screen | Id | What it does |
+|---|---|---|---|
+| 1 | Intro | `flow-<flow>-intro` | Says what this set is, why it exists, and how long it takes. **The first line, before anything else: "This course shows every key, so use test keys. A real system keeps these hidden."** Buttons: `Continue`, `Cancel setup` |
+| 2 | Make it for me | `flow-<flow>-make` | Lists every part in one line each, in words. The only decision is the recommended button `Make it for me`. A link under it reads `Change the defaults or use my own files`. The Host makes and saves every key in the set at once with its safe defaults |
+| 3 | Review | `flow-<flow>-review` | Shows what was made, one block per part, in words, with each fingerprint. The Show keys switch applies. `Back` makes a new version. `Continue` goes on |
+| 4 | Check | `flow-<flow>-check` | Runs the judge for each part. Shows the real command, the real output, and who judged. A part that no outside tool can judge shows an amber note and the chip `Saved, no outside check` |
+| 5 | Done | `flow-<flow>-done` | Shows the chip for each part and which lessons now use the set. Buttons: `Run lesson N`, `Back to the map`, `Use practice keys again` |
 
-It is followed by what the flow makes, how long it takes, and what the learner will have at the end. This line is the first thing on the first screen of all five flows and of the vault exercise.
+The learner makes one decision on the whole path: `Make it for me`. Steve's rule of one decision per screen holds.
 
-#### Screens of each flow
+#### The branch (one screen per flow, except `flow-data`)
 
-Ids are `flow-<flow>-<step>`. "Library" means the step is the same screen as the per-type step in sections 4 and 5, shown once for the whole set. Each flow ends on a `done` screen with `Run lesson N`, `Back to the map`, and `Use practice keys again`.
+`flow-<flow>-options` opens from the link on screen 2 and returns to screen 3 after it makes the set. It is one screen with two parts: `Change the defaults` (names, key kind, dates) and `Use my own files` (a file for each part, with the warnings of 3.6). Section 4 gives its fields for `flow-signin`. Section 5 gives them for the other flows. `flow-data` has no branch because its keys have no choices worth making.
 
-| Flow | Screens in order | Count |
-|---|---|---|
-| `flow-tls` | `intro`, `parts` (tick which parts: all but the old-style server by default), `source` (Make it for me, default; or bring files), `kind` (Ed25519 default; RSA noted), `names` (server names, device name), `validity` (until 2032-01-01 by default, with the clock reason), `readback` (the whole set), `place`, `prove-chain`, `prove-server`, `prove-client`, `prove-tls11` (only if ticked), `done` | 13 |
-| `flow-tls`, bring-your-own branch | `file`, `keyfile`, `chain`, `p12-password`, `os-pick` | 5 |
-| `flow-ssh` | `intro`, `parts`, `source`, `file` (with the `~/.ssh` warning, 3.6), `path-warning`, `readback`, `place`, `compare` (check the fingerprint on a second channel), `prove-host`, `prove-client`, `prove-pin`, `done` | 12 |
-| `flow-dukpt` | `intro` (says "key entry" and "no outside tool can judge this"), `why-entry`, `component-1`, `component-2`, `third-component`, `combine`, `readable`, `readback`, `place`, `pad-follows`, `checked-note` (what was checked, and against what), `done` | 12 |
-| `flow-signin` | `intro`, `parts`, `source`, `file`, `issuer`, `audience`, `subject` (device), `readback`, `place`, `prove-token`, `device-entry-note` ("No outside tool can judge a device key. The sign-in challenge here is modeled on a passkey's. It is not the WebAuthn standard."), `done` | 12 |
-| `flow-data` | `intro`, `source`, `readback`, `place`, `prove`, `done` | 6 |
+#### Counts
 
-Where a flow has `prove-<part>` screens, each runs the judge from section 6.1 in turn and shows its own result. A part with no outside judge shows the amber note and the chip `Saved, no outside check`. No part ends in a green tick that the course gave itself.
-
-#### How section 4 and 5 map into the flows
-
-| Section 4 or 5 step | Appears in a flow as |
+| Group | Screens |
 |---|---|
-| Intro | `flow-<flow>-intro` (one per flow, with the test-keys line first) |
-| ChooseSource | `flow-<flow>-source` (one answer for the whole set where possible) |
-| Type-specific entry (names, kind, validity, components) | The flow's `names`, `kind`, `validity`, `issuer`, `audience`, `subject`, `component-n` steps |
-| ReadBack, Place | `flow-<flow>-readback`, `flow-<flow>-place`, once for the set |
-| Prove | One `prove-<part>` screen per part |
-| Done | `flow-<flow>-done` |
+| Flows, default path | 25 (5 flows, 5 screens each) |
+| Flows, branch | 4 (`flow-tls`, `flow-ssh`, `flow-dukpt`, `flow-signin`) |
+| Vault exercise | 3 (section 5.1) |
+| Shell | 4 (Security setup in flow view, the all-keys view, the refusal banner, the keep-my-place sheet) |
+| **Total, all paths** | **36** |
+| **Default path of one flow** | **5** |
+
+Eleven fewer than the 15 per-type wizards would take on their shortest path, and 34 fewer than the first draft of this design.
 
 #### Contract request for Richard
 
-Today the Host's machine runs one wizard per type (`modes-design.md` 8.1: `POST /api/security/wizards {typeId}`). A flow needs `POST /api/security/wizards {flowId}`. The Host owns the part order and the shared answers. The UI must not chain per-type wizards itself, because then the UI would own the moves. Flow tables are data, as the family tables are. This is open question Q9.
+Today the Host's machine runs one wizard per type (`modes-design.md` 8.1: `POST /api/security/wizards {typeId}`). A flow needs `POST /api/security/wizards {flowId}`. The Host owns the part order, the defaults, and the shared answers. The UI must not chain per-type wizards itself, because then the UI would own the moves. Flow tables are data, as the family tables are. This is open question Q9, asked of Richard directly.
 
 ## 2. The flow
 
@@ -143,10 +140,10 @@ Today the Host's machine runs one wizard per type (`modes-design.md` 8.1: `POST 
 | Step | What the learner sees | Who decides |
 |---|---|---|
 | 0 | Everything is Practice. Nothing needs doing. The first-run line on the Security setup screen: "Every lesson works now with built-in practice keys. Set up your own keys whenever you like." | Host: all types Mock |
-| 1 | Learner opens Security setup and picks a flow card (section 1.4), or picks a lesson in the goal card | Learner |
+| 1 | Learner opens Security setup and picks a flow card (section 1.4), or picks a lesson in the lesson picker | Learner |
 | 2 | The screen lists the types that lesson needs, in order, each with its state | Host: `LabCatalog.Needs(lesson)` plus dependency order |
 | 3 | `Start` opens the first wizard in that list. When it finishes, the next one opens with a `Next: <title>` button | Host: wizard machine |
-| 4 | When all are `Checked` (or `Saved, no outside check`), the goal card shows `Run lesson 10 now` | Host: `SecurityReadiness.Decide` |
+| 4 | When all are `Checked` (or `Saved, no outside check`), the lesson picker shows `Run lesson 10 now` | Host: `SecurityReadiness.Decide` |
 
 ### 2.2 Order of types and dependencies
 
@@ -178,7 +175,7 @@ A modal sheet over the Security setup screen, 720 px wide at most, centered. The
 
 ```
 +------------------------------------------------------------+
-| Set up: Token signing key          Step 3 of 8     [x Close]|
+| Set up: Token signing key          Step 3 of 5     [x Close]|
 | ---------------------------------------------------------- |
 |  WHAT THIS IS                                              |
 |  <2 sentences>                                             |
@@ -209,7 +206,7 @@ A modal sheet over the Security setup screen, 720 px wide at most, centered. The
 
 ### 3.2 The spine
 
-Every family runs the Host's spine: `Intro`, `ChooseSource`, source steps, `ReadBack`, `Place`, `Prove`, `Done` (`modes-design.md` 8.4). The UI never adds, skips, or reorders a step. It renders `step.kind` (`explain`, `choose`, `file`, `entry`, `generate`, `review`, `prove`, `done`) and offers only the buttons in `step.allowed`.
+Every flow runs the Host's spine, drawn on five default screens: `Intro` (screen 1), `ChooseSource` and `Place` together as `make` (screen 2, with `options` as the branch), `ReadBack` (screen 3), `Prove` (screen 4), and `Done` (screen 5) (`modes-design.md` 8.4). The UI never adds, skips, or reorders a step. It renders `step.kind` (`explain`, `choose`, `file`, `entry`, `generate`, `review`, `prove`, `done`) and offers only the buttons in `step.allowed`.
 
 ### 3.3 Words and reading level
 
@@ -234,7 +231,7 @@ Every family runs the Host's spine: `Intro`, `ChooseSource`, source steps, `Read
 
 | Case | Behavior | Needs from the Host |
 |---|---|---|
-| Learner closes the sheet with `Keep my place` | The row says `Setup paused at step 3 of 8`. `Continue setup` reopens the same step | An open wizard survives the sheet |
+| Learner closes the sheet with `Keep my place` | The row says `Setup paused at step 3 of 5`. `Continue setup` reopens the same step | An open wizard survives the sheet |
 | Learner quits the app mid-wizard | On the next start the row still says `Setup paused`. Answers that are not secrets are kept. A typed secret (a DUKPT component) is never kept: that step asks again | The Host stores `{wizardId, state, stepSeq, answers}` without secrets in `.security/`. **This is a contract request** (open question Q3): `GET /api/security` types need `openWizardId` |
 | Learner wants practice keys again | Row action `Use practice key again`, always allowed, one click, one confirmation line: "Your key stays saved. The course stops using it." The Host's `PUT .../mode {Mock}` always works | Exists (`modes-design.md` 8.1) |
 | Learner flips the mode switch to `My test key` with no binding | The wizard opens at once. Closing it with `Keep my place` leaves the mode at `My test key`, state `Needs setup`, and the banner in 1.3 appears at the next lesson start | Exists |
@@ -250,154 +247,138 @@ Every family runs the Host's spine: `Intro`, `ChooseSource`, source steps, `Read
 
 The `~/.ssh` check runs in the Host on the path, in every SSH step that picks a file (`flow-ssh-file`, and `flow-ssh-path-warning` is its warning screen). The UI shows the warning the Host sends. It does not decide.
 
-## 4. One full wizard: the token signing key (`token.issuer`, family F6)
+## 4. One full flow: Make my sign-in set (`flow-signin`)
 
-The first slice. Source choices in M0 are file-backed (`modes-design.md` slice M0): `Make a test key for me` writes an Ed25519 key file under `.security/`, and `Use a key file I already have` reads a PEM. The vault source (M1) adds nothing to the screens.
+The first slice is `token.issuer` (`modes-design.md` slice M0). In the flows it is one part of `flow-signin`, beside the device key. The default path is five screens. The branch is one more. Every screen uses the frame in section 3 and answers the five questions. Words are the copy-file text, and Cussler adjusts voice, not facts.
 
-Eight screens. Ids are `wiz-token-issuer-<n>` with the Host's state in brackets. Words are the copy-file text; Cussler will adjust voice, not facts.
-
-### Screen 1 of 8: Intro (`wiz-token-issuer-intro`, state `Intro`, kind `explain`)
+### Screen 1 of 5: Intro (`flow-signin-intro`, state `Intro`, kind `explain`)
 
 | Block | Words |
 |---|---|
-| Title | Set up: the key that signs tokens |
-| What this is | A {{token}} is a small note that says who you are and what you may do. The note carries a signature, and the key you set up here makes that signature. |
-| Why it exists | In a real system, one service signs the tokens and every other service checks the signature. If the signing key leaks, anyone can make tokens that pass the check. That is why real teams guard it. |
-| What you do now | Read this, then choose `Continue`. Next you will make or pick a key, choose two names, and test it. This takes about 3 minutes. |
-| What good looks like | At the end, lesson 10 signs its tokens with your key. A separate tool called OpenSSL checks the signatures and agrees they are good. |
-| Test-keys line (first, before any choice) | This course shows every key, so use test keys. A real system keeps these hidden. *(When Show keys is Off the line reads: "This course hides your keys on screen for now and shows short fingerprints instead. Saved files can still hold them.")* |
+| First line | This course shows every key, so use test keys. A real system keeps these hidden. *(When Show keys is Off: "This course hides key bytes on screen for now. Saved files can still hold them.")* |
+| What this is | This set makes two keys. The first signs sign-in {{token}}s. A token is a small signed note that says who you are and what you may do. The second is a key for one device, so the device can prove who it is. |
+| Why it exists | A real service signs tokens, and other services check the signature. If the signing key leaks, anyone can make tokens. So real teams guard it. |
+| What you do now | Read this, then choose `Continue`. The whole set takes about 2 minutes. |
+| What good looks like | At the end, lesson 10 uses your keys. |
 | Buttons | `Cancel setup`, `Continue` (default) |
 | Fails when | Nothing here fails. |
 
-### Screen 2 of 8: Choose a source (`wiz-token-issuer-source`, `ChooseSource`, kind `choose`)
+### Screen 2 of 5: Make it for me (`flow-signin-make`, `ChooseSource` and `Place`, kind `generate`)
 
 | Block | Words |
 |---|---|
-| What this is | A signing key is a long secret number. The course can make a new one for you, or you can use a key file you already have. |
-| Why it exists | Real teams do both. A team makes a key once, keeps it safe, and tells the service where to find it. |
-| What you do now (one decision) | Choose one. **Make a test key for me** is Recommended, so pick it if you are unsure. The other choice is Use a key file I already have. |
-| What good looks like | You will see the key's fingerprint on two later screens. It is a short code that stands for the key, so you can tell which key you chose. |
-| Choices | `make` (default), `file` |
-| Fails when | Nothing here fails. |
+| What this is | The course will make two keys with safe settings. Both use {{ed25519}}, a modern signing method with short keys. |
+| Why it exists | Token checks in this course read Ed25519 signatures only, so this is the kind that works here. |
+| What you do now | Choose `Make it for me` (recommended). The course saves the keys in the `.security` folder of this project. |
+| The two parts, one line each | **Token signing key.** Signs tokens for the issuer `https://pump.training/issuer`, for the audience `https://pump.training/api`. **Device key (Device key entry).** One device, named `pump-reader-4`, with its enrolment row. |
+| Link | `Change the defaults or use my own files` |
+| What good looks like | You see `Made 2 keys`. |
+| Fails when | `KEY_FILE_UNREADABLE`: "The course could not save a key file. Check that the project folder can be written, then try again." |
 
-### Screen 3 of 8, path A: Generate (`wiz-token-issuer-generate`, kind `generate`)
+### Branch: Change the defaults or use my own files (`flow-signin-options`, kind `entry`)
 
-| Block | Words |
-|---|---|
-| What this is | The course will make an {{ed25519}} key. Ed25519 is a modern way to sign things, and its keys are short. |
-| Why it exists | The token checks in this course read Ed25519 signatures only. So this is the kind of key that works here. |
-| What you do now | Choose `Make the key`. The key is saved in the `.security` folder of this project. |
-| What good looks like | You see `Key made` and the key's fingerprint. |
-| Fails when | `KEY_FILE_UNREADABLE`: "The course could not save the key file. Check that you can save files in the project folder, then try again." |
+One screen. Two parts. It returns to the Review screen after it makes the set.
 
-### Screen 3 of 8, path B: Pick a file (`wiz-token-issuer-file`, kind `file`)
+| Part | Field | Words and default | Fails when |
+|---|---|---|---|
+| Change the defaults | Issuer name | "The name written in every token that says who signed it. It is a web address." Default `https://pump.training/issuer` | `ISSUER_NAME_BAD`: "An issuer name must be a web address that starts with https://. Try `https://pump.training/issuer`." |
+| Change the defaults | Audience | "Which service a token is meant for. Each service checks that its own name is in the audience." Default `https://pump.training/api` | Same as above |
+| Change the defaults | Device name | "The name of the one device." Default `pump-reader-4` | none |
+| Use my own files | Token key file | A {{pem}} file with an Ed25519 private key. `Choose a file` opens a window. The path goes to the course, not the bytes | `KEY_FILE_UNREADABLE`: "The course could not open that file. Pick it again." `KEY_FILE_FORMAT`: "That is not a PEM key. Make one with `openssl genpkey -algorithm ed25519 -out issuer.pem`." `KEY_FILE_ENCRYPTED`: "That key has a passphrase. For a test key, remove it with `openssl pkey -in issuer.pem -out issuer-open.pem`." `KEY_ALGORITHM_NOT_IN_ENGINE`: "Token keys here must be Ed25519." |
+| Use my own files | Device key file | Same as above | Same as above |
 
-| Block | Words |
-|---|---|
-| What this is | A {{pem}} file is a text file. The key sits between two lines that start with five dashes. |
-| Why it exists | PEM is the usual way to move a key from one tool to another. OpenSSL, a widely used tool, can make one. |
-| What you do now | Choose `Choose a file`. A window opens. Pick your private key file. Only its path goes to the course, meaning where the file lives on your disk. |
-| What good looks like | You see `Read it: an Ed25519 key` and its fingerprint. |
-| Fails when | `KEY_FILE_UNREADABLE`: "The course could not open that file. Pick it again, or move it into the project folder." `KEY_FILE_FORMAT`: "The course could not read that file as a PEM key. To make one, run `openssl genpkey -algorithm ed25519 -out issuer.pem`, then pick the new file." `KEY_FILE_ENCRYPTED`: "That key is locked with a passphrase, and this course has no place to type one. For a test key, you can remove the passphrase with `openssl pkey -in issuer.pem -out issuer-open.pem`, then pick the new file." `KEY_ALGORITHM_NOT_IN_ENGINE`: "That key is RSA or ECDSA, and the token checks here read Ed25519 only. Make an Ed25519 key instead." |
+The warnings of 3.6 apply to every file pick. Nothing is saved until the learner chooses `Make it for me` or `Use these`.
 
-### Screen 4 of 8: Name the issuer (`wiz-token-issuer-issuer`, kind `entry`)
+### Screen 3 of 5: Review (`flow-signin-review`, `ReadBack`, kind `review`)
 
 | Block | Words |
 |---|---|
-| What this is | The {{issuer}} is a name written inside every token. It tells the reader who signed the token. Here the name is a web address. |
-| Why it exists | A service that checks a token must know whose signature to trust. The issuer name tells it which key to use. |
-| What you do now | Keep the suggested name `https://pump.training/issuer`, or type another web address. |
-| What good looks like | The name starts with `https://`. |
-| Fails when | `ISSUER_NAME_BAD`: "The issuer name needs to be a web address that starts with `https://`. Try `https://pump.training/issuer`." *(Code to add in the Host list; open question Q6.)* |
+| What this is | This shows what the course made. Read it like a receipt. |
+| Why it exists | Teams read a key's details before they use it. A wrong key causes a failure far from the mistake. |
+| What you do now | Check the facts. Choose `Back` to make new keys, or `Continue`. |
+| Token signing key | Ed25519. Fingerprint `SHA256:...`. Public key (shown when Show keys is On, a fingerprint when Off). Issuer and audience. Saved as version 1. |
+| Device key | Ed25519. Fingerprint. Device `pump-reader-4`. The enrolment row the issuer will hold: the device name and its public key. |
+| Line under both | These are test keys. This course shows them on screen. |
+| What good looks like | The fingerprints match the ones you saw while the keys were made. |
+| Fails when | Nothing fails here. The Host refused a bad key on the branch. |
 
-### Screen 5 of 8: Name the audience (`wiz-token-issuer-audience`, kind `entry`)
-
-| Block | Words |
-|---|---|
-| What this is | The {{audience}} is a name written inside the token that says which service the token is meant for. |
-| Why it exists | A token made for the pump API must not work on the billing service. Each service checks that its own name is in the audience. |
-| What you do now | Keep `https://pump.training/api`, or type another web address. |
-| What good looks like | The name starts with `https://`. |
-| Fails when | Same as screen 4. |
-
-### Screen 6 of 8: Read it back (`wiz-token-issuer-readback`, `ReadBack`, kind `review`)
+### Screen 4 of 5: Check (`flow-signin-check`, `Prove`, kind `prove`)
 
 | Block | Words |
 |---|---|
-| What this is | Below is what you chose so far. Nothing is saved yet. |
-| Why it exists | Real teams read a key's details before they use it. A wrong key causes a failure far from where the mistake happened. |
-| What you do now | Check the facts. Choose `Back` to change one, or `Continue` to save. |
-| Facts shown (from the Host) | Kind: Ed25519. Fingerprint: `SHA256:...`. Public key (shown when Show keys is On; a fingerprint when Off). Issuer. Audience. Where it will be saved. A line: "This is a test key. This course shows it on screen." |
-| What good looks like | The fingerprint matches the one on the earlier screen. |
-| Fails when | Nothing fails here. The Host already refused a bad key on screen 3. |
+| What this is | The course asks another program to check your work. For the token key, that program is a Go checker. It reads a token the course signed and says if the signature is good. |
+| Why it exists | If the course checked itself, a mistake could hide. A different program has no reason to agree. |
+| What you do now | Choose `Check it`. |
+| Token key result | The command, for example `tokenverify -pub iss.jwk -token <the token>`. The real output. In words: "The Go checker read the public half of your key and said the signature on the token is good." The chip reads `Checked by Go against your key`. |
+| Device key result | An amber note: "No outside tool can check a device key. A passkey-shaped challenge is not WebAuthn. Your key is saved." The chip reads `Saved, no outside check`. No green tick. |
+| What good looks like | A tick for the token key, and a plain amber line for the device key. |
+| Fails when | `REFEREE_MISSING`: "The Go checker was not found. It ships with the course. Run the build again, then check again." `PROOF_FAILED`: "The Go checker said the signature is bad. The key and the token do not match. Choose `Back` and make the keys again. The output is below." |
 
-### Screen 7 of 8: Save it (`wiz-token-issuer-place`, `Place`, kind `generate`)
-
-| Block | Words |
-|---|---|
-| What this is | The course saves your key as a new version. Your practice key stays saved too. |
-| Why it exists | Real systems keep old key versions, so a bad change can be undone. |
-| What you do now | Choose `Save my key`. |
-| What good looks like | You see `Saved as version 1`. |
-| Fails when | `KEY_FILE_UNREADABLE`: "The course could not save to the project folder. Check that the disk has free space and that you can save files in the folder, then try again. Your earlier key is unchanged." |
-
-### Screen 8 of 8: Prove it works (`wiz-token-issuer-prove`, `Prove`, kind `prove`)
+### Screen 5 of 5: Done (`flow-signin-done`, `Done`, kind `done`)
 
 | Block | Words |
 |---|---|
-| What this is | The course asks OpenSSL, a separate tool written by other people, to check a token signed with your key. |
-| Why it exists | If the course checked itself, a mistake could hide. A different tool has no reason to agree. |
-| What you do now | Choose `Check it with OpenSSL`. |
-| What good looks like | You see the real command, the real answer, and `OpenSSL agrees`. |
-| Shown after the run | The command, for example `openssl pkeyutl -verify -pubin -inkey issuer.pub -rawin -in signing-input.bin -sigfile signature.bin`. The tool's output, for example `Signature Verified Successfully`. In words: "OpenSSL read the public half of your key (the half that is safe to share) and said the signature on the token is good." A tier line: `Proof by an outside tool.` |
-| Fails when | `REFEREE_MISSING`: "The course could not find OpenSSL on this computer. Git for Windows includes a copy. Install Git for Windows, or set `NETSEC_OPENSSL` to the path of OpenSSL, then run the check again. Your key is saved and counts as proven once the check passes." `PROOF_FAILED`: "OpenSSL said the signature is bad. The key and the token do not match. Your earlier key is still saved. Choose `Back to the start` and make the key again. The output is below." |
+| What happened | Your sign-in keys are saved. The token key is `Checked by Go`. The device key is `Saved, no outside check`. |
+| Which lessons use them | Lesson 10 now signs its tokens with your token key and enrols your device key. |
+| What you do now | `Run lesson 10` (when you came from a lesson), `Back to the map`, or `Use practice keys again`. |
 
-### Done (`wiz-token-issuer-done`, `Done`, kind `done`)
+## 5. The other four flows
 
-| Block | Words |
+Each flow runs the same five screens as section 4. This section lists what differs: what `Make it for me` makes, what the branch holds, what the Review shows, what the Check runs, and what can go wrong. Defaults: a certificate authority is valid until 1 January 2036. A certificate is valid until 1 January 2032. The lessons run on a clock fixed at 1 January 2030, so a certificate must still be valid then. The learner reads the reason only on the branch screen (`flow-tls-options`).
+
+### 5.1 `flow-tls`: Make my web security set
+
+| Screen | Content |
 |---|---|
-| What happened | Your token signing key now reads `Checked by Go`. That means Go, a separate tool, agreed that the signatures are good. Lesson 10 now signs its tokens with your key. |
-| What you do now | `Run lesson 10` (when you came from a lesson), `Set up the next key`, `Back to the map`, or `Use practice key again`. |
+| Make it for me makes | An {{ed25519}} certificate authority named `MMP Training Root`. A trust list that follows that root. A server certificate for `localhost`, signed by the root. A device certificate `pump-reader-4`, signed by the root. An old-style server certificate (RSA 2048, for lesson 7), signed by the root |
+| Branch (`flow-tls-options`) | Change the defaults: server names, device name, key kind (Ed25519, or RSA with the note "RSA runs through the OS transport"), the dates and why they are long, drop the old-style certificate. Use my own files: root PEM, server certificate and key and chain, device certificate and key with its middle authority, PKCS#12 (RSA), OS store (RSA, with "The course does not install anything in your computer's store without asking") |
+| Review shows | One block per part: who it is for, who signed it, the dates, the fingerprint. A line for the trust list: "It trusts the root you made." The line "A self-signed certificate passes against itself. The check below is against the root you gave it." |
+| Check runs | Chain: `openssl verify -x509_strict -CAfile root.pem -untrusted int.pem -purpose sslserver -verify_hostname localhost srv.pem`. Server: `tlspeer`, then `openssl s_client -tls1_3 ...`. Device: `tlspeer -require-client-cert`, then `openssl s_client ... -cert_chain int.pem`. Old-style: `openssl s_client -tls1_1 -cipher AES128-SHA:@SECLEVEL=0`. Chips: `Checked by OpenSSL against the root you gave it`. Line after the device check: "A valid chain is not permission." Line after the old-style check: "TLS 1.1 was retired by RFC 8996. A pass does not make it safe." |
+| Fails when | `CERT_NOT_A_CA` (pick a CA certificate). `CERT_SIGNATURE_ALG_UNSUPPORTED` ("This root uses RSA or ECDSA. The course checks Ed25519 signatures. Make an Ed25519 root."). `CERT_NAME_MISSING` ("This certificate does not list `localhost`."). `KEY_CERT_MISMATCH` ("This key does not go with this certificate. Pick the key that goes with it."). `CHAIN_INCOMPLETE` ("The certificate of the authority between yours and the root is missing. Add it to the file. A device under a middle authority must send that authority too."). `PKCS12_PASSWORD` ("That file needs a password. Type it, or export again with none."). `REFEREE_MISSING` |
 
-## 5. The other 14 types, step by step
+### 5.2 `flow-ssh`: Make my remote login set
 
-Each row lists the Host's steps in order, with the decision on each. Every screen uses the frame in section 3 and the five-part words. The Intro and Done screens exist for each type and are not repeated. "Default" is the recommended answer. "Fix" is what the failure box tells the learner.
+| Screen | Content |
+|---|---|
+| Make it for me makes | An Ed25519 server identity key (modern round). An RSA 2048 server identity key (legacy round, lesson 8). An Ed25519 user key. The remembered server key (the pin), made from the modern server key |
+| Branch (`flow-ssh-options`) | Change the defaults: drop the legacy key. Use my own files: OpenSSH files for each key (the `~/.ssh` warning of 3.6 shows first), paste a `known_hosts` line, learn the key on the first connect, "user key for the CE process" (file only) |
+| Review shows | Each key's public line and `SHA256:` fingerprint. The line "Check this fingerprint a second way, for example read it from the server file. A fingerprint on this screen proves nothing." The line on the legacy key: "RSA host keys here sign with SHA-1, which is weak." |
+| Check runs | `sshpeer -host-key host_key -authorized authorized_keys`, then `ssh.exe -F NUL -p <port> -i user_key -o IdentitiesOnly=yes -o UserKnownHostsFile=known_hosts -o GlobalKnownHostsFile=NUL -o StrictHostKeyChecking=yes learner@127.0.0.1 "echo hello"`, then a mismatch run that names `SSH_HOST_KEY_CHANGED`. Chips: `Checked by ssh.exe`. A user key held in the vault shows `Saved, no outside check`: no outside tool can use a vault key |
+| Fails when | `KEY_FILE_FORMAT` ("Not an OpenSSH private key. It starts with `-----BEGIN OPENSSH PRIVATE KEY-----`."). `KEY_FILE_ENCRYPTED`. `KEY_ALGORITHM_NOT_IN_ENGINE` ("Sign-in keys here are Ed25519 only."). `KNOWN_HOSTS_LINE_BAD` ("That line does not parse. Wildcards are refused."). `PATH_IN_USER_SSH` (a warning) |
 
-| Type (family) | Plain title | Source choices (default first) | Screens after Intro, one decision each | Typical failures and fix |
+### 5.3 `flow-dukpt`: Enter my card PIN keys (key entry)
+
+This flow says in its name, on its first screen, and on its Check screen: **this is key entry, not a key ceremony. No outside tool can judge it.** A real ceremony uses a secure device and several people.
+
+| Screen | Content |
+|---|---|
+| Make it for me makes | A test base key, 16 bytes, labeled `TEST` on screen. The PIN pad key, which comes from the base key and a key id, as a key loader would |
+| Branch (`flow-dukpt-options`) | Enter my own key parts: two fields (a third if wanted), 32 hex characters each, masked while typed, each with its check value. The final check value to compare with your own paper. A choice: can the key be read back later? `Yes, so I can see it` (default) or `No, one way`. For a key set to `No`, the Review shows the fingerprint only, with the line: "The course refuses to show it. A real HSM would refuse too. These files could still open it here." |
+| Review shows | The base key's fingerprint and check value. The PIN pad's key id. The line "Card numbers and PINs stay test values." |
+| Check runs | The published X9.24-3 vector first, then one sale from the pad to the bank. Judge: `none`. The chip reads `Saved, no outside check`. The screen says: "Checked against published vectors. No outside system can check a base key. One person typing the parts is not dual control." |
+| Fails when | `DUKPT_COMPONENT_LENGTH` ("A component is 32 hex characters, which is 16 bytes. This one has <n>."). `DUKPT_KCV_MISMATCH` ("The check value differs. A digit is wrong. Type that part again.") |
+
+### 5.4 `flow-data`: Make my data keys
+
+| Screen | Content |
+|---|---|
+| Make it for me makes | A wrapping key for lesson 1 (AES) and one for lesson 2 (seals) |
+| Branch | None |
+| Review shows | Each key's fingerprint and length. "A password is not a MAC key. A MAC is not a signature." |
+| Check runs | AES: wrap, unwrap, and compare with the .NET library (`Checked by the .NET library`). Seal: `openssl mac -digest SHA256 -macopt hexkey:<hex> -in <file> HMAC` (`Checked by OpenSSL`). Jared: the comparison with the engine's tag has not run yet |
+| Fails when | `VAULT_UNWRAP_FAILED` ("The key could not open what it locked. Make the keys again."). `REFEREE_MISSING` |
+
+### 5.5 The vault exercise (separate from the flows, 3 screens)
+
+A learner can play with the practice vault. It opens from the map footer (`sec-vault-exercise`). It changes no mode and no key in use. It runs on a throwaway key named `exercise-key`.
+
+| Screen | Id | Words | Learner does | Shows |
 |---|---|---|---|---|
-| `pki.root-ca` (F1) | Certificate authority | Make one for me. Import PEM. PKCS#12 (RSA). OS store (RSA) | 1 Key kind: Ed25519 (default) or RSA (note: Ed25519 runs in the course's own engines, RSA runs through the OS transport). 2 Name: `MMP Training Root`. 3 Valid until: 1 January 2036 (default). 4 Read it back (is a CA: yes). 5 Save. 6 Prove: `openssl verify -CAfile root.pem root.pem`, then a test leaf | `KEY_FILE_FORMAT`: make one with OpenSSL, command shown. `CERT_NOT_A_CA`: "This certificate cannot sign other certificates, so it cannot act as an authority. Pick a certificate made for a certificate authority (CA)." `CERT_SIGNATURE_ALG_UNSUPPORTED`: "The course can check Ed25519 signatures only, and this root uses RSA or ECDSA. Make an Ed25519 root." |
-| `tls13.server` (F1) | Server certificate (TLS 1.3) | Make one for me. Import PEM. PKCS#12 (RSA). OS store (RSA) | 1 Names the server answers to: `localhost` (default). 2 Which authority signs it: my root (default). 3 Valid until: 1 January 2032 (default). The screen says: "A real system issues certificates for 90 days. The lessons here run on a clock fixed at 1 January 2030, so a 90-day certificate would already look expired. This one lasts until 1 January 2032." 4 Read it back. 5 Save. 6 Prove: `openssl s_client -tls1_3 -CAfile <anchors> -verify_return_error` | `CERT_NAME_MISSING`: "This certificate does not list `localhost` as a name it answers to. Make or pick one that does." `KEY_CERT_MISMATCH`: "This key does not go with this certificate. Pick the key that goes with it." `CHAIN_INCOMPLETE`: "The certificate of the authority between yours and the root is missing from the file. Add it to the file." |
-| `tls.trust` (F2) | List of trusted authorities | Follow my root (default). Import certificates | 1 Source. 2 If import: pick files, read each back (name, expiry, is a CA). 3 Save. 4 Prove: `openssl verify -CAfile <anchors> <server certificate>` | `CERT_EXPIRED`: "This authority's certificate ended on <date>. Pick a newer one." `CERT_NOT_A_CA`. |
-| `tls13.client` (F1) | Device certificate (mutual TLS) | Make one for me. Import PEM | 1 Device name: `pump-reader-4`. 2 Signer: my root. 3 Valid until: 1 January 2032 (default, same reason). 4 Include the middle authority? shown only when the signer is not the root (default Yes). 5 Read back. 6 Save. 7 Prove: `openssl s_server -tls1_3 -Verify 1 -CAfile <anchors>` against the course's client | `CHAIN_INCOMPLETE`: "The server cannot find who signed your certificate. A client signed by a middle authority must send that authority's certificate too. Add it." (Jared: Go refused a leaf-only client with `certificate signed by unknown authority`.) `CERT_USAGE_WRONG`: "This certificate is for servers. A device needs one for clients." |
-| `tls11.server` (F1, RSA only) | Old-style server certificate (TLS 1.1) | Make one for me. Import PEM. PKCS#12 | 1 Key kind: RSA 2048, no choice, with the reason on screen ("TLS 1.1 here shares its secret using RSA, so this key has to be RSA"). 2 Names: `localhost`. 3 Signer: my root. 4 Read back. 5 Save. 6 Prove: `openssl s_client -tls1_1 -cipher AES128-SHA:@SECLEVEL=0 -CAfile <anchors>` | `PKCS12_PASSWORD`: "That file is protected by a password. Type it, or export the file again without one." `KEY_ALGORITHM_NOT_IN_ENGINE`: "TLS 1.1 in this course needs an RSA key." |
-| `ssh.host-ed25519` (F3) | Server identity key (modern) | Make one for me. Import OpenSSH | 1 Source. 2 If import: pick `ssh_host_ed25519_key`. 3 Read back: public line and `SHA256:` fingerprint. 4 Save. 5 Prove: `ssh.exe -F NUL -o BatchMode=yes -o UserKnownHostsFile=<pin> ... echo hello` | `KEY_FILE_FORMAT`: "That file is not an OpenSSH private key. A real one starts with `-----BEGIN OPENSSH PRIVATE KEY-----`." `KEY_FILE_ENCRYPTED`. |
-| `ssh.host-rsa` (F3) | Server identity key (legacy RSA) | Make one for me. Import OpenSSH | Same as above, with a line on screen: "RSA host keys here sign with SHA-1, which is weak. Lesson 8 uses it to show a legacy round." | Same as above |
-| `ssh.client` (F3) | User key for signing in | Make one for me. Import OpenSSH. Add "for the CE process": file only | 1 Source. 2 Who uses it: the course's own client (default) or the CE process (file only). 3 Read back. 4 Save. 5 Prove: `ssh.exe` with the key file for a file key. A vault key has no outside tool that can use it, so the screen says "No outside tool can check this key, so no green check appears. Your key is saved." and the chip reads `Saved, no outside check`. | `KEY_ALGORITHM_NOT_IN_ENGINE`: "Sign-in keys in this course must be Ed25519." |
-| `ssh.known-hosts` (F4) | Remembered server key (pin) | Follow my host key (default). Paste a `known_hosts` line. Learn on first connect | 1 Source. 2 Show the fingerprint, ask the learner to compare it by another way, for example read it back from the server file (decision: `It matches` or `It does not match`). 3 Save. 4 Prove: connect to the host key type's server. Then a mismatch demonstration that names `SSH_HOST_KEY_CHANGED` | `KNOWN_HOSTS_LINE_BAD`: "The course could not read that line. It does not accept wildcards. Write the line as `host key-type base64`." |
-| `dukpt.bdk` (F5) | Card base key entry | Enter components (default). Import a vendor test key | 1 Say what this is: "This is key entry. A real key ceremony is the formal event where several people use a secure device to combine key parts. Here one person types the parts. No outside tool can judge the result, so the course shows the steps and makes no claim about your key." 2 Component 1 (masked field, 32 hex characters), shows its check value. 3 Component 2, check value. 4 A third component? (Yes or No; default No). 5 Combine: the key is the XOR of the parts, made inside the box. Learner compares the final check value with the one on their own paper. 6 Can the key be read back later? `Yes, so I can see it` (default) or `No, like a real HSM` (one-way, with the line "This key cannot be read. A real HSM would refuse too."). 7 Read back. 8 Save. 9 Prove: a control first (the published X9 test base key must give the published vector), then a round trip with your key | `DUKPT_COMPONENT_LENGTH`: "A component is 32 hex characters, which is 16 bytes. This one has <n> characters." `DUKPT_KCV_MISMATCH`: "The check value does not match. That usually means a digit was mistyped. Retype that component." |
-| `dukpt.pad` (F5, derived) | PIN pad key (key entry) | Follows the base key. No other choice | 1 Explain: the pad gets its key from the base key and a key id, as a key loader would. 2 Read back: a new key id each run. 3 Prove: one sale, pad to bank | `VAULT_KEY_UNKNOWN`: "The PIN pad gets its key from the base key. Set up the base key first." (with a link) |
-| `device.enrolment` (F7) | Device key entry (modeled on a passkey) | Make one for me. Import PEM | 1 Subject name: `pump-reader-4`. 2 Source. 3 Read back: the enrolment row the issuer will hold (subject, public key). 4 Save. 5 Prove: OpenSSL checks a challenge answer signed with the device key | `KEY_ALGORITHM_NOT_IN_ENGINE`: "Device keys in this course must be Ed25519." |
-| `lab.aes-key` (F8) | Data key for lesson 1 | Make a wrapping key for me | 1 One screen: make the key. 2 Prove: wrap, unwrap, compare with the .NET library | `VAULT_UNWRAP_FAILED` |
-| `lab.seal-key` (F8) | Data key for lesson 2 | Make a wrapping key for me | Same as above | `VAULT_UNWRAP_FAILED` |
+| 1 Sign and derive | `vault-sign-derive` | First line: "This course shows every key, so use test keys. A real system keeps these hidden." Then: "Practice vault. Not an HSM. Not FIPS validated. Refusing to export is a rule in this course's code." Sign: "A vault signs for you, so the key stays inside. A real vault works the same way." Derive: "A vault can make a new key from a parent key and a label. The same label always gives the same key." | Type a message, `Sign it`, `Check it`. Type a label, `Derive` twice, then once with another label | The signature, the public key, the check result (a one-bit change fails). Each derived key's fingerprint: same label, same fingerprint |
+| 2 Refuse | `vault-refuse` | "You can mark a key so it cannot be read out. A real vault then refuses every request to export it." | `Try to read this key out` on a key made non-exportable | The refusal and `VAULT_EXPORT_REFUSED`: "The vault refused. This key cannot be read out." The key view shows the fingerprint only, with the line: "The course refuses to show it. A real HSM would refuse too. These files could still open it here." |
+| 3 Audit | `vault-audit` | "A vault writes down every request. The list is chained, so a changed row shows." | `Show the audit list`, `Check the chain` | Rows of time, who, what, result. Each row holds a hash of the one before. The chain check says whether any row changed |
 
-`token.issuer` is the 15th type and is walked in section 4. The Prove cells above name the family of check. Section 6.1 holds the full commands and the judge for each type.
-
-### 5.1 The vault exercise (separate from the flows)
-
-A learner can play with the practice vault on its own screen, `vault-exercise`, opened from the map footer (`sec-vault-exercise`). It is an exercise, not a setup. Nothing here changes a mode or a key in use. It runs on a throwaway key named `exercise-key`.
-
-First screen, before any choice: "This course shows every key, so use test keys. A real system keeps these hidden." and the label "This is a practice vault. A real vault is a locked device called an HSM, and this is not one. It has no FIPS validation, the formal approval some real vaults hold. Refusing to export is a rule in this course's code."
-
-| Station | Words (what this is, why, what you do) | What the learner does | What the screen shows | Test ids |
-|---|---|---|---|---|
-| 1 Sign | "A vault signs a message for you, so the key never has to leave the vault. A real vault works the same way." | Type a short message. Choose `Sign it` | The signature in hex, the public key, and a `Check it` button that verifies with the public key. A one-bit change in the message gives a failed check | `vault-sign`, `vault-sign-message`, `vault-sign-run`, `vault-sign-result`, `vault-sign-check` |
-| 2 Derive | "A vault can make a new key from a parent key and a label. A label is any name you pick. The same label always gives the same key. A different label gives a different key." | Type a label. Choose `Derive` twice, then once with another label | The child key's fingerprint each time. The two with the same label match | `vault-derive`, `vault-derive-label`, `vault-derive-run`, `vault-derive-result` |
-| 3 Refuse | "You can mark a key so it cannot be read out. To export a key is to copy it out of the vault, and a real vault then refuses every request to export it." | Choose `Try to read this key out` on a key made non-exportable | The refusal in words, with the code `VAULT_EXPORT_REFUSED`: "The vault refused. This key cannot be read out. A real vault would refuse too." | `vault-refuse`, `vault-refuse-run`, `vault-refuse-result` |
-| 4 Audit | "A vault writes down every request, so you can see who asked for what. Each row holds a short code made from the row before it, so a changed row shows up." | Choose `Show the audit list` | Rows: time, who, what, result. Each row holds a hash of the one before. A `Check the chain` button says whether any row changed | `vault-audit`, `vault-audit-run`, `vault-audit-row-<n>`, `vault-audit-check` |
-
-Label on any key view inside the exercise: "A real vault never shows you this." The Show keys switch applies as everywhere.
-
-**Contract request (Q10):** the routes in `modes-design.md` 8.1 cover keys, audit, and export. The exercise also needs `POST /api/security/vault/exercise/sign`, `.../derive`, and `.../audit-check`, or the Host's `vault.sign` events used directly.
+**Contract request (Q10):** the exercise needs `POST /api/security/vault/exercise/sign`, `.../derive`, and `.../audit-check`, or the Host's `vault.sign` events used directly.
 
 ## 6. The proof step in everyday words
 
@@ -415,7 +396,7 @@ Every Prove screen has the same four parts, in this order: the real command in a
 | Pass | A tick and `<tool> agrees`. The chip reads `Checked by <tool> against <what it checked against>`, for example `Checked by OpenSSL against the root you gave it`. The word `trusted` never appears | `Done` |
 | No outside judge | An amber note: "No outside tool can check this key, so no green check appears. Your key is saved." The chip reads `Saved, no outside check`. No green, no tick | `Done` |
 | `PROOF_FAILED` | Red cross, the output, and the one-sentence cause from the copy file | `Back to the start` or `Cancel setup`. The earlier key stays saved |
-| `REFEREE_MISSING` | An amber note, not a failure of the key: "The test tool is missing. Your key is saved and counts as proven once the check passes." | Fix steps in section 8 row 9. The type stays `Set up, not proven` |
+| `REFEREE_MISSING` | An amber note, not a failure of the key: "The test tool is missing. Your key is saved and counts as checked once the check passes." | Fix steps in section 8 row 9. The type stays `Set up, not proven` |
 
 ### 6.1 Judge and full command for each type
 
@@ -429,7 +410,7 @@ The Host runs these (Jared's runs, `modes-real-world.md` section 5). Each `<...>
 | `tls11.server` | OpenSSL | `openssl s_client -connect 127.0.0.1:<port> -tls1_1 -cipher AES128-SHA:@SECLEVEL=0 -CAfile root.pem -verify_return_error -verify_hostname localhost` | "TLS 1.1 was retired by RFC 8996. A pass here does not make it safe to use." |
 | `ssh.host-*`, `ssh.client` | ssh.exe and Go | `sshpeer -host-key host_key -authorized authorized_keys`, then `ssh.exe -F NUL -p <port> -i user_key -o IdentitiesOnly=yes -o UserKnownHostsFile=known_hosts -o GlobalKnownHostsFile=NUL -o StrictHostKeyChecking=yes learner@127.0.0.1 "echo hello"` | Windows only: lock `user_key` with `icacls` first. The wizard does this and says so. |
 | `ssh.known-hosts` | ssh.exe | Same run. The wizard passes `-f` with a course folder and never uses the default key path | "A fingerprint on this screen proves nothing: compare it on a second channel. `accept-new` proves only that later connects match the first one." |
-| `token.issuer` | Go | `tokenverify -pub iss.jwk -token <jws>`. (Section 4 shows an OpenSSL form, `modes-design.md` 8.6. Use whichever the Host reports.) | "A token can be read by anyone who sees it. The signature stops changes, and it hides nothing." |
+| `token.issuer` | Go | `tokenverify -pub iss.jwk -token <jws>`. Go judges a whole token, as clause A11 does (lead's ruling, 2026-11-05) | "A token can be read by anyone who sees it. The signature stops changes, and it hides nothing." |
 | `device.enrolment` | none | The course's own check | `Judged by: our own check.` "Enrolling the key this client just showed is not enrolment. A passkey-shaped challenge is not WebAuthn." No green outside proof. |
 | `dukpt.bdk`, `dukpt.pad` | none live | Published X9.24-3 vectors, then a round trip | "Checked against published vectors, no outside system. A real base key stays inside an HSM. This file is not a TR-31 file. One person typing the parts is not dual control." |
 | `lab.aes-key` | .NET library | Wrap, unwrap, compare with BCL `AesGcm` | none |
@@ -445,9 +426,8 @@ Rule for every Prove screen (Jared): show the command, its real output, and the 
 | Prove output | As the tool printed | The tool output is unchanged (it holds public data), key file paths only |
 | DUKPT component fields | Masked while typed, always. The check value shows | Same |
 | The setup screen header | Test-keys line says "This course shows every key, so use test keys. A real system keeps these hidden." | Says "This course hides your keys on screen for now and shows short fingerprints instead. Saved files can still hold them." |
-| A non-exportable key | Shows the fingerprint and the line "This key cannot be read. A real HSM would refuse too." | Same |
-| Any view of a vault key | Label: "A real vault never shows you this." | Same |
-| The vault itself (map footer, Place screens) | Label: "Practice vault. Not an HSM. Not FIPS validated." Non-export is a rule in this course's code. | Same |
+| A non-exportable key | Shows the fingerprint only, no bytes, with the line "The course refuses to show it. A real HSM would refuse too. These files could still open it here." | Same |
+| The vault itself (map footer, vault exercise) | Label: "Practice vault. Not an HSM. Not FIPS validated." Non-export is a rule in this course's code. | Same |
 
 Flipping the switch while a wizard is open replaces the facts block from the Host. The wizard does not move.
 
@@ -455,15 +435,15 @@ Flipping the switch while a wizard is open replaces the facts block from the Hos
 
 | # | Statement | Where it appears | Source |
 |---|---|---|---|
-| 1 | A public certificate authority will not sign a certificate for `localhost`. A public CA signs only after you show you control a public name, and `localhost` belongs to nobody. So the server certificate here comes from a certificate authority you make yourself. | `pki.root-ca` Intro and `tls13.server` screen 2 | `modes-design.md` 1.8; the course's training CA |
+| 1 | A public certificate authority will not sign a certificate for `localhost`. A public CA signs only after you show you control a public name, and `localhost` belongs to nobody. So the server certificate here comes from a certificate authority you make yourself. | `flow-tls-intro` and `flow-tls-options` | `modes-design.md` 1.8; the course's training CA |
 | 2 | A self-signed certificate is not a chain. It vouches for itself, so nothing outside it proves it. A chain ends in a root that the checker already trusts. | `pki.root-ca` Intro, `tls.trust` Intro | PRD framing; `ChainCheck` |
 | 3 | The course's own engines check Ed25519 signatures only. An RSA or ECDSA certificate stops with a named error code. RSA runs through the OS transport. ECDSA is not supported in the course's engines. | `KEY_ALGORITHM_NOT_IN_ENGINE` and `CERT_SIGNATURE_ALG_UNSUPPORTED` boxes, kind choice screens | `modes-design.md` 1.8, 8.5 |
 | 4 | A certificate signed by a middle authority must be sent together with that authority's certificate. This holds for a client too. Sent alone, it gets the error `certificate signed by unknown authority`. | `tls13.client` screen 4 and `CHAIN_INCOMPLETE` | Jared's finding, `modes-design.md` 8.5 |
 | 5 | This course shows every key, so use test keys. A real system keeps these hidden. Nothing here can tell a test key from a production key, so the line is the whole control (Steve's ruling: no hard stop). | Every Intro, before any choice | `modes-design.md` 8.2 |
 | 6 | The key store is a plain file, and anyone who holds both files can read every key. It is not a production vault. | `Place` screens | `modes-design.md` O5 |
 | 7 | Card numbers and PINs stay test values. The wizard has no field for them. | `dukpt.bdk` Intro, `dukpt.pad` Intro | `modes-design.md` 1.6, O10 |
-| 8 | A key you mark as non-exportable cannot be read back. This is a one-way step, as in a real HSM. | `dukpt.bdk` screen 6, vault key choices | `modes-design.md` 6.3 |
-| 9 | If the test tool is missing, your key is saved but not yet proven, and lessons will not run on it until it is. | Prove screen, `REFEREE_MISSING` | `modes-design.md` 2.3 |
+| 8 | A key you mark as non-exportable shows its fingerprint only. "The course refuses to show it. A real HSM would refuse too. These files could still open it here." The choice is one-way. | `flow-dukpt-options`, vault exercise | `modes-design.md` 6.3 |
+| 9 | If the test tool is missing, your key is saved but not yet checked, and lessons will not run on it until it is. | Prove screen, `REFEREE_MISSING` | `modes-design.md` 2.3 |
 | 10 | Where no outside tool can judge a key, the screen says so and shows no green check. The course never checks its own key and calls it proof. | `prove-tier`, `Saved, no outside check` | Steve, 2026-11-05; Jared section 5 |
 | 11 | "Checked" means checked against the root you gave it. A self-signed certificate passes against itself. The check does not say a stranger would trust it. | `Checked` chip help text, every F1 Prove screen | Jared, section 3.1 |
 | 12 | The wizard never installs a root in the OS store without asking, and says what it changed. | `os-pick` step | Jared, section 3.1 |
@@ -475,8 +455,8 @@ Flipping the switch while a wizard is open replaces the facts block from the Hos
 | 18 | A token is readable by anyone who sees it. The `iss` claim counts only if the code reads it. | `token.issuer` Intro and Done | Jared, section 3.9 |
 | 19 | DPoP stops token theft. Code running on the client can still make new proofs while it is online. | Lesson 10 callout, not a wizard | Jared, section 3.10 |
 | 20 | Enrolling the key a client just showed is not enrolment. A passkey-shaped challenge is not WebAuthn. No proof screen. | `device.enrolment` Intro | Jared, sections 3.11 and 3.12 |
-| 21 | The lessons run on a fixed clock. The TLS labs read 1 January 2030, and the token lab reads a fixed day in November 2026. A certificate must be valid on those dates. A 90-day certificate made today would look expired in the labs. | `flow-tls-validity` | `Tls13Lab.cs:40`, `Lesson07Tls11.cs:29`, `Lesson10Auth.cs:47` |
-| 22 | This is key entry, and a real key ceremony is a bigger event. A real ceremony uses a secure device and several people. Here one person types the parts. No outside tool can judge the result. | `flow-dukpt-intro`, `flow-signin-device-entry-note` | Steve, 2026-11-05; Jared section 3.7 |
+| 21 | The lessons run on a fixed clock. The TLS labs read 1 January 2030, and the token lab reads a fixed day in November 2026. A certificate must be valid on those dates. A 90-day certificate made today would look expired in the labs. | `flow-tls-options` | `Tls13Lab.cs:40`, `Lesson07Tls11.cs:29`, `Lesson10Auth.cs:47` |
+| 22 | This is key entry, and a real key ceremony is a bigger event. A real ceremony uses a secure device and several people. Here one person types the parts. No outside tool can judge the result. | `flow-dukpt-intro`, `flow-dukpt-check`, `flow-signin-check` | Steve, 2026-11-05; Jared section 3.7 |
 
 ## 9. Screens and stable test ids
 
@@ -499,9 +479,10 @@ Names never change after the first build. Echo writes clauses from this table.
 | Area | Ids |
 |---|---|
 | Page | `sec-view-flows`, `sec-view-all`, `sec-flow-<flow>` for `tls`, `ssh`, `dukpt`, `signin`, `data`, `sec-flow-start-<flow>`, `sec-vault-exercise` |
-| Flow frame | `flow-sheet`, `flow-part-progress` (reads `Part 2 of 4: Server certificate`), `flow-title` |
-| Flow screens | `flow-<flow>-<step>` for each step in 1.4 |
-| Vault exercise | `vault-exercise`, `vault-sign`, `vault-derive`, `vault-refuse`, `vault-audit` and the ids in 5.1 |
+| Flow frame | `flow-sheet`, `flow-part-progress` (reads `Screen 2 of 5`), `flow-title` |
+| Flow screens | `flow-<flow>-intro`, `flow-<flow>-make`, `flow-<flow>-review`, `flow-<flow>-check`, `flow-<flow>-done`, and `flow-<flow>-options` for `tls`, `ssh`, `dukpt`, `signin` |
+| Flow controls | `flow-make-button` (`Make it for me`), `flow-options-link` (`Change the defaults or use my own files`), `flow-part-<typeId>` (one block per part on Review and Check) |
+| Vault exercise | `vault-exercise`, `vault-sign-derive`, `vault-refuse`, `vault-audit` and the ids in 5.5: `vault-sign-message`, `vault-sign-run`, `vault-sign-result`, `vault-sign-check`, `vault-derive-label`, `vault-derive-run`, `vault-derive-result`, `vault-refuse-run`, `vault-refuse-result`, `vault-audit-run`, `vault-audit-row-<n>`, `vault-audit-check` |
 | Warnings | `wizard-warning-ssh-path`, `wizard-warning-pick-another`, `wizard-warning-use-anyway`, `wizard-warning-permissions`, `wizard-file-written-to` |
 | State chips | `type-state-<typeId>` with `data-state` one of `practice`, `needs-setup`, `not-checked`, `checked`, `no-outside-check`, `broken` |
 
@@ -511,23 +492,18 @@ Names never change after the first build. Echo writes clauses from this table.
 
 Controls: `wizard-choice-<choiceId>` (radio), `wizard-field-<fieldId>` (text entry), `wizard-file-button`, `wizard-file-path`, `wizard-generate-button`, `wizard-facts`, `wizard-fact-<name>`, `wizard-show-all`, `wizard-copy`.
 
-### 9.3 Screens by family
+### 9.3 Screens and counts
 
-Pattern: `wiz-<typeId>-<step>`. `<step>` values are listed here. A test walks every step of one type per family and asserts the Host's `step.state`.
+The screens are the ids in 9.1 and 9.1a. A test walks the default path of every flow and asserts the Host's `step.state` on each screen.
 
-| Family | Step ids |
-|---|---|
-| All | `intro`, `source`, `readback`, `place`, `prove`, `done` |
-| F1 (`pki.root-ca`, `tls13.server`, `tls13.client`, `tls11.server`) | `kind`, `generate`, `file`, `keyfile`, `chain`, `p12-password`, `os-pick`, `names`, `signer`, `validity`, `device-name`, `middle-ca` |
-| F2 (`tls.trust`) | `file`, `each-cert` |
-| F3 (`ssh.host-*`, `ssh.client`) | `generate`, `file`, `who-uses` |
-| F4 (`ssh.known-hosts`) | `paste`, `compare`, `learn` |
-| F5 (`dukpt.bdk`, `dukpt.pad`) | `why-components`, `component-1`, `component-2`, `third-component`, `combine`, `readable`, `follows` |
-| F6 (`token.issuer`) | `generate`, `file`, `issuer`, `audience` |
-| F7 (`device.enrolment`) | `subject`, `generate`, `file` |
-| F8 (`lab.aes-key`, `lab.seal-key`) | `generate` |
-
-**Screen count: 70.** Flows 60 (`flow-tls` 13 plus 5 for bringing your own files, `flow-ssh` 12, `flow-dukpt` 12, `flow-signin` 12, `flow-data` 6), the vault exercise 5 (intro and four stations), and the shell 5 (Security setup in flow view, the all-keys detail view, the refusal banner, the cancel sheet, the resume sheet). The per-type step ids listed above are the step library that the flow screens draw from. One flow takes between 6 screens (`flow-data`) and 18 (`flow-tls` with its own files)."
+| Group | Ids | Count |
+|---|---|---|
+| Default path | `flow-<flow>-intro`, `-make`, `-review`, `-check`, `-done` for 5 flows | 25 |
+| Branch | `flow-tls-options`, `flow-ssh-options`, `flow-dukpt-options`, `flow-signin-options` | 4 |
+| Vault exercise | `vault-sign-derive`, `vault-refuse`, `vault-audit` | 3 |
+| Shell | Security setup (flow view), all-keys view, refusal banner, keep-my-place sheet | 4 |
+| **Total, all paths** | | **36** |
+| **One flow, default path** | | **5** |
 
 ### 9.4 Prove step
 
@@ -539,14 +515,16 @@ Pattern: `wiz-<typeId>-<step>`. `<step>` values are listed here. A test walks ev
 |---|---|
 | `A17.ui.map-has-15-rows` | The all-keys view shows 15 rows with the ids above |
 | `A17.ui.five-flows` | The flow view shows 5 flow cards with the goals of section 1.4 |
-| `A17.ui.first-screen-line` | Every flow's `intro` and the vault exercise show the test-keys line first |
+| `A17.ui.non-export-line` | A non-exportable key shows its fingerprint only, with the line of section 7 |
+| `A17.ui.first-screen-line` | Every flow's `intro` and `vault-sign-derive` show "This course shows every key, so use test keys. A real system keeps these hidden." first |
 | `A17.ui.no-real-label` | No label on screen reads `Real`, and no state reads `Proven` or `trusted` |
 | `A17.ui.ssh-path-warning` | Picking a file under `.ssh` shows `wizard-warning-ssh-path` and does not read the file until the learner confirms |
 | `A17.ui.no-outside-judge` | Card and device key flows show `Saved, no outside check` and no green tick |
-| `A17.ui.vault-exercise` | Sign, derive, refuse, and audit each show their result, and refuse names `VAULT_EXPORT_REFUSED` |
+| `A17.ui.vault-exercise` | The 3 vault screens show sign, derive, refuse, and audit results, and refuse names `VAULT_EXPORT_REFUSED` |
 | `A17.ui.mode-switch-undo` | `type-mode-practice-<id>` is always enabled and returns the row to Practice |
 | `A17.ui.refusal-names-types` | A lesson on an unready type shows `security-needs-banner` with one `needs-row-<id>` per type |
-| `A17.ui.wizard-token-issuer-walk` | The token part of flow 4 shows the screens of section 4 in order and ends `Checked by Go` |
+| `A17.ui.default-path-5-screens` | Each flow's default path shows 5 screens in order: intro, make, review, check, done |
+| `A17.ui.signin-walk` | `flow-signin` shows the screens of section 4 and ends with the token key `Checked by Go` and the device key `Saved, no outside check` |
 | `A17.ui.next-reason-present` | `wizard-next-reason` exists on every screen, empty when `wizard-next` is enabled |
 | `A17.ui.error-names-fix` | Every `wizard-error` has a non-empty `wizard-error-fix` |
 | `A17.ui.show-keys-switch` | The switch flips key bytes to fingerprints in `wizard-facts` |
@@ -577,54 +555,55 @@ Pattern: `wiz-<typeId>-<step>`. `<step>` values are listed here. A test walks ev
 |   Set up the certificate authority first.  (link)                              |
 | ...                                                                            |
 | SIGN-IN TOKENS                                                                 |
-| Token signing key          Practice | My test key [Setup paused, step 3 of 8] [Continue setup]|
+| Token signing key          Practice | My test key [Setup paused, step 3 of 5] [Continue setup]|
 | ...                                                                            |
 |                                              [ Use practice keys everywhere ]  |
 +--------------------------------------------------------------------------------+
 ```
 
-### 10.2 Wizard screen 6 of 8, read it back (section 4)
+### 10.2 Flow screen 3 of 5, Review (section 4)
 
 ```
 +------------------------------------------------------------+
-| Set up: the key that signs tokens       Step 6 of 8  [x]   |
+| Make my sign-in set                    Screen 3 of 5   [x] |
 | ---------------------------------------------------------- |
 | WHAT THIS IS                                               |
-|  Below is what you chose so far. Nothing is saved yet.     |
-| WHY IT EXISTS IN THE REAL WORLD                            |
-|  Real teams read a key's details before they use it.       |
-|  A wrong key causes a failure far from where the mistake   |
-|  happened.                                                 |
+|  This shows what the course made. Read it like a receipt.  |
 | WHAT YOU DO NOW                                            |
-|  Check the facts. Choose Back to change one, or Continue.  |
+|  Check the facts. Choose Back to make new keys, or Continue.|
+|  TOKEN SIGNING KEY                                         |
 |    Kind          Ed25519                                   |
 |    Fingerprint   SHA256:Qk3...n9w=                         |
 |    Public key    7c1e 9a02 ...   [Show all] [Copy]         |
 |    Issuer        https://pump.training/issuer              |
 |    Audience      https://pump.training/api                 |
-|  This is a test key. This course shows it on screen.       |
-| WHAT GOOD LOOKS LIKE                                       |
-|  The fingerprint matches the one on the earlier screen.    |
+|  DEVICE KEY (Device key entry)                             |
+|    Device        pump-reader-4                             |
+|    Fingerprint   SHA256:Zp1...c0A=                         |
+|  These are test keys. This course shows them on screen.    |
 | ---------------------------------------------------------- |
 | [Back]                          [Cancel setup]  [Continue] |
 +------------------------------------------------------------+
 ```
 
-### 10.3 Prove screen with a failure (section 6)
+### 10.3 Flow screen 4 of 5, Check (section 6)
 
 ```
 +------------------------------------------------------------+
-| Set up: the key that signs tokens       Step 8 of 8  [x]   |
+| Make my sign-in set                    Screen 4 of 5   [x] |
 | ---------------------------------------------------------- |
-|  $ openssl pkeyutl -verify -pubin -inkey issuer.pub ...    |
-|  Signature Verification Failure                            |
-|  [X] OpenSSL said the signature is bad.                    |
-|      The key and the token do not match.                   |
-|      Choose "Back to the start" and make the key again.    |
-|      Your earlier key is still saved.                      |
-|      Proof by an outside tool.         [Details v]         |
+|  TOKEN SIGNING KEY                                         |
+|  $ tokenverify -pub iss.jwk -token <the token>           |
+|  signature ok                                              |
+|  [tick] The Go checker read the public half of your key    |
+|         and said the signature on the token is good.       |
+|         Checked by Go against your key.                    |
+|  DEVICE KEY                                                |
+|  [amber] No outside tool can check a device key.           |
+|          A passkey-shaped challenge is not WebAuthn.       |
+|          Saved, no outside check.                          |
 | ---------------------------------------------------------- |
-| [Back to the start]                     [Cancel setup]     |
+| [Back]                                       [Continue]    |
 +------------------------------------------------------------+
 ```
 
@@ -646,9 +625,10 @@ Each gets a `short` of 20 words or fewer at grade 8, in `app/src/glossary.json`.
 | Q6 | New Host codes the copy needs: `ISSUER_NAME_BAD`, and a `canGoReal`/`whyNot` text for each dependency. Richard adds them. | Add | The Host reuses an existing code |
 | Q7 | Default validity | **Changed.** The lab clock reads 2030-01-01, so a 90-day certificate expires before the lab runs. Defaults: CA until 2036-01-01, certificates until 2032-01-01. A real system uses 90 days. The `validity` screen says why we differ | Richard changes the labs to read the real clock for certificates made by a wizard: then 90 days works |
 | Q8 | Rename the OS-transport button | **Decided yes:** `OS transport`, in the same slice | Closed |
-| Q9 | Flows need `POST /api/security/wizards {flowId}`, with the Host owning part order and shared answers | Add flow tables as data beside the family tables | Richard prefers per-type wizards: then the UI cannot make a flow, and the five goals become five lists of buttons |
-| Q10 | The vault exercise needs sign, derive, and audit-check routes | Add `POST /api/security/vault/exercise/{op}` | Richard exposes the existing `vault.sign` events instead |
-| Q11 | A type with no outside judge: may a lab run on it? | Yes. State `Verified` with `judge: none`, chip `Saved, no outside check`. The lab shows the same chip | Readiness refuses until an outside judge exists: then card and device keys can never go live |
-| Q12 | The `~/.ssh` warning code `PATH_IN_USER_SSH` and `KEY_FILE_PERMISSIONS` are new Host codes | Add both as warnings, not errors | The Host reuses an existing code |
+| Q9 | **Asked of Richard directly.** Flows need `POST /api/security/wizards {flowId}`, with the Host owning part order, defaults, and shared answers | Add flow tables as data beside the family tables | Richard prefers per-type wizards: then the UI cannot make a flow, and the five goals become five lists of buttons |
+| Q10 | **Asked of Richard directly.** The vault exercise needs sign, derive, and audit-check routes | Add `POST /api/security/vault/exercise/{op}` | Richard exposes the existing `vault.sign` events instead |
+| Q11 | **Asked of Richard directly.** A type with no outside judge: may a lab run on it? | Yes. State `Verified` with `judge: none`, chip `Saved, no outside check`. The lab shows the same chip | Readiness refuses until an outside judge exists: then card and device keys can never go live |
+| Q12 | **Asked of Richard directly.** The `~/.ssh` warning code `PATH_IN_USER_SSH` and `KEY_FILE_PERMISSIONS` are new Host codes | Add both as warnings, not errors | The Host reuses an existing code |
+| Q13 | `token.issuer` proves with Go `tokenverify` (lead's ruling). The product must not call `acceptance/referees/go` (D11). Where does the product get the checker? | Ship a built `tokenverify` beside the Host, named by `NETSEC_TOKENVERIFY` | The Host uses a different outside judge: then the wording of `flow-signin-check` changes |
 
 No new package is needed. The design uses Vue 3, Vuetify, and the existing glossary tooltips. The Electron file dialog is part of Electron.
