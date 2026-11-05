@@ -374,9 +374,19 @@ if ($e2eMine.Count -gt 0) {
         $missing = @($toolRuns | Where-Object { $_.ExitCode -eq -998 })
         if ($missing.Count -gt 0) { Set-All $e2eMine 'NOT RUN' 'TOOL_MISSING' (Tail $missing[0].Output 300) } else {
         $env:ACC_ROOT = $ProductRoot; $env:ACC_HOST = $prep.host; $env:ACC_OUT = $out
-        $r = Invoke-Tool 'npx' @('playwright', 'test') $e2e -TimeoutSec 900
+        # Other sessions on this machine run Hosts and vite previews too. A fixed port that is already taken would connect the tests to
+        # somebody else's server, so the run picks free ports: any free port for the Host, and a free one of the two origins the Host allows
+        # (design section 5: localhost:4180 and localhost:5173) for the preview.
+        $listening = @([System.Net.NetworkInformation.IPGlobalProperties]::GetIPGlobalProperties().GetActiveTcpListeners() | ForEach-Object { $_.Port })
+        $previewPort = @(4180, 5173) | Where-Object { $listening -notcontains $_ } | Select-Object -First 1
+        $hostPort = 5180; while ($listening -contains $hostPort) { $hostPort++ }
+        $env:ACC_HOST_PORT = [string]$hostPort
+        if ($previewPort) { $env:ACC_PREVIEW_PORT = [string]$previewPort }
+        else { Set-All $e2eMine 'NOT RUN' 'PORT_BUSY' 'ports 4180 and 5173 are both in use by another process. The Host allows only these two origins, so the UI cannot be served here without testing against a stranger.' }
+        $r = if ($previewPort) { Invoke-Tool 'npx' @('playwright', 'test') $e2e -TimeoutSec 900 } else { [pscustomobject]@{ ExitCode = -997; Output = '' } }
         $json = Join-Path $out 'playwright.json'
-        if ($r.ExitCode -eq -998) { Set-All $e2eMine 'NOT RUN' 'TOOL_MISSING' (Tail $r.Output 300) }
+        if ($r.ExitCode -eq -997) { }      # PORT_BUSY was recorded above
+        elseif ($r.ExitCode -eq -998) { Set-All $e2eMine 'NOT RUN' 'TOOL_MISSING' (Tail $r.Output 300) }
         elseif (-not (Test-Path $json)) { Set-All $e2eMine 'FAIL' 'NO_RESULT' ("Playwright wrote no JSON report. " + (Tail $r.Output 400)) }
         else {
             $rep = Get-Content $json -Raw | ConvertFrom-Json
