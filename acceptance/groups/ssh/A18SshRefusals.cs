@@ -64,7 +64,7 @@ namespace Acceptance
 
         /// <summary>
         /// The engine names only publickey in its reply to the first auth request. So a client that holds only a password has no method left, sends no password, and hangs up, and the engine reads PEER_CLOSED_EARLY.
-        /// So the judge here is the peer: Go must say it could not log in, with no supported method left.
+        /// So the judge here is the peer: Go must say 'attempted methods [none]', which means it never tried the password. A server that offers passwords and rejects this one gives '[none password]' with the same closing words.
         /// </summary>
         [Clause("A18.refuse.ssh.password-login", PerBuild = true)]
         public static string Password(Ctx c)
@@ -74,9 +74,9 @@ namespace Acceptance
             OpenSshKey.RestrictToCurrentUser(p.HostKey);
             Run control = Against(c, p, ModernClient);
             Check.True(control.Result.Completed, "control: a modern Go client should connect, and stopped: " + control.Result.CheckName + " [" + control.Result.Code + "]. Go output: " + control.Output);
-            Run r = Against(c, p, ModernClient + " -password-only training", "no supported methods remain");
+            Run r = Against(c, p, ModernClient + " -password-only training", "unable to authenticate");
             Check.True(!r.Result.Completed, "the glass SSH server completed a session with a password login. The on-screen line A18.screen.l8-ssh-leaves-out needs a change");
-            Check.True(r.Output.Contains("unable to authenticate") && r.Output.Contains("no supported methods remain"), "Go did not report that password login has no supported method. Go output: " + r.Output);
+            Check.True(r.Output.Contains("attempted methods [none]"), "Go did not say 'attempted methods [none]', so it may have tried the password. The on-screen line A18.screen.l8-ssh-leaves-out needs a change. Go output: " + r.Output);
             return "control connects; the server offers no password method, so a password-only client cannot log in. The engine reads " + r.Result.Code;
         }
     }

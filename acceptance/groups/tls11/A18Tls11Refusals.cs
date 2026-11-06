@@ -52,6 +52,7 @@ namespace Acceptance
             Check.True(control.Result.Completed, "control: Go on TLS_RSA_WITH_AES_128_CBC_SHA should connect, and stopped: " + control.Result.CheckName + " [" + control.Result.Code + "]. Go output: " + control.Output);
             Session s = GoClient(c, p, "TLS_RSA_WITH_3DES_EDE_CBC_SHA");
             Check.True(!s.Result.Completed, "the glass TLS 1.1 server completed a session on the 3DES suite. The on-screen line A18.screen.l7-tls11-leaves-out needs a change");
+            Check.Equal("refusal code for the 3DES suite", "TLS11_SUITE_REFUSED", s.Result.Code);
             return "control connects; Go offering only the 3DES suite stops the server: " + s.Result.CheckName + " [" + s.Result.Code + "]";
         }
 
@@ -74,10 +75,13 @@ namespace Acceptance
         public static string NoClientCertRequest(Ctx c)
         {
             PkiDir p = PkiDir.Export(c, "a18-t11-cert");
-            Session s = Run(c, p, "-cipher AES128-SHA:@SECLEVEL=0");
+            Session s = Run(c, p, "-state -cipher AES128-SHA:@SECLEVEL=0");
             Check.True(s.Result.Completed, "the session should connect, and stopped: " + s.Result.CheckName + " [" + s.Result.Code + "]");
+            // A server can ask with an empty CA list, and OpenSSL then prints the same words as below. So the state trace is the judge, and it must be present for its silence to count.
+            Check.True(s.Output.Contains("read server certificate"), "OpenSSL printed no state trace to judge. Output: " + s.Output);
+            Check.True(!s.Output.Contains("read server certificate request"), "OpenSSL read a certificate request from the server. The on-screen line A18.screen.l7-tls11-leaves-out needs a change");
             Check.True(s.Output.Contains("No client certificate CA names sent"), "OpenSSL does not report 'No client certificate CA names sent', so the server may ask for a client certificate. The on-screen line A18.screen.l7-tls11-leaves-out needs a change. Output: " + s.Output);
-            return "OpenSSL reports that the server asks for no client certificate";
+            return "the OpenSSL state trace holds no certificate request step";
         }
     }
 }

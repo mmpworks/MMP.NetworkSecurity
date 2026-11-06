@@ -31,10 +31,15 @@ namespace Acceptance
         /// <summary>A server leaf for localhost under the root, with extra extension lines.</summary>
         static void Leaf(Ctx c, Root pki, string name, string extraExt, int serial, out string pem, out string key)
         {
+            Leaf(c, pki, name, extraExt, serial, "-algorithm ed25519", out pem, out key);
+        }
+
+        static void Leaf(Ctx c, Root pki, string name, string extraExt, int serial, string keyArgs, out string pem, out string key)
+        {
             string openssl = Referees.OpenSsl(c), d = pki.Dir;
             key = Path.Combine(d, name + ".key"); pem = Path.Combine(d, name + ".pem");
             string csr = Path.Combine(d, name + ".csr"), ext = Path.Combine(d, name + ".cnf");
-            LivePki.Run(openssl, "genpkey -algorithm ed25519 -out " + Q(key), d, "leaf key");
+            LivePki.Run(openssl, "genpkey " + keyArgs + " -out " + Q(key), d, "leaf key");
             LivePki.Run(openssl, "req -new -key " + Q(key) + " -subj \"/CN=localhost\" -out " + Q(csr), d, "leaf request");
             File.WriteAllText(ext, "subjectAltName=DNS:localhost\nextendedKeyUsage=serverAuth\nbasicConstraints=CA:FALSE\n" + extraExt);
             LivePki.Run(openssl, "x509 -req -in " + Q(csr) + " -CA " + Q(pki.Pem) + " -CAkey " + Q(pki.Key) + " -days 2 -set_serial " + serial + " -extfile " + Q(ext) + " -out " + Q(pem), d, "leaf");
@@ -67,8 +72,28 @@ namespace Acceptance
             Leaf(c, pki, "critical", ext, 41, out pem, out key);
             ProbeResult r = Connect(c, pem, key, "a leaf with " + what);
             Check.True(!r.Completed, "the glass client accepted a leaf with " + what + ". So it now reads this extension, and the on-screen line A18.screen.l4-pki-leaves-out needs a change");
+            Check.Equal("refusal code for a leaf with " + what, "CERT_UNKNOWN_CRITICAL", r.Code);
             return "a plain leaf connects; a leaf with " + what + " is refused: " + r.CheckName + " [" + r.Code + "]";
         }
+
+        /// <summary>Matrix row 4, the client side: the glass client offers Ed25519 signatures only, so an OpenSSL server that holds another key type has nothing to sign with and sends an alert.</summary>
+        static string ClientRefusesKeyType(Ctx c, string stem, string keyArgs, string what)
+        {
+            Root pki = TrainingRoot(c, stem);
+            Control(c, pki);
+            string pem, key;
+            Leaf(c, pki, "other-key", "", 43, keyArgs, out pem, out key);
+            ProbeResult r = Connect(c, pem, key, "a server with " + what);
+            Check.True(!r.Completed, "the glass client completed a session with a server that holds " + what + ". The on-screen line A18.screen.l5-tls13-leaves-out needs a change");
+            Check.Equal("refusal code against a server with " + what, "TLS13_ALERT_RECEIVED", r.Code);
+            return "a plain leaf connects; a server with " + what + " stops the glass client: " + r.CheckName + " [" + r.Code + "]";
+        }
+
+        [Clause("A18.refuse.tls13.client-rsa-server")]
+        public static string ClientRsaServer(Ctx c) { return ClientRefusesKeyType(c, "a18-t13-rsa", "-algorithm RSA -pkeyopt rsa_keygen_bits:2048", "an RSA key"); }
+
+        [Clause("A18.refuse.tls13.client-ecdsa-server")]
+        public static string ClientEcdsaServer(Ctx c) { return ClientRefusesKeyType(c, "a18-t13-ecdsa", "-algorithm EC -pkeyopt ec_paramgen_curve:P-256", "an ECDSA key"); }
 
         [Clause("A18.refuse.pki.critical-name-constraints")]
         public static string NameConstraints(Ctx c) { return CriticalRefused(c, "a18-pki-nc", "nameConstraints=critical,permitted;DNS:localhost\n", "a critical name constraints extension"); }

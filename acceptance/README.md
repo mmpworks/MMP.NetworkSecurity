@@ -2,7 +2,7 @@
 
 Author: Echo. Date: 2026-11-05. Branch: `test/acceptance-suite`. Rule: D11. Builders never write under `acceptance/`.
 
-Conclusion: the suite has **M = 373 product clauses** (`clauses.json`): the 208 of the first release, 54 for A17 (sections 8 and 12) and 73 for the AES walk, A19 (sections 10 and 11). With no product built it reports **0 of 373 PASS, 0 FAIL, 373 NOT RUN**.
+Conclusion: the suite has **M = 375 product clauses** (`clauses.json`): the 208 of the first release, 54 for A17 (sections 8 and 12) and 73 for the AES walk, A19 (sections 10 and 11). With no product built it reports **0 of 375 PASS, 0 FAIL, 375 NOT RUN**.
 Its 31 checks on itself all PASS. The suite is written against `docs/program-design.md` section 11, `docs/modes-design.md`, and the merged referees in `acceptance/referees`. Every group compiles against the contract stub on net10.0 and on net48 with the CF build of MMP.AsyncProxy.
 Disposition: merge this branch. Send the open items in section 7 and in `CONTRACT.md` section 5.7 to Richard and Jared.
 
@@ -253,6 +253,6 @@ Disposition: merge, then Richard and Nancy write the words. The refusal clauses 
 
 ## 15. A18: the refusal pins (added 2026-11-06)
 
-Conclusion: the refusal clauses add **30 clauses**, so M is **373**. All pass on main's engines. Each pairs with a line of section 14, so a change to the engine shows which line needs a change. 15 of the 17 clause names run a control first. The other 2 (`tls11.no-resumption`, `tls11.no-client-certificate-request`) read one session that must complete. No self-check covers them, because they need real engines and real peers.
+Conclusion: the refusal clauses add **32 clauses**, so M is **375**. All pass on main's engines. Each pairs with a line of section 14, so a change to the engine shows which line needs a change. 17 of the 19 clause names run a control first. The other 2 (`tls11.no-resumption`, `tls11.no-client-certificate-request`) read one session that must complete. No self-check covers them, because they need real engines and real peers.
 
 Disposition: merge after section 14.

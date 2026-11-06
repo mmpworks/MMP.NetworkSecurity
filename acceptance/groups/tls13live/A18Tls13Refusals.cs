@@ -74,6 +74,7 @@ namespace Acceptance
             {
                 ProbeResult r = ProbeKit.Connect(Make(bad.Port), "glass client against a P-256 only server");
                 Check.True(!r.Completed, "the glass client completed a session with a P-256 only server. The on-screen line A18.screen.l5-tls13-leaves-out needs a change");
+                Check.Equal("refusal code against a P-256 only server", "TLS13_ALERT_RECEIVED", r.Code);
                 return "control connects; a P-256 only server stops the glass client: " + r.CheckName + " [" + r.Code + "]";
             }
         }

@@ -2245,6 +2245,17 @@
    "counts": true
   },
   {
+   "id": "A18.refuse.tls13.client-ecdsa-server",
+   "base": "A18.refuse.tls13.client-ecdsa-server",
+   "assertion": "A18",
+   "group": "a17probe",
+   "build": "host",
+   "slice": "Each",
+   "referee": "script over the tour files; OpenSSL 3.5.7 and Go referees for refusals",
+   "roles": [],
+   "counts": true
+  },
+  {
    "id": "A18.refuse.tls13.client-p256-only-server.cf",
    "base": "A18.refuse.tls13.client-p256-only-server",
    "assertion": "A18",
@@ -2261,6 +2272,17 @@
    "assertion": "A18",
    "group": "tls13live",
    "build": "net10",
+   "slice": "Each",
+   "referee": "script over the tour files; OpenSSL 3.5.7 and Go referees for refusals",
+   "roles": [],
+   "counts": true
+  },
+  {
+   "id": "A18.refuse.tls13.client-rsa-server",
+   "base": "A18.refuse.tls13.client-rsa-server",
+   "assertion": "A18",
+   "group": "a17probe",
+   "build": "host",
    "slice": "Each",
    "referee": "script over the tour files; OpenSSL 3.5.7 and Go referees for refusals",
    "roles": [],
