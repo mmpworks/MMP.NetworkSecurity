@@ -21,6 +21,63 @@ namespace NetSec.Tests
         static readonly byte[] Bdk = new TrainingKeySource().Find(KeyIds.DukptBdk128).CopyMaterial();
 
         static DukptPinPad NewPad() => new DukptPinPad(DukptBank.DeriveInitialKey(Bdk, KeyId), KeyId);
+        static ExternalForwardLink OpenForward(ListSink sink, out System.Net.Sockets.TcpListener listener, out System.Net.Sockets.Socket peer)
+        {
+            listener = new System.Net.Sockets.TcpListener(System.Net.IPAddress.Loopback, 0);
+            listener.Start();
+            ExternalForwardLink link = new ExternalForwardLink((System.Net.IPEndPoint)listener.LocalEndpoint, sink, "t/ce/local", "t", new FixedClock(1));
+            IFuture opened = link.Open();
+            peer = listener.AcceptSocket();
+            Assert.True(opened.Wait(20000));
+            Assert.False(opened.IsFaulted);
+            return link;
+        }
+
+        /// <summary>The same rule as the pump's: a wire.sent whose bytes may not have left is followed by an event that says so, and the caller still sees the fault.</summary>
+        [Fact]
+        public void A_lost_CE_write_says_so_in_the_trace_and_still_faults()
+        {
+            ListSink sink = new ListSink();
+            System.Net.Sockets.TcpListener listener;
+            System.Net.Sockets.Socket peer;
+            ExternalForwardLink link = OpenForward(sink, out listener, out peer);
+            link.Close().Wait(20000);
+
+            IFuture send = link.Send(new byte[] { 1, 2, 3 });
+            Assert.True(send.Wait(20000));
+            peer.Close();
+            listener.Stop();
+
+            Assert.True(send.IsFaulted);
+            TraceEvent sent = sink.Events.Single(e => e.Type == "wire.sent");
+            TraceEvent lost = sink.Events.Single(e => e.Type == "wire.write.failed");
+            Assert.Equal(sent.Message, lost.Message);
+            Assert.Equal(sent.From, lost.From);
+            Assert.Equal(sent.To, lost.To);
+            Assert.StartsWith(ErrorCodes.LinkLost + ":", lost.Detail);
+            Assert.Contains(sent.EventId, lost.Detail);
+            Assert.True(lost.Wire == null || lost.Wire.Length == 0, "only bytes that left carry Wire");
+        }
+
+        [Fact]
+        public void A_CE_write_that_completes_logs_no_failure()
+        {
+            ListSink sink = new ListSink();
+            System.Net.Sockets.TcpListener listener;
+            System.Net.Sockets.Socket peer;
+            ExternalForwardLink link = OpenForward(sink, out listener, out peer);
+
+            IFuture send = link.Send(new byte[] { 1, 2, 3 });
+            Assert.True(send.Wait(20000));
+            Assert.False(send.IsFaulted);
+            link.Close().Wait(20000);
+            peer.Close();
+            listener.Stop();
+
+            Assert.Single(sink.Events, e => e.Type == "wire.sent");
+            Assert.DoesNotContain(sink.Events, e => e.Type == "wire.write.failed");
+        }
+
         static PadSale Sell(DukptPinPad pad = null) => PinPadCore.Sell(pad ?? NewPad(), "t1", Pin, Pan, new SeededRandom(5));
 
         [Fact]
