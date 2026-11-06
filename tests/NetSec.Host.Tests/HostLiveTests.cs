@@ -139,6 +139,51 @@ namespace NetSec.Host.Tests
             return request;
         }
 
+        async Task<string> FinishedLessonOne(int seed)
+        {
+            using Socket s = await Socket.Open(host);
+            await s.Send("{\"type\":\"session.start\",\"requestId\":\"r1\",\"lesson\":1,\"seed\":" + seed + ",\"mode\":\"run\",\"transport\":\"glass\"}");
+            string id = (await s.Until("session.started")).GetProperty("sessionId").GetString();
+            await s.UntilFinished(id);
+            return id;
+        }
+
+        /// <summary>Design section 2.7: a size the run did not use walks a practice key from the session seed, and the reply says so.</summary>
+        [Fact]
+        public async Task The_walk_at_192_bits_runs_a_practice_key_and_says_so()
+        {
+            string id = await FinishedLessonOne(7);
+            JsonElement run = await GetJson($"/api/sessions/{id}/walk/aes/block?source=text&keyBits=128");
+            JsonElement practice = await GetJson($"/api/sessions/{id}/walk/aes/block?source=text&keyBits=192");
+            Assert.Equal("run", run.GetProperty("keySource").GetString());
+            Assert.Equal("practice", practice.GetProperty("keySource").GetString());
+            Assert.Equal(12, practice.GetProperty("rounds").GetInt32());
+            Assert.Equal(52, practice.GetProperty("keyWords").GetArrayLength());
+            Assert.Equal("notSent", practice.GetProperty("wire").GetProperty("status").GetString());
+            Assert.Equal(run.GetProperty("inputHex").GetString(), practice.GetProperty("inputHex").GetString());
+            Assert.NotEqual(run.GetProperty("keyWords")[0].GetProperty("word").GetString(), practice.GetProperty("keyWords")[0].GetProperty("word").GetString());
+            Assert.Equal(practice.GetProperty("inputHex").GetString(), practice.GetProperty("inverse").GetProperty("output").GetString());
+            JsonElement again = await GetJson($"/api/sessions/{id}/walk/aes/block?source=text&keyBits=192");
+            Assert.Equal(practice.GetProperty("forward").GetProperty("output").GetString(), again.GetProperty("forward").GetProperty("output").GetString());
+        }
+
+        [Theory]
+        [InlineData("source=ecb&block=0", 409, "WALK_NOT_BUILT")]
+        [InlineData("source=gcm&block=0", 409, "WALK_NOT_BUILT")]
+        [InlineData("source=text", 400, "WALK_BAD_ARGUMENT")]
+        [InlineData("keyBits=128", 400, "WALK_BAD_ARGUMENT")]
+        [InlineData("source=text&keyBits=abc", 400, "WALK_BAD_ARGUMENT")]
+        public async Task A_block_query_the_walk_cannot_answer_says_why(string query, int status, string code)
+        {
+            string id = await FinishedLessonOne(7);
+            using HttpClient http = new HttpClient();
+            HttpResponseMessage response = await http.SendAsync(Get($"/api/sessions/{id}/walk/aes/block?{query}"));
+            Assert.Equal(status, (int)response.StatusCode);
+            JsonElement body = JsonDocument.Parse(await response.Content.ReadAsStringAsync()).RootElement;
+            Assert.Equal(code, body.GetProperty("code").GetString());
+            Assert.Contains("no-store", response.Headers.CacheControl?.ToString() ?? "");
+        }
+
         async Task<JsonElement> GetJson(string path)
         {
             using HttpClient http = new HttpClient();

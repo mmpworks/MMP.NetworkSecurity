@@ -7,7 +7,7 @@ namespace NetSec.Crypto
     /// column by column, so row r of column c is state[r + 4c]. An instance holds only the round keys and is safe to share.
     /// The table lookups use secret indexes, which can leak through a CPU cache. Production AES uses hardware instructions.
     /// </summary>
-    public sealed class AesKey
+    public sealed partial class AesKey
     {
         const int BlockSize = 16;
 
