@@ -78,6 +78,42 @@ namespace NetSec.Tests
             Assert.DoesNotContain(sink.Events, e => e.Type == "wire.write.failed");
         }
 
+        /// <summary>Its write faults, and its read never returns. So a flow that reads after a lost write waits forever.</summary>
+        sealed class LostWriteLink : IDeviceLink
+        {
+            public bool Received, Closed;
+            public string Kind => "lost-write";
+            public IFuture Open() => Futures.Completed;
+            public IFuture Send(byte[] frame) => Futures.FromException(new InvalidOperationException("the peer is gone"));
+            public IFuture<byte[]> Receive() { Received = true; return new Promise<byte[]>().Future; }
+            public IFuture Close() { Closed = true; return Futures.Completed; }
+        }
+
+        [Fact]
+        public void A_lost_CE_write_ends_the_relay_and_names_the_write()
+        {
+            LinkListener padListener = new LinkListener(new System.Net.IPEndPoint(System.Net.IPAddress.Loopback, 0));
+            IFuture<SocketLink> accepted = padListener.Accept();
+            LostWriteLink link = new LostWriteLink();
+            CeRunOptions options = new CeRunOptions();
+            options.PinPad = new System.Net.IPEndPoint(System.Net.IPAddress.Loopback, padListener.Port);
+            options.Link = link;
+            options.Sink = new ListSink();
+            options.Clock = new FixedClock(1);
+            IFuture<CeRunResult> run = CeDeviceFlow.Run(options);
+
+            Assert.True(accepted.Wait(20000));
+            Assert.True(FrameIo.WriteFrame(accepted.Result, Sell().Envelope.Bytes).Wait(20000));
+
+            Assert.True(run.Wait(5000), "the relay read after the lost write");
+            accepted.Result.Close();
+            padListener.Close();
+            Assert.False(run.Result.Ok);
+            Assert.Equal(ErrorCodes.LinkLost, run.Result.Code);
+            Assert.False(link.Received);
+            Assert.True(link.Closed);
+        }
+
         static PadSale Sell(DukptPinPad pad = null) => PinPadCore.Sell(pad ?? NewPad(), "t1", Pin, Pan, new SeededRandom(5));
 
         [Fact]

@@ -92,6 +92,9 @@ namespace NetSec.Bridge
     {
         public IPEndPoint PinPad, Gateway;
         public string LinkKind;
+
+        /// <summary>Null means LinkKind picks the link.</summary>
+        public IDeviceLink Link;
         public SshSuite Suite;
         public IRandomSource Random;
         public ITrainingKeySource Keys;
@@ -215,6 +218,7 @@ namespace NetSec.Bridge
 
         static IDeviceLink LinkFor(CeRunOptions o, string traceId)
         {
+            if (o.Link != null) return o.Link;
             if (o.LinkKind == LinkExternalForward)
                 return new ExternalForwardLink(o.Gateway, o.Sink, traceId + "/ce/forward", traceId, o.Clock);
             if (o.LinkKind == GlassSshLink.KindName)
