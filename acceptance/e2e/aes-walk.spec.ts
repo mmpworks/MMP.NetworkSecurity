@@ -6,6 +6,9 @@ import { HOST_PORT, NotRun, TOKEN, hostGet, openApp, requireLive } from './suppo
  * The Host clauses judge the bytes against RefAes and FIPS 197. These clauses judge what the screen does with those bytes, and read them from the Host's own reply.
  */
 
+// The tour walk to the tab, and a clause that reads all 80 states, each take longer than the suite's 60 s default.
+test.describe.configure({ timeout: 240_000 });
+
 const TEXT = 'Pump four is ok.';
 const WALK_BLOCK = /\/walk\/aes\/block/;
 
