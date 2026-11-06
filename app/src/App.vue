@@ -49,7 +49,7 @@ const sessionTabs = computed(() => ui.sessions.filter(s => s.lesson === ui.lesso
 // Lesson views: tabs appear only when the shown events carry that kind of data. A new selection of that kind opens its tab.
 type TabId = 'bytes' | 'picture' | 'chain' | 'ladder' | 'measures' | 'hostkey' | 'token' | 'timing' | 'onion'
 const tabs = computed(() => {
-  const list: { id: TabId; label: string }[] = [{ id: 'bytes', label: 'Bytes' }]
+  const list: { id: TabId; label: string }[] = [{ id: 'bytes', label: 'Message bytes' }]
   const ev = shownEvents.value
   if (ev.some(e => pictureOf(e))) list.push({ id: 'picture', label: 'Picture' })
   if (ev.some(e => e.type === 'ca.certificate.issued')) list.push({ id: 'chain', label: 'Chain' })
@@ -84,6 +84,8 @@ const raceUpTo = computed(() => selectedEvent.value?.seq ?? Infinity)
 const race = computed(() => ({ left: raceStats(shownEvents.value, raceUpTo.value, 'tls11'), right: raceStats(shownEvents.value, raceUpTo.value, 'tls13') }))
 
 function setView(v: ViewMode) { ui.view = v }
+// The Message bytes pane keeps at least 345 px, the height of a short message with every row and field in view. The diagram scrolls, so it gives up the height.
+const bytesPanePercent = Math.min(70, Math.max(46, Math.ceil(345 / Math.max(1, window.innerHeight - 90) * 100)))
 function toggleTransport() { ui.transport = ui.transport === 'os' ? 'glass' : 'os' }
 
 function moveSelection(d: number) {
@@ -152,7 +154,7 @@ const shortcuts: [string, string][] = [
             Security setup
             <v-badge v-if="badgeCount" :content="badgeCount" color="warning" inline data-testid="security-badge" />
           </v-btn>
-          <label class="target-label">Target device
+          <label class="target-label" title="Target device"><span class="sr-only">Target device</span>
             <select v-model="ui.target" class="ns-select" data-testid="target-select"><option v-for="d in TARGET_DEVICES" :key="d.id" :value="d.id" :disabled="!d.enabled">{{ d.label }}</option></select>
           </label>
           <v-spacer />
@@ -188,7 +190,7 @@ const shortcuts: [string, string][] = [
           <Pane :size="17" :min-size="11"><LessonRail /></Pane>
           <Pane :size="50" :min-size="30">
             <Splitpanes horizontal>
-              <Pane :size="60" :min-size="25">
+              <Pane :size="100 - bytesPanePercent" :min-size="25">
                 <div class="panel">
                   <div v-if="sessionTabs.length > 1" class="tabs-row">
                     <button v-for="(s, i) in sessionTabs" :key="s.id" type="button" class="stab" :class="{ on: s.id === ui.activeId }" :data-testid="`session-tab-${i}`" @click="switchSession(s.id)">{{ s.label }}</button>
@@ -216,7 +218,7 @@ const shortcuts: [string, string][] = [
                   </div>
                 </div>
               </Pane>
-              <Pane :size="40" :min-size="18">
+              <Pane :size="bytesPanePercent" :min-size="18">
                 <div class="panel">
                   <div v-if="tabs.length > 1" class="tabs-inline" data-testid="inspector-tabs">
                     <button v-for="t in tabs" :key="t.id" type="button" class="stab" :class="{ on: ui.inspectorTab === t.id }" :data-testid="`inspector-tab-${t.id}`" @click="ui.inspectorTab = t.id">{{ t.label }}</button>

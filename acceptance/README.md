@@ -2,7 +2,7 @@
 
 Author: Echo. Date: 2026-11-05. Branch: `test/acceptance-suite`. Rule: D11. Builders never write under `acceptance/`.
 
-Conclusion: the suite has **M = 331 product clauses** (`clauses.json`): the 208 of the first release, 53 for A17 (section 8) and 70 for the AES walk, A19 (sections 10 and 11). With no product built it reports **0 of 331 PASS, 0 FAIL, 331 NOT RUN**.
+Conclusion: the suite has **M = 332 product clauses** (`clauses.json`): the 208 of the first release, 54 for A17 (sections 8 and 12) and 70 for the AES walk, A19 (sections 10 and 11). With no product built it reports **0 of 332 PASS, 0 FAIL, 332 NOT RUN**.
 Its 31 checks on itself all PASS. The suite is written against `docs/program-design.md` section 11, `docs/modes-design.md`, and the merged referees in `acceptance/referees`. Every group compiles against the contract stub on net10.0 and on net48 with the CF build of MMP.AsyncProxy.
 Disposition: merge this branch. Send the open items in section 7 and in `CONTRACT.md` section 5.7 to Richard and Jared.
 
@@ -224,3 +224,11 @@ Conclusion: these add **24 clauses**, so M is **331** (307 + 24). Source: `docs/
 Limit: `A19.ui.end-frames-on-all-key-sizes` and `A19.ui.key-band-on-192-and-256` read NOT RUN until W1c builds the key sizes, and `A19.app.gcm-panel-names-the-field` reads NOT RUN until W1c builds the GCM panel. So the W1 kill condition reads those 3 as W1c work. The GHASH, forgery and tap-a-byte clause themes of #155 arrive with W1c and W2.
 
 Disposition: merge after section 10.
+
+## 12. A17: the `.security` fallback (added 2026-11-06)
+
+Conclusion: `A17.security.fallback-finds-the-repo-folder` adds **1 clause**, so M is **332**. Every other suite run sets `NETSEC_SECURITY_DIR`, so before this clause no test ran the path a learner gets. The clause copies the built Host under a stand-in repository, so it never touches the real `.security/`.
+
+Limit: the last branch of `SecurityStore.ResolveRoot`, with no `.git` above the Host, is not run. A temp folder may have a `.git` above it on some machines, so the result would depend on the machine.
+
+Disposition: merge after sections 10 and 11.

@@ -61,6 +61,41 @@ namespace Acceptance
             Check.True(r[id].StartsWith("FAIL"), id + " should FAIL when " + change + ", gave " + r[id]);
         }
 
+        static string Outcome(System.Action judge)
+        {
+            try { judge(); return "PASS"; }
+            catch (FailException ex) { return "FAIL: " + ex.Message; }
+        }
+
+        /// <summary>The fallback clause needs the real Host, so a stand-in tree tests its judge: the right tree passes, and each wrong tree FAILS.</summary>
+        [Clause("SELF.a17-security-folder-bites")]
+        public static string SecurityFolderBites(Ctx c)
+        {
+            string tmp = Path.Combine(c.WorkDir, "security-folder");
+            if (Directory.Exists(tmp)) Directory.Delete(tmp, true);
+            string good = Path.Combine(tmp, "good"), host = Path.Combine(good, "bin", "host"), chosen = Path.Combine(tmp, "chosen");
+            Directory.CreateDirectory(host);
+            SelfA17Text.Put(good, ".security/modes.json", "{}");
+            Check.True(Outcome(delegate { SecurityFolderClauses.JudgeFallback(good, host, "t"); }) == "PASS", "the right tree should PASS");
+
+            string none = Path.Combine(tmp, "none"), noneHost = Path.Combine(none, "bin", "host");
+            Directory.CreateDirectory(noneHost);
+            Check.True(Outcome(delegate { SecurityFolderClauses.JudgeFallback(none, noneHost, "t"); }).StartsWith("FAIL"), "no modes.json in the repository should FAIL");
+
+            string beside = Path.Combine(tmp, "beside"), besideHost = Path.Combine(beside, "bin", "host");
+            SelfA17Text.Put(beside, ".security/modes.json", "{}");
+            SelfA17Text.Put(besideHost, ".security/modes.json", "{}");
+            Check.True(Outcome(delegate { SecurityFolderClauses.JudgeFallback(beside, besideHost, "t"); }).StartsWith("FAIL"), ".security/ beside the Host's files should FAIL");
+
+            SelfA17Text.Put(chosen, "modes.json", "{}");
+            string clean = Path.Combine(tmp, "clean");
+            Directory.CreateDirectory(clean);
+            Check.True(Outcome(delegate { SecurityFolderClauses.JudgeVariableWins(clean, chosen, "t"); }) == "PASS", "the variable's folder alone should PASS");
+            Check.True(Outcome(delegate { SecurityFolderClauses.JudgeVariableWins(good, chosen, "t"); }).StartsWith("FAIL"), "a repository .security/ with the variable set should FAIL");
+            Check.True(Outcome(delegate { SecurityFolderClauses.JudgeVariableWins(clean, clean, "t"); }).StartsWith("FAIL"), "no modes.json in the variable's folder should FAIL");
+            return "2 right trees PASS, and 4 wrong trees each FAIL";
+        }
+
         [Clause("SELF.walk-text-checks-bite")]
         public static string TextChecksBite(Ctx c)
         {

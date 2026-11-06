@@ -1,6 +1,6 @@
 # MMP.NetworkSecurity: walkthrough design
 
-Author: Richard. Date: 2026-11-06. Revision 9, adding true pause and resume on every motion, and the round key number on the AddRoundKey step button. Status: design only, for Jared's check and Echo's clauses. No product code.
+Author: Richard. Date: 2026-11-06. Revision 11, adding the round constant doubling. Revision 10 added the phantom column. Status: design only, for Jared's check and Echo's clauses. No product code.
 
 Sources of facts: FIPS 197, the engine, and Jared's sheet `E:\dev\ns-lesson1-facts.md`. Steve's web pages set depth and teaching order only (section 2.1).
 
@@ -265,18 +265,61 @@ Worked example, the FIPS 197 appendix A key `2b7e1516 28aed2a6 abf71588 09cf4f3c
 
 | Moment | On screen | Value from the reply |
 |---|---|---|
-| 1. Light the sources | Byte j of `w(i - Nk)`, and the source byte of `w(i - 1)`, light up in the table, and in the original key line when they are key words | Position arithmetic |
+| 1. Light the sources | Byte j of `w(i - Nk)` lights up in the table. So does the source byte of `w(i - 1)`, or byte j of the phantom column when the word has one. Both also light in the original key line when they are key words | Position arithmetic |
 | 2. The stages | The stage rows show. In the `previous` row, the source byte lights. In each row after RotWord, byte j lights | `previous`, `rotated`, `substituted`, `afterRcon`, `keyBack` |
 | 3. The equation | "2b XOR 8b = a0", with each value's bits below it | `keyBack[j]`, the last stage's byte j, and `word[j]`. The app prints these, and it computes no XOR |
 | 4. The answer flies | The byte flies to its cell, and the column fills one cell at a time | `word[j]` |
 
 **The source byte.** RotWord moves each byte left, so on a word that passes through RotWord, byte j of the stage comes from byte `(j + 1) mod 4` of the word before. On every other word, it is byte j. The last stage is `afterRcon` on a RotWord step, `substituted` at the AES-256 `i mod 8 = 4` step, and `previous` otherwise.
 
-The stage row for RotWord reads "RotWord: rotate left one byte". With reduced motion, each word lands whole, and Back mid-word leaves no marks.
+The stage row for RotWord reads "RotWord: rotate one byte, up this column". With reduced motion, each word lands whole, and Back mid-word leaves no marks.
+
+**The phantom column (Steve's item, W1b).** A word that transforms the word before gets a phantom: a copy of that column, lifted above the base. RotWord words have one, and so do AES-256's SubWord-only words. Plain words, such as w5, show none. The base column never changes, and the learner can see that.
+
+| Moment | The phantom shows | Value from the reply |
+|---|---|---|
+| 1. It lifts | A copy of `w(i - 1)`, above the base column | `previous` |
+| 2. It rotates (RotWord words only) | Each byte moves up one place, and the top byte wraps to the bottom | `rotated` |
+| 3. It flips through the S-box | Each byte changes to its S-box byte | `substituted` |
+| 4. It flips with the round constant (RotWord words only) | The top byte changes | `afterRcon` |
+| 5. It lines up | Row by row with the new word. Byte j of the phantom combines with byte j of the word back | The last stage, and `keyBack` |
+| 6. It flattens | It settles down and goes when the column is done | None |
+
+Panel words, with the word names from `i`:
+
+1. RotWord word: "RotWord works on a copy of w7, so w7 itself does not change. The copy moves up one byte, and the top byte wraps to the bottom. All 4 bytes of w8 then use this one finished copy."
+2. SubWord-only word: "SubWord works on a copy of w11, so w11 itself does not change. All 4 bytes of w12 then use this one finished copy."
+
+| Case | Rule |
+|---|---|
+| New reply fields | None. The stages already hold every value, and the app computes none |
+| Pause | Holds the phantom in place, as section 2.2a sets out. It is a CSS or Web Animations motion inside the walk's root |
+| Back, a round chip, or Show keys OFF | Removes the phantom, with none left behind |
+| Reduced motion | No phantom. The word lands whole, and the stage rows and the panel words still show |
+| A tap on a built word | Opens its stage rows, with no phantom, because the phantom belongs to the build |
 
 **The reply needs no new field.** `keyWords[]` already has every row by `i`, and each row holds `word`, `previous`, `rotated`, `substituted`, `rcon`, `afterRcon`, and `keyBack`. Grid, column, cell, and byte position come from `i` by layout: `i / 4`, `i % 4`, and `4i + r`. The two words to light are `i - 1` and `i - Nk`, with Nk from the tables route's size table. That is position arithmetic, and the app reads no byte value to do it. A clause holds it: the bytes in the lit cells must equal `previous` and `keyBack`.
 
 **Rcon row.** `01 02 04 08 10 20 40 80 1b 36`. Each value is the one before it, doubled in the field. Ordinary doubling of `80` gives `100`, which does not fit in a byte. Field doubling gives `1b`. This row is the first place the learner meets the field in real use. The row comes from the tables route, because the app holds no crypto values.
+
+**The round constants animate (Steve's item, W1b).** A "Play the doubling" button builds the list from `01`, one doubling at a time. Next takes one doubling.
+
+| Part | On screen | Value from the tables route |
+|---|---|---|
+| The list | The 10 values, filling from `01` | `rcon` |
+| One doubling | The same bit rows as the matrix view (section 2.2i) | `rconSteps[n]`: `from`, `shifted`, `reduced`, `to` |
+| `80` to `1b` | Bit 8 breaks away and flies off, and the XOR 1b row shows, as section 2.2i sets out | `rconSteps[7]`, where `shifted` is `100` and `reduced` is true |
+| Values this size does not use | Dimmed, with the words "AES-192 uses 8 of these 10." | `rconUsed`: 10, 8, 7 |
+
+Play builds all 10 values at every key size, and stops at the end of the list. The mock stops at the size's used count, so AES-192 and AES-256 never reach `80` to `1b`. Steve asked to see that step, so the design keeps it for every size, with the values past the used count dimmed.
+
+Words at the start: "The list starts at 01. No key goes in, so every AES key uses this same list."
+
+**A compact row in the key schedule side panel** shows the same 10 values and lights the one the current rotating word uses. The app finds it by comparing the first byte of that word's `rcon` with the list, which it can do because the 10 values differ. A SubWord-only word and a plain word light none.
+
+Pause and Resume follow section 2.2a. With reduced motion, each doubling lands at once. Show keys OFF stops the motion, as section 3.5 sets out. The list holds no key byte, so the tables route still answers with Show keys OFF.
+
+**A new field: yes, `rconSteps` on the tables route.** The app runs no math, so the engine sends each doubling. It uses the `AesDoubling` shape that MixColumns terms use, so the bit rows read one shape. The list has 10 values, so it has 9 steps.
 
 **Words on screen:**
 
@@ -837,6 +880,7 @@ namespace NetSec.Crypto {
     public static int[] ShiftMap(bool inverse);      // A copy of ShiftRowsMap or InverseShiftRowsMap
     public static int[] DependsOn(AesStepKind kind, int cell);   // W2. The earlier cells this cell depends on (section 2.2e)
     public static byte[] RoundConstants(int count);  // Each value is the one before it, doubled in the field
+    public static AesDoubling[] RoundConstantSteps(int count);   // count - 1 doublings, one between each pair of values
     public static AesColumnByte[] MixTerms(byte[] before, bool inverse);   // One entry per state byte, in r + 4c order
   }
   public static class Gcm {                   // Added to Gcm.cs
@@ -963,7 +1007,7 @@ Replies, trimmed. Every error carries `code`, `message`, `retryable`, and `reque
 
 ```json
 // /api/walk/aes/tables
-{ "sbox": "637c777b...", "inverseSbox": "52096ad5...", "shiftRows": [0, 5, 10, 15, "..."], "inverseShiftRows": [0, 13, 10, 7, "..."], "rcon": "01020408102040801b36",
+{ "sbox": "637c777b...", "inverseSbox": "52096ad5...", "shiftRows": [0, 5, 10, 15, "..."], "inverseShiftRows": [0, 13, 10, 7, "..."], "rcon": "01020408102040801b36", "rconSteps": [ { "from": "01", "shifted": "002", "reduced": false, "to": "02" }, "...", { "from": "80", "shifted": "100", "reduced": true, "to": "1b" }, { "from": "1b", "shifted": "036", "reduced": false, "to": "36" } ],
   "sizes": [ { "keyBits": 128, "keyWords": 4, "rounds": 10, "roundKeys": 11, "words": 44, "rconUsed": 10 } ] }
 
 // /block?source=text
@@ -1212,7 +1256,8 @@ If Steve does not follow it after 2 rounds of word changes, stop and re-plan the
 | Round values | Every CIPHER and INVERSE CIPHER state for FIPS C.1, C.2, C.3, by position. The vector reader skips the appendix's EQUIVALENT INVERSE CIPHER lists, which hold a different order |
 | Start view | At the start of encryption, the right-hand grid equals round key 0, and the first Next lands on AddRoundKey 0. At the start of decryption, it equals round key Nr, and the first Next lands on AddRoundKey Nr. It is gone with Show keys OFF |
 | ShiftRows roll | The roll ends on the engine state. A Back during a roll leaves no strip and no hidden cell. Row 0 does not move |
-| Key fill | The lit `w(i - Nk)` byte equals `keyBack[j]`. The lit `w(i - 1)` byte equals `previous` at the source position, which is `(j + 1) mod 4` on a RotWord step. The equation's three values equal the reply's. A Back mid-word leaves no mark and no flying byte |
+| Phantom column | At each key size, a word has a phantom only on a RotWord or SubWord-only step, so w5 at AES-128 has none. Its cells equal `previous`, then `rotated`, `substituted`, and `afterRcon`, in that order. Each base column equals its `word` through every moment. A Back, a round chip, and Show keys OFF each leave no phantom. Pause holds it, by the Pause holds clause. Reduced motion shows none. The panel names `w(i - 1)` and `wi`, and the RotWord row reads "RotWord: rotate one byte, up this column" |
+| Key fill | The lit `w(i - Nk)` byte equals `keyBack[j]`. On a word with no phantom, the lit `w(i - 1)` byte equals `previous` at byte j. On a word with a phantom, the phantom's lit byte equals the last stage's byte j, and the `previous` row lights the source position, which is `(j + 1) mod 4` on a RotWord step. The equation's three values equal the reply's. A Back mid-word leaves no mark and no flying byte |
 | Spec table | Every `url` has a host in `hosts`, and every row has a synopsis that passes reading grade |
 | Spec on screen | A scan of tour text, gloss, and copy finds each spec-shaped name in the table. At the end of each lesson walk, an e2e scan of the page finds no spec-shaped name outside a card trigger. A Host refusal naming RFC 8446 shows a card |
 | Spec card | It opens on hover, focus, and tap. It stays open with the pointer on it. Esc closes it. Tour files keep their hash |
@@ -1222,13 +1267,16 @@ If Steve does not follow it after 2 rounds of word changes, stop and re-plan the
 | Key words | FIPS appendix A rows, for all three sizes. The Rcon row equals `01 02 04 08 10 20 40 80 1b 36`, and the used counts are 10, 8, 7 |
 | End frames | Every animated step lands on the engine state for that step, for all three key sizes |
 | Reduced motion | Each step shows its end frame with no transition |
-| Pause holds | With motion on at the `slow` speed, Pause during a flying byte, a key fill, and a matrix multiply. The clause waits for each animation's `ready`, then samples. Each moving element's position stays the same for 2 seconds, within 1 pixel. At least one paused animation has a `currentTime` below its end. If nothing runs when the click lands, the clause repeats from the step before, and it reads NOT RUN after 3 tries |
+| Pause holds | With motion on at the `slow` speed, Pause during a flying byte, a key fill, a phantom column, and a matrix multiply. The clause waits for each animation's `ready`, then samples. Each moving element's position stays the same for 2 seconds, within 1 pixel. At least one paused animation has a `currentTime` below its end. If nothing runs when the click lands, the clause repeats from the step before, and it reads NOT RUN after 3 tries |
 | Resume carries on | Before the Resume click, a `requestAnimationFrame` sampler in the page logs `performance.now()` and each animation's `currentTime`. At the first frame after Resume, `currentTime` is at or above the paused value, below the end, and no further past the paused value than the elapsed page time plus 1 frame, times the speed. So the motion neither restarts nor jumps to the end. The motion then lands on the engine state |
 | Pause label | The button reads Pause during a motion from one Next, Resume when frozen, and Play when nothing runs. Play still stops at the end of a round and of a grid |
 | Next and Back while paused | Each ends the motion and acts. After Next, the next step's motion runs and the button reads Pause, and it lands on that step's engine state. Back leaves no flyer, strip, box, or mark. Play does not restart |
 | Tips while paused | A hover tip and a spec card open while paused, and the moving elements stay still |
 | Show keys while paused | Show keys OFF clears the walk, with no frozen flyer left and no timer that fires later |
 | Key number | Each AddRoundKey button reads "AddRoundKey r", and r is the step's `round`. The grid it shows equals round key r. Encrypt counts up from 0, and decrypt counts down from Nr to 0, for all three key sizes |
+| Rcon steps | The tables route sends 9 steps. Each `from` and `to` equal the neighbouring `rcon` values. Each `to` equals `shifted`, XOR `11b` when `reduced`, and `reduced` means `shifted` is past 8 bits. Only `80` to `1b` is reduced. W1a holds this clause, because the route is W1a |
+| Rcon doubling | Play builds 10 values from `01` at each key size and stops. The bit rows print the step's values. `80` to `1b` shows the break-away and the XOR 1b row. 10, 8, and 7 values show undimmed. Pause holds the rows, by the Pause holds clause |
+| Rcon compact row | On each RotWord word, the lit value equals the first byte of that row's `rcon`. A SubWord-only word and a plain word light none |
 | Shift map | `state[i]` after ShiftRows equals `state[map[i]]` before it, using the map the tables route sends |
 | Matrix view | The lit row's factors and the flown column equal the part's `factor` and `input`. The landed byte equals the state after. Tapping a byte picks its column. Fill all equals the state after. A Back during Play leaves no flyer, box, or lit row. InvMixColumns shows 14, 11, 13, 9 |
 | Overflow rows | On every doubling, `to` equals `shifted`, XOR `11b` when `reduced`, and `reduced` means `shifted` is past 8 bits. An overflow shows the break-away and the XOR 1b row. The last `running` equals `result`, and the last `sums` equals the part's `result` |
@@ -1288,7 +1336,7 @@ If Steve does not follow it after 2 rounds of word changes, stop and re-plan the
 | Rejected | Asynchronous projection and a stored view. No staleness exists here, because the walk computes at the query |
 | Where we differ | One learner on one machine. No scale pressure. The read side recomputes with the real engine, and that is the teaching |
 
-**The arithmetic.** One learner, at most about 1 walk query per second while picking blocks. A block reply is about 5 to 7 KiB of states and key words. The MixColumns terms add 1,152 terms at AES-128 and 1,664 at AES-256. With the matrix view's fields, a spike's count of the JSON gives about 235 KiB at AES-128 and 340 KiB at AES-256. That is a large reply for one click, and it is still small for a local socket, so the design sends it whole and keeps no second query. W1b measures it. A visible delay would move the terms to a query per step. A feed reply holds at most 5 rows. The tables reply is about 1.1 KiB, fetched once. A walk costs about 6 microseconds in this test environment, against about 0.5 microseconds for `EncryptBlock`. Storage over three years is zero, since nothing is stored. So the design uses no cache, no streaming, and no per-step request. One reply holds the whole walk, and Next is a local move.
+**The arithmetic.** One learner, at most about 1 walk query per second while picking blocks. A block reply is about 5 to 7 KiB of states and key words. The MixColumns terms add 1,152 terms at AES-128 and 1,664 at AES-256. With the matrix view's fields, a spike's count of the JSON gives about 235 KiB at AES-128 and 340 KiB at AES-256. That is a large reply for one click, and it is still small for a local socket, so the design sends it whole and keeps no second query. W1b measures it. A visible delay would move the terms to a query per step. A feed reply holds at most 5 rows. The tables reply is about 1.6 KiB by estimate, fetched once. A walk costs about 6 microseconds in this test environment, against about 0.5 microseconds for `EncryptBlock`. Storage over three years is zero, since nothing is stored. So the design uses no cache, no streaming, and no per-step request. One reply holds the whole walk, and Next is a local move.
 
 **Gem catalog.** I read `E:\dev\MMP.ProgrammingGems\INDEX.md`.
 
