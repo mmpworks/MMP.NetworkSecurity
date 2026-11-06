@@ -8,6 +8,8 @@ import { HOST_PORT, NotRun, TOKEN, hostGet, openApp, requireLive } from './suppo
 
 // The tour walk to the tab, and a clause that reads all 80 states, each take longer than the suite's 60 s default.
 test.describe.configure({ timeout: 240_000 });
+// An action with no bound waits out the whole test and reports only "test timeout". With this bound, the failure names the action.
+test.use({ actionTimeout: 15_000 });
 
 const TEXT = 'Pump four is ok.';
 const WALK_BLOCK = /\/walk\/aes\/block/;
@@ -42,7 +44,7 @@ async function reachTab(page: Page): Promise<void> {
   const next = page.getByTestId('tour-next');
   for (let hop = 0; hop < 30 && !(await tab.isVisible().catch(() => false)); hop++) {
     if (!(await next.isEnabled().catch(() => false))) { await page.waitForTimeout(1_000); continue; }
-    await next.click();
+    await next.click().catch(() => { /* the tour moved on, or a step holds Next: the loop looks again */ });
     await page.waitForTimeout(500);
   }
   if (!(await tab.isVisible().catch(() => false))) throw new NotRun('PRODUCT_MISSING', 'lesson 1 shows no aes-walk-tab');
