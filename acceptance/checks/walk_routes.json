@@ -3,6 +3,8 @@
   "routes": [
     { "route": "/api/walk/aes/tables", "off": "open", "why": "the tables are public" },
     { "route": "/api/sessions/{id}/walk/aes/block", "off": "409 KEYS_HIDDEN", "why": "it holds the key and the round keys" },
-    { "route": "/api/sessions/{id}/walk/aes/modes", "off": "open", "why": "each field comes from plain and wire, which the trace shows with Show keys OFF" }
+    { "route": "/api/sessions/{id}/walk/aes/modes", "off": "open", "why": "each field comes from plain and wire, which the trace shows with Show keys OFF" },
+    { "route": "/api/sessions/{id}/walk/aes/ghash", "off": "409 KEYS_HIDDEN", "why": "it holds H, and each Y value is built from H" },
+    { "route": "/api/sessions/{id}/walk/aes/forge", "off": "409 KEYS_HIDDEN", "why": "H is key material, on Jared's recommendation" }
   ]
 }

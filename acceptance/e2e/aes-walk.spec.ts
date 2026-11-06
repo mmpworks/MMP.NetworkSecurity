@@ -232,23 +232,88 @@ test('[A19.ui.flip-during-play-stops-the-timeline] a flip to OFF during Play sto
   } finally { await setShowKeys(true); }
 });
 
-test('[A19.ui.key-schedule-shows-each-word] the word wall holds every word in fours, a click opens a word, and the Rcon row comes from the Host', async ({ page }) => {
+const tableCell = (page: Page, n: number) => page.getByTestId(`aes-walk-table-cell-${n}`);
+
+/** The whole expanded key as hex, from the reply's word rows, by the layout of design section 2.2b. */
+const expandedHex = (rows: any[]) => rows.slice().sort((a, b) => a.i - b.i).map(r => r.word.toLowerCase()).join('');
+
+async function toKeySchedule(page: Page): Promise<void> {
+  for (let i = 0; i < 40 && !(await tableCell(page, 0).isVisible().catch(() => false)); i++) await page.getByTestId('aes-walk-next').click();
+  await expect(tableCell(page, 0), 'the expanded table').toBeVisible();
+}
+
+test('[A19.ui.expanded-table-layout] 11 grids of 16 cells: the key cells start filled, and each cell names its word and shows no letter', async ({ page }) => {
   const reply = await openWalk(page);
+  await toKeySchedule(page);
+  const hex = expandedHex(reply.keyWords);
+  await expect(page.locator('[data-testid^="aes-walk-table-grid-"]'), 'one grid per round key').toHaveCount(11);
+  await expect(page.locator('[data-testid^="aes-walk-table-cell-"]'), 'one cell per byte, 0 to 175').toHaveCount(176);
+  await expect(page.getByTestId('aes-walk-table-grid-1').locator('[data-testid^="aes-walk-table-cell-"]'), 'each grid holds 16 cells').toHaveCount(16);
+  for (let n = 0; n < 176; n++) {
+    const c = tableCell(page, n);
+    await expect(c, `byte ${n}: its word name`).toHaveAttribute('data-word', `w${Math.floor(n / 4)}`);
+    expect(await c.getAttribute('data-letter'), `byte ${n}: key bytes are not text`).toBeNull();
+    if (n < 16) await expect(c, `key byte ${n} starts filled`).toContainText(hex.slice(2 * n, 2 * n + 2), { ignoreCase: true });
+    else await expect(c, `byte ${n} starts empty`).not.toContainText(new RegExp(`\\b${hex.slice(2 * n, 2 * n + 2)}\\b`, 'i'));
+  }
+});
+
+test('[A19.ui.word-build-lights-its-two-words] Next adds one word, the lit cells hold its two source words, and a tap opens only a built word', async ({ page }) => {
+  const reply = await openWalk(page);
+  await toKeySchedule(page);
   const tables = await hostGet('/api/walk/aes/tables');
   expect(tables.status, 'GET tables').toBe(200);
-  for (let i = 0; i < 40 && !(await page.getByTestId('aes-walk-word-0').isVisible().catch(() => false)); i++) await page.getByTestId('aes-walk-next').click();
-  const rows: any[] = reply.keyWords;
-  expect(rows.length, 'word rows in the reply').toBe(44);
-  for (const row of rows) await expect(page.getByTestId(`aes-walk-word-${row.i}`), `w${row.i}`).toContainText(row.word, { ignoreCase: true });
-  await expect(page.locator('[data-testid^="aes-walk-round-key-group-"]'), 'one group per round key').toHaveCount(11);
-  await expect(page.getByTestId('aes-walk-round-key-group-1').locator('[data-testid^="aes-walk-word-"]'), 'each group holds 4 words').toHaveCount(4);
-  const row = rows.find(r => r.i === 4);
-  await page.getByTestId('aes-walk-word-4').click();
-  for (const [id, value] of [['previous', row.previous], ['rotated', row.rotated], ['substituted', row.substituted], ['rcon', row.rcon], ['after-rcon', row.afterRcon], ['key-back', row.keyBack], ['word', row.word]])
-    await expect(page.getByTestId(`aes-walk-build-${id}`), `build of w4: ${id}`).toContainText(value, { ignoreCase: true });
   const rcon: string = tables.body.rcon;
   const shown = ((await page.getByTestId('aes-walk-rcon').textContent()) ?? '').replace(/\s+/g, '').toLowerCase();
-  expect(shown, 'the Rcon row').toContain(rcon.toLowerCase());
+  expect(shown, 'the Rcon row comes from the Host').toContain(rcon.toLowerCase());
+  const rows: any[] = reply.keyWords.slice().sort((a: any, b: any) => a.i - b.i);
+  const nk = tables.body.sizes.find((s: any) => s.keyBits === reply.keyBits).keyWords;
+  const hex = expandedHex(rows);
+  const litBytes = async () => {
+    const lit = page.locator('[data-testid^="aes-walk-table-cell-"][data-lit="true"]');
+    const out: string[] = [];
+    for (let k = 0; k < await lit.count(); k++) out.push(((await lit.nth(k).textContent()) ?? '').replace(/\s+/g, ''));
+    return out.join(' ').toLowerCase();
+  };
+  // A tap on a word not yet built does nothing.
+  await tableCell(page, 4 * 10).click();
+  await expect(page.getByTestId('aes-walk-build-word'), 'an unbuilt word opens no stage rows').toHaveCount(0);
+  // A key word has no stage rows, and says so.
+  await tableCell(page, 0).click();
+  await expect(page.getByTestId('aes-walk-build-key-note')).toContainText('This word is part of the key');
+  for (const i of [nk, nk + 1, nk + 2, nk + 3, nk + 4]) {
+    const row = rows.find(r => r.i === i);
+    await page.getByTestId('aes-walk-next').click();
+    for (let b = 0; b < 4; b++) await expect(tableCell(page, 4 * i + b), `w${i} byte ${b} is built`).toContainText(hex.slice(2 * (4 * i + b), 2 * (4 * i + b) + 2), { ignoreCase: true });
+    const lit = await litBytes();
+    for (const [name, value] of [['the word before', row.previous], ['the word Nk back', row.keyBack]]) {
+      for (let b = 0; b < 4; b++) expect(lit, `w${i}: ${name} is lit`).toContain(value.slice(2 * b, 2 * b + 2).toLowerCase());
+    }
+  }
+  await tableCell(page, 4 * nk).click();
+  const row = rows.find(r => r.i === nk);
+  for (const [id, value] of [['previous', row.previous], ['rotated', row.rotated], ['substituted', row.substituted], ['rcon', row.rcon], ['after-rcon', row.afterRcon], ['key-back', row.keyBack], ['word', row.word]])
+    await expect(page.getByTestId(`aes-walk-build-${id}`), `the stage rows of w${nk}: ${id}`).toContainText(value, { ignoreCase: true });
+});
+
+test('[A19.ui.key-band-on-192-and-256] at 192 and 256 bits the key runs past round key 0, the key cells start filled, and the panel says how many words', async ({ page }) => {
+  await openWalk(page);
+  for (const [bits, grids, cells, nk] of [[192, 13, 208, 6], [256, 15, 240, 8]]) {
+    const pick = page.getByTestId(`aes-walk-key-size-${bits}`);
+    if (!(await pick.isVisible().catch(() => false))) throw new NotRun('PRODUCT_MISSING', `no aes-walk-key-size-${bits}. Key sizes arrive in W1c`);
+    const [r] = await Promise.all([page.waitForResponse(WALK_BLOCK, { timeout: 30_000 }), pick.click()]);
+    const reply = await r.json();
+    await toKeySchedule(page);
+    await expect(page.locator('[data-testid^="aes-walk-table-grid-"]'), `${bits} bits: grids`).toHaveCount(grids);
+    await expect(page.locator('[data-testid^="aes-walk-table-cell-"]'), `${bits} bits: cells`).toHaveCount(cells);
+    const hex = expandedHex(reply.keyWords);
+    for (let n = 0; n < 4 * nk; n++) {
+      await expect(tableCell(page, n), `${bits} bits: key byte ${n} starts filled`).toContainText(hex.slice(2 * n, 2 * n + 2), { ignoreCase: true });
+      await expect(tableCell(page, n), `${bits} bits: key byte ${n} is in the band`).toHaveAttribute('data-key', 'true');
+    }
+    await expect(tableCell(page, 4 * nk), `${bits} bits: the first built word is past the band`).not.toHaveAttribute('data-key', 'true');
+    await expect(page.getByTestId('aes-walk-key-band-note'), `${bits} bits: the line`).toContainText(`first ${nk} words are the key`);
+  }
 });
 
 test('[A19.ui.multiply-shows-the-engine-terms] the field panel states the definition, and a MixColumns step prints one real multiply from the reply', async ({ page }) => {

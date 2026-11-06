@@ -2,7 +2,7 @@
 
 Author: Echo. Date: 2026-11-05. Branch: `test/acceptance-suite`. Rule: D11. Builders never write under `acceptance/`.
 
-Conclusion: the suite has **M = 329 product clauses** (`clauses.json`): the 208 of the first release, 53 for A17 (section 8) and 68 for the AES walk, A19 (sections 10 and 11). With no product built it reports **0 of 329 PASS, 0 FAIL, 329 NOT RUN**.
+Conclusion: the suite has **M = 331 product clauses** (`clauses.json`): the 208 of the first release, 53 for A17 (section 8) and 70 for the AES walk, A19 (sections 10 and 11). With no product built it reports **0 of 331 PASS, 0 FAIL, 331 NOT RUN**.
 Its 31 checks on itself all PASS. The suite is written against `docs/program-design.md` section 11, `docs/modes-design.md`, and the merged referees in `acceptance/referees`. Every group compiles against the contract stub on net10.0 and on net48 with the CF build of MMP.AsyncProxy.
 Disposition: merge this branch. Send the open items in section 7 and in `CONTRACT.md` section 5.7 to Richard and Jared.
 
@@ -212,15 +212,15 @@ Disposition: merge. Then Richard builds W1a and Nancy builds W1b. Chapter 2 clau
 
 ## 11. A19: animation, key schedule, finite field (added 2026-11-06)
 
-Conclusion: these add **22 clauses**, so M is **329** (307 + 22). Source: `docs/walkthrough-design.md` at c19b151, sections 2.2a to 2.2d, 2.4, 3.3 to 3.5.
+Conclusion: these add **24 clauses**, so M is **331** (307 + 24). Source: `docs/walkthrough-design.md` at c19b151, sections 2.2a to 2.2d, 2.4, 3.3 to 3.5, and the expanded table of #156 (main at 4ffba13).
 
 | Group | Clauses | Judge |
 |---|---|---|
 | `walk`, net10 and CF | 10: 5 on each build. Terms, worked example, round constants, shift map, one-bit spread | The design's worked examples, FIPS 197, `RefField` |
 | `a17`, Host over HTTP | 4: tables, terms on 2 seeds, Show keys OFF holds no word or term, `match` on the `L1-use-ecb` fork | `RefField`, `RefAes`, a live trace |
 | `docs` | 2: definition lines at the reading grade, GCM panel line | `checks/walk_lines.json` |
-| `e2e` | 6: end frames, reduced motion, Play stops at the round's end, flip during Play, key schedule, one real multiply | The browser against the Host's own reply |
+| `e2e` | 8: end frames, reduced motion with its motion-on control, Play stops at the round's end, flip during Play, expanded table, word build, key band, one real multiply | The browser against the Host's own reply |
 
-Limit: `A19.ui.end-frames-on-all-key-sizes` reads NOT RUN until W1c builds the key sizes, and `A19.app.gcm-panel-names-the-field` reads NOT RUN until W1c builds the GCM panel. So the W1 kill condition reads those 2 as W1c work.
+Limit: `A19.ui.end-frames-on-all-key-sizes` and `A19.ui.key-band-on-192-and-256` read NOT RUN until W1c builds the key sizes, and `A19.app.gcm-panel-names-the-field` reads NOT RUN until W1c builds the GCM panel. So the W1 kill condition reads those 3 as W1c work. The GHASH, forgery and tap-a-byte clause themes of #155 arrive with W1c and W2.
 
 Disposition: merge after section 10.
