@@ -68,6 +68,15 @@ namespace NetSec.Trace
         public TraceSecret[] Secrets;
         public TraceCheck Check;
         public TraceKeyUse KeyUse;
+
+        /// <summary>Names the wire.sent event whose bytes may not have left. It carries no Wire, because only bytes that left carry Wire.</summary>
+        public static TraceEventDraft LostWrite(TraceEvent sent, string code)
+        {
+            TraceEventDraft draft = new TraceEventDraft();
+            draft.Type = "wire.write.failed"; draft.From = sent.From; draft.To = sent.To; draft.Message = sent.Message;
+            draft.Detail = code + ": the write for event " + sent.EventId + " failed, so its bytes may not have left";
+            return draft;
+        }
     }
 
     /// <summary>Immutable. Only an event that went over a socket carries Wire, so the Wire fields joined by direction equal the bytes a tap sees.</summary>
