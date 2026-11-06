@@ -5,12 +5,12 @@
       "lesson": 1,
       "title": "Why we lock data",
       "text": [
-        "Anyone can listen on a network wire. If you send a secret as readable bytes, the listener reads it too.",
-        "{{term:aes}} is a lock for data. It turns readable {{term:plaintext}} into scrambled {{term:ciphertext}}, and only the right {{term:key}} turns it back.",
-        "This lesson shows three ways to use AES. Two of them hide your data well, and one of them leaks patterns. You will see which.",
-        "Built to show the parts. Do not copy."
+        "Anyone on a network wire can copy the bytes you send. If you send a secret as readable bytes, the listener reads it too.",
+        "Readable data is called {{term:plaintext}}. Scrambled data is called {{term:ciphertext}}.",
+        "{{term:aes}} is a standard lock for data. It uses a secret number, the {{term:key}}, to turn plaintext into ciphertext. Only the right key turns it back.",
+        "This lesson uses AES in three ways. Two ways hide your data well, and one way leaks patterns. Built to show the parts. Do not copy."
       ],
-      "glossary": ["aes", "plaintext", "ciphertext", "key"],
+      "glossary": ["plaintext", "ciphertext", "aes", "key"],
       "bind": { "kind": "concept" },
       "highlight": ["diagram:lane=client", "diagram:lane=server"],
       "unlock": { "mode": "ack" }
@@ -18,11 +18,37 @@
     {
       "id": "L1-S02",
       "lesson": 1,
+      "title": "One key, or a key pair",
+      "text": [
+        "Locks come in two kinds. {{term:symmetric}} encryption uses one key. The same key locks the data and unlocks it, so both sides must hold a copy.",
+        "The other kind is {{term:asymmetric}}. It uses a key pair. The private key stays with its owner. The public key is safe to give to anyone, and nobody can work back from it to the private key.",
+        "A symmetric lock is fast, so it carries the data. A key pair is slow, so programs use it for small jobs: to agree on a shared key, and to prove who is talking. Lessons 3 and 4 show those jobs.",
+        "AES is a symmetric lock. This lesson is about that kind."
+      ],
+      "glossary": ["symmetric", "asymmetric"],
+      "bind": { "kind": "concept" },
+      "claims": [
+        {
+          "id": "L1-C06",
+          "text": "Symmetric encryption uses one shared key to lock and unlock data. Asymmetric methods use a key pair: a private key that stays with its owner and a public key that anyone may hold. The private key cannot be worked out from the public key.",
+          "source": "NIST SP 800-57 Part 1 Rev. 5, section 2.1, Glossary (entries: symmetric key, public key, private key, public-key (asymmetric) cryptography)"
+        },
+        {
+          "id": "L1-C07",
+          "text": "Real protocols use the key pair to agree on a shared key and to prove identity, then lock the bulk data with a symmetric cipher.",
+          "source": "RFC 8446, section 2 (Protocol Overview: the handshake does key exchange and server authentication; the record protocol protects traffic with the shared keys); lesson 5 tour, L5-S01"
+        }
+      ],
+      "unlock": { "mode": "ack" }
+    },
+    {
+      "id": "L1-S03",
+      "lesson": 1,
       "title": "Both sides hold the same key",
       "text": [
-        "The client and the server now hold one 16-byte key. The same key locks the data and unlocks it.",
-        "Look at the secrets panel. Both lanes list the key, because both sides need it.",
-        "Real programs agree on a key with a key exchange. Lesson 3 shows how that works."
+        "The client and the server now hold one 16-byte AES key. This is the symmetric case: one key, two copies.",
+        "Look at the panel named What each side knows. The Server column and the Client column each show a row named aes.key. The box at the bottom compares the two rows and says match.",
+        "No key crossed the wire here. The lab gave each side a copy. Real programs must agree on a key in public first, and lesson 3 shows how."
       ],
       "glossary": [],
       "bind": { "kind": "event", "eventType": "keys.installed", "match": { "actor": "client", "message": "aes-128" } },
@@ -30,33 +56,48 @@
       "unlock": { "mode": "event" }
     },
     {
-      "id": "L1-S03",
+      "id": "L1-S04",
       "lesson": 1,
-      "title": "Readable in, scrambled out",
+      "title": "The readable bytes",
       "text": [
-        "This is the first message, locked with AES in {{term:gcm}} mode. At the moment the key went in, the readable blue bytes turned into scrambled amber ones.",
-        "Open the Message bytes panel. The cipher field holds the ciphertext. The {{term:nonce}} is a number used once, and the {{term:tag}} is a seal that catches changes.",
-        "Try it: switch to the eavesdropper view. You will see what a listener sees, which is a nonce, a tag, and noise."
+        "The client sends its first message. The diagram names it TextGcm1. The message is the line \"Pump four is ok.\" four times, which is 64 bytes.",
+        "Look at the Bytes panel under the diagram. Its header says before protection, so these are the readable bytes.",
+        "Each {{term:byte}} shows as two {{term:hex}} digits. The first four bytes are 50 75 6d 70, and they spell Pump. The column on the right shows the same bytes as letters."
+      ],
+      "glossary": ["byte", "hex"],
+      "bind": { "kind": "event", "eventType": "wire.sent", "match": { "actor": "client", "message": "TextGcm1" } },
+      "highlight": ["inspector:toggle=wire-plain"],
+      "unlock": { "mode": "event" }
+    },
+    {
+      "id": "L1-S05",
+      "lesson": 1,
+      "title": "The scrambled bytes",
+      "text": [
+        "AES in {{term:gcm}} mode locks this message. A mode is one way to use AES on a message. GCM scrambles the data and adds a seal.",
+        "Try it: switch to the eavesdropper view. The panel then shows what crosses the wire: 96 bytes, and no readable letters.",
+        "The field list beside the bytes names each part. The numbers 4 + 12 mean that the part starts at byte 4 and is 12 bytes long.",
+        "First come type and length. Next is the {{term:nonce}}, 12 bytes, a number used once. Then come the 64 scrambled bytes. Last is the {{term:tag}}, 16 bytes, a seal that catches changes. The nonce and the tag are not secret. Only the key is."
       ],
       "glossary": ["gcm", "nonce", "tag"],
       "bind": { "kind": "event", "eventType": "wire.sent", "match": { "actor": "client", "message": "TextGcm1" } },
       "highlight": ["inspector:field=cipher", "inspector:field=nonce", "inspector:field=tag"],
       "tryIt": {
-        "id": "L1-S03-T1",
+        "id": "L1-S05-T1",
         "label": "Switch to the eavesdropper view",
         "action": { "type": "set-view", "value": "eavesdropper" },
         "expect": { "type": "view", "value": "eavesdropper" }
       },
-      "unlock": { "mode": "action", "ref": "L1-S03-T1" }
+      "unlock": { "mode": "action", "ref": "L1-S05-T1" }
     },
     {
-      "id": "L1-S04",
+      "id": "L1-S06",
       "lesson": 1,
       "title": "Blocks, chains, and the IV",
       "text": [
-        "AES works on {{term:block}}s of 16 bytes. A long message is cut into blocks, and each block is locked in turn.",
-        "{{term:cbc}} mode chains the blocks. Each block is mixed with the one before it, so a repeated block locks to different bytes.",
-        "The first block has nothing before it, so CBC starts with a random {{term:iv}}. Find the iv field in the Message bytes panel."
+        "AES locks 16 bytes at a time. Each 16-byte piece is a {{term:block}}. A mode is the rule for a message longer than one block.",
+        "{{term:cbc}} stands for cipher block chaining. Each block is mixed with the locked block before it, so two equal blocks lock to different bytes.",
+        "The first block has nothing before it. So CBC starts with a random 16-byte {{term:iv}}, a starting value. Find the iv field in the field list. Like the nonce, the IV is not secret."
       ],
       "glossary": ["block", "cbc", "iv"],
       "bind": { "kind": "event", "eventType": "wire.sent", "match": { "actor": "client", "message": "TextCbc" } },
@@ -64,13 +105,13 @@
       "unlock": { "mode": "event" }
     },
     {
-      "id": "L1-S05",
+      "id": "L1-S07",
       "lesson": 1,
       "title": "ECB locks each block alone",
       "text": [
-        "{{term:ecb}} is the simplest mode. It locks every 16-byte block on its own, with no chain between blocks.",
-        "The trouble is that two equal blocks give two equal locked blocks. In a picture, big patches of one color repeat, so the pattern survives the lock.",
-        "Look at the locked picture in the Picture tab. The outline of the shape still shows through."
+        "{{term:ecb}} stands for electronic codebook. It is the simplest mode. It locks each 16-byte block alone, with no chain.",
+        "The trouble is that two equal blocks give two equal locked blocks. A picture has big patches of one color, so the pattern survives the lock.",
+        "Open the Picture tab under the diagram. Clear picture is the readable data. Locked with ECB is the scrambled bytes, drawn as dots. The outline of the pump still shows."
       ],
       "glossary": ["ecb"],
       "bind": { "kind": "event", "eventType": "wire.sent", "match": { "actor": "client", "message": "PictureEcb" } },
@@ -85,32 +126,32 @@
       "unlock": { "mode": "event" }
     },
     {
-      "id": "L1-S06",
+      "id": "L1-S08",
       "lesson": 1,
       "title": "Count the leak",
       "text": [
-        "The server counted the repeated blocks in the locked picture. The count is a measured number from the trace, and the screen invents nothing.",
-        "A good lock gives a count near zero. ECB gives a large count, and that count is the leak.",
-        "Try it: send the text message in ECB as well. The result says that no check caught it, because the lock itself works and the mode is the weak part."
+        "The server counted the repeated blocks in the locked picture. The line under the picture gives the count. The count is a measured number from the trace, and the screen invents nothing.",
+        "A good mode gives a count near zero. ECB gives a large count, and that count is the leak.",
+        "Try it: send the text message in ECB as well. No check catches it, because the lock itself works. The mode is the weak part."
       ],
       "glossary": [],
       "bind": { "kind": "event", "eventType": "measure.result", "match": { "actor": "server", "message": "PictureEcb" } },
       "highlight": ["diagram:lane=server"],
       "tryIt": {
-        "id": "L1-S06-T1",
+        "id": "L1-S08-T1",
         "label": "Send the text message in ECB",
         "action": { "type": "run-attack", "attackId": "L1-use-ecb" },
         "expect": { "type": "ran" }
       },
-      "unlock": { "mode": "action", "ref": "L1-S06-T1" }
+      "unlock": { "mode": "action", "ref": "L1-S08-T1" }
     },
     {
-      "id": "L1-S07",
+      "id": "L1-S09",
       "lesson": 1,
       "title": "CBC and GCM hide the shape",
       "text": [
-        "Here is the same picture locked with GCM. It looks like noise, and the outline is gone.",
-        "CBC gives the same result. Check the repeat count on each picture: it stays near zero."
+        "Here is the same picture locked with GCM. The locked image looks like noise, and the outline is gone.",
+        "CBC gives the same result. Check the repeat count under each picture: it stays near zero."
       ],
       "glossary": [],
       "bind": { "kind": "event", "eventType": "wire.sent", "match": { "actor": "client", "message": "PictureGcm" } },
@@ -118,19 +159,20 @@
       "unlock": { "mode": "event" }
     },
     {
-      "id": "L1-S08",
+      "id": "L1-S10",
       "lesson": 1,
       "title": "GCM catches edits",
       "text": [
-        "Locking hides data. It leaves the bytes open to edits, so GCM adds a tag that catches edits.",
-        "The server checks the tag before it trusts a message. On the normal run, the check passed.",
+        "Locking hides data. An attacker can still change the locked bytes, so GCM adds a tag that catches edits.",
+        "The server checks the tag before it trusts a message. The box named GCM tag in the diagram shows that the check passed on the normal run.",
+        "The tag shows that someone who holds the shared key made the message. Both sides hold that key, so the tag cannot say which side. A signature can, and lesson 4 shows one.",
         "Try it: flip one bit of the locked text. The tag no longer fits, the check fails, and the server refuses the message."
       ],
       "glossary": [],
       "bind": { "kind": "event", "eventType": "check.result", "match": { "message": "GCM tag" } },
       "highlight": ["check:name=GCM tag"],
       "tryIt": {
-        "id": "L1-S08-T1",
+        "id": "L1-S10-T1",
         "label": "Flip one bit in the GCM text",
         "action": { "type": "run-attack", "attackId": "L1-flip-gcm" },
         "expect": { "type": "check", "name": "GCM tag", "result": "fail" }
@@ -142,22 +184,22 @@
           "source": "NIST SP 800-38D, section 7.2 (authenticated decryption)"
         }
       ],
-      "unlock": { "mode": "action", "ref": "L1-S08-T1" }
+      "unlock": { "mode": "action", "ref": "L1-S10-T1" }
     },
     {
-      "id": "L1-S09",
+      "id": "L1-S11",
       "lesson": 1,
       "title": "A nonce must never repeat",
       "text": [
-        "GCM needs a fresh nonce for every message under one key. A repeat can let an attacker compare two messages and forge new ones.",
-        "Real GCM has no alarm for this mistake. The lab adds a detector so you can see it.",
-        "Try it: send the last message with the first nonce. The detector fails the check."
+        "GCM needs a new nonce for every message under one key. A repeat can let an attacker compare two messages and forge new ones.",
+        "Real GCM has no alarm for this mistake. The lab adds a box named nonce reuse detector so you can see it.",
+        "Try it: send the last message with the first nonce. The tag check still passes. Only the detector fails."
       ],
       "glossary": [],
       "bind": { "kind": "event", "eventType": "check.result", "match": { "message": "nonce reuse detector" } },
       "highlight": ["check:name=nonce reuse detector"],
       "tryIt": {
-        "id": "L1-S09-T1",
+        "id": "L1-S11-T1",
         "label": "Reuse the first nonce",
         "action": { "type": "run-attack", "attackId": "L1-reuse-nonce" },
         "expect": { "type": "check", "name": "nonce reuse detector", "result": "fail" }
@@ -174,10 +216,10 @@
           "source": "NIST SP 800-38D, Appendix A (in most cases the authenticated decryption function cannot detect an IV repetition); docs/ux-design.md, section 8, lesson 1 row (the detector is an engine event)"
         }
       ],
-      "unlock": { "mode": "action", "ref": "L1-S09-T1" }
+      "unlock": { "mode": "action", "ref": "L1-S11-T1" }
     },
     {
-      "id": "L1-S10",
+      "id": "L1-S12",
       "lesson": 1,
       "title": "Some edits slip through",
       "text": [
@@ -189,7 +231,7 @@
       "bind": { "kind": "event", "eventType": "aes.message.received", "match": { "actor": "server", "message": "TextCbc" } },
       "highlight": ["diagram:lane=server"],
       "tryIt": {
-        "id": "L1-S10-T1",
+        "id": "L1-S12-T1",
         "label": "Flip one bit in the CBC text",
         "action": { "type": "run-attack", "attackId": "L1-flip-cbc" },
         "expect": { "type": "ran" }
@@ -204,12 +246,13 @@
       "unlock": { "mode": "action", "ref": "L1-S10-T1" }
     },
     {
-      "id": "L1-S11",
+      "id": "L1-S13",
       "lesson": 1,
       "title": "What to take away",
       "text": [
         "ECB hides the bytes but leaks patterns. CBC hides patterns but lets edits through. GCM hides patterns and catches edits.",
         "Pick a mode that does both jobs, and give each message its own nonce.",
+        "AES is the symmetric lock that carries the data. Lessons 3 and 4 show the asymmetric parts that set up its key.",
         "Built to show the parts. Do not copy."
       ],
       "glossary": [],
