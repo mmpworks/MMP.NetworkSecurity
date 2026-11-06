@@ -542,10 +542,11 @@ Sheet 5.9 lists them, and these three matter most:
 
 | Slice | Builds | Closing check | Owner |
 |---|---|---|---|
-| W0 | This doc. Jared's review. Echo's clauses, from sections 2 to 4, red | Clauses exist and fail with a named code | Richard, Jared, Echo |
-| **W1a** skeleton | `AesKey.Walk.cs`, `Gcm.CounterBlock`, `AesWalks`, the three routes. No UI | FIPS, table, wire, BCL, toggle, and golden clauses pass on both builds. `tools/gate.ps1` green | Richard |
-| **W1b** small section | `walk.ts`, `AesBlockWalk.vue`, `SboxView.vue`, chapter 1 at 128 bits, encrypt and decrypt | e2e: a learner reaches `Pump four is ok.` by Next alone. A clicked cell's lookup equals the next state, both tables. Grid order clause. S-box scan | Nancy |
-| **W1c** | `AesFeedView.vue`, chapter 2 with ECB, CBC, GCM. Key sizes, the flip guard, two tour steps, gloss | e2e on wire match per mode and on the flip. A15, A15a by a reader who did not write it | Nancy, Richard |
+| W0 | This doc and Jared's review. **After Jared passes the head,** Echo writes clauses from sections 2 to 4, red | Jared's pass on a named head. Clauses exist and fail with a named code | Richard, Jared, Echo |
+| **W1a** skeleton | `AesKey.Walk.cs`, `AesWalks.Block`, the tables route and the block route. No UI | FIPS, table, BCL, toggle, and golden clauses pass on both builds. `tools/gate.ps1` green | Richard |
+| **W1b** small section | `walk.ts`, `AesBlockWalk.vue`, `SboxView.vue`, chapter 1 at 128 bits, encrypt and decrypt, the flip guard | e2e: a learner reaches `Pump four is ok.` by Next alone. A clicked cell's lookup equals the next state, both tables. Grid order clause. S-box scan | Nancy |
+| **Stop: show Steve** | Steve steps through chapter 1 in the app and reacts. CBC and modes work starts after this | His reaction goes in `docs/learnings.md`, and later slices read it | Lead |
+| **W1c** | `Gcm.CounterBlock`, `AesWalks.Feed`, the modes route, `AesFeedView.vue`, chapter 2 with ECB, CBC, GCM. Key sizes, two tour steps, gloss | Wire clauses per mode. e2e on wire match and on damage. A15, A15a by a reader who did not write it | Richard, Nancy |
 | W2 | `AesKey.SboxBuild(byte)` and "how the table was built". `flipKeyBit`. One-bit-flip spread count (4 bytes after round 1, 16 after round 2) | FIPS 5.1.1 worked example for `53`. Spread count against Jared's values | Richard, Nancy |
 | W3 | Lesson 3 try-it, lesson 4 bench | Clauses on each check result | Richard, Nancy, Jared on wording |
 | W4 | Lesson 5 record walk and speed bench | Record walk equals the wire. The number's label names the machine | Richard, Nancy |
@@ -625,4 +626,4 @@ If Steve does not follow it after 2 rounds of word changes, stop and re-plan the
 
 ## Disposition
 
-Ready for Jared's review on the crypto wording and sections 2.4, 2.5, 3.5, 3.6, and 5, and for Echo's clauses. Do not start W1a until both are done.
+Ready for Jared's review on the crypto wording and sections 1.1, 2.4, 2.5, 3.5, 3.6, and 5. Echo writes clauses after Jared passes the head. Do not start W1a until both are done.
