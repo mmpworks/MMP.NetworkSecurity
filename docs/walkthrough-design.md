@@ -1,6 +1,6 @@
 # MMP.NetworkSecurity: walkthrough design
 
-Author: Richard. Date: 2026-11-06. Revision 12, adding the order of the AddRoundKey motion. Status: design only, for Jared's check and Echo's clauses. No product code.
+Author: Richard. Date: 2026-11-06. Revision 13, adding the test that decides each word, with its numbers from the engine. Status: design only, for Jared's check and Echo's clauses. No product code.
 
 Sources of facts: FIPS 197, the engine, and Jared's sheet `E:\dev\ns-lesson1-facts.md`. Steve's web pages set depth and teaching order only (section 2.1).
 
@@ -261,6 +261,19 @@ Worked example, the FIPS 197 appendix A key `2b7e1516 28aed2a6 abf71588 09cf4f3c
 
 **AES-256 only:** at `i mod 8 = 4`, the word before passes through SubWord alone. The panel says so when the learner picks 256.
 
+**Each word's panel shows the test that decided it (Steve's item, W1b).** FIPS 197 section 5.2 picks a word's steps by dividing its index by Nk.
+
+| The word | Words on screen, by example |
+|---|---|
+| Has `rotated` | "18 ÷ 6 = 3, no remainder, so w18 rotates. It is rotation 3, so it takes round constant 3: 04." |
+| Has `substituted` and no `rotated` | "12 ÷ 8 leaves 4, so w12 gets the S-box step only. AES-256 adds this rule." |
+| Has no stages, past the key | "19 ÷ 6 leaves 1, so w19 is plain: no rotation." |
+| Part of the key | "w3 is part of the key, so nothing is calculated." |
+
+**A new field: yes, on each `keyWords` row.** The row gains `divisor`, `quotient`, and `remainder`, and the app prints them. They are not layout, which the app can work out from `i`. They are the rule itself, so an app that worked them out would be a second copy of the engine's branch, and the sentence could then disagree with the word it describes.
+
+The app picks the sentence from which stages the row holds, so the sentence cannot name a step the engine did not run. "Round constant 3" prints `quotient`, and "04" prints the first byte of the row's `rcon`. At AES-192, a word with remainder 4 is plain, and its sentence says so: "10 ÷ 6 leaves 4, so w10 is plain: no rotation."
+
 **A new word builds byte by byte.** For byte j of word i:
 
 | Moment | On screen | Value from the reply |
@@ -298,7 +311,7 @@ Panel words, with the word names from `i`:
 | Reduced motion | No phantom. The word lands whole, and the stage rows and the panel words still show |
 | A tap on a built word | Opens its stage rows, with no phantom, because the phantom belongs to the build |
 
-**The reply needs no new field.** `keyWords[]` already has every row by `i`, and each row holds `word`, `previous`, `rotated`, `substituted`, `rcon`, `afterRcon`, and `keyBack`. Grid, column, cell, and byte position come from `i` by layout: `i / 4`, `i % 4`, and `4i + r`. The two words to light are `i - 1` and `i - Nk`, with Nk from the tables route's size table. That is position arithmetic, and the app reads no byte value to do it. A clause holds it: the bytes in the lit cells must equal `previous` and `keyBack`.
+**The reply needs no other new field.** `keyWords[]` already has every row by `i`, and each row holds `word`, `previous`, `rotated`, `substituted`, `rcon`, `afterRcon`, and `keyBack`, beside the 3 numbers of the word test above. Grid, column, cell, and byte position come from `i` by layout: `i / 4`, `i % 4`, and `4i + r`. The two words to light are `i - 1` and `i - Nk`, with Nk from the tables route's size table. That is position arithmetic, and the app reads no byte value to do it. A clause holds it: the bytes in the lit cells must equal `previous` and `keyBack`.
 
 **Rcon row.** `01 02 04 08 10 20 40 80 1b 36`. Each value is the one before it, doubled in the field. Ordinary doubling of `80` gives `100`, which does not fit in a byte. Field doubling gives `1b`. This row is the first place the learner meets the field in real use. The row comes from the tables route, because the app holds no crypto values.
 
@@ -856,6 +869,7 @@ namespace NetSec.Crypto {
   public sealed class GhashWalk { public readonly byte[] Hash, CounterBlock, Mask, Tag; public readonly GhashRow[] Rows; }
   public sealed class AesKeyWord {            // One row of the FIPS 197 appendix A tables. An unused cell is null
     public readonly int Index;
+    public readonly int Divisor, Quotient, Remainder;   // Index / Nk, the test FIPS 197 section 5.2 applies to this word
     public readonly byte[] Previous, Rotated, Substituted, Rcon, AfterRcon, KeyBack, Word;
   }
   public sealed class AesDoubling {          // One field multiply by 2
@@ -1014,7 +1028,7 @@ Replies, trimmed. Every error carries `code`, `message`, `retryable`, and `reque
 {
   "source": "text", "keyBits": 128, "rounds": 10, "keySource": "run",
   "inputHex": "50756d7020666f7572206973206f6b2e",
-  "keyWords": [ { "i": 4, "previous": "...", "rotated": "...", "substituted": "...", "rcon": "...", "afterRcon": "...", "keyBack": "...", "word": "..." } ],
+  "keyWords": [ { "i": 4, "divisor": 4, "quotient": 1, "remainder": 0, "previous": "...", "rotated": "...", "substituted": "...", "rcon": "...", "afterRcon": "...", "keyBack": "...", "word": "..." } ],
   "forward": { "input": "...", "output": "...", "steps": [ { "kind": "AddRoundKey", "round": 0, "state": "...", "roundKey": "..." },
                                                  { "kind": "MixColumns", "round": 1, "state": "...", "terms": [ { "result": "04", "running": ["b3", "69", "34", "04"], "parts": [ { "factor": 2, "input": "d4", "doublings": [ { "from": "d4", "shifted": "1a8", "reduced": true, "to": "b3" } ], "picks": ["b3"], "sums": ["b3"], "reduced": true, "result": "b3" } ] } ] } ] },
   "inverse": { "input": "...", "output": "...", "steps": [] },
@@ -1264,6 +1278,7 @@ If Steve does not follow it after 2 rounds of word changes, stop and re-plan the
 | Spec link | A new window is always denied, and so is `will-navigate`. A link opens outside only for `https:` and a listed host. A test URL on another host does not open, and `file://` with a listed host does not open |
 | Expanded table | 11, 13, and 15 grids of 16 cells. The cell at byte position n shows byte n of the expanded key, and its word name is `w(n / 4)`. No cell shows a letter. The key band ends where section 2.2b says, and those cells start filled |
 | Word build | Next adds one word. The lit cells equal that row's `previous` and `keyBack`. A tap on a built word opens its stage rows, and a tap on an unbuilt word does nothing. Each `aes-walk-*` key schedule cell is gone with Show keys OFF |
+| Word test | On every row at all three sizes, `divisor` is Nk, and `divisor` x `quotient` + `remainder` equals `i`. `rotated` is set only when `i` is at or past Nk and `remainder` is 0. `substituted` alone is set only at AES-256 with `remainder` 4. W1a holds this part. In W1b, the panel prints those numbers in the sentence that matches the row's stages, for a RotWord word, a SubWord-only word, a plain word, and a key word. At AES-192, a word with remainder 4 reads plain |
 | Key words | FIPS appendix A rows, for all three sizes. The Rcon row equals `01 02 04 08 10 20 40 80 1b 36`, and the used counts are 10, 8, 7 |
 | AddRoundKey order | With motion on, the key grid equals the step's `roundKey` while the block still equals the state before the step, then the block changes. An AddRoundKey that runs from a Start view shows no fill, on encrypt and on decrypt. Every other one fills first, including one reached by a round chip, and decrypt's AddRoundKey 0. Pause holds the fill and the slide, by the Pause holds clause |
 | End frames | Every animated step lands on the engine state for that step, for all three key sizes |
