@@ -2,7 +2,7 @@
 
 Author: Echo. Date: 2026-11-05. Branch: `test/acceptance-suite`. Rule: D11. Builders never write under `acceptance/`.
 
-Conclusion: the suite has **M = 377 product clauses** (`clauses.json`): the 208 of the first release, 54 for A17 (sections 8 and 12) and 73 for the AES walk, A19 (sections 10 and 11). With no product built it reports **0 of 377 PASS, 0 FAIL, 377 NOT RUN**.
+Conclusion: the suite has **M = 378 product clauses** (`clauses.json`): the 208 of the first release, 54 for A17 (sections 8 and 12) and 73 for the AES walk, A19 (sections 10 and 11). With no product built it reports **0 of 378 PASS, 0 FAIL, 378 NOT RUN**.
 Its 31 checks on itself all PASS. The suite is written against `docs/program-design.md` section 11, `docs/modes-design.md`, and the merged referees in `acceptance/referees`. Every group compiles against the contract stub on net10.0 and on net48 with the CF build of MMP.AsyncProxy.
 Disposition: merge this branch. Send the open items in section 7 and in `CONTRACT.md` section 5.7 to Richard and Jared.
 
@@ -262,3 +262,9 @@ Disposition: merge after section 14.
 Conclusion: `A2.rsa.pkcs1` adds **2 clauses**, one per build, so M is **377**. Source: `docs/conformance-matrix.md` row 29, by Steve's ruling that a library comparison is the evidence where the library can check a primitive. Before this, RSA had OpenSSL-made vectors, live TLS 1.1, and a library check of its key format only.
 
 Disposition: merge after section 15.
+
+## 17. A19: the practice key at 192 and 256 bits (added 2026-11-06)
+
+Conclusion: `A19.host.practice-key-192-256` adds **1 clause**, so M is **378**. Source: `docs/walkthrough-design.md`, the "Which key runs?" row. It runs when the Host has the walk route (#178).
+
+Disposition: merge after section 16.
