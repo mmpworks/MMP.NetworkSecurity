@@ -223,7 +223,7 @@ Steve's ask: define a finite field. The panel states the definition and shows on
 **Definition on screen, in this order:**
 
 1. "A field is a set of values with add, subtract, multiply and divide, where every answer stays in the set. Only divide by zero is not allowed. They follow the usual rules of arithmetic."
-2. "A finite field has a fixed number of values. The field that AES uses has 256 values, one for each byte. Its name is GF(2^8)."
+2. "A finite field has a fixed number of values. Another name for it is a Galois field. The field that AES uses has 256 values, one for each byte. Its name is GF(2^8)."
 3. "Add is XOR."
 4. "Multiply treats each byte as a polynomial, multiplies without carries, and reduces the result by `x^8 + x^4 + x^3 + x + 1` (`11b` in hex). So the answer always fits in a byte."
 5. "Every value except zero has an inverse. So multiplying by any nonzero value can be undone."
@@ -328,7 +328,7 @@ What each tab states, from sheet 5.12:
 | CBC, 5 blocks with padding | Sender 5 | Receiver 5 |
 | GCM, 4 blocks and no padding | Each side 6: 4 counters, 1 hash key, 1 tag mask | 0 |
 
-`Gcm.cs` never calls `DecryptBlock` (sheet 5.2). The panel walks the 4 counters, and it names the other 2 calls. GHASH makes the tag, and it is out of scope for the walk. The panel shows the `GCM tag` result from the run's own `check.result` event.
+`Gcm.cs` never calls `DecryptBlock` (sheet 5.2). The panel walks the 4 counters, and it names the other 2 calls. GHASH makes the tag, and it is out of scope for the walk, pending Steve's ruling. The GCM panel says: "The G in GCM means Galois. GHASH makes the tag in a much larger Galois field, GF(2^128)." The panel shows the `GCM tag` result from the run's own `check.result` event.
 
 **Live checks from the run.**
 
