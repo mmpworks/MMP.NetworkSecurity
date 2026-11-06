@@ -253,6 +253,6 @@ Disposition: merge, then Richard and Nancy write the words. The refusal clauses 
 
 ## 15. A18: the refusal pins (added 2026-11-06)
 
-Conclusion: the refusal clauses add **30 clauses**, so M is **373**. All pass on main's engines. Each pairs with a line of section 14, so a change to the engine shows which line needs a change. Each runs a control with the same peer. No self-check covers them, because they need real engines and real peers.
+Conclusion: the refusal clauses add **30 clauses**, so M is **373**. All pass on main's engines. Each pairs with a line of section 14, so a change to the engine shows which line needs a change. 15 of the 17 clause names run a control first. The other 2 (`tls11.no-resumption`, `tls11.no-client-certificate-request`) read one session that must complete. No self-check covers them, because they need real engines and real peers.
 
 Disposition: merge after section 14.
