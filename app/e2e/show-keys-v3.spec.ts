@@ -184,6 +184,49 @@ test('a failed read after OFF leaves no key bytes, and it claims no match', asyn
   await expect.poll(async () => /[0-9a-f]{16,}/i.test(await rowText(page))).toBe(true)
 })
 
+// Holds the reply of the first PUT only, so the Host takes both flips in order and the first flip's reply lands last.
+async function holdFirstPutReply(page: Page) {
+  let held = false
+  await page.route(/\/api\/security\/show-keys$/, async route => {
+    if (route.request().method() !== 'PUT' || held) { await route.continue(); return }
+    held = true
+    const reply = await route.fetch()
+    await page.waitForTimeout(1500)
+    await route.fulfill({ response: reply })
+  })
+}
+
+test('OFF then ON, with the OFF reply landing last: the screen follows the Host, which is ON', async ({ page }) => {
+  await freePlay(page, 1)
+  await holdFirstPutReply(page)
+  const sw = page.getByTestId('show-keys-switch')
+  await sw.click()
+  await expect.poll(hostOn).toBe(false)
+  await sw.click()
+  await expect.poll(hostOn).toBe(true)
+  await page.waitForTimeout(2500)
+  await expect(sw).toBeChecked()
+  await expect(page.getByTestId('show-keys-off-banner')).toHaveCount(0)
+  await expect.poll(() => bytesShown(page)).toBe(true)
+})
+
+test('ON then OFF, with the ON reply landing last: the screen follows the Host, which is OFF', async ({ page }) => {
+  await freePlay(page, 1)
+  const sw = page.getByTestId('show-keys-switch')
+  await sw.click()
+  await expect.poll(hostOn).toBe(false)
+  await expect(sw).not.toBeChecked()
+  await holdFirstPutReply(page)
+  await sw.click()
+  await expect.poll(hostOn).toBe(true)
+  await sw.click()
+  await expect.poll(hostOn).toBe(false)
+  await page.waitForTimeout(2500)
+  await expect(sw).not.toBeChecked()
+  await expect(page.getByTestId('show-keys-off-banner')).toBeVisible()
+  await noBytesOnScreen(page)
+})
+
 test('a flip during a run loses no event', async ({ page }) => {
   await open(page, host)
   await page.route(eventsRoute, async route => {
