@@ -221,7 +221,7 @@ In lesson 1, a free flip on a non-wire event changes nothing. `Interpreter.Apply
 | GCM cipher block | That row `differs`, `damage: cipher` | None. The tag failed, and the engine returns no bytes | The failed tag |
 | GCM nonce | All `match`, `damage: nonce` | None | The failed tag. The lock column still shows the nonce the sender used |
 | GCM tag | All `match`, `damage: tag` | None | The cipher blocks arrived intact, and the tag failed |
-| Frame header, type or length | All `match`, `damage: type` or `length` | None | The receiver could not read this frame as sent. The run's own events show what happened |
+| Frame header, type or length | All `match`, `damage: type` or `length` | None | The receiver read this frame as something else. Most flips end in a named failure, and the panel shows it from the run's own events. A type flip can land on another message the state allows, and then no check fires. On `TextCbc`, xor 10 makes it `TextEcb`, and the run completes with no error |
 
 **The chapter ends with "Mistakes people make".** Each row points at an attack the lesson already runs, so this adds no route and no engine code. Steve's links show these habits in real writing. The on-screen words name the habit and never a person or a page, and Jared checks them first.
 
@@ -404,7 +404,7 @@ Call path for the two session routes:
 3. `session.Lesson != 1` returns 409 `WALK_NOT_BUILT`.
 4. `AesWalkFacts.Read(session.After(0), session.TamperPlan)` reads the facts. It filters on `StoredEvent.Type`, `Message`, and `StreamId`, and parses only those shown lines:
    - `aes.key`, and the `plain` of each `aes.message.sent`.
-   - The `wire` of the client's `wire.sent`, which is the received frame. Calling `TamperPlan.Apply` with the message's `StreamId` and `StreamSeq` gives the sender's frame.
+   - The `wire` of the client's `wire.sent`, which is the received frame. Calling `TamperPlan.Apply` with the `StreamId` and `StreamSeq` of the client's `aes.message.sent` gives the sender's frame. It must be that event's address and not the `wire.sent` event's own, because a free flip plan is addressed by stream. `EnginePump.cs:342` and `SessionManager.PlanFor` use the same address.
    - The tag result. All three GCM checks have the message `GCM tag`, so the filter also reads `step`: `aes.s.text-gcm-1` belongs to `TextGcm1`. No such event gives `NotRun`.
 5. `AesWalks.Block` or `AesWalks.Feed` runs. For a practice key, the Host draws it first.
 6. `AesWalkJson.Write` writes the reply, with `Cache-Control: no-store`. English stays out of Core.
@@ -520,7 +520,7 @@ The 186 encrypt values and 186 inverse values come from FIPS 197 (2001 edition),
 Limits of the spike:
 
 1. The walk file ran on the desktop CLR, on the copy of `AesKey`. It compiled for CF and did not run on it.
-2. The feed logic in the spike is throwaway code, and `AesWalks` does not exist yet. No route, no app panel, no Show keys path, and no sender-frame undo ran.
+2. The feed logic in the spike is throwaway code, and `AesWalks` does not exist yet. No route, no app panel, and no Show keys path ran. The sender-frame undo did not run in this spike. Jared ran it in his own scratch folder: `TamperPlan.Apply` gave back the control run's sender frame on 12 of 12 flips (type, length, nonce, cipher, tag, IV), addressed by message and by stream.
 3. Same-seed runs give the same key, so the `TextEcb` check compares two runs.
 
 **Which FIPS edition.** FIPS 197-upd1 (2023) is the source of record for the algorithm: section 3.4 for the state, 5.1 for the cipher, 5.2 for key expansion, 5.3 for the inverse. Its appendix B gives the AES-128 cipher example, and its appendix A gives the key tables. Upd1 removed the appendix C round values and points to NIST's example site. Its appendix D says the technical specifications did not change. So the inverse round values come from the 2001 edition, the same source `acceptance/vectors/SOURCES.md` already names. Jared should confirm this choice.
@@ -638,7 +638,7 @@ If Steve does not follow it after 2 rounds of word changes, stop and re-plan the
 | S-box view | A clicked cell's row, column, and table value equal the next state's cell, on SubBytes and InvSubBytes |
 | Real run | Key and block from a live session's trace, with the BCL as referee on the walk's output |
 | Modes | `match` on every row: `TextGcm1` 4, `TextCbc` 5, `PictureEcb` capped rows, `TextEcb` 5 on the fork. `unlockPass` is inverse for ECB and CBC, forward for GCM. Call counts per section 2.4 |
-| Damage | `L1-flip-cbc` gives `differs` and the 16, 1, 0, 0, 0 pattern. `L1-flip-gcm` gives `differs`, a failed tag, and no unlock bytes. Free flips: CBC IV gives `damage: iv` with block 1's bit flipped. GCM nonce and tag give all `match`, the named `damage`, and a failed tag. A header flip gives no unlock. The lock column shows the sender's starter in each case |
+| Damage | `L1-flip-cbc` gives `differs` and the 16, 1, 0, 0, 0 pattern. `L1-flip-gcm` gives `differs`, a failed tag, and no unlock bytes. Free flips: CBC IV gives `damage: iv` with block 1's bit flipped. GCM nonce and tag give all `match`, the named `damage`, and a failed tag. A header flip gives no unlock. A `TextCbc` type flip with xor 10 gives `damage: type`, and the run completes with no failed check. The lock column shows the sender's starter in each case. A free wire flip, addressed by stream, recovers the sender's frame. A failed run can cut the client's burst short, so a clause on a later message in a flip fork allows a row result or `WALK_MESSAGE_NOT_SENT` |
 | Tag per message | A flip on `PictureGcm` leaves `TextGcm1`'s tag as `passed` |
 | Bug versus tamper | A session with no plan never reads `differs`. A unit test gives `Feed` a wrong sender frame, and it throws `AES_WALK_DIVERGED`. A free flip on a non-wire event reads all `match` |
 | Box rows | `/block` answers for every row of `/modes`, including the padding row, and gives 400 one past it |
