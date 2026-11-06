@@ -168,6 +168,20 @@ async function resync() {
   } catch { /* the live feed keeps going */ }
 }
 
+
+/** The Host redacts at its boundary, so after a flip of Show keys every open session is read again and its copy replaced, never merged. A replay keeps its file. */
+export async function replaceOpenSessions() {
+  for (const s of ui.sessions.filter(x => !x.replay)) {
+    try {
+      const body = await hostGet(addr, `/api/sessions/${s.id}/events`)
+      const rows: any[] = Array.isArray(body) ? body : body?.events ?? []
+      s.events = rows.map(normalizeEvent).sort((a, b) => a.seq - b.seq)
+    } catch { /* the session stays as it is */ }
+  }
+}
+
+let showKeysHandler: ((on: boolean) => void) | null = null
+export function onShowKeys(h: (on: boolean) => void) { showKeysHandler = h }
 // The Host sends every frame to every open socket. This client owns only the sessions it asked for: a session.started whose
 // requestId it sent. A trace or finished frame can arrive ahead of its session.started, so frames of unknown sessions wait by id.
 const myRequests = new Set<string>()
@@ -195,6 +209,10 @@ function onFrame(f: any) {
       if (!mySessions.has(String(f.sessionId))) return hold(f)
       return f.type === 'trace' ? onTrace(f) : onFinished(f)
     case 'session.forked': return mySessions.has(String(f.sessionId)) || mySessions.has(String(f.parentId)) ? onForked(f) : undefined
+    case 'security.show-keys':
+      showKeysHandler?.(f.on !== false)
+      void replaceOpenSessions()
+      return
     case 'error':
       if (f.requestId && !myRequests.has(String(f.requestId))) return
       ui.error = normalizeError(f)

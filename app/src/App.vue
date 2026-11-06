@@ -29,7 +29,7 @@ import VaultPage from './components/VaultPage.vue'
 import { closeVault, vault } from './vault'
 import ShowKeysSwitch from './components/ShowKeysSwitch.vue'
 import WizardSheet from './components/WizardSheet.vue'
-import { badgeCount, closeSecurity, keysChip, loadSecurity, openSecurity, sec } from './security'
+import { badgeCount, closeSecurity, keysChip, loadSecurity, openSecurity, sec, words } from './security'
 
 const lightbox = ref(false)
 const mineCountColor = computed(() => (keysChip.value === 'Keys: built-in' ? undefined : 'primary'))
@@ -182,6 +182,7 @@ const shortcuts: [string, string][] = [
         </v-alert>
 
         <NeedsBanner />
+        <v-alert v-if="!sec.showKeys" type="info" class="banner" data-testid="show-keys-off-banner">{{ words('wizard.keys.off-banner') }}</v-alert>
         <SecurityPage v-if="sec.open && !vault.open" />
         <VaultPage v-if="sec.open && vault.open" />
         <WizardSheet v-if="sec.run" />

@@ -102,7 +102,6 @@
   "wizard.says.no-outside-judge.dukpt.pad": "No outside tool can judge this. Our code matches the published vectors. Your key is saved.",
   "wizard.error.WIZARD_PART_NOT_BUILT": "This set is not built yet. Use built-in keys for these lessons for now.",
   "wizard.error.WIZARD_CHECK_NOT_DONE": "Run the check first, then continue.",
-  "wizard.keys.hiding-later": "Hiding keys arrives in a later release. For now the course shows every key.",
   "wizard.vault.title": "Practice vault",
   "wizard.vault.statement": "Practice vault. Not an HSM. Not FIPS validated. Non-export is a rule in our code. Anyone can open the SQLite file and read the wrapped key.",
   "wizard.vault.hidden-key": "The course refuses to show it. A real HSM would refuse too. These files could still open it here.",
@@ -121,5 +120,9 @@
   "wizard.error.VAULT_AUDIT_FAILED": "The vault could not write down this request, so it refused it. Try again.",
   "wizard.error.VAULT_OP_REFUSED": "This key may not do that. A key's use is fixed when it is made.",
   "wizard.vault.sign.control": "Second run, as a control. The course changes one bit of the message. OpenSSL must now refuse the same signature.",
-  "wizard.error.VAULT_MASTER_KEY_BAD": "The vault's master key file is damaged, so the vault cannot open any key. Restore the file, or make the keys again."
+  "wizard.error.VAULT_MASTER_KEY_BAD": "The vault's master key file is damaged, so the vault cannot open any key. Restore the file, or make the keys again.",
+  "wizard.keys.off-banner": "Show keys is off, so you see a short fingerprint of each key. Two keys with the same fingerprint are the same key.",
+  "wizard.keys.in-use.title": "Keys in use",
+  "wizard.keys.in-use.note": "The keys this lesson took from your key store when it started.",
+  "wizard.keys.replay-off": "This file was saved with Show keys off, so its bytes are gone. You see fingerprints."
 }

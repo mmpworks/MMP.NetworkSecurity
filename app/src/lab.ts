@@ -87,7 +87,7 @@ export function chainOf(events: readonly TraceEvent[], upTo: number): ChainView 
 
 // ---- lessons 5 and 6: key ladders ----
 
-export interface Rung { key: string; holder: string; name: string; state: 'held' | 'erased'; derivedFrom: string[]; seq: number }
+export interface Rung { key: string; holder: string; name: string; state: 'held' | 'erased'; derivedFrom: string[]; seq: number; fingerprint: string }
 
 const TLS_LADDER = /^(tls11\.[a-z0-9_.]+|ssh\.[a-zA-Z0-9_.]+|early_secret|handshake_secret|master_secret|[cs]_hs_traffic|[cs]_ap_traffic|exp_master|x25519_shared|mlkem_shared|hybrid_shared)$/
 
@@ -102,9 +102,9 @@ export function ladderRungs(events: readonly TraceEvent[], upTo: number): Rung[]
     if (e.type === 'dukpt.key.erased') {
       const key = `${e.actor}.${e.message}`
       const prior = rungs.get(key)
-      rungs.set(key, { key, holder: e.actor, name: e.message, state: 'erased', derivedFrom: prior?.derivedFrom ?? [], seq: prior?.seq ?? e.seq })
+      rungs.set(key, { key, holder: e.actor, name: e.message, state: 'erased', derivedFrom: prior?.derivedFrom ?? [], seq: prior?.seq ?? e.seq, fingerprint: prior?.fingerprint ?? '' })
     } else if (isLadderEvent(e)) {
-      for (const s of e.secrets) { const key = `${s.holder}.${s.name}`; if (!rungs.has(key)) rungs.set(key, { key, holder: s.holder, name: s.name, state: 'held', derivedFrom: s.derivedFrom, seq: e.seq }) }
+      for (const s of e.secrets) { const key = `${s.holder}.${s.name}`; if (!rungs.has(key)) rungs.set(key, { key, holder: s.holder, name: s.name, state: 'held', derivedFrom: s.derivedFrom, seq: e.seq, fingerprint: s.hex ? '' : s.fingerprint }) }
     }
   }
   return [...rungs.values()]

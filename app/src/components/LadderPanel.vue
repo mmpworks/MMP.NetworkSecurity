@@ -19,6 +19,7 @@ const short = (s: string) => s.replace(/^dukpt\./, '')
       <div v-for="(r, i) in rungs" :key="r.key" class="rung" :class="r.state" :data-testid="`key-rung-${i}`" :data-name="r.name">
         <span class="rname">{{ r.holder }} · {{ short(r.name) }}</span>
         <span v-for="d in r.derivedFrom" :key="d" class="chip-from">from {{ d }}</span>
+        <code v-if="r.fingerprint" class="muted" :data-testid="`key-rung-fingerprint-${i}`">{{ r.fingerprint }}</code>
         <span v-if="r.state === 'erased'" class="erased-tag" :data-testid="`key-rung-erased-${i}`">erased from the {{ r.holder }} memory</span>
       </div>
     </template>
