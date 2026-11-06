@@ -36,6 +36,18 @@ namespace NetSec.Trace
         public string Name;
         public byte[] Bytes;
         public string[] DerivedFrom;
+        /// <summary>Set only on a hidden secret, with Bytes null: "fp:" and 16 hex, the byte count, and why it is hidden ("toggle" or "non-exportable").</summary>
+        public string Fingerprint;
+        public int Length;
+        public string Hidden;
+    }
+
+    /// <summary>The key a lab runs on, named on the Host's key.in-use event: its security type, version (0 for a built-in key) and provider.</summary>
+    public sealed class TraceKeyUse
+    {
+        public string TypeId;
+        public int Version;
+        public string Provider;
     }
 
     public sealed class TraceCheck
@@ -55,6 +67,7 @@ namespace NetSec.Trace
         public TraceField[] Fields;
         public TraceSecret[] Secrets;
         public TraceCheck Check;
+        public TraceKeyUse KeyUse;
     }
 
     /// <summary>Immutable. Only an event that went over a socket carries Wire, so the Wire fields joined by direction equal the bytes a tap sees.</summary>
@@ -73,6 +86,7 @@ namespace NetSec.Trace
         public readonly TraceField[] Fields;
         public readonly TraceSecret[] Secrets;
         public readonly TraceCheck Check;
+        public readonly TraceKeyUse KeyUse;
         public readonly string WaitingFor;
         public readonly long AtMicros;
 
@@ -85,22 +99,25 @@ namespace NetSec.Trace
             SessionId = stream.SessionId; TraceId = stream.TraceId; Hop = stream.Hop; Actor = stream.Actor;
             From = draft.From; To = draft.To; Type = draft.Type; Message = draft.Message; Step = draft.Step; Detail = draft.Detail;
             Wire = Copy(draft.Wire); Plain = Copy(draft.Plain);
-            Fields = draft.Fields; Secrets = draft.Secrets; Check = draft.Check;
+            Fields = draft.Fields; Secrets = draft.Secrets; Check = draft.Check; KeyUse = draft.KeyUse;
             WaitingFor = draft.WaitingFor;
             AtMicros = atMicros;
         }
 
-        TraceEvent(TraceEvent e, string traceId)
+        TraceEvent(TraceEvent e, string traceId, TraceSecret[] secrets)
         {
             Schema = e.Schema; EventId = e.EventId; StreamId = e.StreamId; StreamSeq = e.StreamSeq;
             SessionId = e.SessionId; TraceId = traceId; Hop = e.Hop; Actor = e.Actor;
             From = e.From; To = e.To; Type = e.Type; Message = e.Message; Step = e.Step; Detail = e.Detail;
-            Wire = e.Wire; Plain = e.Plain; Fields = e.Fields; Secrets = e.Secrets; Check = e.Check;
+            Wire = e.Wire; Plain = e.Plain; Fields = e.Fields; Secrets = secrets; Check = e.Check; KeyUse = e.KeyUse;
             WaitingFor = e.WaitingFor; AtMicros = e.AtMicros;
         }
 
         /// <summary>The same event under a trace id its process learned after it stamped the event.</summary>
-        public TraceEvent WithTraceId(string traceId) { return new TraceEvent(this, traceId); }
+        public TraceEvent WithTraceId(string traceId) { return new TraceEvent(this, traceId, Secrets); }
+
+        /// <summary>The same event with other secrets. Everything else, the event id and the stream place too, stays.</summary>
+        internal TraceEvent WithSecrets(TraceSecret[] secrets) { return new TraceEvent(this, TraceId, secrets); }
 
         static byte[] Copy(byte[] bytes)
         {
@@ -172,6 +189,14 @@ namespace NetSec.Trace
     }
 
     /// <summary>Writes the field names of ux-design.md section 0. One writer for both builds. An absent field is left out.</summary>
+    /// <summary>The Show keys boundary (modes-design.md section 6.4). Pure: same input, same output. Rules, engines and labs never call it.</summary>
+    public static class TraceRedaction
+    {
+        public static string Fingerprint(byte[] secret) { return null; }
+
+        public static TraceEvent Hide(TraceEvent e) { return e; }
+    }
+
     public static class TraceJson
     {
         public static string ToLine(TraceEvent e)

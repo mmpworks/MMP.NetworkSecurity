@@ -1,0 +1,184 @@
+#nullable enable
+using System;
+using System.Collections.Generic;
+using System.IO;
+using System.Linq;
+using System.Net.WebSockets;
+using System.Text;
+using System.Text.Json;
+using System.Threading;
+using System.Threading.Tasks;
+using Xunit;
+
+namespace NetSec.Host.Tests;
+
+/// <summary>The Show keys toggle at the Host's trace boundary (modes-design.md section 6): frames, /events, files, the key log, save, replay, key.in-use.</summary>
+public sealed class ShowKeysLiveTests
+{
+    /// <summary>A socket that sends commands and waits for one frame by type.</summary>
+    sealed class Ws(SecurityLiveTests.Host host) : IDisposable
+    {
+        readonly ClientWebSocket _ws = new();
+        readonly CancellationTokenSource _limit = new(TimeSpan.FromSeconds(30));
+        public readonly List<JsonElement> Frames = [];
+
+        public async Task Open() => await _ws.ConnectAsync(new Uri($"ws://127.0.0.1:{host.Port}/ws?token={host.Token}"), _limit.Token);
+
+        public Task Send(object command) => _ws.SendAsync(Encoding.UTF8.GetBytes(JsonSerializer.Serialize(command)), WebSocketMessageType.Text, true, _limit.Token);
+
+        public async Task<JsonElement> Until(string type)
+        {
+            while (true)
+            {
+                byte[] buffer = new byte[1 << 16];
+                using MemoryStream all = new();
+                WebSocketReceiveResult r;
+                do { r = await _ws.ReceiveAsync(buffer, _limit.Token); all.Write(buffer, 0, r.Count); } while (!r.EndOfMessage);
+                JsonElement frame = JsonDocument.Parse(all.ToArray()).RootElement.Clone();
+                Frames.Add(frame);
+                if (frame.GetProperty("type").GetString() == type) return frame;
+            }
+        }
+
+        public void Dispose() { _ws.Dispose(); _limit.Dispose(); }
+    }
+
+    static IEnumerable<JsonElement> SecretsIn(JsonElement node)
+    {
+        if (node.ValueKind == JsonValueKind.Object)
+        {
+            foreach (JsonProperty p in node.EnumerateObject())
+            {
+                if (p.Name == "secrets" && p.Value.ValueKind == JsonValueKind.Array) foreach (JsonElement s in p.Value.EnumerateArray()) yield return s;
+                foreach (JsonElement s in SecretsIn(p.Value)) yield return s;
+            }
+        }
+        else if (node.ValueKind == JsonValueKind.Array) foreach (JsonElement v in node.EnumerateArray()) foreach (JsonElement s in SecretsIn(v)) yield return s;
+    }
+
+    static List<JsonElement> SecretsOfText(string text) =>
+        text.Split('\n').Select(l => l.Trim()).Where(l => l.StartsWith('{') || l.StartsWith('['))
+            .SelectMany(l => SecretsIn(JsonDocument.Parse(l).RootElement.Clone())).ToList();
+
+    static int WithHex(IEnumerable<JsonElement> secrets) => secrets.Count(s => s.TryGetProperty("hex", out _));
+
+    static Task SetShowKeys(SecurityLiveTests.Host host, bool on) => host.Put("/api/security/show-keys", "{\"on\":" + (on ? "true" : "false") + "}");
+
+    static string StartedId(List<JsonElement> frames) => frames.First(f => f.GetProperty("type").GetString() == "session.started").GetProperty("sessionId").GetString()!;
+    static string StartedFile(List<JsonElement> frames) => frames.First(f => f.GetProperty("type").GetString() == "session.started").GetProperty("sessionFile").GetString()!;
+
+    [Fact]
+    public async Task An_off_session_holds_no_hex_in_frames_events_or_its_file()
+    {
+        using SecurityLiveTests.Host host = new();
+        await SetShowKeys(host, false);
+        List<JsonElement> frames = await host.Session(1);
+        List<JsonElement> secrets = frames.SelectMany(SecretsIn).ToList();
+        Assert.NotEmpty(secrets);
+        Assert.Equal(0, WithHex(secrets));
+        Assert.All(secrets, s =>
+        {
+            Assert.StartsWith("fp:", s.GetProperty("fingerprint").GetString());
+            Assert.True(s.GetProperty("length").GetInt32() > 0);
+            Assert.False(string.IsNullOrEmpty(s.GetProperty("hidden").GetString()));
+        });
+        Assert.Equal(0, WithHex(SecretsOfText((await host.Get("/api/sessions/" + StartedId(frames) + "/events")).Body)));
+        Assert.Equal(0, WithHex(SecretsOfText(File.ReadAllText(StartedFile(frames)))));
+    }
+
+    [Fact]
+    public async Task A_flip_redacts_an_open_session_and_the_flip_back_restores_it()
+    {
+        using SecurityLiveTests.Host host = new();
+        List<JsonElement> frames = await host.Session(1);
+        string events = "/api/sessions/" + StartedId(frames) + "/events";
+        int shown = WithHex(SecretsOfText((await host.Get(events)).Body));
+        Assert.True(shown > 0, "control: an ON session shows no hex");
+        await SetShowKeys(host, false);
+        Assert.Equal(0, WithHex(SecretsOfText((await host.Get(events)).Body)));
+        await SetShowKeys(host, true);
+        Assert.Equal(shown, WithHex(SecretsOfText((await host.Get(events)).Body)));
+    }
+
+    [Fact]
+    public async Task The_flip_is_broadcast_to_the_socket()
+    {
+        using SecurityLiveTests.Host host = new();
+        using Ws ws = new(host);
+        await ws.Open();
+        Task<JsonElement> seen = ws.Until("security.show-keys");
+        await SetShowKeys(host, false);
+        JsonElement frame = await seen;
+        Assert.False(frame.GetProperty("on").GetBoolean());
+    }
+
+    [Fact]
+    public async Task The_key_log_is_refused_while_off()
+    {
+        using SecurityLiveTests.Host host = new();
+        string id = StartedId(await host.Session(1));
+        Assert.Equal(200, (await host.Get("/api/sessions/" + id + "/keylog")).Status);
+        await SetShowKeys(host, false);
+        (int status, string body) = await host.Get("/api/sessions/" + id + "/keylog");
+        Assert.Equal(409, status);
+        Assert.Equal("KEYS_HIDDEN", JsonDocument.Parse(body).RootElement.GetProperty("code").GetString());
+    }
+
+    [Fact]
+    public async Task Key_in_use_names_the_type_version_and_provider_on_the_keys_stream()
+    {
+        using SecurityLiveTests.Host host = new();
+        await host.MakeFlow("my-login");
+        string keyHex = JsonDocument.Parse((await host.Get("/api/security/types/token.issuer/key")).Body).RootElement.GetProperty("hex").GetString()!;
+        List<JsonElement> frames = await host.Session(10);
+        string id = StartedId(frames);
+        List<JsonElement> uses = frames.Where(f => f.GetProperty("type").GetString() == "trace").Select(f => f.GetProperty("event"))
+            .Where(e => e.GetProperty("type").GetString() == "key.in-use").ToList();
+        JsonElement issuer = uses.Single(e => e.GetProperty("typeId").GetString() == "token.issuer");
+        Assert.Equal(id + "/keys", issuer.GetProperty("streamId").GetString());
+        Assert.Equal("vault", issuer.GetProperty("provider").GetString());
+        Assert.True(issuer.GetProperty("version").GetInt32() >= 1);
+        JsonElement secret = issuer.GetProperty("secrets").EnumerateArray().Single();
+        Assert.Equal("token.issuer", secret.GetProperty("name").GetString());
+        Assert.Equal(keyHex, secret.GetProperty("hex").GetString(), ignoreCase: true);
+        // A built-in key the lab reads names provider builtin, version 0, and shows its bytes.
+        JsonElement root = uses.Single(e => e.GetProperty("typeId").GetString() == "pki.root-ca");
+        Assert.Equal("builtin", root.GetProperty("provider").GetString());
+        Assert.Equal(0, root.GetProperty("version").GetInt32());
+        Assert.Equal(1, WithHex(root.GetProperty("secrets").EnumerateArray()));
+        // Every type lesson 10 reads has its event.
+        Assert.Equal(6, uses.Count);
+    }
+
+    [Fact]
+    public async Task Save_while_off_returns_a_redacted_copy_and_replay_names_it()
+    {
+        using SecurityLiveTests.Host host = new();
+        List<JsonElement> frames = await host.Session(1);
+        string id = StartedId(frames), file = StartedFile(frames);
+        Assert.True(WithHex(SecretsOfText(File.ReadAllText(file))) > 0, "control: the ON file holds no hex");
+        await SetShowKeys(host, false);
+
+        using Ws ws = new(host);
+        await ws.Open();
+        await ws.Send(new { type = "session.save", requestId = "s", sessionId = id });
+        string copy = (await ws.Until("session.saved")).GetProperty("sessionFile").GetString()!;
+        Assert.NotEqual(file, copy);
+        Assert.Equal(0, WithHex(SecretsOfText(File.ReadAllText(copy))));
+        Assert.True(WithHex(SecretsOfText(File.ReadAllText(file))) > 0, "OFF must not rewrite a file written ON");
+
+        // Saved ON, replayed OFF: fingerprints reach the frames.
+        await ws.Send(new { type = "session.load", requestId = "l1", file = Path.GetFileName(file) });
+        await ws.Until("session.finished");
+        Assert.Equal(0, WithHex(ws.Frames.SelectMany(SecretsIn)));
+
+        // Saved OFF, replayed ON: still fingerprints, and session.started says the file hides its keys.
+        await SetShowKeys(host, true);
+        ws.Frames.Clear();
+        await ws.Send(new { type = "session.load", requestId = "l2", file = Path.GetFileName(copy) });
+        JsonElement started = await ws.Until("session.started");
+        Assert.True(started.GetProperty("fileHidesKeys").GetBoolean());
+        await ws.Until("session.finished");
+        Assert.Equal(0, WithHex(ws.Frames.SelectMany(SecretsIn)));
+    }
+}
