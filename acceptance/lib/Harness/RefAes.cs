@@ -21,6 +21,7 @@ namespace Acceptance
     public sealed class KeyRow
     {
         public int Index; public string Previous, Rotated, Substituted, Rcon, AfterRcon, KeyBack, Word;
+        public int Divisor = -1, Quotient = -1, Remainder = -1;   // Index / Nk. -1 means the source does not state it (FIPS 197 appendix A)
     }
 
     /// <summary>
@@ -72,12 +73,12 @@ namespace Acceptance
                 if (i < _nk)
                 {
                     _w[i] = new byte[] { key[4 * i], key[4 * i + 1], key[4 * i + 2], key[4 * i + 3] };
-                    KeyRow first = new KeyRow(); first.Index = i; first.Word = Hex.Encode(_w[i]);
+                    KeyRow first = new KeyRow(); first.Index = i; first.Word = Hex.Encode(_w[i]); first.Divisor = _nk; first.Quotient = i / _nk; first.Remainder = i % _nk;
                     _rows.Add(first);
                     continue;
                 }
                 KeyRow row = new KeyRow();
-                row.Index = i;
+                row.Index = i; row.Divisor = _nk; row.Quotient = i / _nk; row.Remainder = i % _nk;
                 byte[] t = (byte[])_w[i - 1].Clone();
                 row.Previous = Hex.Encode(t);
                 if (i % _nk == 0)

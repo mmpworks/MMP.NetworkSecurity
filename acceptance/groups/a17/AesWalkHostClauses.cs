@@ -49,6 +49,7 @@ namespace Acceptance
             {
                 Dictionary<string, object> m = MiniJson.AsObject(o);
                 KeyRow k = new KeyRow();
+                k.Divisor = (int)MiniJson.Num(m, "divisor", -2); k.Quotient = (int)MiniJson.Num(m, "quotient", -2); k.Remainder = (int)MiniJson.Num(m, "remainder", -2);
                 k.Index = (int)MiniJson.Num(m, "i", -1); k.Previous = MiniJson.Str(m, "previous"); k.Rotated = MiniJson.Str(m, "rotated"); k.Substituted = MiniJson.Str(m, "substituted");
                 k.Rcon = MiniJson.Str(m, "rcon"); k.AfterRcon = MiniJson.Str(m, "afterRcon"); k.KeyBack = MiniJson.Str(m, "keyBack"); k.Word = MiniJson.Str(m, "word");
                 r.Add(k);

@@ -47,6 +47,32 @@ namespace Acceptance
             return s.ToLowerInvariant();
         }
 
+        /// <summary>Design section 2.2b, the word test: the numbers on each row are the rule FIPS 197 section 5.2 applies to that word, and the row's stages must agree with them.</summary>
+        [Clause("A19.walk.word-test", PerBuild = true)]
+        public static string WordTest(Ctx c)
+        {
+            int checkedRows = 0;
+            Random random = new Random(20261109);
+            foreach (int size in Sizes)
+            {
+                int nk = size / 4;
+                byte[] key = new byte[size];
+                random.NextBytes(key);
+                foreach (KeyRow r in WalkSubject.KeyWords(key))
+                {
+                    string at = (size * 8) + "-bit w[" + r.Index + "]";
+                    Check.True(r.Divisor == nk, at + ": divisor " + r.Divisor + ", expected Nk " + nk);
+                    Check.True(r.Divisor * r.Quotient + r.Remainder == r.Index && r.Remainder >= 0 && r.Remainder < nk, at + ": " + r.Divisor + " x " + r.Quotient + " + " + r.Remainder + " is not the row's index, with a remainder below Nk");
+                    bool rotates = r.Index >= nk && r.Remainder == 0;
+                    Check.True((r.Rotated != null) == rotates, at + ": rotated is " + (r.Rotated ?? "empty") + ", with remainder " + r.Remainder);
+                    bool subOnly = nk == 8 && r.Index >= nk && r.Remainder == 4;
+                    Check.True((r.Substituted != null && r.Rotated == null) == subOnly, at + ": substituted alone is " + (r.Substituted != null && r.Rotated == null) + ", with remainder " + r.Remainder);
+                    checkedRows++;
+                }
+            }
+            return checkedRows + " key rows at 3 key sizes: each test's numbers give the row's index, and only the words they name rotate or take SubWord alone";
+        }
+
         [Clause("A19.walk.terms-worked-example", PerBuild = true)]
         public static string WorkedExample(Ctx c)
         {

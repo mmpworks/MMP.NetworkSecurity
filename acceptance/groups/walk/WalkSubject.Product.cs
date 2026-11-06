@@ -29,7 +29,7 @@ namespace Acceptance
             foreach (AesKeyWord w in new AesKey(key).WalkKeyExpansion())
             {
                 KeyRow r = new KeyRow();
-                r.Index = w.Index; r.Previous = WalkCheck.Lower(w.Previous); r.Rotated = WalkCheck.Lower(w.Rotated); r.Substituted = WalkCheck.Lower(w.Substituted);
+                r.Divisor = w.Divisor; r.Quotient = w.Quotient; r.Remainder = w.Remainder; r.Index = w.Index; r.Previous = WalkCheck.Lower(w.Previous); r.Rotated = WalkCheck.Lower(w.Rotated); r.Substituted = WalkCheck.Lower(w.Substituted);
                 r.Rcon = WalkCheck.Lower(w.Rcon); r.AfterRcon = WalkCheck.Lower(w.AfterRcon); r.KeyBack = WalkCheck.Lower(w.KeyBack); r.Word = WalkCheck.Lower(w.Word);
                 rows.Add(r);
             }

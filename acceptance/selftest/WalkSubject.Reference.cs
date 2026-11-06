@@ -57,6 +57,10 @@ namespace Acceptance
         {
             List<KeyRow> rows = new RefAes(key).KeyRows;
             if (Defect == "key-row-flip") rows[rows.Count - 1].Word = "00000000";
+            if (Defect == "word-divisor-is-four") foreach (KeyRow r in rows) r.Divisor = 4;
+            if (Defect == "word-numbers-miss-index") rows[rows.Count - 1].Remainder += 1;
+            if (Defect == "word-rotates-every-row") foreach (KeyRow r in rows) r.Rotated = r.Rotated ?? "00000000";
+            if (Defect == "word-subword-at-192") foreach (KeyRow r in rows) if (r.Divisor == 6 && r.Remainder == 4 && r.Index >= 6) r.Substituted = "00000000";
             if (Defect == "rcon-empty") rows[rows.Count / 2 / 4 * 4].Rcon = null;
             return rows;
         }

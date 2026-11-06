@@ -104,6 +104,7 @@ namespace NetSec.Crypto
     public sealed class AesKeyWord
     {
         public readonly int Index = 0;
+        public readonly int Divisor = 0, Quotient = 0, Remainder = 0;
         public readonly byte[] Previous = null, Rotated = null, Substituted = null, Rcon = null, AfterRcon = null, KeyBack = null, Word = null;
     }
 

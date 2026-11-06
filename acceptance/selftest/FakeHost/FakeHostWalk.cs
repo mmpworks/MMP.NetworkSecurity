@@ -135,7 +135,7 @@ namespace Acceptance
             List<object> words = new List<object>();
             foreach (KeyRow r in reference.KeyRows)
             {
-                Dictionary<string, object> d = D("i", (double)r.Index, "word", M("walk-key-row-flip") && r.Index == 20 ? "00000000" : r.Word);
+                Dictionary<string, object> d = D("i", (double)r.Index, "divisor", (double)r.Divisor, "quotient", (double)r.Quotient, "remainder", M("walk-word-test-wrong") ? 9.0 : (double)r.Remainder, "word", M("walk-key-row-flip") && r.Index == 20 ? "00000000" : r.Word);
                 if (r.Previous != null) d["previous"] = r.Previous;
                 if (r.Rotated != null) d["rotated"] = r.Rotated;
                 if (r.Substituted != null) d["substituted"] = r.Substituted;
