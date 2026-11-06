@@ -61,8 +61,8 @@
       "title": "The readable bytes",
       "text": [
         "The client sends its first message. The diagram names it TextGcm1. The message is the line \"Pump four is ok.\" four times, which is 64 bytes.",
-        "Look at the Bytes panel under the diagram. Its header says before protection, so these are the readable bytes.",
-        "Each {{term:byte}} shows as two {{term:hex}} digits. The first four bytes are 50 75 6d 70, and they spell Pump. The text at the end of each row shows the same bytes as letters."
+        "Look at the Message bytes panel under the diagram. The top grid, Before: what the sender wrote, holds the readable bytes.",
+        "Each {{term:byte}} shows as two {{term:hex}} digits. The first four bytes are 50 75 6d 70, and they spell Pump."
       ],
       "glossary": ["byte", "hex"],
       "bind": { "kind": "event", "eventType": "wire.sent", "match": { "actor": "client", "message": "TextGcm1" } },
@@ -75,9 +75,9 @@
       "title": "The scrambled bytes",
       "text": [
         "AES locked this message in {{term:gcm}} mode. A mode is one way to use AES. GCM scrambles the data and adds a seal.",
-        "Try it: switch to the eavesdropper view. The Bytes panel then shows the 96 bytes on the wire. No letters are readable.",
-        "The field list names each part. 4 + 12 means that the part starts at byte 4 and is 12 bytes long.",
-        "The {{term:nonce}} is a number used once. The 64 scrambled bytes come next. The {{term:tag}} is a 16-byte seal that catches changes. Only the key is secret."
+        "The bottom grid, After: what goes on the wire, holds the 96 bytes that travel. No letters are readable.",
+        "Beside the grids are field buttons: type, length, nonce, cipher, tag. Click one to light its bytes. Click cipher, and the readable bytes it came from light up too.",
+        "The {{term:nonce}} is a number used once. The {{term:tag}} is a 16-byte seal that catches changes. Only the key is secret. Try it: switch to the eavesdropper view to see only what a listener sees."
       ],
       "glossary": ["gcm", "nonce", "tag"],
       "bind": { "kind": "event", "eventType": "wire.sent", "match": { "actor": "client", "message": "TextGcm1" } },
@@ -97,7 +97,7 @@
       "text": [
         "AES locks 16 bytes at a time. Each 16-byte piece is a {{term:block}}. A mode is the rule for a message longer than one block.",
         "{{term:cbc}} stands for cipher block chaining. Each block is mixed with the locked block before it, so two equal blocks lock to different bytes.",
-        "The first block has nothing before it. So CBC starts with a random 16-byte {{term:iv}}, a starting value. Find the iv field in the field list. Like the nonce, the IV is not secret."
+        "The first block has nothing before it. So CBC starts with a random 16-byte {{term:iv}}, a starting value. Click iv in the field buttons to light its bytes. Like the nonce, the IV is not secret."
       ],
       "glossary": ["block", "cbc", "iv"],
       "bind": { "kind": "event", "eventType": "wire.sent", "match": { "actor": "client", "message": "TextCbc" } },
