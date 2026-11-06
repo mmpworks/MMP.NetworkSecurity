@@ -344,6 +344,9 @@ namespace NetSec.Io
             }
             TraceEvent sent = WireEvent("wire.sent", _engine.Stream.Actor, _engine.Peer, item.Event.Message, wire, item.Event.Plain, item.Event.Fields);
             yield return _gate.Pass(sent);
+            // Logged before the write. Once the bytes leave, the peer can answer and log its reply, and the session list is one order across both pumps.
+            // A write that then fails leaves this event behind, and the link error that follows it names the failure.
+            _sink.Write(sent);
             IFuture write = _link.Write(wire, 0, wire.Length);
             foreach (IFuture wait in AwaitWrite(write)) yield return wait;
             if (!write.IsCompleted)
@@ -358,7 +361,6 @@ namespace NetSec.Io
                 yield break;
             }
             _bytesSent += wire.Length;
-            _sink.Write(sent);
         }
 
         void Deliver(EngineOutput output)
