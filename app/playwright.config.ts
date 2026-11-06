@@ -12,7 +12,8 @@ const hostDll = process.env.NETSEC_HOST_DLL ?? path.resolve(__dirname, '..', 'sr
 // The Host reads its security folder once at start, and every spec on port 5190 shares that Host, so a run has one folder. Without this line the Host
 // falls back to the tree's .security folder, which holds keys from earlier runs. Workers inherit the value, so the config makes one folder per run.
 process.env.NETSEC_SECURITY_DIR ??= fs.mkdtempSync(path.join(os.tmpdir(), 'ns-e2e-security-'))
-process.env.NETSEC_HOST_DLL = hostDll
+// A name of its own, so NETSEC_HOST_DLL stays as the person set it and start.spec still runs the path fallback in electron/main.cjs.
+process.env.NETSEC_E2E_HOST_DLL = hostDll
 
 export default defineConfig({
   testDir: './e2e',
@@ -24,7 +25,7 @@ export default defineConfig({
   reporter: [['list']],
   use: { baseURL: 'http://localhost:4180', viewport: { width: 1440, height: 900 }, trace: 'retain-on-failure' },
   webServer: [
-    { command: 'npx vite preview --port 4180 --strictPort', port: 4180, reuseExistingServer: true, timeout: 60_000 },
+    { command: 'npx vite preview --port 4180 --strictPort', port: 4180, reuseExistingServer: false, timeout: 60_000 },
     { command: `dotnet "${hostDll}"`, port: HOST_PORT, reuseExistingServer: false, timeout: 60_000, env: { NETSEC_PORT: String(HOST_PORT), NETSEC_TOKEN: TOKEN } },
     // A second Host on a damaged vault master key, for the VAULT_MASTER_KEY_BAD spec only.
     { command: 'node e2e/start-bad-key-host.cjs', port: 5191, reuseExistingServer: false, timeout: 60_000, env: { NETSEC_HOST_DLL: hostDll } },
