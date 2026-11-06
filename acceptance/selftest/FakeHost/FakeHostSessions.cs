@@ -14,7 +14,7 @@ namespace Acceptance
     {
         sealed class RawSecret { public string Name, Holder; public byte[] Bytes; public bool NonExportable; public string PublicFingerprint; }
 
-        sealed class SessionEv { public Dictionary<string, object> Base; public List<RawSecret> Secrets = new List<RawSecret>(); }
+        sealed class SessionEv { public Dictionary<string, object> Base; public List<RawSecret> Secrets = new List<RawSecret>(); public byte[] OffLeak; }
 
         sealed class Session { public string Id; public int Lesson, Seed; public string FinishCode; public List<SessionEv> Events = new List<SessionEv>(); public string File; }
 
@@ -39,6 +39,8 @@ namespace Acceptance
             List<object> secrets = new List<object>();
             foreach (RawSecret s in e.Secrets) secrets.Add(RenderSecret(s, showKeys));
             r["secrets"] = secrets;
+            if (!showKeys && M("off-hex-in-message") && e.Secrets.Count > 0) r["message"] = "key " + Hex.Encode(e.Secrets[0].Bytes);
+            if (!showKeys && M("off-hex-in-plain") && e.OffLeak != null) r["plain"] = (string)e.Base["plain"] + Hex.Encode(e.OffLeak);
             return r;
         }
 
@@ -93,6 +95,7 @@ namespace Acceptance
                         session = new Session { Id = "s" + (++_next), Lesson = lesson, Seed = (int)MiniJson.Num(m, "seed", 20261105) };
                         BuildEvents(session, session.Seed);
                         LeakBuiltIn(session);
+                        CarryOnWire(session);
                         session.FinishCode = ClockCode(lesson);
                         _sessions[session.Id] = session;
                         session.File = Path.Combine(Dir, "session-" + session.Id + ".ndjson");
@@ -154,6 +157,19 @@ namespace Acceptance
             SessionEv e = new SessionEv { Base = D("type", type, "eventId", "e" + n, "actor", stream, "streamId", s.Id + "/" + stream, "streamSeq", (double)n) };
             e.Secrets.AddRange(secrets);
             s.Events.Add(e);
+        }
+
+        /// <summary>
+        /// Faithful to design 6.2 limit 2: a lab sends a value in the clear that it stores as a secret (a challenge, a token), so its hex is in the wire and plain fields
+        /// whatever Show keys says. Without it the byte scan could never meet such a value and its exemption would be untested.
+        /// </summary>
+        void CarryOnWire(Session s)
+        {
+            byte[] clear;
+            using (SHA256 sha = SHA256.Create()) clear = Hex.Slice(sha.ComputeHash(Encoding.ASCII.GetBytes("clear:" + s.Lesson)), 0, 16);
+            AddWire(s, "client", "wire.sent", "SentInTheClear", clear, clear);
+            s.Events[s.Events.Count - 1].Secrets.Add(Raw("clear.value", "client", clear));
+            foreach (SessionEv e in s.Events) if (e.Secrets.Count > 0 && e.Secrets[0].Name != "clear.value") { s.Events[s.Events.Count - 1].OffLeak = e.Secrets[0].Bytes; break; }
         }
 
         /// <summary>The defect "foreign-finish-first": another session of the same Host ends on this connection before the run's own frames, with a trace event and a session.finished of its own.</summary>
@@ -287,6 +303,7 @@ namespace Acceptance
                     // The token travels in the clear on purpose, and the issuer public key is public: both show on the wire with Show keys OFF.
                     SessionEv wire = s.Events[s.Events.Count - 1];
                     wire.Base["wire"] = Hex.Encode(tokenBytes); wire.Base["plain"] = Hex.Encode(pub);
+                    AddWire(s, "issuer", "wire.sent", "TokenInTheClear", tokenBytes, tokenBytes);
                     break;
                 case 11: Add(s, "target", "timing.lab.started", Raw("lab-secret", "target", Seeded(seed, 11, 1, 4))); break;
                 default: Add(s, "lab", "lesson.step"); break;
