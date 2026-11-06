@@ -408,7 +408,7 @@ Steve moved this into the modes chapter. Facts come from SP 800-38D and Jared's 
 
 **Words the panel must get right, from sheet 5.18:**
 
-1. "The nonce is not in GHASH. A changed nonce still fails, because the mask and the key stream change."
+1. "The nonce is not in GHASH. A changed nonce still fails, because the mask changes."
 2. "GCM needs no padding, because XOR uses only the key stream bytes it needs." GHASH zero-fills a short block for its own use, and that changes no sent byte.
 3. "AAD is empty in this lesson, so GHASH starts at the cipher blocks."
 4. The tag check comes first in this engine, and no text comes out on a failure.
@@ -714,7 +714,7 @@ Replies, trimmed. Every error carries `code`, `message`, `retryable`, and `reque
 | A bad mode, source, block, or key size | 400 `WALK_BAD_ARGUMENT` |
 | Forge: the two frames are the same text, as on `L1-reuse-nonce` | 409 `WALK_FORGE_SAME_TEXT` |
 | Forge: the two frames have different nonces, as on a control run | 409 `WALK_FORGE_NONCE_DIFFERS`, with no H shown |
-| Forge: more than the last block differs | 409 `WALK_FORGE_TOO_MANY_BLOCKS`. This case needs root finding, and the pilot does not build it |
+| Forge: anything other than one changed last block | 409 `WALK_FORGE_TOO_MANY_BLOCKS`. This covers more than the last block differing (which needs root finding, and the pilot does not build it), only an earlier block differing (the divisor would be zero), and different lengths (H would come out wrong). No lab row reaches the last two, and `Recover` is public, so it refuses them |
 | A guard fired | 500 `AES_WALK_DIVERGED` |
 
 ### 3.5 Show keys OFF
@@ -936,7 +936,7 @@ If Steve does not follow it after 2 rounds of word changes, stop and re-plan the
 | GHASH | Each row is XOR then multiply. `Tag` equals the frame's tag on `TextGcm1`, and on a message with the BCL as referee. H equals AES of the zero block. The nonce is not an input to a row |
 | Forgery recovery | Recovered H equals AES of the zero block under the run's key, on 2 seeds. Section 2.4b's table holds |
 | Forgery accepted | `Gcm.TryOpen` accepts the forged message and returns the forged text. A one-bit change to the forged tag fails it |
-| Forgery refusals | Same text twice gives `WALK_FORGE_SAME_TEXT`, never a divide by zero or a wrong H. Two nonces give `WALK_FORGE_NONCE_DIFFERS`, with no H. More than the last block differing gives `WALK_FORGE_TOO_MANY_BLOCKS` |
+| Forgery refusals | Same text twice gives `WALK_FORGE_SAME_TEXT`, never a divide by zero or a wrong H. Two nonces give `WALK_FORGE_NONCE_DIFFERS`, with no H. More than the last block differing, only an earlier block differing, and different lengths each give `WALK_FORGE_TOO_MANY_BLOCKS` |
 | Forgery reads no key | `GcmForgeries.Recover` takes frames and known text only. A test calls it with no key in scope |
 | Control unchanged | The control's golden is unchanged with the new option in the code. No forgery value enters a trace or session file |
 | Tap a byte (W2) | The flip test of section 2.2e, on every step and cell |
