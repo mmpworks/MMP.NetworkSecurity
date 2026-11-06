@@ -136,6 +136,9 @@ The oracle is a .NET 10 console program. It reads one JSON request per line and 
 | `hash` | `alg` (`md5`, `sha1`, `sha256`, `sha384`, `sha512`, `sha3-256`, `sha3-384`, `sha3-512`, `shake128`, `shake256`), `data`, `length` for shake | `digest` |
 | `hmac` | `alg` (`sha1`, `sha256`, `sha384`, `sha512`), `key`, `data` | `mac` |
 | `hkdf` | `alg`, `ikm`, `length`, optional `salt`, `info` | `okm` |
+| `rsa-keygen` | `bits` | `n`, `e`, `d`, `p`, `q`, `dp`, `dq`, `qi` |
+| `rsa-sign`, `rsa-verify` | the key fields, `alg` (sha1, sha256), `data`, and `signature` to verify | `output` (the signature, or 1 or 0) |
+| `rsa-encrypt`, `rsa-decrypt` | the key fields, `data` | `output` (PKCS#1 v1.5) |
 | `hkdf-extract` | `alg`, `ikm`, optional `salt` | `prk` |
 | `hkdf-expand` | `alg`, `prk`, `length`, optional `info` | `okm` |
 | `aes-ecb-encrypt`, `aes-ecb-decrypt` | `key`, `data`, optional `padding` (`none`, `pkcs7`) | `output` |

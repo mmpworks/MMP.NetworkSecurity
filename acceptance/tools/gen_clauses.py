@@ -41,7 +41,7 @@ GROUPS = {
 
 ASSERTIONS = {
     "A1": "AES (ECB, CBC, CTR, GCM), SHA-1, SHA-256, SHA-384, SHA-512, SHA-3, SHAKE, MD5, HMAC, CMAC, HKDF, X25519, Ed25519, RSA, TDES and DH group 14 pass published vectors on both builds",
-    "A2": "10,000 random inputs for AES, HMAC, HKDF and GCM match the .NET 10 BCL; 200 ML-KEM-768 rounds interoperate with .NET 10 MLKem in both directions",
+    "A2": "10,000 random inputs for AES, HMAC, HKDF and GCM match the .NET 10 BCL; 200 ML-KEM-768 rounds interoperate with .NET 10 MLKem in both directions; RSA PKCS#1 v1.5 signatures and encryption interoperate with the .NET library on keys it made",
     "A3": "AES DUKPT matches the X9.24-3-2017 vectors for AES-128 and AES-256 base keys; pad and bank agree for 1,000 sales; used keys are absent from PIN-pad state; the tour states that a managed heap can keep copies",
     "A4": "Key schedule secrets match the RFC 8448 trace byte for byte",
     "A5": "The glass client completes TLS 1.3 against OpenSSL 3.5.7 and Go crypto/tls, with X25519 and with X25519MLKEM768; the glass server does the same if built; the referee reports the group",
