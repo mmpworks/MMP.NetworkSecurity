@@ -172,6 +172,7 @@ Source: `docs/walkthrough-design.md` on `main` at c19b151 (Jared's pass on d1368
 | Block reply, shape at bd0a9bd (#161) | A mix step carries `terms[]`, one per state byte, with `result`, `running[]` (the XOR after each term) and `parts[]`: `factor`, `input`, `doublings[]`, `picks[]`, `sums[]`, `reduced`, `result`. A doubling holds `from`, `shifted` (hex, 9 bits), `reduced`, `to` | Design 2.2i, 3.3, 3.4. Another step has no `terms`. `picks` run from the factor's low bit up, so an odd factor picks `input` first, and factor 1 has no doublings and picks `input` alone (Richard confirmed this on the build plan, 2026-11-06) |
 | App words | `app/src/components/FieldPanel.vue` or `app/src/walk-gloss.json` holds the 5 lines of `checks/walk_lines.json`, in order. The GCM line sits in `components/AesFeedView.vue` or `walk-gloss.json` | Design 2.2c, 2.4 |
 | A bare 404 on a walk route | NOT RUN `PRODUCT_MISSING` | As for `/api/security` |
+| A step or import error list with only `WIZARD_PART_NOT_BUILT` | NOT RUN `WIZARD_PART_NOT_BUILT`, and the reason names the owed part. Any other code in the list stays FAIL | The Host's `FlowParts` has no row for the type |
 | Host source | `src/NetSec.Host/AesWalkRoutes.cs`. Each walk route is a string in the source, and is listed in `checks/walk_routes.json` | Design 3.5 |
 | App files | `app/src/walk.ts`, `app/src/components/AesBlockWalk.vue`. No part of either S-box under `app/src` | Design 3.1, 3.7 |
 
