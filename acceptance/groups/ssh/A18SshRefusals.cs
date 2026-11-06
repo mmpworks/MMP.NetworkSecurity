@@ -13,7 +13,10 @@ namespace Acceptance
 
         sealed class Run { public ProbeResult Result; public string Output; }
 
-        static Run Against(Ctx c, PkiDir p, string goArgs)
+        static Run Against(Ctx c, PkiDir p, string goArgs) { return Against(c, p, goArgs, null); }
+
+        /// <summary>The engine's result can arrive before Go prints its error, so a clause that judges Go's words names the line to wait for.</summary>
+        static Run Against(Ctx c, PkiDir p, string goArgs, string waitLine)
         {
             ProbeRequest req = ProbeKit.Request(WireProtocol.Ssh, 0, "127.0.0.1");
             req.SshSuite = SshSuite.Modern;
@@ -28,6 +31,7 @@ namespace Acceptance
             {
                 Run r = new Run();
                 r.Result = Futs.Get(listener.Result, 60000, "glass SSH server against Go");
+                if (waitLine != null) go.P.WaitForLine(delegate (string l) { return l.Contains(waitLine); }, 10000);
                 r.Output = go.P.AllOutput;
                 return r;
             }
@@ -70,7 +74,7 @@ namespace Acceptance
             OpenSshKey.RestrictToCurrentUser(p.HostKey);
             Run control = Against(c, p, ModernClient);
             Check.True(control.Result.Completed, "control: a modern Go client should connect, and stopped: " + control.Result.CheckName + " [" + control.Result.Code + "]. Go output: " + control.Output);
-            Run r = Against(c, p, ModernClient + " -password-only training");
+            Run r = Against(c, p, ModernClient + " -password-only training", "no supported methods remain");
             Check.True(!r.Result.Completed, "the glass SSH server completed a session with a password login. The on-screen line A18.screen.l8-ssh-leaves-out needs a change");
             Check.True(r.Output.Contains("unable to authenticate") && r.Output.Contains("no supported methods remain"), "Go did not report that password login has no supported method. Go output: " + r.Output);
             return "control connects; the server offers no password method, so a password-only client cannot log in. The engine reads " + r.Result.Code;
