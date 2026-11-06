@@ -41,7 +41,7 @@
       "title": "The server's certificate",
       "text": [
         "The CA now signs a certificate for the server. A certificate is a signed card. It binds a name to a public key.",
-        "Open the inspector. Find the subject (who the card is for), the issuer (who signed it), the serial number, and the two dates that bound its life. The signature at the end covers all the rest.",
+        "Open the Message bytes panel. Find the subject (who the card is for), the issuer (who signed it), the serial number, and the two dates that bound its life. The signature at the end covers all the rest.",
         "Anyone can read a certificate. It holds no secret, and that matters in a later step."
       ],
       "glossary": [],

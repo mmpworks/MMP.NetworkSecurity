@@ -1,6 +1,7 @@
 // Electron's main process. It starts NetSec.Host with a fresh session token, opens one window, and ends the Host on exit.
 // Set NETSEC_HOST=external to skip spawning and use a Host you started yourself (then set NETSEC_PORT and NETSEC_TOKEN too).
-const { app, BrowserWindow } = require('electron')
+const { app, BrowserWindow, screen } = require('electron')
+const { fitWindow } = require('./window-size.cjs')
 const { spawn, execFileSync } = require('node:child_process')
 const crypto = require('node:crypto')
 const fs = require('node:fs')
@@ -53,7 +54,7 @@ function waitForHost(timeoutMs = 60000) {
 
 async function createWindow() {
   const win = new BrowserWindow({
-    width: 1440, height: 900, title: 'Network Security Lab', backgroundColor: '#0e1318',
+    ...fitWindow(screen.getPrimaryDisplay().workArea), title: 'Network Security Lab', backgroundColor: '#0e1318',
     webPreferences: { preload: path.join(__dirname, 'preload.cjs'), contextIsolation: true, additionalArguments: [`--netsec-port=${PORT}`, `--netsec-token=${TOKEN}`] },
   })
   const devUrl = process.env.VITE_DEV_SERVER_URL

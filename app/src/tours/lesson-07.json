@@ -33,7 +33,7 @@
       "title": "The TLS 1.1 hello",
       "text": [
         "The TLS 1.1 client opens with its ClientHello. It travels in the clear, as in TLS 1.3.",
-        "Find the suites list in the inspector. In this lab the list holds an RSA suite with AES in CBC mode and a SHA-1 based seal."
+        "Find the suites list in the Message bytes panel. In this lab the list holds an RSA suite with AES in CBC mode and a SHA-1 based seal."
       ],
       "glossary": [],
       "bind": { "kind": "event", "eventType": "tls11.message.sent", "match": { "actor": "client", "message": "ClientHello" } },

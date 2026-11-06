@@ -35,7 +35,7 @@
       "title": "Readable in, scrambled out",
       "text": [
         "This is the first message, locked with AES in {{term:gcm}} mode. At the moment the key went in, the readable blue bytes turned into scrambled amber ones.",
-        "Open the inspector. The cipher field holds the ciphertext. The {{term:nonce}} is a number used once, and the {{term:tag}} is a seal that catches changes.",
+        "Open the Message bytes panel. The cipher field holds the ciphertext. The {{term:nonce}} is a number used once, and the {{term:tag}} is a seal that catches changes.",
         "Try it: switch to the eavesdropper view. You will see what a listener sees, which is a nonce, a tag, and noise."
       ],
       "glossary": ["gcm", "nonce", "tag"],
@@ -56,7 +56,7 @@
       "text": [
         "AES works on {{term:block}}s of 16 bytes. A long message is cut into blocks, and each block is locked in turn.",
         "{{term:cbc}} mode chains the blocks. Each block is mixed with the one before it, so a repeated block locks to different bytes.",
-        "The first block has nothing before it, so CBC starts with a random {{term:iv}}. Find the iv field in the inspector."
+        "The first block has nothing before it, so CBC starts with a random {{term:iv}}. Find the iv field in the Message bytes panel."
       ],
       "glossary": ["block", "cbc", "iv"],
       "bind": { "kind": "event", "eventType": "wire.sent", "match": { "actor": "client", "message": "TextCbc" } },
@@ -70,7 +70,7 @@
       "text": [
         "{{term:ecb}} is the simplest mode. It locks every 16-byte block on its own, with no chain between blocks.",
         "The trouble is that two equal blocks give two equal locked blocks. In a picture, big patches of one color repeat, so the pattern survives the lock.",
-        "Look at the locked picture in the inspector. The outline of the shape still shows through."
+        "Look at the locked picture in the Picture tab. The outline of the shape still shows through."
       ],
       "glossary": ["ecb"],
       "bind": { "kind": "event", "eventType": "wire.sent", "match": { "actor": "client", "message": "PictureEcb" } },
