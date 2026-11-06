@@ -158,6 +158,7 @@ test('[A17.ui.show-keys-switch] on by default; off replaces key bytes with finge
   const textOf = async () => (await secretRows.allInnerTexts()).join('\n');
   expect(await textOf(), 'ON: a row shows key bytes').toMatch(/[0-9a-f]{16,}/i);
 
+  await expect(sw, 'the switch can be used. A disabled switch means the app still locks it (V0_LOCKED in ShowKeysSwitch.vue)').toBeEnabled({ timeout: 5_000 });
   await sw.click();
   await expect.poll(async () => (await hostGet('/api/security/show-keys')).body?.on, { timeout: 15_000, message: 'the Host follows the switch to OFF' }).toBe(false);
   expect(await isOn(), 'the switch reads OFF after the click').toBe(false);

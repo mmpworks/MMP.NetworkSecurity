@@ -42,9 +42,11 @@ async function reachTab(page: Page): Promise<void> {
   await openApp(page);
   await page.getByTestId('lesson-item-1').click();
   const start = page.getByRole('button', { name: /start tour/i });
-  if (await start.isVisible().catch(() => false)) await start.click();
   const tab = page.getByTestId('aes-walk-tab');
   const next = page.getByTestId('tour-next');
+  // A cold first page draws the button late. A check with no wait misses it, and then no tour runs, so every later look at Next waits out its bound.
+  await expect(start.or(next).first(), 'the tour panel').toBeVisible({ timeout: 30_000 });
+  if (await start.isVisible().catch(() => false)) await start.click();
   for (let hop = 0; hop < 30 && !(await tab.isVisible().catch(() => false)); hop++) {
     if (!(await next.isEnabled().catch(() => false))) { await page.waitForTimeout(1_000); continue; }
     await next.click().catch(() => { /* the tour moved on, or a step holds Next: the loop looks again */ });
