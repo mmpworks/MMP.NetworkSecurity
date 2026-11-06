@@ -1,6 +1,6 @@
 # MMP.NetworkSecurity: walkthrough design
 
-Author: Richard. Date: 2026-11-06. Revision 8, adding the Start view's round key, the ShiftRows roll, the key fill, and spec cards. Status: design only, for Jared's check and Echo's clauses. No product code.
+Author: Richard. Date: 2026-11-06. Revision 8, adding the Start view's round key, the ShiftRows roll and its colours, the key fill, the MixColumns matrix view, and spec cards. Status: design only, for Jared's check and Echo's clauses. No product code.
 
 Sources of facts: FIPS 197, the engine, and Jared's sheet `E:\dev\ns-lesson1-facts.md`. Steve's web pages set depth and teaching order only (section 2.1).
 
@@ -176,10 +176,22 @@ Steve's ask: see the 16 bytes change at each stage.
 | Where a byte came from | Each cell shows a small mark with its position before this step, 0 to 15. The marks reset at each step, because a byte has no single source after MixColumns |
 | Which way ShiftRows moves | The engine's `ShiftRowsMap` and `InverseShiftRowsMap` come from the tables route (section 3.4), so a motion cannot disagree with the real map |
 | Next and Back | They land on the same states as without animation. A click during a motion jumps to the end frame. A Back during a roll or a key fill leaves no strip, no flying byte, no mark, and no hidden cell |
-| Start view | The right-hand grid shows round key 0, in place of "Before this step". Next then runs the AddRoundKey motion from it. Show keys OFF closes it, as the block walk closes |
+| Start view | The right-hand grid shows the round key the next step uses, in place of "Before this step": round key 0 at the start of encryption, and round key Nr at the start of decryption. Next then runs the AddRoundKey motion from it. Show keys OFF closes it, as the block walk closes |
 | `prefers-reduced-motion` | Each step jumps to its end frame |
 | Show keys flips OFF during a motion | The timeline stops, and the walk clears (section 3.5) |
 | Library | None. CSS transforms and one small composable, `useWalkTimeline`. I would add a library only if a transform cannot do the MixColumns join |
+
+**ShiftRows colours.** During the roll, only the bytes that wrap take the highlight colour: 1 in row 1, 2 in row 2, 3 in row 3. The others stay normal, and the colours stay on the end frame. On ShiftRows they form a staircase at the right, and on InvShiftRows the bytes wrap the other way, so it forms at the left:
+
+```
+ShiftRows   InvShiftRows
+. . . .     . . . .
+. . . X     X . . .
+. . X X     X X . .
+. X X X     X X X .
+```
+
+The app marks a cell from the shift map the tables route sends, and it reads no byte value to do so.
 
 **ShiftRows words on screen:** "Row 0 stays. Rows 1, 2 and 3 rotate left by 1, 2 and 3 bytes. The name says shift, but no byte is lost: FIPS 197 calls it a cyclic shift, the same idea as a rotate left (ROL)."
 
@@ -231,7 +243,7 @@ Worked example, the FIPS 197 appendix A key `2b7e1516 28aed2a6 abf71588 09cf4f3c
 | Moment | On screen | Value from the reply |
 |---|---|---|
 | 1. Light the sources | Byte j of `w(i - Nk)`, and the source byte of `w(i - 1)`, light up in the table, and in the original key line when they are key words | Position arithmetic |
-| 2. The stages | The stage rows show, and byte j lights in each | `previous`, `rotated`, `substituted`, `afterRcon`, `keyBack` |
+| 2. The stages | The stage rows show. In the `previous` row, the source byte lights. In each row after RotWord, byte j lights | `previous`, `rotated`, `substituted`, `afterRcon`, `keyBack` |
 | 3. The equation | "2b XOR 8b = a0", with each value's bits below it | `keyBack[j]`, the last stage's byte j, and `word[j]`. The app prints these, and it computes no XOR |
 | 4. The answer flies | The byte flies to its cell, and the column fills one cell at a time | `word[j]` |
 
@@ -406,7 +418,7 @@ Steve's rule: any mention of a named spec on any screen, in any lesson, is a hov
 
 | Choice | Result |
 |---|---|
-| **Find names at render (chosen).** `specParts(text)` in `tour.ts` splits text on a pattern built from the table's names and aliases, as `splitText` splits `{{term:id}}` today | The 12 tour files stay as they are, so no A15a reader re-stamp. A new mention gets its card with no edit. Text the engine sends is covered too |
+| **Find names at render (chosen).** `specParts(text)` in `tour.ts` splits text on a pattern built from the table's names and aliases, longest first, so `X9.24-3` wins over `X9.24`, as `splitText` splits `{{term:id}}` today | The 12 tour files stay as they are, so no A15a reader re-stamp. A new mention gets its card with no edit. Text the engine sends is covered too |
 | A `{{spec:id}}` mark in the tours | Each mention is an edit, the text hash changes, and the reader re-stamps each lesson. An unmarked mention gets no card, and Host messages have no marks |
 
 | Where a spec name can reach the screen | How it gets its card |
@@ -417,11 +429,58 @@ Steve's rule: any mention of a named spec on any screen, in any lesson, is a hov
 | Words written in a `.vue` template | They use `<SpecCard id="fips197" />` directly |
 | A claim's `source` in lesson JSON | Off screen, so no card. A source can name a spec with no row |
 
+**`specs.json` holds a row for each name on screen,** including `PKCS#7` from section 2.4c and `PKCS12` from `wizard-copy.json`. DUKPT rows use the names as they appear on screen. Today that is `X9.24-3` only.
+
 **Section numbers stay as text.** "RFC 8446 section 4.2" gets a card on "RFC 8446", and the words "section 4.2" stay beside it. Names that are not specs, such as `TLS 1.3`, get no card unless the table lists them.
 
-**Links need new code in Electron.** `app/electron/main.cjs` has no window-open handler today. It gains `setWindowOpenHandler`, which always denies a new window, and it calls `shell.openExternal` only when the URL's host is in `hosts`. The renderer asks through `preload.cjs`. The app fetches nothing from these hosts, and a card works offline except for its link. Under `vite preview`, the link is a normal `target="_blank" rel="noopener"`.
+**Links need new code in Electron.** `app/electron/main.cjs` has no window-open handler today. It gains `setWindowOpenHandler`, which always denies a new window, and it denies `will-navigate`, because a plain link does not reach that handler. It calls `shell.openExternal` only when the URL is `https:` and its host is in `hosts`. On Windows, `file://` with a listed host is a network path, so a host check alone is not enough. The renderer asks through `preload.cjs`. The app fetches nothing from these hosts, and a card works offline except for its link. Under `vite preview`, the link is a normal `target="_blank" rel="noopener"`.
 
 **Show keys:** a card holds no key, so it stays open in every state.
+
+### 2.2i The MixColumns matrix view (W1b)
+
+Steve's words: "I want to show where the elements come from and how the multiplication result is built."
+
+The step shows: fixed matrix × state before = state after. It walks one output byte at a time, in this order:
+
+| Moment | On screen | Value from the reply |
+|---|---|---|
+| 1. Pick | A column, by its control or a tap on its byte | The step's `terms`, in `r + 4c` order |
+| 2. The row and column | The matrix row lights. The state column flies up above the matrix, and a box links each pair | Each part's `factor` and `input`. The matrix itself comes from the factors, so the app stores no matrix |
+| 3. Each multiply | A caption and bit rows, one part at a time | `doublings`, `picks`, `sums`, `result` |
+| 4. The running XOR | A line builds, term by term | `running` |
+| 5. The byte lands | It lands in its result cell | `result`, which equals the state after |
+
+**Controls in this view:** pick a column, Back, Next, Play this column, and Fill all. This is the one Play button, in this view scoped to the column, so it still stops at a natural end. Fill all shows the engine's state after.
+
+**InvMixColumns works the same way,** with factors 14, 11, 13, 9. Each of those needs 3 doublings. The panel shows each doubling, then the picks that make up the factor: 14 is 8 + 4 + 2, so `14 x 04` picks `08 10 20`, and its sums run `08 18 38`.
+
+**The multiply as bit rows.** For a factor other than 1:
+
+| Row | No overflow | Overflow |
+|---|---|---|
+| The byte | `from` | `from` |
+| Shift left | `shifted`, which fits | `shifted`, with bit 8 shown |
+| The top bit breaks away | | Bit 8 flies off the screen |
+| XOR 1b | | The rest of `11b` |
+| The doubled value | `to` | `to` |
+| 3 x only: XOR the byte, and the answer | `input`, `result` | `input`, `result` |
+
+**Words on screen:**
+
+1. The caption: "2 × d4 = b3: shift left to get 1a8, too big, so XOR 11b."
+2. On overflow: "The top bit does not fit in a byte, so it breaks away. Reducing by 11b removes that bit and XORs 1b into the rest."
+
+Dropping the bit alone gives the wrong byte, so the XOR 1b row always shows. The "1b" and "11b" are the field's reduction value. They come from section 2.2c's definition, so the panel prints them as words and computes nothing with them.
+
+**New reply fields: yes, two kinds.**
+
+| Field | Why |
+|---|---|
+| `running`, on each mixed byte | The XOR after each term. The app runs no math, so the engine sends it. The last value equals `result` |
+| `doublings` holds `from`, `shifted`, `reduced`, `to` in place of one byte each. `picks` and `sums` join each part | Bit rows need the 9-bit `shifted` value, and the inverse factors need the picks and their running sum. `to` equals `shifted`, XOR `11b` when it overflows |
+
+**Back during play stops Play, ends every flying byte and bit, and lands on the previous whole moment,** with no box, flyer, or lit row left behind. Next during a motion jumps to that motion's end. With reduced motion, each moment lands at once. A Show keys flip stops it all, as section 3.5 sets out.
 
 ### 2.3 The S-box view
 
@@ -733,14 +792,19 @@ namespace NetSec.Crypto {
     public readonly int Index;
     public readonly byte[] Previous, Rotated, Substituted, Rcon, AfterRcon, KeyBack, Word;
   }
+  public sealed class AesDoubling {          // One field multiply by 2
+    public readonly byte From; public readonly int Shifted;   // Shifted is 9 bits, before the reduction
+    public readonly bool Reduced; public readonly byte To;
+  }
   public sealed class AesTerm {               // One factor x input term of a mixed byte
     public readonly int Factor;               // 2, 3, 1 or 14, 11, 13, 9
     public readonly byte Input;
-    public readonly byte[] Doublings;         // Input x2, x4, x8, as far as the factor needs. The inverse factors need 3
+    public readonly AesDoubling[] Doublings;  // As far as the factor needs. The inverse factors need 3
+    public readonly byte[] Picks, Sums;       // The doubled values that make up the factor, and their running XOR
     public readonly bool Reduced;             // Any doubling needed the reduction by 11b
     public readonly byte Result;
   }
-  public sealed class AesColumnByte { public readonly AesTerm[] Terms; public readonly byte Result; }   // Result is the XOR of the terms
+  public sealed class AesColumnByte { public readonly AesTerm[] Terms; public readonly byte[] Running; public readonly byte Result; }   // Running is the XOR after each term. Its last value is Result
   public sealed partial class AesKey {
     public AesBlockWalk WalkEncrypt(byte[] block);   // Throws AES_WALK_DIVERGED if it differs from EncryptBlock
     public AesBlockWalk WalkDecrypt(byte[] block);   // Throws AES_WALK_DIVERGED if it differs from DecryptBlock
@@ -885,7 +949,7 @@ Replies, trimmed. Every error carries `code`, `message`, `retryable`, and `reque
   "inputHex": "50756d7020666f7572206973206f6b2e",
   "keyWords": [ { "i": 4, "previous": "...", "rotated": "...", "substituted": "...", "rcon": "...", "afterRcon": "...", "keyBack": "...", "word": "..." } ],
   "forward": { "input": "...", "output": "...", "steps": [ { "kind": "AddRoundKey", "round": 0, "state": "...", "roundKey": "..." },
-                                                 { "kind": "MixColumns", "round": 1, "state": "...", "terms": [ { "result": "04", "parts": [ { "factor": 2, "input": "d4", "doublings": ["b3"], "reduced": true, "result": "b3" } ] } ] } ] },
+                                                 { "kind": "MixColumns", "round": 1, "state": "...", "terms": [ { "result": "04", "running": ["b3", "69", "34", "04"], "parts": [ { "factor": 2, "input": "d4", "doublings": [ { "from": "d4", "shifted": "1a8", "reduced": true, "to": "b3" } ], "picks": ["b3"], "sums": ["b3"], "reduced": true, "result": "b3" } ] } ] } ] },
   "inverse": { "input": "...", "output": "...", "steps": [] },
   "wire": { "status": "notSent", "message": "TextEcb" }
 }
@@ -1016,6 +1080,7 @@ Limits of the spike:
 | `app/src/components/AesBlockWalk.vue` | Picker, grid, Back, Next, round chips |
 | `app/src/components/SboxView.vue` | The 16 by 16 table, row and column lights, for both tables |
 | `app/src/specs.json`, `components/SpecCard.vue`, `components/TextWithSpecs.vue` | The spec table, the card, and text with its names turned into cards (section 2.2h). `specParts` is pure, in `tour.ts`. `app/electron/main.cjs` and `preload.cjs` gain the link handler |
+| `app/src/components/MixMatrixView.vue` | The matrix view of section 2.2i, for MixColumns and InvMixColumns. It prints the engine's terms |
 | `app/src/components/KeySchedulePanel.vue` | The key as words, the expanded table of grids, one word's stage rows, the Rcon row |
 | `app/src/components/FieldPanel.vue` | The definition lines, and one multiply from the engine's terms |
 | `app/src/components/LongTextView.vue` | W2: the box, the side-by-side rows, the flip, and the picture beside it. It prints typed text as text, and never as HTML |
@@ -1099,7 +1164,7 @@ Sheet 5.9 lists them, and these three matter most:
 | **W1a** skeleton | `AesKey.Walk.cs` with word rows and MixColumns terms, `AesWalks.Block`, the tables route and the block route. No UI | FIPS, table, BCL, toggle, term, and golden clauses pass on both builds. `tools/gate.ps1` green | Richard |
 | **SC** spec cards | `specs.json`, `SpecCard.vue`, `TextWithSpecs.vue`, `specParts`, the Electron link handler, and the table's rows for every spec on screen. It lands with the new look, before W1b, because it binds every screen | Spec card clauses. A15 and A15a on `specs.json` | Nancy, Richard, Jared on the table |
 | **Hold on W1b** | Do not start the walk screens until the lead says the new look is set. Steve wants a major UX refresh. W1a is engine work, and it is not affected | | Lead |
-| **W1b** small section | `walk.ts`, `useWalkTimeline.ts`, `AesBlockWalk.vue`, `SboxView.vue`, `KeySchedulePanel.vue`, `FieldPanel.vue`, chapter 1 at 128 bits with animation, binary on hover, and typed text (`AesTypedBlocks`, `/typed-block`), encrypt and decrypt, the flip guard | e2e: a learner reaches `Pump four is ok.` by Next alone. A clicked cell's lookup equals the next state, both tables. Grid order clause. S-box scan. Measure the block reply time at AES-128 and AES-256, and record both in `docs/learnings.md`, because section 7 keeps one reply until this shows a visible delay | Nancy |
+| **W1b** small section | `walk.ts`, `useWalkTimeline.ts`, `AesBlockWalk.vue`, `SboxView.vue`, `KeySchedulePanel.vue`, `FieldPanel.vue`, `MixMatrixView.vue`, chapter 1 at 128 bits with animation, binary on hover, and typed text (`AesTypedBlocks`, `/typed-block`), encrypt and decrypt, the flip guard | e2e: a learner reaches `Pump four is ok.` by Next alone. A clicked cell's lookup equals the next state, both tables. Grid order clause. S-box scan. Measure the block reply time at AES-128 and AES-256, and record both in `docs/learnings.md`, because section 7 keeps one reply until this shows a visible delay | Nancy |
 | **Stop: show Steve** | Steve steps through chapter 1 in the app and reacts. CBC and modes work starts after this | His reaction goes in `docs/learnings.md`, and later slices read it | Lead |
 | **W1c** | `Gcm.CounterBlock`, `AesWalks.Feed`, the modes route, `AesFeedView.vue`, chapter 2 with ECB, CBC, GCM, and "Mistakes people make". `Gcm.WalkTag`, `Gf128.Inverse` and `SquareRoot`, `GcmForgeries`, `OptionForgeLastBlock`, the attack row, `/ghash`, `/forge`, `GhashView.vue`, `ForgeryView.vue`. Key sizes, two tour steps, gloss | Wire clauses per mode. e2e on wire match and on damage. A15, A15a by a reader who did not write it | Richard, Nancy |
 | W2 | `AesKey.SboxBuild(byte)` and "how the table was built". `flipKeyBit`. `AesKey.DependsOn` and tap-a-byte. `AesLongText`, `/long-text`, `LongTextView.vue`, and the picture side by side. One-bit-flip spread count (4 bytes after round 1, 16 after round 2) | FIPS 5.1.1 worked example for `53`. Spread count against Jared's values | Richard, Nancy |
@@ -1122,19 +1187,22 @@ If Steve does not follow it after 2 rounds of word changes, stop and re-plan the
 | Theme | What a clause checks |
 |---|---|
 | Round values | Every CIPHER and INVERSE CIPHER state for FIPS C.1, C.2, C.3, by position. The vector reader skips the appendix's EQUIVALENT INVERSE CIPHER lists, which hold a different order |
-| Start view | The right-hand grid equals round key 0, and it is gone with Show keys OFF. The first Next lands on AddRoundKey 0 |
+| Start view | At the start of encryption, the right-hand grid equals round key 0, and the first Next lands on AddRoundKey 0. At the start of decryption, it equals round key Nr, and the first Next lands on AddRoundKey Nr. It is gone with Show keys OFF |
 | ShiftRows roll | The roll ends on the engine state. A Back during a roll leaves no strip and no hidden cell. Row 0 does not move |
-| Key fill | Each lit source byte equals the bytes in that byte's equation. A RotWord step lights byte `(j + 1) mod 4` of the word before. The equation's three values equal the reply's. A Back mid-word leaves no mark and no flying byte |
+| Key fill | The lit `w(i - Nk)` byte equals `keyBack[j]`. The lit `w(i - 1)` byte equals `previous` at the source position, which is `(j + 1) mod 4` on a RotWord step. The equation's three values equal the reply's. A Back mid-word leaves no mark and no flying byte |
 | Spec table | Every `url` has a host in `hosts`, and every row has a synopsis that passes reading grade |
 | Spec on screen | A scan of tour text, gloss, and copy finds each spec-shaped name in the table. At the end of each lesson walk, an e2e scan of the page finds no spec-shaped name outside a card trigger. A Host refusal naming RFC 8446 shows a card |
 | Spec card | It opens on hover, focus, and tap. It stays open with the pointer on it. Esc closes it. Tour files keep their hash |
-| Spec link | A new window is always denied. A link opens outside only for a listed host, and a test URL on another host does not open |
+| Spec link | A new window is always denied, and so is `will-navigate`. A link opens outside only for `https:` and a listed host. A test URL on another host does not open, and `file://` with a listed host does not open |
 | Expanded table | 11, 13, and 15 grids of 16 cells. The cell at byte position n shows byte n of the expanded key, and its word name is `w(n / 4)`. No cell shows a letter. The key band ends where section 2.2b says, and those cells start filled |
 | Word build | Next adds one word. The lit cells equal that row's `previous` and `keyBack`. A tap on a built word opens its stage rows, and a tap on an unbuilt word does nothing. Each `aes-walk-*` key schedule cell is gone with Show keys OFF |
 | Key words | FIPS appendix A rows, for all three sizes. The Rcon row equals `01 02 04 08 10 20 40 80 1b 36`, and the used counts are 10, 8, 7 |
 | End frames | Every animated step lands on the engine state for that step, for all three key sizes |
 | Reduced motion | Each step shows its end frame with no transition |
 | Shift map | `state[i]` after ShiftRows equals `state[map[i]]` before it, using the map the tables route sends |
+| Matrix view | The lit row's factors and the flown column equal the part's `factor` and `input`. The landed byte equals the state after. Tapping a byte picks its column. Fill all equals the state after. A Back during Play leaves no flyer, box, or lit row. InvMixColumns shows 14, 11, 13, 9 |
+| Overflow rows | On every doubling, `to` equals `shifted`, XOR `11b` when `reduced`, and `reduced` means `shifted` is past 8 bits. An overflow shows the break-away and the XOR 1b row. The last `running` equals `result`, and the last `sums` equals the part's `result` |
+| ShiftRows colours | On ShiftRows, the marked cells are the staircase at the right. On InvShiftRows, it is at the left. Each marked byte is one that wrapped, by the shift map |
 | Field terms | The XOR of the terms equals the state byte, in every round, both directions. `d4 bf 5d 30` gives `04 66 81 e5` |
 | Definition | Lines 1 to 5 of section 2.2c appear, and pass the reading-grade clause |
 | Step counts | 40, 48, 56 per direction. The last encrypt round has no MixColumns. The decrypt order is section 5.3's |
@@ -1190,7 +1258,7 @@ If Steve does not follow it after 2 rounds of word changes, stop and re-plan the
 | Rejected | Asynchronous projection and a stored view. No staleness exists here, because the walk computes at the query |
 | Where we differ | One learner on one machine. No scale pressure. The read side recomputes with the real engine, and that is the teaching |
 
-**The arithmetic.** One learner, at most about 1 walk query per second while picking blocks. A block reply is about 5 to 7 KiB of states and key words. The MixColumns terms add 1,152 terms at AES-128 and 1,664 at AES-256, at about 40 bytes each by estimate, so about 46 to 67 KiB more. That is a large reply for one click, and it is still small for a local socket, so the design sends it whole and keeps no second query. A feed reply holds at most 5 rows. The tables reply is about 1.1 KiB, fetched once. A walk costs about 6 microseconds in this test environment, against about 0.5 microseconds for `EncryptBlock`. Storage over three years is zero, since nothing is stored. So the design uses no cache, no streaming, and no per-step request. One reply holds the whole walk, and Next is a local move.
+**The arithmetic.** One learner, at most about 1 walk query per second while picking blocks. A block reply is about 5 to 7 KiB of states and key words. The MixColumns terms add 1,152 terms at AES-128 and 1,664 at AES-256. With the matrix view's fields, a spike's count of the JSON gives about 235 KiB at AES-128 and 340 KiB at AES-256. That is a large reply for one click, and it is still small for a local socket, so the design sends it whole and keeps no second query. W1b measures it. A visible delay would move the terms to a query per step. A feed reply holds at most 5 rows. The tables reply is about 1.1 KiB, fetched once. A walk costs about 6 microseconds in this test environment, against about 0.5 microseconds for `EncryptBlock`. Storage over three years is zero, since nothing is stored. So the design uses no cache, no streaming, and no per-step request. One reply holds the whole walk, and Next is a local move.
 
 **Gem catalog.** I read `E:\dev\MMP.ProgrammingGems\INDEX.md`.
 
