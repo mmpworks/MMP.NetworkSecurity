@@ -226,7 +226,8 @@ namespace Acceptance
             {
                 case 1:
                     {
-                        byte[] aes = KeyBytes(_types["lab.aes-key"]);
+                        byte[] aes = (byte[])KeyBytes(_types["lab.aes-key"]).Clone();
+                        if (seed != 20261105 && !Active(_types["lab.aes-key"])) aes[0] ^= (byte)(seed | 1);   // the real lab draws its key from the seed
                         Add(s, "client", "aes.key", Raw("aes.key", "client", aes));
                         byte[] picture = new byte[4096];
                         for (int i = 0; i < picture.Length; i++) picture[i] = (byte)(i % 7);

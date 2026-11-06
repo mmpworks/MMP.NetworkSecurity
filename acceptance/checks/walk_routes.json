@@ -1,0 +1,8 @@
+{
+  "_about": "Every Host route of the walk, with its behaviour while Show keys is OFF (docs/walkthrough-design.md section 3.5). A19.repo.walk-routes-listed fails on a route that is not here. A route may answer with Show keys OFF only if its reply holds no key byte.",
+  "routes": [
+    { "route": "/api/walk/aes/tables", "off": "open", "why": "the tables are public" },
+    { "route": "/api/sessions/{id}/walk/aes/block", "off": "409 KEYS_HIDDEN", "why": "it holds the key and the round keys" },
+    { "route": "/api/sessions/{id}/walk/aes/modes", "off": "open", "why": "each field comes from plain and wire, which the trace shows with Show keys OFF" }
+  ]
+}

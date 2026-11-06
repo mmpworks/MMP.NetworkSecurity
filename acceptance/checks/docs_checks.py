@@ -380,6 +380,88 @@ def statement(root, lesson, patterns, label):
     raise Fail("lesson %d has no single step that states %s (needs text matching %s)" % (lesson, label, " and ".join(patterns)))
 
 
+def fips_table(name):
+    path = os.path.join(os.path.dirname(os.path.dirname(os.path.abspath(__file__))), "vectors", "aes-fips197-rounds.nsv")
+    lines = open(path, encoding="utf-8").read().splitlines()
+    for i, line in enumerate(lines):
+        if line == "table = " + name:
+            return bytes.fromhex(lines[i + 1].split(" = ")[1])
+    raise NotRun("VECTORS_MISSING", "no table %s in aes-fips197-rounds.nsv" % name)
+
+
+def table_patterns(table):
+    """8 bytes from each row of a table, as hex or decimal, with any separators. So a copy of any part of a table shows, whatever its format."""
+    out = []
+    for start in range(0, 256, 16):
+        chunk = table[start:start + 8]
+        out.append(r"[\s,'\"]*(?:0x)?".join("%02x" % b for b in chunk))
+        out.append(r"\b" + r"\s*,\s*".join(str(b) for b in chunk) + r"\b")
+    return [re.compile(p, re.I) for p in out]
+
+
+def a19_no_table_in_app(root):
+    """Design section 3.1: every state and table on screen comes from the engine at query time, so app/src holds neither S-box."""
+    if not os.path.exists(os.path.join(root, "app", "src", "walk.ts")):
+        raise NotRun("PRODUCT_MISSING", "app/src/walk.ts does not exist yet")
+    patterns = table_patterns(fips_table("sbox")) + table_patterns(fips_table("inverse"))
+    hits = []
+    for folder, _, files in os.walk(os.path.join(root, "app", "src")):
+        for name in files:
+            path = os.path.join(folder, name)
+            text = open(path, encoding="utf-8", errors="replace").read()
+            if any(p.search(text) for p in patterns):
+                hits.append(os.path.relpath(path, root))
+    if hits:
+        raise Fail("app/src holds S-box bytes in: %s" % ", ".join(hits))
+    return "no part of either S-box is under app/src"
+
+
+WALK_NEVER = [
+    (r"SubBytes replaces each byte of the plaintext", None),
+    (r"10 main rounds", None),
+    (r"decryption reverses the steps", r"\b(?:one block|ECB|CBC)\b"),
+    (r"matrix multiplication", r"special multiply"),
+    (r"4-bit chunk", None),
+    (r"AES makes the tag", None),
+]
+
+
+def a19_words(root):
+    """Design section 2.6. A banned phrase with an 'unless' pattern is allowed on a line that also matches it."""
+    panel = os.path.join(root, "app", "src", "components", "AesBlockWalk.vue")
+    if not os.path.exists(panel):
+        raise NotRun("PRODUCT_MISSING", "app/src/components/AesBlockWalk.vue does not exist yet")
+    names = [panel, os.path.join(root, "app", "src", "components", "SboxView.vue"), os.path.join(root, "app", "src", "walk-gloss.json"), os.path.join(root, "app", "src", "tours", "lesson-01.json")]
+    bad = []
+    for path in names:
+        if not os.path.exists(path):
+            continue
+        for line in open(path, encoding="utf-8").read().splitlines():
+            for phrase, unless in WALK_NEVER:
+                if re.search(phrase, line, re.I) and not (unless and re.search(unless, line, re.I)):
+                    bad.append("%s: '%s'" % (os.path.basename(path), phrase))
+    if bad:
+        raise Fail("the walk's words break design section 2.6: %s" % "; ".join(bad))
+    return "none of the %d phrases of design section 2.6 is in the walk's words" % len(WALK_NEVER)
+
+
+def a19_routes_listed(root):
+    """Design section 3.5: a clause lists each walk route and its behaviour with Show keys OFF, so a new route must join the list (checks/walk_routes.json)."""
+    host = os.path.join(root, "src", "NetSec.Host")
+    if not os.path.exists(os.path.join(host, "AesWalkRoutes.cs")):
+        raise NotRun("PRODUCT_MISSING", "src/NetSec.Host/AesWalkRoutes.cs does not exist yet")
+    listed = {r["route"] for r in json.load(open(os.path.join(os.path.dirname(os.path.abspath(__file__)), "walk_routes.json"), encoding="utf-8"))["routes"]}
+    found = set()
+    for path in glob.glob(os.path.join(host, "**", "*.cs"), recursive=True):
+        found |= set(re.findall(r"\"(?P<route>/api/[^\"]*walk[^\"]*)\"", open(path, encoding="utf-8").read()))
+    if not found:
+        raise Fail("no walk route found under src/NetSec.Host")
+    unknown = sorted(found - listed)
+    if unknown:
+        raise Fail("these walk routes are not in checks/walk_routes.json: %s. Each needs its Show keys OFF rule and a clause" % ", ".join(unknown))
+    return "%d walk routes in the Host, each listed with its Show keys OFF rule" % len(found)
+
+
 NON_GOAL_HEADING = re.compile(r"(?i)^#{1,6}\s.*\b(non-?goals?|out of scope|not in scope|will not do)\b")
 
 
@@ -582,6 +664,9 @@ def main():
         "A17.ui.test-keys-line": lambda: a17_test_keys_line(root),
         "A17.ui.no-outside-judge-line": lambda: a17_no_outside_judge_line(root),
         "A17.copy.grade-and-tics": lambda: a17_copy_grade_and_tics(root, a.max_grade, a.tic_gate),
+        "A19.app.no-table-under-src": lambda: a19_no_table_in_app(root),
+        "A19.app.words-follow-the-rules": lambda: a19_words(root),
+        "A19.repo.walk-routes-listed": lambda: a19_routes_listed(root),
     }
     if a.list:
         print("\n".join(sorted(clauses)))

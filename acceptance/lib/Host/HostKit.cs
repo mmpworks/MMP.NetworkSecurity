@@ -73,6 +73,7 @@ namespace Acceptance
     public sealed class Reply
     {
         public int Status;
+        public string CacheControl;
         public string Body;
         public Dictionary<string, object> Json;       // set when the body is a JSON object
         public List<object> Array;                    // set when the body is a JSON array, as GET /api/sessions/{id}/events answers
@@ -110,11 +111,12 @@ namespace Acceptance
                 Reply reply = new Reply();
                 reply.Status = (int)r.StatusCode;
                 reply.Body = r.Content.ReadAsStringAsync().Result;
+                reply.CacheControl = r.Headers.CacheControl == null ? null : r.Headers.CacheControl.ToString();
                 try { object parsed = MiniJson.Parse(reply.Body); reply.Json = parsed as Dictionary<string, object>; reply.Array = parsed as List<object>; }
                 catch (FormatException) { reply.Json = null; reply.Array = null; }
                 // A security route the Host does not have answers with the framework's bare 404, which carries no code. That is a feature not built, and never a FAIL.
                 // A 404 with a code (WIZARD_RUN_NOT_FOUND, SECURITY_TYPE_UNKNOWN) comes from a Host that has the route.
-                if (reply.Status == 404 && reply.Code == null && path.StartsWith("/api/security"))
+                if (reply.Status == 404 && reply.Code == null && (path.StartsWith("/api/security") || path.IndexOf("/walk/aes/", StringComparison.Ordinal) >= 0))
                     throw new NotRunException("PRODUCT_MISSING", "the Host has no route " + method + " " + path + " yet (modes-design.md section 8.3)");
                 return reply;
             }
@@ -154,6 +156,12 @@ namespace Acceptance
         public static SessionRun Run(HostProc h, int lesson, string transport, string extraJson)
         {
             return Drive(h, "{\"type\":\"session.start\",\"requestId\":\"r1\",\"lesson\":" + lesson + ",\"seed\":20261105,\"mode\":\"step\",\"transport\":\"" + transport + "\"" + (extraJson ?? "") + "}", true);
+        }
+
+        /// <summary>The same run on a seed the caller picks. A17 runs keep one seed. A19 uses two, so a stored table cannot pass.</summary>
+        public static SessionRun RunSeeded(HostProc h, int lesson, string transport, int seed)
+        {
+            return Drive(h, "{\"type\":\"session.start\",\"requestId\":\"r1\",\"lesson\":" + lesson + ",\"seed\":" + seed + ",\"mode\":\"step\",\"transport\":\"" + transport + "\"}", true);
         }
 
         /// <summary>

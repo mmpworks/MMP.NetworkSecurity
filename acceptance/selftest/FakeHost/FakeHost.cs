@@ -193,6 +193,7 @@ namespace Acceptance
 
         void Route(HttpListenerContext ctx, string method, string path, Dictionary<string, object> body)
         {
+            if (WalkRoute(ctx, path)) return;
             if (path == "/api/health")
             {
                 Dictionary<string, object> h = D("ok", true);
