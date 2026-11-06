@@ -254,12 +254,12 @@
       "lesson": 10,
       "title": "The issuer sets a challenge",
       "text": [
-        "The issuer answers with a random challenge, a number used once. It keeps a copy of the challenge it sent. Find it in the issuer column of the secrets panel.",
+        "The issuer answers with a random challenge, a number used once. It keeps a copy of the challenge it sent. The challenge travels in the clear, so the secrets panel does not list it. Find it in the inspector.",
         "The challenge makes the proof fresh. Because the issuer remembers it, only a challenge it really sent can be answered."
       ],
       "glossary": [],
       "bind": { "kind": "event", "eventType": "wire.sent", "match": { "actor": "issuer", "message": "Challenge" } },
-      "highlight": ["inspector:field=challenge", "secrets:row=issuer.auth.issued-challenge"],
+      "highlight": ["inspector:field=challenge"],
       "unlock": { "mode": "event" }
     },
     {

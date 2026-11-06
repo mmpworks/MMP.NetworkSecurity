@@ -30,10 +30,11 @@ Each call carries a token and a fresh DPoP proof. The server answers each with `
 
 The token parts and proof parts have dots between them, one byte each. Their fields are named `dot`, with kind `header`.
 
+The challenge nonce and the signed answer travel in the clear. They are public protocol values, so no `secret.derived` event lists them. The issuer keeps the nonce it sent as state, to compare the answer. The client keeps its last answer as state, for the replay row.
+
 | Event type | `actor` | `message` | Carries |
 |---|---|---|---|
-| `secret.derived` | `client` | none | `secrets[]`: `auth.device-key`, then `auth.challenge`, then `auth.token` |
-| `secret.derived` | `issuer` | none | `secrets[]`: `auth.issued-challenge`. The challenge is public on the wire. The issuer stores it to compare the answer |
+| `secret.derived` | `client` | none | `secrets[]`: `auth.device-key`, then `auth.token`, then `auth.last-call` (the token and the DPoP proof of each call) |
 | `measure.result` | `issuer` | `token claims` | `plain`: the claims JSON as text. Bind the moment that splits a token and reads its claims here |
 | `measure.result` | `client` | `proof claims` | `plain`: the DPoP claims JSON as text, one per call |
 | `auth.message.sent`, `wire.sent` | sender | as tables | |
