@@ -115,13 +115,15 @@ namespace Acceptance
             if (!found) { WalkFail(ctx, 404, "SESSION_NOT_FOUND", "no session " + id); return true; }
             if (s.Lesson != 1) { WalkFail(ctx, 409, M("walk-lesson-wrong-code") ? "WALK_WAITING_FOR_WIRE" : "WALK_NOT_BUILT", "the walk is built for lesson 1"); return true; }
             string source = ctx.Request.QueryString["source"], bits = ctx.Request.QueryString["keyBits"];
-            if (source != "text" || bits != "128")
+            if (source != "text" || (bits != "128" && bits != "192" && bits != "256"))
             {
                 if (M("walk-bad-argument-500")) { WalkFail(ctx, 500, "AES_WALK_DIVERGED", "a bad argument"); return true; }
                 WalkFail(ctx, 400, "WALK_BAD_ARGUMENT", "source and keyBits");
                 return true;
             }
-            byte[] key = M("walk-canned") || (s.EcbFork && M("walk-fork-other-key")) ? CannedWalkKey : RunKey(s);
+            int keyBits = int.Parse(bits);
+            byte[] key = keyBits != 128 ? AesWalkHostClauses.PracticeKey(M("walk-practice-no-xor") ? s.Seed ^ keyBits : s.Seed, keyBits)
+                : M("walk-canned") || (s.EcbFork && M("walk-fork-other-key")) ? CannedWalkKey : RunKey(s);
             byte[] block = Encoding.ASCII.GetBytes("Pump four is ok.");
             if (M("walk-input-other")) block[0] ^= 1;
             RefAes reference = new RefAes(key);
@@ -146,7 +148,7 @@ namespace Acceptance
             }
             if (M("walk-adds-event")) Add(s, "client", "aes.walk.read");
             if (M("walk-state-in-events")) Add(s, "client", "aes.walk.state", Raw("walk.state", "client", Hex.Decode(forward.Steps[1].State)));
-            Dictionary<string, object> reply = D("source", "text", "keyBits", 128.0, "rounds", 10.0, "keySource", "run", "inputHex", Hex.Encode(block),
+            Dictionary<string, object> reply = D("source", "text", "keyBits", (double)keyBits, "rounds", (double)(keyBits / 32 + 6), "keySource", keyBits != 128 && !M("walk-practice-says-run") ? "practice" : "run", "inputHex", Hex.Encode(block),
                 "keyWords", words, "forward", RunJson(forward), "inverse", RunJson(inverse), "wire", D("status", M("walk-label-match") || (s.EcbFork && !M("walk-fork-not-sent")) ? "match" : "notSent", "message", "TextEcb"));
             WalkWrite(ctx, 200, reply, M("walk-no-store-missing"));
             return true;

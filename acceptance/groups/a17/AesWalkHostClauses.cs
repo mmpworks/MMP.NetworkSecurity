@@ -127,6 +127,69 @@ namespace Acceptance
             return values + " values on 2 seeds equal RefAes, and each output equals the BCL";
         }
 
+        /// <summary>The practice key of walkthrough-design.md: new SeededRandom(session.Seed ^ keyBits), which is SHAKE256 of the label "NetSec.Seed" and the value in big-endian order. This group links no product code, so the .NET library computes it.</summary>
+        public static byte[] PracticeKey(int seed, int keyBits)
+        {
+            int v = seed ^ keyBits;
+            byte[] input = new byte[15];
+            Encoding.ASCII.GetBytes("NetSec.Seed", 0, 11, input, 0);
+            input[11] = (byte)(v >> 24); input[12] = (byte)(v >> 16); input[13] = (byte)(v >> 8); input[14] = (byte)v;
+            return Shake256.HashData(input, keyBits / 8);
+        }
+
+        /// <summary>At 192 and 256 bits, chapter 1 runs a practice key from the session seed. Each walk equals RefAes and the BCL under that key, and Show keys OFF closes it.</summary>
+        [Clause("A19.host.practice-key-192-256")]
+        public static string PracticeKeySizes(Ctx c)
+        {
+            int values = 0;
+            using (HostProc h = A17.Host(c, "walk-practice"))
+            using (Aes aes = Aes.Create())
+            {
+                List<string> seen = new List<string>();
+                byte[] block = Encoding.ASCII.GetBytes(TextBlock);
+                SessionRun run = null;
+                foreach (int seed in new int[] { 20261105, 7 })
+                {
+                    run = HostSession.RunSeeded(h, 1, "glass", seed);
+                    Check.True(run.SessionId != null, "seed " + seed + ": no session: " + run.ErrorCode);
+                    string runKey = KeyOf(run);
+                    foreach (int bits in new int[] { 192, 256 })
+                    {
+                        string where = "seed " + seed + " at " + bits + " bits";
+                        byte[] key = PracticeKey(seed, bits);
+                        string keyHex = Hex.Encode(key).ToLowerInvariant();
+                        Check.True(!seen.Contains(keyHex) && !keyHex.StartsWith(runKey, StringComparison.Ordinal), where + ": the expected key repeats another key, so this clause cannot tell them apart");
+                        seen.Add(keyHex);
+                        Reply r = HostHttp.Get(h, "/api/sessions/" + run.SessionId + "/walk/aes/block?source=text&keyBits=" + bits);
+                        Check.True(r.Ok && r.Json != null, where + ": GET block got " + r);
+                        Check.True((int)MiniJson.Num(r.Json, "keyBits", 0) == bits, where + ": keyBits is " + MiniJson.Num(r.Json, "keyBits", 0));
+                        int rounds = bits / 32 + 6;
+                        Check.True((int)MiniJson.Num(r.Json, "rounds", 0) == rounds, where + ": rounds is " + MiniJson.Num(r.Json, "rounds", 0));
+                        Check.True(MiniJson.Str(r.Json, "keySource") == "practice", where + ": keySource is " + MiniJson.Str(r.Json, "keySource"));
+                        RefAes reference = new RefAes(key);
+                        WalkRun forward = ReadWalk(MiniJson.Obj(r.Json, "forward"), where + " forward", rounds);
+                        values += WalkCheck.Compare(where + " forward against RefAes", reference.Encrypt(block), forward);
+                        aes.Key = key;
+                        Check.True(string.Equals(forward.Output, Hex.Encode(aes.EncryptEcb(block, PaddingMode.None)), StringComparison.OrdinalIgnoreCase), where + ": the forward output differs from the BCL");
+                        WalkRun inverse = ReadWalk(MiniJson.Obj(r.Json, "inverse"), where + " inverse", rounds);
+                        values += WalkCheck.Compare(where + " inverse against RefAes", reference.Decrypt(Hex.Decode(forward.Output)), inverse);
+                        values += WalkCheck.CompareRows(where + " key rows against RefAes", reference.KeyRows, ReadRows(r.Json));
+                    }
+                }
+                SetShowKeys(h, false);
+                foreach (int bits in new int[] { 192, 256 })
+                {
+                    Reply off = HostHttp.Get(h, "/api/sessions/" + run.SessionId + "/walk/aes/block?source=text&keyBits=" + bits);
+                    Check.True(off.Status == 409 && off.Code == "KEYS_HIDDEN", "OFF at " + bits + " bits: GET block got " + off + ", expected 409 KEYS_HIDDEN");
+                    // This looks for the whole key. A scan for any run of hex digits would trip on requestId, which is 32 hex characters.
+                    string body = (off.Body ?? "").ToLowerInvariant();
+                    Check.True(body.IndexOf(Hex.Encode(PracticeKey(7, bits)).ToLowerInvariant(), StringComparison.Ordinal) < 0, "OFF at " + bits + " bits: the error body holds the practice key");
+                }
+                SetShowKeys(h, true);
+            }
+            return values + " values on 2 seeds and 2 key sizes equal RefAes under the key from the seed, each output equals the BCL, and OFF closes both sizes";
+        }
+
         [Clause("A19.host.show-keys-off-closes-block-first")]
         public static string OffClosesBlock(Ctx c)
         {
