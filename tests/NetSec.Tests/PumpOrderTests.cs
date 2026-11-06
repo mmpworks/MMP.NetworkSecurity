@@ -18,9 +18,10 @@ namespace NetSec.Tests
         /// <summary>Each call makes one output. Its wire bytes are the count of outputs so far, so a swap shows on the far side.</summary>
         sealed class CountingEngine : IProtocolEngine
         {
-            readonly TraceStream _stream = Make.Stream("client");
+            readonly TraceStream _stream;
             int _count;
             public volatile bool Fed;
+            public CountingEngine(string actor = "client") { _stream = Make.Stream(actor); }
             public EngineStatus Status { get; private set; } = EngineStatus.Open;
             public TraceStream Stream => _stream;
             public string Peer => "server";
@@ -104,6 +105,81 @@ namespace NetSec.Tests
             pump.Enqueue(EngineCommand.Close);
             Assert.True(run.Wait(20000));
             Assert.Equal(0, misordered);
+        }
+
+        /// <summary>Delivers the bytes, then holds the writer. The peer can read and answer during that hold.</summary>
+        sealed class SlowFinishLink : IByteLink
+        {
+            readonly IByteLink _inner;
+            readonly ListSink _sink;
+            public int WireSentAtWrite = -1;
+            public SlowFinishLink(IByteLink inner, ListSink sink) { _inner = inner; _sink = sink; }
+            public IFuture<int> Read(byte[] b, int off, int n) => _inner.Read(b, off, n);
+            public void Close() => _inner.Close();
+
+            public IFuture Write(byte[] b, int off, int n)
+            {
+                if (WireSentAtWrite < 0) WireSentAtWrite = _sink.Events.Length;
+                IFuture write = _inner.Write(b, off, n);
+                Thread.Sleep(200);
+                return write;
+            }
+        }
+
+        static string[] WireSentActors(ListSink sink)
+        {
+            System.Collections.Generic.List<string> actors = new System.Collections.Generic.List<string>();
+            foreach (TraceEvent e in sink.Events) if (e.Type == "wire.sent") actors.Add(e.Actor);
+            return actors.ToArray();
+        }
+
+        /// <summary>
+        /// The session list is one order across two pumps, and a lesson counts round trips from it. So a message is logged before its bytes can reach the peer.
+        /// Logged after the write, a reply can be listed ahead of the message it answers: lesson 7 then showed 1 round trip where the run took 2.
+        /// </summary>
+        [Fact]
+        public void A_reply_is_never_logged_ahead_of_the_message_it_answers()
+        {
+            MemoryLink[] links = MemoryLink.Pair();
+            ListSink sink = new ListSink();
+            EnginePump client = new EnginePump(new CountingEngine("client"), new SlowFinishLink(links[0], sink), sink, new FreeRunGate(), null, 0);
+            EnginePump server = new EnginePump(new CountingEngine("server"), links[1], sink, new FreeRunGate(), null, 0);
+            IFuture<PumpResult> clientRun = client.Run(), serverRun = server.Run();
+
+            client.Enqueue(new EngineCommand(EngineCommandKind.Send, 0, new byte[1], null));
+            SpinWait.SpinUntil(() => WireSentActors(sink).Length >= 2, 20000);
+
+            // These engines answer every message, so the exchange runs on. The first two entries are the request and its reply.
+            string[] actors = WireSentActors(sink);
+            Assert.Equal("client", actors[0]);
+            Assert.Equal("server", actors[1]);
+            client.Enqueue(EngineCommand.Close);
+            server.Enqueue(EngineCommand.Close);
+            links[0].Close();
+            links[1].Close();
+            clientRun.Wait(20000);
+            serverRun.Wait(20000);
+        }
+
+        [Fact]
+        public void A_message_is_in_the_trace_when_its_bytes_go_to_the_link()
+        {
+            MemoryLink[] links = MemoryLink.Pair();
+            ListSink sink = new ListSink();
+            SlowFinishLink link = new SlowFinishLink(links[0], sink);
+            EnginePump pump = new EnginePump(new CountingEngine(), link, sink, new FreeRunGate(), null, 0);
+            IFuture<PumpResult> run = pump.Run();
+
+            pump.Enqueue(new EngineCommand(EngineCommandKind.Send, 0, new byte[1], null));
+            Assert.True(SpinWait.SpinUntil(() => WireSentActors(sink).Length >= 1, 20000));
+
+            Assert.True(link.WireSentAtWrite >= 0, "the link never saw a write");
+            TraceEvent[] atWrite = new TraceEvent[link.WireSentAtWrite];
+            System.Array.Copy(sink.Events, atWrite, link.WireSentAtWrite);
+            Assert.Contains(atWrite, e => e.Type == "wire.sent");
+            pump.Enqueue(EngineCommand.Close);
+            links[1].Close();
+            run.Wait(20000);
         }
     }
 }
