@@ -227,7 +227,7 @@ In lesson 1, a free flip on a non-wire event changes nothing. `Interpreter.Apply
 
 | Mistake | What the learner runs | What the learner sees |
 |---|---|---|
-| ECB, often as a tool's default | `L1-use-ecb` | Equal blocks give equal cipher blocks |
+| ECB | `L1-use-ecb` | Equal blocks give equal cipher blocks |
 | CBC with no tag. A strong key does not fix this | `L1-flip-cbc` | A flipped bit passes with no error |
 | A repeated GCM nonce | `L1-reuse-nonce` | Two messages share a key stream. Only the lab's detector calls it out |
 
