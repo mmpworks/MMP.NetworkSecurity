@@ -326,10 +326,13 @@ namespace NetSec.Host
             string[] lines = File.ReadAllLines(path);
             // fileHidesKeys: the file was saved with Show keys OFF, so its bytes are gone and ON cannot bring them back.
             Send(new { type = "session.started", requestId, sessionId, replay = true, sessionFile = path, fileHidesKeys = lines.Any(TraceLines.HoldsHiddenKeys) });
-            bool show = security.ShowKeys;
+            // Each line reads the toggle as it goes out, so a flip during the replay hides every line after the flip frame.
             long seq = 0;
             foreach (string line in lines)
-                sessions.Broadcast($"{{\"type\":\"trace\",\"sessionId\":{JsonSerializer.Serialize(sessionId)},\"seq\":{++seq},\"event\":{(show ? line : TraceLines.HideLine(line))}}}");
+            {
+                long lineSeq = ++seq;
+                sessions.BroadcastPicked(show => $"{{\"type\":\"trace\",\"sessionId\":{JsonSerializer.Serialize(sessionId)},\"seq\":{lineSeq},\"event\":{(show ? line : TraceLines.HideLine(line))}}}");
+            }
             Send(new { type = "session.finished", sessionId, outcome = "replay", code = (string?)null, check = (string?)null });
         }
 
