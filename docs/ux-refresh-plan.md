@@ -6,9 +6,9 @@ Owner: Nancy. Decision owner: Steve. Date: 2026-11-06.
 
 1. The refresh ships in 5 small slices. Each slice is one PR with its own pictures.
 2. Slices 1 and 2 land the shell, the top bar and the Tour panel first. Richard's spec cards (SC) and walk screens (W1b) build on that shell.
-3. No design doc from Richard is needed for the shell. The drawing is the design. Section 3 names the walk's root element, and Richard confirms it.
+3. No design doc from Richard is needed for the shell. The drawing is the design. Section 3 names the walk's root element, and Richard has confirmed it.
 4. No test id changes. Specs change only where a control moves into Settings.
-5. Recommendation: approve the font decision in section 7, then start slice 1.
+5. The lead approved fonts on conditions (section 7). Slice 1 is #184.
 
 ## 1. Goal and approved direction
 
@@ -39,7 +39,16 @@ The work ends when all of these are true, by 2026-11-13:
 | Lesson rail | `lesson-rail` | Unchanged test id |
 | Workspace | `workspace` | The diagram, bytes, tour and secrets panels, or the walk |
 
-**The walk mounts in the workspace.** The element is `<section data-testid="walk-root" class="walk-root">`. It replaces the diagram, bytes, tour and secrets panels while the AES walk is open, and the rail and top bar stay. `.walk-root` has `position: relative` and `overflow: clip`, so Pause and flying bytes stay inside it (`walkthrough-design.md` section 2.2a). Richard confirms this before W1b starts.
+**The walk mounts in the workspace.** The element is `<section data-testid="walk-root" class="walk-root">`. It replaces the diagram, bytes, tour and secrets panels while the AES walk is open, and the rail and top bar stay. `.walk-root` has `position: relative` and `overflow: clip`, so Pause and flying bytes stay inside it (`walkthrough-design.md` section 2.2a).
+
+Richard confirmed this on 2026-11-06, with 4 conditions:
+
+1. The control that opens the walk keeps `aes-walk-tab`. It stays visible while the walk is open, and it is also the way back. `aes-walk-panel` is Richard's, inside the root.
+2. `workspace` scrolls, and `walk-root` grows with its content.
+3. Tips and spec cards mount in one overlay layer outside `walk-root`, so the clip cannot cut them. The shell provides that layer.
+4. `walk-root` stays mounted with Show keys OFF, because the closed line shows inside it.
+
+The tour panel hides while the walk is open. A tour step says to open the walk, and the learner returns by the same control.
 
 Reason: the approved mock needs about 1180 px of width. The bottom panel has about 700 px at 1440 wide.
 
@@ -76,16 +85,9 @@ Order across the team, from Richard: slice 2 lands the shell, then SC, then W1b.
 5. **Contrast and motion.** Every slice passes the 4.5 to 1 sweep in both themes. Every motion respects `prefers-reduced-motion`.
 6. **Pictures.** Each PR body shows before and after, in both themes.
 
-## 7. Decision for the lead: fonts
+## 7. Fonts
 
-The mock uses Familjen Grotesk, Atkinson Hyperlegible and JetBrains Mono from Google Fonts. The app is offline-first, and a learner may have no network, so the fonts must ship in the app.
-
-| Option | What it needs | Cost |
-|---|---|---|
-| A. Add the 3 `@fontsource` packages | Approval for 3 new packages, and their licenses in `THIRD-PARTY-NOTICES.md` | About 1 MB in the app |
-| B. Use system fonts: Segoe UI and Consolas | Nothing | The app looks less like the mock Steve approved |
-
-Recommendation: A. All 3 families carry the SIL Open Font License, which I must confirm from the package files before I add them. Without approval I build on B, and A stays a one-line change.
+The mock uses Familjen Grotesk, Atkinson Hyperlegible and JetBrains Mono. The app works offline, so the fonts ship inside it. The lead approved 3 `@fontsource` packages on conditions: pinned versions at least 2 weeks old, the license and install scripts read first, only the weights in use, the licenses recorded, and a spec that fails if a font request leaves the app. #184 reports each condition.
 
 ## 8. Not in this plan
 
@@ -100,4 +102,4 @@ Recommendation: A. All 3 families carry the SIL Open Font License, which I must 
 
 ## 10. Disposition
 
-Start slice 1 when the lead answers section 7. Richard confirms section 3 before W1b.
+Slice 1 is #184. Slice 2 follows when #182 and #184 land. OS transport stays in the top bar at every width, and the slice 2 picture tells Steve why.
