@@ -2,11 +2,12 @@ import { expect, test, type Page } from '@playwright/test'
 import * as fs from 'node:fs'
 import * as path from 'node:path'
 import { MIN_RATIO, scanPage, setTheme } from './contrast'
-import { open } from './walk'
+import { open, PORT, TOKEN } from './walk'
 
 // V1 vault page and the three exercise screens, on a real Host with the /api/security/vault routes. Contrast is tested on every screen in both themes.
 const OUT = path.join(__dirname, '..', 'test-results', 'vault-v1')
 const shot = async (page: Page, name: string) => { fs.mkdirSync(OUT, { recursive: true }); await page.screenshot({ path: path.join(OUT, `${name}.png`) }) }
+const api = (method: string, p: string, body?: unknown) => fetch(`http://127.0.0.1:${PORT}${p}`, { method, headers: { Authorization: `Bearer ${TOKEN}`, 'Content-Type': 'application/json' }, body: body === undefined ? undefined : JSON.stringify(body) })
 const TEST_KEYS = 'Use test keys only. This course shows your keys on screen and in saved files.'
 
 async function openVault(page: Page) {
@@ -145,6 +146,9 @@ test('the chain check names the row after an edited row, and both results name w
   await page.getByTestId('vault-tab-audit').click()
   await page.getByTestId('vault-audit-check').click()
   await expect(page.getByTestId('vault-audit-chain')).toContainText('Every row fits the row before it.')
+  const hostLimits = ((await (await api('POST', '/api/security/vault/exercise/audit-check', {})).json()) as { limits: string }).limits
+  expect(hostLimits).not.toBe('')
+  await expect(page.getByTestId('vault-audit-limits')).toHaveText(hostLimits)
   await expect(page.getByTestId('vault-audit-limits')).toContainText('an edit to the newest row')
   await expect(page.getByTestId('vault-audit-limits')).toContainText('rows cut from the end')
   await expect(page.getByTestId('vault-audit-limits')).toContainText('a full rewrite')
