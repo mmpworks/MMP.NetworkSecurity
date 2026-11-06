@@ -211,6 +211,8 @@ public sealed class ShowKeysLiveTests
         Assert.True(traces == 3000, "the socket got " + traces + " of 3000 trace frames, so the order check would not hold");
         int late = WithHex(ws.Frames.Skip(off + 1).SelectMany(SecretsIn));
         Assert.True(late == 0, late + " secrets with hex reached the socket after the flip to OFF, out of " + ws.Frames.Skip(off + 1).Count(f => f.GetProperty("type").GetString() == "trace") + " trace frames after it");
-        Assert.True(ws.Frames.Take(off).Count(f => f.GetProperty("type").GetString() == "trace") < 3000, "the replay ended before the flip, so the test proves nothing");
+        int before = ws.Frames.Take(off).Count(f => f.GetProperty("type").GetString() == "trace");
+        Assert.True(before > 0, "the flip landed before the replay started, so the test proves nothing");
+        Assert.True(before < 3000, "the replay ended before the flip, so the test proves nothing");
     }
 }
