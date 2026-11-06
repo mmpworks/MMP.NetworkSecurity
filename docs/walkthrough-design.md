@@ -56,7 +56,22 @@ Steve's Wikipedia page sets the order. It describes the older TDES form. **This 
 | 7. The bank | The bank holds no per-reader key. It takes the KSN, walks from the base key through each 1 bit of the counter, and reaches the same PIN key | Bank | Replay of `DukptDerivation.WalkDown` |
 | 8. A past key | Attack `L6-ask-past-key`: the reader cannot rebuild a used key. `L6-replay-sale`: the bank refuses a repeated KSN | Both | `check.result` |
 
-**Words on screen.** "Erased" keeps the existing tour line: erasing clears a register in place, and a managed heap can keep copies.
+**The shape on screen.** One chain of real values, top to bottom, in numbered steps with one input and one output each, ending in the digits the learner can read. The lab's sale 3 is counter binary 11, so it shows a two-step walk. The screen uses the run's real keys.
+
+**A checked test case, off screen.** Jared computed this chain on the course code. X9's free test vector PDF lists the four key values marked "X9". W5 pins it in a test.
+
+| Step | Value |
+|---|---|
+| Base key | `FEDCBA9876543210F1F1F1F1F1F1F1F1` |
+| Key id | `1234567890123456` |
+| Initial key (X9) | `1273671EA26AC29AFA4D1084127652A1` |
+| Counter 5 is binary 101, so bit 2 is on: counter 4 (X9) | `0EEFC7ADA628BA68878DA9165A8A1887` |
+| Then bit 0 is on: counter 5 (X9) | `C2A7AC328A5DA2D6002D62465BFC028B` |
+| PIN key for counter 5 (X9) | `35A43BC9EFEB09C756204B57E3FB7D4D` |
+| KSN | `123456789012345600000005` |
+| PIN block, random `0102030405060708` | `8C1C1152B1543E9D70CA145336E264E2`, opens to `1234` |
+
+**Words on screen.** Older DUKPT pages call a single "session key" a PIN variant, with XOR masks. Those are TDES details, and they stay out. "Erased" keeps the existing tour line: erasing clears a register in place, and a managed heap can keep copies.
 
 **How the query stays real.** It builds a new `DukptPinPad` from the run's `dukpt.initial` bytes and key id, steps it to each sale, and reads its registers. `HeldKeys()` gives no register numbers, so W5 adds a read that does. Each replayed PIN key must equal the run's `dukpt.pinKey.<c>`, or the query throws `WALK_DIVERGED`. The replay writes no event, so the golden holds.
 
@@ -228,10 +243,10 @@ In lesson 1, a free flip on a non-wire event changes nothing. `Interpreter.Apply
 | Mistake | What the learner runs | What the learner sees |
 |---|---|---|
 | ECB, the default in some tools | `L1-use-ecb` | Equal blocks give equal cipher blocks |
-| CBC with no tag. A strong key does not fix this | `L1-flip-cbc` | In this lab, a flipped bit passes with no error. A library that checks padding raises an error on a flip in the last blocks, and it still passes a flip in the earlier blocks |
+| CBC with no tag. A strong key does not fix this | `L1-flip-cbc` | In this lab, a flipped bit passes with no error. A library that checks padding can raise an error on a flip near the end, and it still passes a flip in the earlier blocks |
 | A repeated GCM nonce | `L1-reuse-nonce` | Two messages share a key stream. Only the lab's detector calls it out |
 
-Off-screen sources for these words. MySQL 8.4 Reference Manual, `block_encryption_mode`: default value `aes-128-ecb`. .NET 10.0.14 `Aes.Create()`, run by Jared: CBC and PKCS7 by default, and a flip in an earlier block raised no error on 384 of 384, while the second-last block raised a padding error on 128 of 128, and the last byte raised one on all 8 bits. MySQL stays off the screen.
+Off-screen sources for these words. MySQL 8.4 Reference Manual, `block_encryption_mode`: default value `aes-128-ecb`. .NET 10.0.14 `Aes.Create()`, run by Jared: CBC and PKCS7 by default, and a flip in an earlier block raised no error on 384 of 384, while the second-last block raised a padding error on 128 of 128 for a 64-byte text and on 56 of 128 for a 41-byte text, and the last byte of the 64-byte text raised one on all 8 bits. MySQL stays off the screen.
 
 **Out of scope, named on the tab.** The modes page also lists CFB, OFB, and CTR, and it names XTS. CFB, OFB, and XTS are not in this course (grep of `src/NetSec.Core`: 0 files). CTR alone runs in lesson 8's SSH suite, and the panel points there. Lesson 1 runs counter mode only inside GCM.
 
