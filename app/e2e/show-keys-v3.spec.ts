@@ -2,21 +2,26 @@ import { expect, test, type Page } from '@playwright/test'
 import * as fs from 'node:fs'
 import * as path from 'node:path'
 import { MIN_RATIO, scanPage, setTheme } from './contrast'
-import { open, PORT, TOKEN } from './walk'
+import { startOwnHost, type OwnHost } from './own-host'
+import { open } from './walk'
 
 // V3: the Show keys switch is real. The Host redacts at its boundary, so this spec drives the switch and reads the screen against the Host's own answers.
 const OUT = path.join(__dirname, '..', 'test-results', 'show-keys-v3')
 const shot = async (page: Page, name: string) => { fs.mkdirSync(OUT, { recursive: true }); await page.screenshot({ path: path.join(OUT, `${name}.png`) }) }
 const api = (method: string, p: string, body?: unknown) =>
-  fetch(`http://127.0.0.1:${PORT}${p}`, { method, headers: { Authorization: `Bearer ${TOKEN}`, 'Content-Type': 'application/json' }, body: body === undefined ? undefined : JSON.stringify(body) })
+  fetch(`http://127.0.0.1:${host.port}${p}`, { method, headers: { Authorization: `Bearer ${host.token}`, 'Content-Type': 'application/json' }, body: body === undefined ? undefined : JSON.stringify(body) })
 const hostOn = async () => ((await (await api('GET', '/api/security/show-keys')).json()) as { on: boolean }).on
 
 test.describe.configure({ mode: 'serial' })
+
+// The own-keys test makes a key for good, and this file flips the Host-wide switch, so it runs on a Host of its own.
+let host: OwnHost
+test.beforeAll(async () => { host = await startOwnHost() })
 test.beforeEach(async () => { await api('PUT', '/api/security/show-keys', { on: true }) })
-test.afterAll(async () => { await api('PUT', '/api/security/show-keys', { on: true }) })
+test.afterAll(async () => { await host.stop() })
 
 async function freePlay(page: Page, lesson: number) {
-  await open(page)
+  await open(page, host)
   await page.getByTestId(`lesson-item-${lesson}`).click()
   await page.getByTestId('mode-free').click()
   await page.getByTestId('free-start').click()
@@ -122,6 +127,19 @@ test('OFF: two sides that hold one key still show a match, from the fingerprints
   await expect.poll(async () => /[0-9a-f]{32,}/i.test(await rowText(page))).toBe(false)
   await expect(page.getByTestId('convergence-match').first()).toBeVisible()
   await shot(page, '03-lesson3-off')
+})
+
+test('OFF at 1440 x 760: the banner cuts no row of the Message bytes panel', async ({ page }) => {
+  await page.setViewportSize({ width: 1440, height: 760 })
+  await freePlay(page, 1)
+  await page.locator('[data-testid^=diagram-message-]', { hasText: 'TextGcm1' }).first().click()
+  await page.getByTestId('inspector-tab-bytes').click()
+  await page.getByTestId('show-keys-switch').uncheck()
+  await expect.poll(hostOn).toBe(false)
+  await page.waitForTimeout(900)
+  const grids = await page.locator('.hex-scroll').evaluateAll(all => all.map(e => ({ shown: e.clientHeight, whole: e.scrollHeight })))
+  expect(grids).toHaveLength(2)
+  for (const g of grids) expect(g.whole, 'a hex row is cut').toBeLessThanOrEqual(g.shown)
 })
 
 test('OFF: the key log is refused by name', async ({ page }) => {

@@ -84,8 +84,8 @@ const raceUpTo = computed(() => selectedEvent.value?.seq ?? Infinity)
 const race = computed(() => ({ left: raceStats(shownEvents.value, raceUpTo.value, 'tls11'), right: raceStats(shownEvents.value, raceUpTo.value, 'tls13') }))
 
 function setView(v: ViewMode) { ui.view = v }
-// The Message bytes pane keeps at least 345 px, the height of a short message with every row and field in view. The diagram scrolls, so it gives up the height.
-const bytesPanePercent = Math.min(70, Math.max(46, Math.ceil(345 / Math.max(1, window.innerHeight - 90) * 100)))
+// The Message bytes pane keeps at least 360 px: a short message with every row and field in view, also under the 50 px Show keys banner. The diagram scrolls, so it gives up the height.
+const bytesPanePercent = Math.min(70, Math.max(46, Math.ceil(360 / Math.max(1, window.innerHeight - 90) * 100)))
 function toggleTransport() { ui.transport = ui.transport === 'os' ? 'glass' : 'os' }
 
 function moveSelection(d: number) {
