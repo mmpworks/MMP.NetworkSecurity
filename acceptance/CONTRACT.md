@@ -58,7 +58,7 @@ The command lines below come from section 11 and section 6. A flag marked ASSUME
 | `NetSec.Host.exe` | `--port P --token T`, and also the environment `NETSEC_PORT`, `NETSEC_TOKEN` (section 5), because sections 5 and 11 differ and the suite sends both; `LOCALAPPDATA`; `NETSEC_OS_PEER=127.0.0.1:<port>` and `SSL_CERT_FILE=<peer certificate>` for the OS transport | binds `127.0.0.1:P` | `LOCALAPPDATA` moves the session folder. `NETSEC_OS_PEER` (ASSUMED, renamed from `NETSEC_REAL_PEER`) tells the OS transport which TLS 1.3 server lesson 5 connects to. The peer is an OpenSSL `s_server` with an RSA key (SslStream fails the handshake against an Ed25519 server certificate, modes-design.md section 7.1) and a self-signed certificate. `SSL_CERT_FILE` (ASSUMED) is the custom trust the OS transport must load for that certificate, since the system store does not hold it. `NETSEC_SECURITY_DIR` moves the `.security/` folder (section 5). The suite starts a lesson with `session.start` in `mode: step`, then sends `session.run` (ASSUMED value) |
 
 Trace file lines (NDJSON, one object per line, `ux-design.md` section 0 and `program-design.md` section 2.1): `actor`, `type`, `from`, `to`, `wire` (hex), `plain` (hex), `secrets[]` (`holder`, `name`, `hex`), `check` (`name`, `result` pass or fail, `code`), `traceId`, `hop` (`hop1` for CE to gateway, `hop2` for gateway to server), `streamId`, `streamSeq`, `message`.
-Each process emits a `wire.sent` event for the bytes it wrote to the socket after tamper (section 2.1). For one hop, the `wire.sent` bytes of the client end, joined in file order, equal the tap log client-to-server bytes. The `wire.sent` bytes of the server end equal the tap log server-to-client bytes (A10a).
+Each process emits a `wire.sent` event for the bytes it hands to the socket after tamper (section 2.1), just before the link write (PR #162). On a failed write, a `wire.sent` event can name bytes that did not fully leave, and a `wire.write.failed` event follows it. That event carries no wire bytes, and its Detail starts with the code and names the `wire.sent` event id. So the equality below applies to a run with no `wire.write.failed` event. For one hop, the `wire.sent` bytes of the client end, joined in file order, equal the tap log client-to-server bytes. The `wire.sent` bytes of the server end equal the tap log server-to-client bytes (A10a).
 All five processes use one `traceId`: the PIN pad makes it and the envelope carries it.
 
 ## 4. Product files the text clauses read
@@ -166,6 +166,10 @@ Source: `docs/walkthrough-design.md` on `main` at c19b151 (Jared's pass on d1368
 | `GET /api/walk/aes/tables` | `sbox`, `inverseSbox` as 512 hex characters. Open with Show keys OFF. `Cache-Control: no-store` | Design 3.4 |
 | `GET /api/sessions/{id}/walk/aes/block?source=text&keyBits=128` | `source`, `keyBits`, `rounds`, `keySource`, `inputHex`, `keyWords[]`, `forward`, `inverse`, `wire` | Design 3.4. `forward` and `inverse` hold `input`, `output`, `steps[]` with `kind`, `round`, `state`, `roundKey` (only on AddRoundKey). `keyWords[]` holds every row, with `i`, `previous`, `rotated`, `substituted`, `rcon`, `afterRcon`, `keyBack`, `word`. A cell the row does not use is absent |
 | Refusals | `code`, `message`, `retryable`, `requestId`. OFF: 409 `KEYS_HIDDEN`, checked before the session read. 404 `SESSION_NOT_FOUND`. Another lesson: 409 `WALK_NOT_BUILT`. Bad `source` or `keyBits`: 400 `WALK_BAD_ARGUMENT` | Design 3.4 |
+| Core, added at c19b151 | `AesStep.Terms` (`AesColumnByte[]`, one per state byte in r + 4c order, only on a mix step), `AesTerm`, `AesColumnByte`; static `AesKey.ShiftMap`, `RoundConstants`, `MixTerms` | Design 3.3. `ShiftMap` returns a copy |
+| Tables reply, added at c19b151 | `shiftRows`, `inverseShiftRows` (16 integers), `rcon` (hex), `sizes[]` with `keyBits`, `keyWords`, `rounds`, `roundKeys`, `words`, `rconUsed` | Design 3.4. All open with Show keys OFF |
+| Block reply, added at c19b151 | A mix step carries `terms[]`, one per state byte, with `result` and `parts[]`: `factor`, `input`, `doublings[]`, `reduced`, `result` | Design 3.4. Another step has no `terms` |
+| App words | `app/src/components/FieldPanel.vue` or `app/src/walk-gloss.json` holds the 5 lines of `checks/walk_lines.json`, in order. The GCM line sits in `components/AesFeedView.vue` or `walk-gloss.json` | Design 2.2c, 2.4 |
 | A bare 404 on a walk route | NOT RUN `PRODUCT_MISSING` | As for `/api/security` |
 | Host source | `src/NetSec.Host/AesWalkRoutes.cs`. Each walk route is a string in the source, and is listed in `checks/walk_routes.json` | Design 3.5 |
 | App files | `app/src/walk.ts`, `app/src/components/AesBlockWalk.vue`. No part of either S-box under `app/src` | Design 3.1, 3.7 |
@@ -182,4 +186,14 @@ UI test ids, all ASSUMED under the design's `aes-walk-` prefix:
 | `aes-walk-readable` | At the end of the walk it reads `Pump four is ok.` |
 | `aes-walk-sbox-row`, `aes-walk-sbox-col`, `aes-walk-sbox-value` | After a click on a cell of a SubBytes or InvSubBytes step: one hex digit, one hex digit, and the 2-digit table value |
 | `aes-walk-sbox-cell-{x}-{y}` | One table cell, with x and y as hex digits |
+| `aes-walk-play`, `aes-walk-speed` | One Play and Pause button. One speed control holding `slow`, `normal`, `fast`. No `aes-walk-play-round` exists |
+| `aes-walk-key-size-{bits}` | Picks 128, 192 or 256. It arrives in W1c. Until then `A19.ui.end-frames-on-all-key-sizes` reads NOT RUN |
+| `aes-walk-table-grid-{n}` | One grid per round key: 11, 13 or 15. Design 2.2b at #156 |
+| `aes-walk-table-cell-{p}` | Byte position p of the expanded key, 0 to 175 at AES-128. `data-hex` holds its 2 hex digits once built, and is empty or absent before that. `data-word` holds `w(p / 4)`, `data-lit` is `true` on the source words of the word being built, `data-key` is `true` on the key's own bytes. It carries no `data-letter`. Next adds one word |
+| `aes-walk-build-{previous,rotated,substituted,rcon,after-rcon,key-back,word}` | The stage rows of a tapped built word. A tap on an unbuilt word shows none |
+| `aes-walk-build-key-note` | After a tap on a key word: "This word is part of the key" |
+| `aes-walk-key-band-note` | At 192 and 256 bits: "The first 6 words are the key", or 8. It arrives in W1c. Until then `A19.ui.key-band-on-192-and-256` reads NOT RUN |
+| `aes-walk-rcon` | The Rcon row. Without its spaces, it holds the tables route's `rcon` |
+| `aes-walk-field-panel` | The definition lines |
+| `aes-walk-term-{0..3}`, `aes-walk-term-result` | After a click on a cell of a mix step: factor, input and result of each term, `data-reduced` as true or false, and the XOR |
 | `aes-walk-closed` | Shows while Show keys is OFF, with the sentence of design 3.5. No `aes-walk-cell-*` exists then |

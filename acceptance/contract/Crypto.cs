@@ -53,6 +53,9 @@ namespace NetSec.Crypto
         public AesKeyWord[] WalkKeyExpansion() { throw new NotImplementedException(); }
         public static byte[] SubstitutionTable() { throw new NotImplementedException(); }
         public static byte[] InverseSubstitutionTable() { throw new NotImplementedException(); }
+        public static int[] ShiftMap(bool inverse) { throw new NotImplementedException(); }
+        public static byte[] RoundConstants(int count) { throw new NotImplementedException(); }
+        public static AesColumnByte[] MixTerms(byte[] before, bool inverse) { throw new NotImplementedException(); }
     }
 
     public enum AesStepKind { AddRoundKey, SubBytes, ShiftRows, MixColumns, InvShiftRows, InvSubBytes, InvMixColumns }
@@ -63,6 +66,22 @@ namespace NetSec.Crypto
         public readonly int Round = 0;
         public readonly byte[] State = null;
         public readonly byte[] RoundKey = null;
+        public readonly AesColumnByte[] Terms = null;
+    }
+
+    public sealed class AesTerm
+    {
+        public readonly int Factor = 0;
+        public readonly byte Input = 0;
+        public readonly byte[] Doublings = null;
+        public readonly bool Reduced = false;
+        public readonly byte Result = 0;
+    }
+
+    public sealed class AesColumnByte
+    {
+        public readonly AesTerm[] Terms = null;
+        public readonly byte Result = 0;
     }
 
     public sealed class AesBlockWalk

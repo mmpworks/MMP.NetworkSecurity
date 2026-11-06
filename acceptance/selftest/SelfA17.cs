@@ -64,6 +64,10 @@ namespace Acceptance
             new Case("A19.host.replies-carry-no-store", AesWalkHostClauses.NoStore, "walk-no-store-missing"),
             new Case("A19.host.errors-carry-a-code", AesWalkHostClauses.Errors, "walk-lesson-wrong-code", "walk-bad-argument-500", "walk-no-request-id"),
             new Case("A19.host.walk-adds-no-trace-event", AesWalkHostClauses.AddsNoEvent, "walk-adds-event", "walk-state-in-events"),
+            new Case("A19.host.tables-carry-maps-rcon-sizes", AesWalkHostClauses.TablesCarryMaps, "walk-map-wrong", "walk-rcon-wrong", "walk-sizes-wrong"),
+            new Case("A19.host.block-terms-real-run", AesWalkHostClauses.BlockTerms, "walk-canned", "walk-term-flip", "walk-no-terms"),
+            new Case("A19.host.off-holds-no-word-or-term", AesWalkHostClauses.OffHoldsNoWord, "walk-block-open-off", "walk-off-error-bytes", "walk-tables-leak-key", "walk-off-error-terms", "walk-tables-leak-terms", "walk-tables-leak-words"),
+            new Case("A19.host.ecb-fork-says-match", AesWalkHostClauses.EcbForkMatches, "walk-fork-not-sent", "walk-fork-other-key"),
             new Case("A19.host.control-run-says-not-sent", AesWalkHostClauses.ControlNotSent, "walk-label-match"),
             new Case("A17.lesson-10.my-keys", MyKeysClauses.L10, "mine-run-differs", "builtin-half", "no-key-in-use"),
         };

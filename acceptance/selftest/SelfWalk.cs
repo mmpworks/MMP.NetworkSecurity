@@ -86,6 +86,11 @@ namespace Acceptance
             new Row("A19.walk.tables-equal-fips", AesStepClauses.Tables, "sbox-flip", "inverse-sbox-flip", "shared-table"),
             new Row("A19.walk.step-order", AesStepClauses.StepOrder, "extra-mix", "equivalent-order"),
             new Row("A19.walk.equals-real-path-and-reference", AesStepClauses.EqualsRealPath, "real-path-differs", "state-flip", "inverse-flip", "canned", "key-row-flip"),
+            new Row("A19.walk.terms-equal-reference-and-xor", AesFieldClauses.TermsEqualReference, "steps-carry-no-terms", "step-term-flip", "inverse-terms-forward"),
+            new Row("A19.walk.terms-worked-example", AesFieldClauses.WorkedExample, "term-wrong-result", "term-not-reduced", "term-no-doublings", "term-plain-multiply"),
+            new Row("A19.walk.round-constants", AesFieldClauses.RoundConstants, "rcon-plain-double", "rcon-empty"),
+            new Row("A19.walk.shift-map", AesFieldClauses.ShiftMap, "map-shared", "map-swapped", "map-right-for-left", "state-flip"),
+            new Row("A19.walk.one-bit-spread", AesFieldClauses.OneBitSpread, "canned", "no-spread"),
             new Row("A19.walk.output-equals-bcl", AesStepClauses.OutputEqualsBcl, "output-other", "canned"),
         };
 

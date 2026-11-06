@@ -203,7 +203,7 @@ namespace Acceptance
         }
 
         /// <summary>
-        /// Waits until the processes have finished writing. A process writes a wire.sent event after it writes the bytes, and tap writes its log
+        /// Waits until the processes have finished writing. A process writes a wire.sent event just before it writes the bytes, and tap writes its log
         /// record as the bytes pass, so a fixed sleep can read both too early on a loaded machine. The wait ends when the files stop growing for
         /// 1.5 s and, in a run with no tamper, the wire.sent bytes equal the tap bytes. The longest wait is 25 s. A comparison that is still unequal
         /// after that is left to the A10a clause to report.

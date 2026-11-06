@@ -8,6 +8,8 @@ import { HOST_PORT, NotRun, TOKEN, hostGet, openApp, requireLive } from './suppo
 
 // The tour walk to the tab, and a clause that reads all 80 states, each take longer than the suite's 60 s default.
 test.describe.configure({ timeout: 240_000 });
+// An action with no bound waits out the whole test and reports only "test timeout". With this bound, the failure names the action.
+test.use({ actionTimeout: 15_000 });
 
 const TEXT = 'Pump four is ok.';
 const WALK_BLOCK = /\/walk\/aes\/block/;
@@ -42,7 +44,7 @@ async function reachTab(page: Page): Promise<void> {
   const next = page.getByTestId('tour-next');
   for (let hop = 0; hop < 30 && !(await tab.isVisible().catch(() => false)); hop++) {
     if (!(await next.isEnabled().catch(() => false))) { await page.waitForTimeout(1_000); continue; }
-    await next.click();
+    await next.click().catch(() => { /* the tour moved on, or a step holds Next: the loop looks again */ });
     await page.waitForTimeout(500);
   }
   if (!(await tab.isVisible().catch(() => false))) throw new NotRun('PRODUCT_MISSING', 'lesson 1 shows no aes-walk-tab');
@@ -157,6 +159,192 @@ test('[A19.ui.sbox-click-matches-next-state] a clicked cell lights its row and c
   await checkLookups(page, tables.body.sbox.toLowerCase(), 'SubBytes', reply.forward.steps);
   await go('InvSubBytes');
   await checkLookups(page, tables.body.inverseSbox.toLowerCase(), 'InvSubBytes', reply.inverse.steps);
+});
+
+/** Under reduced motion each step lands at once on its end frame, so a clause reads end frames and never waits on a timer (design section 2.2a). */
+async function reduced(page: Page): Promise<void> { await page.emulateMedia({ reducedMotion: 'reduce' }); }
+
+const running = (page: Page) => page.evaluate(() => document.getAnimations().filter(a => a.playState === 'running').length);
+
+test('[A19.ui.end-frames-on-all-key-sizes] each step lands on the engine state, for 128, 192 and 256 bits', async ({ page }) => {
+  await reduced(page);
+  let reply = await openWalk(page);
+  for (const bits of [128, 192, 256]) {
+    if (bits !== 128) {
+      const pick = page.getByTestId(`aes-walk-key-size-${bits}`);
+      if (!(await pick.isVisible().catch(() => false))) throw new NotRun('PRODUCT_MISSING', `no aes-walk-key-size-${bits}. Key sizes arrive in W1c`);
+      const [r] = await Promise.all([page.waitForResponse(WALK_BLOCK, { timeout: 30_000 }), pick.click()]);
+      expect(r.status(), `GET block at ${bits} bits`).toBe(200);
+      reply = await r.json();
+      expect(reply.keyBits, 'the reply names the key size').toBe(bits);
+    }
+    await toFirstStep(page);
+    const steps: any[] = [...reply.forward.steps, ...reply.inverse.steps];
+    for (let i = 0; i < steps.length; i++) {
+      expect(await grid(page), `${bits} bits, step ${i + 1} of ${steps.length} (${steps[i].kind})`).toBe(steps[i].state.toLowerCase());
+      if (i < steps.length - 1) await page.getByTestId('aes-walk-next').click();
+    }
+  }
+});
+
+test('[A19.ui.reduced-motion-has-no-transition] with reduced motion each step shows its end frame, and nothing moves', async ({ page }) => {
+  await reduced(page);
+  const reply = await openWalk(page);
+  await toFirstStep(page);
+  const steps: any[] = [...reply.forward.steps, ...reply.inverse.steps];
+  for (let i = 0; i < 12; i++) {
+    await page.getByTestId('aes-walk-next').click();
+    expect(await running(page), `running animations at step ${i + 2}`).toBe(0);
+    expect(await grid(page), `the end frame at step ${i + 2}`).toBe(steps[i + 1].state.toLowerCase());
+  }
+  // The control: with motion allowed, a step does move. Design 2.2a: a click during a motion jumps to that step's end frame, and does not start the next step.
+  await page.emulateMedia({ reducedMotion: 'no-preference' });
+  await page.getByTestId('aes-walk-next').click();
+  await expect.poll(() => running(page), { message: 'something moves with motion allowed', timeout: 2_000, intervals: [20] }).toBeGreaterThan(0);
+  await page.getByTestId('aes-walk-next').click();
+  await expect.poll(() => grid(page), { message: 'a click during a motion lands on that step\'s end frame', timeout: 5_000 }).toBe(steps[13].state.toLowerCase());
+  await expect.poll(() => running(page), { message: 'the motion has ended', timeout: 5_000 }).toBe(0);
+  expect(await grid(page), 'the click did not start the next step').toBe(steps[13].state.toLowerCase());
+});
+
+test('[A19.ui.play-stops-at-the-end-of-a-round] one Play and Pause button runs one round and stops, and pressing it again runs the next', async ({ page }) => {
+  await reduced(page);
+  const reply = await openWalk(page);
+  await toFirstStep(page);
+  const speed = page.getByTestId('aes-walk-speed');
+  await expect(speed, 'the one speed control').toBeVisible();
+  for (const name of ['slow', 'normal', 'fast']) await expect(speed.getByRole('radio', { name }).or(speed.getByRole('option', { name })).or(speed.getByRole('button', { name })).first(), `speed ${name}`).toBeAttached();
+  const play = page.getByTestId('aes-walk-play');
+  await expect(page.getByTestId('aes-walk-play-round'), 'no separate Play this round button').toHaveCount(0);
+  const lastOfRound = (r: number) => reply.forward.steps.find((s: any) => s.kind === 'AddRoundKey' && s.round === r);
+  for (const round of [1, 2]) {
+    await play.click();
+    await expect.poll(async () => await kindNow(page) === 'AddRoundKey' && (await grid(page)) === lastOfRound(round).state.toLowerCase(), { message: `Play stops at the end of round ${round}`, timeout: 15_000 }).toBe(true);
+    const held = await grid(page);
+    await page.waitForTimeout(800);
+    expect(await grid(page), `the walk holds at the end of round ${round}`).toBe(held);
+  }
+});
+
+test('[A19.ui.flip-during-play-stops-the-timeline] a flip to OFF during Play stops the motion and clears the walk', async ({ page }) => {
+  try {
+    await openWalk(page);
+    await toFirstStep(page);
+    await page.getByTestId('aes-walk-play').click();
+    await page.getByTestId('show-keys-switch').click();
+    await expect(page.locator('[data-testid^="aes-walk-cell-"]'), 'no state cell after the flip').toHaveCount(0, { timeout: 5_000 });
+    await expect(page.getByTestId('aes-walk-closed')).toBeVisible();
+    await page.waitForTimeout(800);
+    await expect(page.locator('[data-testid^="aes-walk-cell-"]'), 'the timeline stays stopped').toHaveCount(0);
+  } finally { await setShowKeys(true); }
+});
+
+const tableCell = (page: Page, n: number) => page.getByTestId(`aes-walk-table-cell-${n}`);
+
+/** The whole expanded key as hex, from the reply's word rows, by the layout of design section 2.2b. */
+const expandedHex = (rows: any[]) => rows.slice().sort((a, b) => a.i - b.i).map(r => r.word.toLowerCase()).join('');
+
+/** A cell's byte, from data-hex, which is empty or absent until the cell is built. Cell text also holds a position mark and a word name, so the clause does not read text. */
+async function hexOf(page: Page, n: number): Promise<string> { return ((await tableCell(page, n).getAttribute('data-hex')) ?? '').toLowerCase(); }
+
+async function toKeySchedule(page: Page): Promise<void> {
+  for (let i = 0; i < 40 && !(await tableCell(page, 0).isVisible().catch(() => false)); i++) await page.getByTestId('aes-walk-next').click();
+  await expect(tableCell(page, 0), 'the expanded table').toBeVisible();
+}
+
+test('[A19.ui.expanded-table-layout] 11 grids of 16 cells: the key cells start filled, and each cell names its word and shows no letter', async ({ page }) => {
+  const reply = await openWalk(page);
+  await toKeySchedule(page);
+  const hex = expandedHex(reply.keyWords);
+  await expect(page.locator('[data-testid^="aes-walk-table-grid-"]'), 'one grid per round key').toHaveCount(11);
+  await expect(page.locator('[data-testid^="aes-walk-table-cell-"]'), 'one cell per byte, 0 to 175').toHaveCount(176);
+  await expect(page.getByTestId('aes-walk-table-grid-1').locator('[data-testid^="aes-walk-table-cell-"]'), 'each grid holds 16 cells').toHaveCount(16);
+  for (let n = 0; n < 176; n++) {
+    const c = tableCell(page, n);
+    await expect(c, `byte ${n}: its word name`).toHaveAttribute('data-word', `w${Math.floor(n / 4)}`);
+    expect(await c.getAttribute('data-letter'), `byte ${n}: key bytes are not text`).toBeNull();
+    if (n < 16) expect(await hexOf(page, n), `key byte ${n} starts filled`).toBe(hex.slice(2 * n, 2 * n + 2));
+    else expect(await hexOf(page, n), `byte ${n} starts empty`).toBe('');
+  }
+});
+
+test('[A19.ui.word-build-lights-its-two-words] Next adds one word, the lit cells hold its two source words, and a tap opens only a built word', async ({ page }) => {
+  const reply = await openWalk(page);
+  await toKeySchedule(page);
+  const tables = await hostGet('/api/walk/aes/tables');
+  expect(tables.status, 'GET tables').toBe(200);
+  const rcon: string = tables.body.rcon;
+  const shown = ((await page.getByTestId('aes-walk-rcon').textContent()) ?? '').replace(/\s+/g, '').toLowerCase();
+  expect(shown, 'the Rcon row comes from the Host').toContain(rcon.toLowerCase());
+  const rows: any[] = reply.keyWords.slice().sort((a: any, b: any) => a.i - b.i);
+  const nk = tables.body.sizes.find((s: any) => s.keyBits === reply.keyBits).keyWords;
+  const hex = expandedHex(rows);
+  /** Every lit cell, as word name to its bytes in position order. So lighting extra cells, or the wrong cells, fails. */
+  const litWords = async () => {
+    const lit = page.locator('[data-testid^="aes-walk-table-cell-"][data-lit="true"]');
+    const words: Record<string, string> = {};
+    for (let k = 0; k < await lit.count(); k++) {
+      const name = (await lit.nth(k).getAttribute('data-word')) ?? '?';
+      words[name] = (words[name] ?? '') + ((await lit.nth(k).getAttribute('data-hex')) ?? '').toLowerCase();
+    }
+    return words;
+  };
+  // A tap on a word not yet built does nothing.
+  await tableCell(page, 4 * 10).click();
+  await expect(page.getByTestId('aes-walk-build-word'), 'an unbuilt word opens no stage rows').toHaveCount(0);
+  // A key word has no stage rows, and says so.
+  await tableCell(page, 0).click();
+  await expect(page.getByTestId('aes-walk-build-key-note')).toContainText('This word is part of the key');
+  for (const i of [nk, nk + 1, nk + 2, nk + 3, nk + 4]) {
+    const row = rows.find(r => r.i === i);
+    await page.getByTestId('aes-walk-next').click();
+    for (let b = 0; b < 4; b++) expect(await hexOf(page, 4 * i + b), `w${i} byte ${b} is built`).toBe(hex.slice(2 * (4 * i + b), 2 * (4 * i + b) + 2));
+    expect(await hexOf(page, 4 * (i + 1)), `w${i + 1} is not built yet`).toBe('');
+    expect(await litWords(), `w${i}: only its two source words are lit`).toEqual({ [`w${i - 1}`]: row.previous.toLowerCase(), [`w${i - nk}`]: row.keyBack.toLowerCase() });
+  }
+  await tableCell(page, 4 * nk).click();
+  const row = rows.find(r => r.i === nk);
+  for (const [id, value] of [['previous', row.previous], ['rotated', row.rotated], ['substituted', row.substituted], ['rcon', row.rcon], ['after-rcon', row.afterRcon], ['key-back', row.keyBack], ['word', row.word]])
+    await expect(page.getByTestId(`aes-walk-build-${id}`), `the stage rows of w${nk}: ${id}`).toContainText(value, { ignoreCase: true });
+});
+
+test('[A19.ui.key-band-on-192-and-256] at 192 and 256 bits the key runs past round key 0, the key cells start filled, and the panel says how many words', async ({ page }) => {
+  await openWalk(page);
+  for (const [bits, grids, cells, nk] of [[192, 13, 208, 6], [256, 15, 240, 8]]) {
+    const pick = page.getByTestId(`aes-walk-key-size-${bits}`);
+    if (!(await pick.isVisible().catch(() => false))) throw new NotRun('PRODUCT_MISSING', `no aes-walk-key-size-${bits}. Key sizes arrive in W1c`);
+    const [r] = await Promise.all([page.waitForResponse(WALK_BLOCK, { timeout: 30_000 }), pick.click()]);
+    const reply = await r.json();
+    await toKeySchedule(page);
+    await expect(page.locator('[data-testid^="aes-walk-table-grid-"]'), `${bits} bits: grids`).toHaveCount(grids);
+    await expect(page.locator('[data-testid^="aes-walk-table-cell-"]'), `${bits} bits: cells`).toHaveCount(cells);
+    const hex = expandedHex(reply.keyWords);
+    for (let n = 0; n < 4 * nk; n++) {
+      expect(await hexOf(page, n), `${bits} bits: key byte ${n} starts filled`).toBe(hex.slice(2 * n, 2 * n + 2));
+      await expect(tableCell(page, n), `${bits} bits: key byte ${n} is in the band`).toHaveAttribute('data-key', 'true');
+    }
+    await expect(tableCell(page, 4 * nk), `${bits} bits: the first built word is past the band`).not.toHaveAttribute('data-key', 'true');
+    await expect(page.getByTestId('aes-walk-key-band-note'), `${bits} bits: the line`).toContainText(`first ${nk} words are the key`);
+  }
+});
+
+test('[A19.ui.multiply-shows-the-engine-terms] the field panel states the definition, and a MixColumns step prints one real multiply from the reply', async ({ page }) => {
+  const reply = await openWalk(page);
+  await toFirstStep(page);
+  for (let n = 0; n < 200 && (await kindNow(page)) !== 'MixColumns'; n++) await page.getByTestId('aes-walk-next').click();
+  expect(await kindNow(page)).toBe('MixColumns');
+  await expect(page.getByTestId('aes-walk-field-panel'), 'the definition').toContainText('Add is XOR.');
+  const step = reply.forward.steps.find((s: any) => s.kind === 'MixColumns');
+  await cell(page, 0, 0).click();
+  const parts: any[] = step.terms[0].parts;
+  for (let j = 0; j < 4; j++) {
+    const t = page.getByTestId(`aes-walk-term-${j}`);
+    await expect(t, `term ${j}: the input`).toContainText(parts[j].input, { ignoreCase: true });
+    await expect(t, `term ${j}: the result`).toContainText(parts[j].result, { ignoreCase: true });
+    await expect(t, `term ${j}: the factor`).toContainText(String(parts[j].factor));
+    await expect(t, `term ${j}: whether it reduced`).toHaveAttribute('data-reduced', String(parts[j].reduced));
+  }
+  await expect(page.getByTestId('aes-walk-term-result'), 'the XOR of the terms').toContainText(step.terms[0].result, { ignoreCase: true });
 });
 
 test('[A19.ui.off-shows-the-closed-line] with Show keys OFF the steps close, the line says why, and the table stays open', async ({ page }) => {

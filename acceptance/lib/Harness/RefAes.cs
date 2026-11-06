@@ -7,6 +7,7 @@ namespace Acceptance
     public sealed class WalkStep
     {
         public string Kind; public int Round; public string State, RoundKey;
+        public List<ColumnByte> Terms;   // MixColumns and InvMixColumns only
         public override string ToString() { return Kind + " round " + Round; }
     }
 
@@ -160,7 +161,7 @@ namespace Acceptance
             {
                 Sub(s, Sbox); Note(run, "SubBytes", r, s, null);
                 Shift(s, 1); Note(run, "ShiftRows", r, s, null);
-                if (r < _nr) { Mix(s, 2, 3, 1, 1); Note(run, "MixColumns", r, s, null); }
+                if (r < _nr) { List<ColumnByte> t = RefField.MixTerms(s, false); Mix(s, 2, 3, 1, 1); Note(run, "MixColumns", r, s, null); run.Steps[run.Steps.Count - 1].Terms = t; }
                 Add(run, s, RoundKey(r), r);
             }
             run.Output = Hex.Encode(s);
@@ -179,7 +180,7 @@ namespace Acceptance
                 Shift(s, -1); Note(run, "InvShiftRows", r, s, null);
                 Sub(s, InverseSbox); Note(run, "InvSubBytes", r, s, null);
                 Add(run, s, RoundKey(r), r);
-                if (r > 0) { Mix(s, 14, 11, 13, 9); Note(run, "InvMixColumns", r, s, null); }
+                if (r > 0) { List<ColumnByte> t = RefField.MixTerms(s, true); Mix(s, 14, 11, 13, 9); Note(run, "InvMixColumns", r, s, null); run.Steps[run.Steps.Count - 1].Terms = t; }
             }
             run.Output = Hex.Encode(s);
             return run;
