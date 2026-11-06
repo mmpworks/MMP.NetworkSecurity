@@ -344,6 +344,10 @@ Steve's ruling: "We should allow a user to enter a string. For some lessons, we 
 | Empty | The box goes back to `Pump four is ok.` | The same |
 | Past the Host's limit | The same marking, from byte 65,537 | The same marking, from byte 65,537 |
 
+**Which views have the box.** Chapter 1's block walk (W1b) and the longer text view (W2). Chapter 2's mode tabs do not, because they show messages the run sent.
+
+**The box itself sets no limit.** A learner can paste any length. The app measures it and marks what no view reads. Only the included part goes to the Host, up to 65,536 bytes. Chapter 1 sends that same text, and the engine picks the 16 bytes, so the rule for the cut lives in one place.
+
 The default stays `Pump four is ok.`, so the walk that Steve first steps through does not change. A typed block reads "Your text. It did not go on the wire", in place of the teaching-example label.
 
 **The unit is bytes, as UTF-8.** AES takes 16 bytes, and a character can take 1 to 4. The screen says: "A block holds 16 bytes. Some characters take more than one byte."
