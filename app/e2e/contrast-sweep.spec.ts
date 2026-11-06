@@ -51,12 +51,12 @@ for (const theme of ['dark', 'light'] as const) {
     await page.getByRole('button', { name: /start tour/i }).click()
     await expect(page.getByTestId('tour-step-id')).toBeVisible()
     await visit(page, theme, 'lesson 1 tour step 1')
-    for (let i = 0; i < 2; i++) {
+    for (let i = 0; i < 4; i++) {
       const next = page.getByTestId('tour-next')
       if (await next.isDisabled()) { const t = page.getByTestId('tour-try-it-action'); if (await t.isVisible()) await t.click() }
       await expect(next).toBeEnabled(); await next.click()
     }
-    await visit(page, theme, 'lesson 1 tour step 3')
+    await visit(page, theme, 'lesson 1 tour step 5')
     await hoverVisit(page, theme, 'term-gcm')
 
     // Free play on every lesson, with every inspector tab and the attack result.
