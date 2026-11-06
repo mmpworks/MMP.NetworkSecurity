@@ -18,7 +18,7 @@ public static class AesWalkRoutes
 
     public static void Map(WebApplication app, SecurityStore security, SessionManager sessions)
     {
-        app.MapGet("/api/walk/aes/tables", (HttpContext http) => NoStore(http, Results.Json(AesWalkJson.Tables())));
+        app.MapGet("/api/walk/aes/tables", (HttpContext http) => NoStore(http, Guarded(() => Results.Json(AesWalkJson.Tables()))));
         app.MapGet("/api/sessions/{id}/walk/aes/block", (HttpContext http, string id, string? source, string? keyBits) =>
             NoStore(http, Block(security.ShowKeys, sessions.Find(id), id, source, keyBits)));
     }
@@ -42,27 +42,34 @@ public static class AesWalkRoutes
 
     static IResult TextBlock(LabSession session, int keyBits)
     {
+        // Read before the events. A run that sends and finishes between the two reads then reads as waiting, which a retry resolves.
+        bool finished = session.Finished;
         AesWalkFacts facts = AesWalkFacts.Read(session.After(0));
-        if (facts.Key is null || facts.Text is null || facts.Text.Length < BlockSize) return NotReached(session);
+        if (facts.Key is null || facts.Text is null || facts.Text.Length < BlockSize) return NotReached(finished);
         byte[] block = facts.Text[..BlockSize];
         // Section 2.7: at 128 bits, the key the run used. At 192 or 256 bits, a key that never ran in the lesson.
         bool runKey = keyBits == facts.Key.Length * 8;
         byte[] key = runKey ? facts.Key : PracticeKey(session.Seed, keyBits);
-        try
+        return Guarded(() =>
         {
             byte[] cipher = new byte[BlockSize];
             new AesKey(key).EncryptBlock(block, 0, cipher, 0);
             AesBlockPair pair = AesWalks.Block(key, block, cipher);
             string wire = runKey ? WireStatus(facts.EcbTextFrame, cipher) : "notSent";
             return Results.Json(AesWalkJson.Block("text", runKey ? "run" : "practice", pair, wire, EcbText));
-        }
+        });
+    }
+
+    static IResult Guarded(Func<IResult> walk)
+    {
+        try { return walk(); }
         catch (NetSecException e) when (e.Error.Code == ErrorCodes.AesWalkDiverged)
         {
             return Refuse(500, ErrorCodes.AesWalkDiverged, "The walk differs from the real AES path, so it shows nothing.");
         }
     }
 
-    static IResult NotReached(LabSession session) => session.Finished
+    static IResult NotReached(bool finished) => finished
         ? Refuse(409, ErrorCodes.WalkMessageNotSent, "This run ended before it sent its text.")
         : Refuse(409, ErrorCodes.WalkWaitingForWire, "This run has not sent its text yet.", true);
 

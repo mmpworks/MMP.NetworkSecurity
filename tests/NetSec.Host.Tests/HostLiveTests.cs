@@ -157,6 +157,9 @@ namespace NetSec.Host.Tests
             JsonElement practice = await GetJson($"/api/sessions/{id}/walk/aes/block?source=text&keyBits=192");
             Assert.Equal("run", run.GetProperty("keySource").GetString());
             Assert.Equal("practice", practice.GetProperty("keySource").GetString());
+            byte[] drawn = new byte[24];
+            new NetSec.Platform.SeededRandom(7 ^ 192).Fill(drawn, 0, drawn.Length);
+            Assert.Equal(Convert.ToHexString(drawn, 0, 4).ToLowerInvariant(), practice.GetProperty("keyWords")[0].GetProperty("word").GetString());
             Assert.Equal(12, practice.GetProperty("rounds").GetInt32());
             Assert.Equal(52, practice.GetProperty("keyWords").GetArrayLength());
             Assert.Equal("notSent", practice.GetProperty("wire").GetProperty("status").GetString());
