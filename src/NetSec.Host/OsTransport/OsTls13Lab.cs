@@ -100,7 +100,7 @@ public sealed class OsTls13Lab(string host, int port, string nameToCheck, X509Ce
         string said = flags.HasFlag(X509ChainStatusFlags.NotTimeValid) ? "The server's certificate, or one above it, is outside its dates."
             : flags.HasFlag(X509ChainStatusFlags.NotValidForUsage) ? "The server's certificate is not made for a TLS server."
             : flags.HasFlag(X509ChainStatusFlags.InvalidBasicConstraints) ? "A certificate that signed the server's certificate is not a CA."
-            : flags.HasFlag(X509ChainStatusFlags.PartialChain) ? "The chain stops before a root in SSL_CERT_FILE: the server sent no certificate that links its certificate to one."
+            : flags.HasFlag(X509ChainStatusFlags.PartialChain) ? "The chain does not reach a root in SSL_CERT_FILE. Either another root issued the server's certificate, or the server sent no certificate that links it to a root in the file."
             : flags.HasFlag(X509ChainStatusFlags.UntrustedRoot) ? "The chain ends at a root that is not in SSL_CERT_FILE."
             : "The server's certificate chain does not hold.";
         return $"{said} ({flags})";
