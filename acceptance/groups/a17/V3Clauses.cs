@@ -8,7 +8,7 @@ namespace Acceptance
     /// <summary>
     /// A17, slice V3: the Show keys toggle (modes-design.md section 6). The suite runs with it ON. These clauses turn it OFF on purpose, each in its own Host.
     /// The anchor is the bytes: the suite reads secrets while ON, flips the toggle, and looks for those same bytes. It computes fingerprints itself.
-    /// Two exclusions, named by the design: the bearer token of lesson 10 (it travels in the clear on purpose) and lesson 11's lab-secret (it is stored in plain).
+    /// One exclusion by name: lesson 11's lab-secret (it is stored in plain). Lesson 10's bearer token has no exclusion by name: the on-the-wire rule below exempts it only while it travels on the wire.
     /// A public key is no secret either, so a secret whose name holds "public" is left out of the text scan.
     /// </summary>
     public static class V3Clauses
@@ -17,7 +17,7 @@ namespace Acceptance
 
         static bool Excluded(string name)
         {
-            return name == "auth.token" || name == "lab-secret" || (name ?? "").IndexOf("public", StringComparison.OrdinalIgnoreCase) >= 0;
+            return name == "lab-secret" || (name ?? "").IndexOf("public", StringComparison.OrdinalIgnoreCase) >= 0;
         }
 
         /// <summary>

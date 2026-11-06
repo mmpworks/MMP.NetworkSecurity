@@ -303,6 +303,7 @@ namespace Acceptance
                     // The token travels in the clear on purpose, and the issuer public key is public: both show on the wire with Show keys OFF.
                     SessionEv wire = s.Events[s.Events.Count - 1];
                     wire.Base["wire"] = Hex.Encode(tokenBytes); wire.Base["plain"] = Hex.Encode(pub);
+                    AddWire(s, "issuer", "wire.sent", "TokenInTheClear", tokenBytes, tokenBytes);
                     break;
                 case 11: Add(s, "target", "timing.lab.started", Raw("lab-secret", "target", Seeded(seed, 11, 1, 4))); break;
                 default: Add(s, "lab", "lesson.step"); break;
