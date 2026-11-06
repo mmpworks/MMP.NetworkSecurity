@@ -19,7 +19,7 @@ for (const theme of ['dark', 'light'] as const) {
   test(`the GCM tooltip reads at ${MIN_RATIO} to 1 or better in the ${theme} theme`, async ({ page }) => {
     await startTour(page, 1)
     await setTheme(page, theme)
-    await toStep(page, 'L1-S03')
+    await toStep(page, 'L1-S05')
     await page.getByTestId('term-gcm').hover()
     const tip = page.locator('[data-testid="term-popover-short"]:visible')
     await expect(tip).toBeVisible()
