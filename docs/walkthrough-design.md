@@ -203,7 +203,7 @@ For tests: a clause reads end frames under reduced motion, so no test waits on a
 |---|---|
 | Pause | Everything freezes in place, including a byte in mid-flight. Nothing jumps to the end of the word or the step |
 | Resume | The motion carries on from that spot, with the time it had left |
-| Next or Back while paused | The current motion ends, then the button acts. Play stops too |
+| Next or Back while paused | The current motion ends, then the button acts. Play stops too. This differs on purpose from a click during a running motion, which only jumps to that motion's end. A learner who paused has finished with that motion, so one press moves on |
 | A tap that changes the view while paused (a byte, a column, a word, a round chip, a selector) | The current motion ends, then the tap acts. Play stops too |
 | Hover or focus while paused | Tips and spec cards still work. They read the same values as when the walk is stopped |
 | Speed while paused | The new speed applies from the next motion |
@@ -218,7 +218,7 @@ The one button reads by state:
 
 Play still stops at the end of a round or a grid. Only Pause freezes in mid-motion. This replaces the earlier words, where Pause stopped at an end point.
 
-**One clock.** `useWalkTimeline` owns every timer and every running animation. A view asks it for a delay and never calls `setTimeout` itself. Pause clears each timer and records the time left, then pauses each running animation under the walk's root element. Resume starts both again. A flying byte or bit mounts inside that root, so Pause reaches it, and Pause leaves the rest of the app running. With reduced motion, a step lands at once, so Pause freezes only the wait between steps.
+**One clock.** `useWalkTimeline` owns every timer and every running animation. A view asks it for a delay and never calls `setTimeout` itself. Pause clears each timer and records the time left, then pauses each running animation under the walk's root element. Resume starts both again. A motion is CSS or Web Animations only, because the clock reads the animation list under the root, and a `requestAnimationFrame` flyer would escape both Pause and the clauses. A flying byte or bit mounts inside that root, so Pause reaches it, and Pause leaves the rest of the app running. With reduced motion, a step lands at once, so Pause freezes only the wait between steps.
 
 ### 2.2b The key schedule part
 
@@ -1222,10 +1222,10 @@ If Steve does not follow it after 2 rounds of word changes, stop and re-plan the
 | Key words | FIPS appendix A rows, for all three sizes. The Rcon row equals `01 02 04 08 10 20 40 80 1b 36`, and the used counts are 10, 8, 7 |
 | End frames | Every animated step lands on the engine state for that step, for all three key sizes |
 | Reduced motion | Each step shows its end frame with no transition |
-| Pause holds | With motion on, Pause during a flying byte, a key fill, and a matrix multiply. One frame later, the position of each moving element stays the same for 2 seconds, within 1 pixel. No end frame shows |
-| Resume carries on | After Resume, each element moves on from its paused position and lands on the engine state. Its first position after Resume is within the distance it can travel in 100 ms, so it does not restart or jump to the end |
+| Pause holds | With motion on at the `slow` speed, Pause during a flying byte, a key fill, and a matrix multiply. The clause waits for each animation's `ready`, then samples. Each moving element's position stays the same for 2 seconds, within 1 pixel. At least one paused animation has a `currentTime` below its end. If nothing runs when the click lands, the clause repeats from the step before, and it reads NOT RUN after 3 tries |
+| Resume carries on | Before the Resume click, a `requestAnimationFrame` sampler in the page logs `performance.now()` and each animation's `currentTime`. At the first frame after Resume, `currentTime` is at or above the paused value, below the end, and no further past the paused value than the elapsed page time plus 1 frame, times the speed. So the motion neither restarts nor jumps to the end. The motion then lands on the engine state |
 | Pause label | The button reads Pause during a motion from one Next, Resume when frozen, and Play when nothing runs. Play still stops at the end of a round and of a grid |
-| Next and Back while paused | Each ends the motion and acts. Next lands on the next step's engine state. Back leaves no flyer, strip, box, or mark. Play does not restart |
+| Next and Back while paused | Each ends the motion and acts. After Next, the next step's motion runs and the button reads Pause, and it lands on that step's engine state. Back leaves no flyer, strip, box, or mark. Play does not restart |
 | Tips while paused | A hover tip and a spec card open while paused, and the moving elements stay still |
 | Show keys while paused | Show keys OFF clears the walk, with no frozen flyer left and no timer that fires later |
 | Key number | Each AddRoundKey button reads "AddRoundKey r", and r is the step's `round`. The grid it shows equals round key r. Encrypt counts up from 0, and decrypt counts down from Nr to 0, for all three key sizes |
