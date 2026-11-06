@@ -191,6 +191,58 @@ namespace NetSec.Tests
             Assert.True(o.Error == null || (Tls13Codes.AlertFor(o.Error.Code) != UnsupportedExtension && Tls13Codes.AlertFor(o.Error.Code) != IllegalParameter), Describe(o));
         }
 
+        // ---------------------------------------------------------------- section 4.2, one extension of each type in a block
+
+        static byte[] Twice(byte[] message, int type)
+        {
+            byte[] all = Extensions(message);
+            for (int at = 0; at < all.Length;)
+            {
+                int length = 4 + ((all[at + 2] << 8) | all[at + 3]);
+                if (((all[at] << 8) | all[at + 1]) == type) return WithExtra(message, all.Skip(at).Take(length).ToArray());
+                at += length;
+            }
+            throw new ArgumentException("no extension " + type);
+        }
+
+        [Theory]
+        [InlineData(ExtSupportedVersions)]
+        [InlineData(ExtKeyShare)]
+        public void A_repeated_server_hello_extension_gets_illegal_parameter(int type)
+        {
+            AssertAlert(IllegalParameter, FeedClient(Twice(ServerHelloBytes(), type)));
+        }
+
+        [Theory]
+        [InlineData(ExtKeyShare)]
+        [InlineData(ExtSignatureAlgorithms)]
+        public void A_repeated_client_hello_extension_gets_illegal_parameter(int type)
+        {
+            AssertAlert(IllegalParameter, FeedServer(Twice(ClientHelloBytes(), type)));
+        }
+
+        [Fact]
+        public void A_repeated_unknown_client_hello_extension_gets_illegal_parameter()
+        {
+            AssertAlert(IllegalParameter, FeedServer(WithExtra(WithExtra(ClientHelloBytes(), Extension(ExtUnknown)), Extension(ExtUnknown))));
+        }
+
+        [Fact]
+        public void A_repeated_encrypted_extensions_entry_gets_illegal_parameter()
+        {
+            byte[] repeated = Extension(ExtServerName).Concat(Extension(ExtServerName)).ToArray();
+            AssertAlert(IllegalParameter, ClientGetsFlightWith("EncryptedExtensions", EncryptedExtensionsWith(repeated)));
+        }
+
+        // ---------------------------------------------------------------- section 6, a message that does not parse
+
+        [Fact]
+        public void Bytes_after_the_encrypted_extensions_block_get_decode_error()
+        {
+            byte[] trailing = WithBodyLength(new byte[] { HandshakeType.EncryptedExtensions, 0, 0, 0, 0, 0, 0xAB, 0xCD });
+            AssertAlert(DecodeError, ClientGetsFlightWith("EncryptedExtensions", trailing));
+        }
+
         // ---------------------------------------------------------------- section 4.2.3, signature_algorithms
 
         [Fact]

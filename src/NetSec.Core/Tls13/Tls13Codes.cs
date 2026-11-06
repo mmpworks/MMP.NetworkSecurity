@@ -31,6 +31,7 @@ namespace NetSec.Tls13
         public const string ExtensionNotRequested = "TLS13_EXTENSION_NOT_REQUESTED";
         public const string ExtensionWrongMessage = "TLS13_EXTENSION_WRONG_MESSAGE";
         public const string EmptyCertificate = "TLS13_EMPTY_CERTIFICATE";
+        public const string ExtensionRepeated = "TLS13_EXTENSION_REPEATED";
 
         sealed class Row
         {
@@ -60,6 +61,7 @@ namespace NetSec.Tls13
             new Row(ExtensionNotRequested, "extension was requested", 110),
             new Row(ExtensionWrongMessage, "extension allowed in this message", 47),
             new Row(EmptyCertificate, "server certificate present", 50),
+            new Row(ExtensionRepeated, "one extension of each type", 47),
             new Row(NoCommonGroup, "common group", 40),
             new Row(NoCommonSuite, "common cipher suite", 40),
             new Row(NoCommonSignature, "common signature scheme", 40),

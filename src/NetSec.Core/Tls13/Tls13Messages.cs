@@ -50,6 +50,7 @@ namespace NetSec.Tls13
         public int[] Groups = new int[0];
         public int[] SignatureSchemes = new int[0];
         public bool HasSignatureAlgorithms, HasSupportedGroups, HasKeyShare;
+        public readonly List<int> ExtensionTypes = new List<int>();
         public string ServerName;
         public readonly Dictionary<int, byte[]> KeyShares = new Dictionary<int, byte[]>();
         public FieldMark[] Marks;
@@ -225,6 +226,7 @@ namespace NetSec.Tls13
             int type = r.U16("extension.type", "header");
             int length = r.U16("extension.length", "length");
             int end = r.Remaining - length;
+            info.ExtensionTypes.Add(type);
             switch (type)
             {
                 case ExtServerName:
@@ -396,19 +398,33 @@ namespace NetSec.Tls13
                 r.Take("extension.data", "data", r.U16("extension.length", "length"));
             }
             CheckEnd(r, end, "encrypted_extensions");
+            if (r.Remaining != 0) throw new ParseFailure(ErrorCodes.ParseTruncated, "encrypted_extensions has " + r.Remaining + " bytes after its block");
             return types;
         }
 
         /// <summary>
         /// RFC 8446 section 4.2. Null when every type is allowed. A type this client never asked for is ExtensionNotRequested. A type it asked for,
-        /// in a message the section 4.2 table does not list it in, is ExtensionWrongMessage. Type gives the first one at fault.
+        /// in a message the section 4.2 table does not list it in, is ExtensionWrongMessage. A repeat of any type is ExtensionRepeated. Type gives the first one at fault.
         /// </summary>
         public static string ServerHelloExtensionFault(List<int> types, out int type) { return ExtensionFault(types, AllowedInServerHello, out type); }
 
         public static string EncryptedExtensionsFault(List<int> types, out int type) { return ExtensionFault(types, AllowedInEncryptedExtensions, out type); }
 
+        /// <summary>RFC 8446 section 4.2: one extension of each type in a block, known or not. True gives the first repeat.</summary>
+        public static bool HasRepeat(List<int> types, out int type)
+        {
+            for (int i = 0; i < types.Count; i++)
+            {
+                type = types[i];
+                if (types.IndexOf(type) != i) return true;
+            }
+            type = -1;
+            return false;
+        }
+
         static string ExtensionFault(List<int> types, int[] allowed, out int type)
         {
+            if (HasRepeat(types, out type)) return Tls13Codes.ExtensionRepeated;
             for (int i = 0; i < types.Count; i++)
             {
                 type = types[i];
