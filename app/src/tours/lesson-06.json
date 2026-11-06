@@ -8,6 +8,8 @@
         "A card reader sends your PIN to a bank. The PIN must travel locked, so the reader and the bank need a key.",
         "If every sale used one key, a thief who got that key could read every PIN ever sent. {{term:dukpt}} fixes this. Its name means derived unique key per transaction.",
         "With DUKPT, each sale gets a new key, made from a base key and a counter. After the sale, the reader erases the key it used. A stolen reader holds no key that opens past sales.",
+        "The promise has a limit. A stolen reader still holds the keys it needs for later sales, so a thief can work out those keys. One leaked sale key is smaller: it opens only that one sale.",
+        "This lab runs AES DUKPT, named in ANSI X9.24-3-2017. An older form uses Triple DES and has different sizes.",
         "Built to show the parts. Do not copy."
       ],
       "glossary": ["dukpt"],
@@ -16,8 +18,13 @@
       "claims": [
         {
           "id": "L6-C01",
-          "text": "DUKPT gives each transaction a distinct key. If a present derived key is compromised, past and future keys stay uncompromised.",
-          "source": "Wikipedia, Derived unique key per transaction, Overview (secondary source, read 2026-11-05). ANSI X9.24-3-2017 is a paid standard and was not read."
+          "text": "DUKPT gives each transaction a distinct key. If a reader's registers leak, past keys stay safe and later keys do not. A single leaked transaction key exposes only that sale.",
+          "source": "Engine run on main 7b569a1 (docs/conformance-matrix.md section 6, PR #148): after 3 sales, stolen registers rebuilt counters 4, 1000 and 65536, each equal to the real key, and could not rebuild counters 1 to 3. src/NetSec.Core/Dukpt/DukptPinPad.cs. Jared's accuracy sheet section 5.15 for the single-key limit. ANSI X9.24-3-2017 is a paid standard and was not read. The Wikipedia sentence on future keys is false for stolen registers and is not used."
+        },
+        {
+          "id": "L6-C12",
+          "text": "This lab runs AES DUKPT, named in ANSI X9.24-3-2017, with an AES-128 base key and AES-128 PIN keys. An older form uses Triple DES and has different sizes.",
+          "source": "src/NetSec.Core/Labs/Lesson06Dukpt.cs:49-50, src/NetSec.Core/Dukpt/DukptDerivation.cs; X9 free test vectors for X9.24-3-2017, acceptance clauses A3.vec.*; Jared's accuracy sheet section 5.15. The standard is paid and was not read."
         }
       ],
       "unlock": { "mode": "ack" }
