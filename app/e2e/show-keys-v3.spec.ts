@@ -50,13 +50,45 @@ test('OFF: bytes leave the panel at once, fingerprints stay, the banner shows, a
   await expect.poll(async () => /[0-9a-f]{32,}/i.test(await rowText(page))).toBe(false)
   expect(await rowText(page)).toMatch(/fp:[0-9a-f]{16}/)
   await expect(page.getByTestId('show-keys-off-banner')).toContainText('Show keys is off, so you see a short fingerprint of each key.')
-  await expect(page.getByTestId('keys-in-use')).toContainText(/fp:[0-9a-f]{16}/)
+  await expect(page.getByTestId('key-in-use-lab.aes-key')).toContainText('Built-in key')
   await expect(page.locator('[data-testid^="secret-reveal-"]')).toHaveCount(0)
   await shot(page, '02-off')
   await page.getByTestId('show-keys-switch').check()
   await expect.poll(hostOn).toBe(true)
   await expect.poll(async () => /[0-9a-f]{16,}/i.test(await rowText(page))).toBe(true)
   await expect(page.getByTestId('show-keys-off-banner')).toHaveCount(0)
+})
+
+// Own keys: the my-login flow makes token.issuer and device.enrolment, and lesson 10 reads them. Their key.in-use events carry the key.
+async function makeLoginKeys() {
+  const start = (await (await api('POST', '/api/security/flows/my-login/runs', {})).json()) as { runId: string; step: { stepSeq: number } }
+  let seq = start.step.stepSeq
+  for (const event of ['next', 'make', 'next', 'check', 'next']) {
+    const r = (await (await api('POST', `/api/security/runs/${start.runId}/events`, { event, stepSeq: seq, data: {} })).json()) as { step?: { stepSeq: number } }
+    if (!r.step) throw new Error(`event ${event} was refused`)
+    seq = r.step.stepSeq
+  }
+}
+const backToBuiltin = async () => { for (const t of ['token.issuer', 'device.enrolment']) await api('PUT', `/api/security/types/${t}/mode`, { mode: 'BuiltIn' }) }
+
+test('own keys: lesson 10 names token.issuer in the strip with its key ON and its fingerprint OFF, and the bytes come back', async ({ page }) => {
+  await makeLoginKeys()
+  try {
+    await freePlay(page, 10)
+    const chip = page.getByTestId('key-in-use-token.issuer')
+    await expect(chip).toBeVisible()
+    await expect(chip).toContainText('My test key')
+    await expect(chip).toContainText('version 1')
+    await expect(page.getByTestId('key-in-use-value-token.issuer')).toHaveText(/[0-9a-f]{16}/i)
+    await shot(page, '05-own-key-on')
+    await page.getByTestId('show-keys-switch').uncheck()
+    await expect.poll(hostOn).toBe(false)
+    await expect(page.getByTestId('key-in-use-value-token.issuer')).toHaveText(/^fp:[0-9a-f]{16}$/)
+    await shot(page, '06-own-key-off')
+    await page.getByTestId('show-keys-switch').check()
+    await expect.poll(hostOn).toBe(true)
+    await expect(page.getByTestId('key-in-use-value-token.issuer')).toHaveText(/[0-9a-f]{16}/i)
+  } finally { await backToBuiltin() }
 })
 
 test('OFF: two sides that hold one key still show a match, from the fingerprints', async ({ page }) => {
