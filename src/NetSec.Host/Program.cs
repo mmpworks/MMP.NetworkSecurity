@@ -307,9 +307,7 @@ namespace NetSec.Host
         {
             LabSession? session = Text(m, "sessionId") is { } id ? sessions.Find(id) : _current;
             if (session is null) { Fail(requestId, "SESSION_NOT_FOUND", "No session to save."); return; }
-            // While Show keys is OFF, a saved trace holds no key bytes: a file written while ON gets a hidden copy, and the original stays.
-            string file = !security.ShowKeys && session.FileHoldsShownKeys ? TraceLines.WriteHiddenCopy(session.SessionFile) : session.SessionFile;
-            Send(new { type = "session.saved", requestId, sessionId = session.SessionId, sessionFile = file });
+            sessions.Save(session, file => JsonSerializer.Serialize(new { type = "session.saved", requestId, sessionId = session.SessionId, sessionFile = file }));
         }
 
         void Load(JsonElement m, string? requestId)
@@ -326,10 +324,13 @@ namespace NetSec.Host
             string[] lines = File.ReadAllLines(path);
             // fileHidesKeys: the file was saved with Show keys OFF, so its bytes are gone and ON cannot bring them back.
             Send(new { type = "session.started", requestId, sessionId, replay = true, sessionFile = path, fileHidesKeys = lines.Any(TraceLines.HoldsHiddenKeys) });
-            bool show = security.ShowKeys;
+            // Each line reads the toggle as it goes out, so a flip during the replay hides every line after the flip frame.
             long seq = 0;
             foreach (string line in lines)
-                sessions.Broadcast($"{{\"type\":\"trace\",\"sessionId\":{JsonSerializer.Serialize(sessionId)},\"seq\":{++seq},\"event\":{(show ? line : TraceLines.HideLine(line))}}}");
+            {
+                long lineSeq = ++seq;
+                sessions.BroadcastPicked(show => $"{{\"type\":\"trace\",\"sessionId\":{JsonSerializer.Serialize(sessionId)},\"seq\":{lineSeq},\"event\":{(show ? line : TraceLines.HideLine(line))}}}");
+            }
             Send(new { type = "session.finished", sessionId, outcome = "replay", code = (string?)null, check = (string?)null });
         }
 

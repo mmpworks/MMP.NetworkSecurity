@@ -321,6 +321,42 @@ namespace NetSec.Tests
             }
         }
 
+        /// <summary>
+        /// Jared's ruling: the challenge nonce and the signed answer travel in the clear and are public protocol values.
+        /// Only the device key, the bearer token and the last call (token plus DPoP proof) are listed as secrets.
+        /// </summary>
+        [Fact]
+        public void The_control_lists_the_device_key_the_token_and_the_last_call_as_its_only_secrets()
+        {
+            Run run = Go();
+            Assert.True(run.Result.Completed, run.Result.FailedCode + " " + run.Result.FailedCheck);
+            TraceSecret[] secrets = run.Events.Where(e => e.Secrets != null && !e.StreamId.Contains("auth-mtls")).SelectMany(e => e.Secrets).ToArray();
+            Assert.Equal(new[] { "client.auth.device-key", "client.auth.token", "client.auth.last-call" }, secrets.Select(s => s.Holder + "." + s.Name).Distinct().ToArray());
+            Assert.DoesNotContain(run.Events, e => e.Actor == "issuer" && e.Secrets != null && !e.StreamId.Contains("auth-mtls"));
+        }
+
+        [Fact]
+        public void Every_secrets_row_the_lesson_10_tour_points_at_is_a_secret_the_control_lists()
+        {
+            string tour = System.IO.File.ReadAllText(TourFile(10));
+            string[] targets = System.Text.RegularExpressions.Regex.Matches(tour, "\"secrets:row=(?<row>[^\"]+)\"").Cast<System.Text.RegularExpressions.Match>().Select(m => m.Groups["row"].Value).ToArray();
+            Assert.NotEmpty(targets);
+            Run run = Go();
+            string[] listed = run.Events.Where(e => e.Secrets != null && !e.StreamId.Contains("auth-mtls")).SelectMany(e => e.Secrets).Select(s => s.Holder + "." + s.Name).Distinct().ToArray();
+            foreach (string row in targets) Assert.True(listed.Contains(row), "lesson-10.json points at secrets row " + row + ", and the control lists only " + string.Join(", ", listed));
+        }
+
+        static string TourFile(int lesson)
+        {
+            string name = System.IO.Path.Combine("app", "src", "tours", "lesson-" + lesson.ToString("00") + ".json");
+            for (System.IO.DirectoryInfo d = new System.IO.DirectoryInfo(AppContext.BaseDirectory); d != null; d = d.Parent)
+            {
+                string path = System.IO.Path.Combine(d.FullName, name);
+                if (System.IO.File.Exists(path)) return path;
+            }
+            throw new InvalidOperationException("no " + name + " above " + AppContext.BaseDirectory);
+        }
+
         [Fact]
         public void The_flip_row_aims_inside_the_token_claims()
         {
