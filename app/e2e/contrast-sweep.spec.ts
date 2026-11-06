@@ -1,11 +1,17 @@
 import { expect, test, type Page } from '@playwright/test'
 import { MIN_RATIO, scanPage, setTheme, type ScanFail } from './contrast'
-import { open, PORT, TOKEN } from './walk'
+import { startOwnHost, type OwnHost } from './own-host'
+import { open } from './walk'
 
 // The class behind the unreadable tooltip: text that fails 4.5 to 1 on its own box. This visits every screen, tooltip, dialog, banner and chip
 // in both themes and tests every visible piece of text. Each visit prints "checked N, failed M". The test fails on any failure.
 const api = (method: string, p: string, body?: unknown) =>
-  fetch(`http://127.0.0.1:${PORT}${p}`, { method, headers: { Authorization: `Bearer ${TOKEN}`, 'Content-Type': 'application/json' }, body: body === undefined ? undefined : JSON.stringify(body) })
+  fetch(`http://127.0.0.1:${host.port}${p}`, { method, headers: { Authorization: `Bearer ${host.token}`, 'Content-Type': 'application/json' }, body: body === undefined ? undefined : JSON.stringify(body) })
+
+// The sign-in flow below makes a key for good, and each theme walks that flow from the start, so each theme gets its own Host.
+let host: OwnHost
+test.beforeEach(async () => { host = await startOwnHost() })
+test.afterEach(async () => { await host.stop() })
 
 const all: Record<string, ScanFail[]> = {}
 const log: string[] = []
@@ -32,7 +38,7 @@ for (const theme of ['dark', 'light'] as const) {
     test.setTimeout(480_000)
     await api('PUT', '/api/security/types/token.issuer/mode', { mode: 'BuiltIn' })
     await api('PUT', '/api/security/types/device.enrolment/mode', { mode: 'BuiltIn' })
-    await open(page)
+    await open(page, host)
     await setTheme(page, theme)
     await visit(page, theme, 'start, nothing picked')
     for (const id of ['training-only-label', 'keys-chip', 'show-keys-switch']) await hoverVisit(page, theme, id)
