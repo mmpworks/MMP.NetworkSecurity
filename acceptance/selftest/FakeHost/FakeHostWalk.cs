@@ -83,6 +83,16 @@ namespace Acceptance
                 sizes.Add(D("keyBits", 256.0, "keyWords", 8.0, "rounds", 14.0, "roundKeys", 15.0, "words", 60.0, "rconUsed", 7.0));
                 Dictionary<string, object> tables = D("sbox", Hex.Encode(sbox), "inverseSbox", Hex.Encode(RefAes.InverseSbox), "shiftRows", forwardMap, "inverseShiftRows", inverseMap,
                     "rcon", M("walk-rcon-wrong") ? "01020408102040800036" : "01020408102040801b36", "sizes", sizes);
+                List<object> rconSteps = new List<object>();
+                byte[] rconValues = RefField.RoundConstants(10);
+                for (int i = 0; i < 9; i++)
+                {
+                    TermPart twice = RefField.Part(2, rconValues[i]);
+                    Doubling step = twice.Doublings[0];
+                    rconSteps.Add(D("from", step.From, "shifted", step.Shifted.ToString("x3"), "reduced", M("walk-rcon-steps-all-reduced") || step.Reduced, "to", M("walk-rcon-steps-drop-bit") ? (step.Shifted & 0xff).ToString("x2") : step.To));
+                }
+                if (M("walk-rcon-steps-short")) rconSteps.RemoveAt(8);
+                if (!M("walk-rcon-steps-missing")) tables["rconSteps"] = rconSteps;
                 if (M("walk-tables-leak-terms")) tables["terms"] = new List<object> { D("result", "04") };
                 if (M("walk-tables-leak-words")) tables["keyWords"] = new List<object> { D("i", 4.0) };
                 if (M("walk-tables-leak-key"))

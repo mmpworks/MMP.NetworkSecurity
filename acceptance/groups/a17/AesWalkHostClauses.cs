@@ -284,6 +284,40 @@ namespace Acceptance
             for (int i = 0; i < 16; i++) Check.True(Convert.ToInt32(got[i]) == want[i], state + ": " + name + "[" + i + "] is " + got[i] + ", expected " + want[i]);
         }
 
+        /// <summary>Design section 2.2b: the Host sends each doubling of the round constants. The values are the FIPS 197 row, and the rules are the field's, so no step's numbers come from the Host alone.</summary>
+        [Clause("A19.host.rcon-steps")]
+        public static string RconSteps(Ctx c)
+        {
+            byte[] rcon = Hex.Decode("01020408102040801b36");
+            using (HostProc h = A17.Host(c, "walk-rcon"))
+            {
+                foreach (bool on in new bool[] { true, false })
+                {
+                    SetShowKeys(h, on);
+                    string state = on ? "Show keys ON" : "Show keys OFF";
+                    Reply r = HostHttp.Get(h, Tables);
+                    Check.True(r.Ok && r.Json != null, state + ": GET tables got " + r);
+                    List<object> steps = MiniJson.Arr(r.Json, "rconSteps");
+                    Check.True(steps != null && steps.Count == 9, state + ": rconSteps should hold 9 steps, holds " + (steps == null ? 0 : steps.Count));
+                    for (int i = 0; i < 9; i++)
+                    {
+                        Dictionary<string, object> s = MiniJson.AsObject(steps[i]);
+                        string at = state + ", step " + i;
+                        Check.True(s != null, at + ": not an object");
+                        int from = Convert.ToInt32(MiniJson.Str(s, "from") ?? "-1", 16), to = Convert.ToInt32(MiniJson.Str(s, "to") ?? "-1", 16), shifted = Convert.ToInt32(MiniJson.Str(s, "shifted") ?? "-1", 16);
+                        bool reduced = MiniJson.Bool(s, "reduced", false);
+                        Check.True(from == rcon[i], at + ": from " + from.ToString("x2") + ", expected " + rcon[i].ToString("x2"));
+                        Check.True(to == rcon[i + 1], at + ": to " + to.ToString("x2") + ", expected " + rcon[i + 1].ToString("x2"));
+                        Check.True(shifted == from << 1, at + ": shifted " + shifted.ToString("x") + " is not " + from.ToString("x2") + " moved left by one bit");
+                        Check.True(reduced == (shifted > 0xff), at + ": reduced " + reduced + " with shifted " + shifted.ToString("x"));
+                        Check.True(to == (reduced ? shifted ^ 0x11b : shifted), at + ": to " + to.ToString("x2") + " does not follow from shifted " + shifted.ToString("x"));
+                        Check.True(reduced == (from == 0x80), at + ": only 80 to 1b is reduced, and this step from " + from.ToString("x2") + " reads " + reduced);
+                    }
+                }
+            }
+            return "9 steps follow the round constants and the field's rules, and only 80 to 1b is reduced, with Show keys ON and OFF";
+        }
+
         [Clause("A19.host.block-terms-real-run")]
         public static string BlockTerms(Ctx c)
         {
