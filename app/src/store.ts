@@ -195,11 +195,14 @@ export async function replaceOpenSessions(on: boolean) {
       const rows: any[] = Array.isArray(body) ? body : body?.events ?? []
       const read = rows.map(normalizeEvent).sort((a, b) => a.seq - b.seq)
       const last = read.length ? read[read.length - 1].seq : 0
-      s.events = [...read, ...s.events.filter(e => e.seq > last)]
+      s.events = [...(keysHidden ? read.map(withoutBytes) : read), ...s.events.filter(e => e.seq > last)]
     } catch { /* The live feed keeps going. On OFF the bytes are already gone. */ }
   }
 }
 
+// The Host's frame is the truth for Show keys. A PUT reply that lands after a frame is the same flip or an older one, so it must not act.
+let showKeysFrames = 0
+export const showKeysFrameCount = () => showKeysFrames
 let showKeysHandler: ((on: boolean) => void) | null = null
 export function onShowKeys(h: (on: boolean) => void) { showKeysHandler = h }
 // The Host sends every frame to every open socket. This client owns only the sessions it asked for: a session.started whose
@@ -230,6 +233,7 @@ function onFrame(f: any) {
       return f.type === 'trace' ? onTrace(f) : onFinished(f)
     case 'session.forked': return mySessions.has(String(f.sessionId)) || mySessions.has(String(f.parentId)) ? onForked(f) : undefined
     case 'security.show-keys':
+      showKeysFrames++
       showKeysHandler?.(f.on !== false)
       void replaceOpenSessions(f.on !== false)
       return
