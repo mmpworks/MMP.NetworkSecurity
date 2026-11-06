@@ -21,7 +21,7 @@ const props = defineProps<{
 const emit = defineEmits<{ (e: 'pick', offset: number): void }>()
 
 const PER_ROW = 16
-const ROW_H = 22
+const ROW_H = 20
 const bytes = computed(() => hexToBytes(props.hex))
 const scroller = ref<HTMLElement | null>(null)
 const top = ref(0)

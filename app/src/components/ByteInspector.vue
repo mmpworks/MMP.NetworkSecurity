@@ -19,8 +19,8 @@ const locked = computed(() => !!ev.value && isProtected(ev.value))
 const unreadableBytes = computed(() => (eve.value ? (ev.value?.fields ?? []).filter(f => !f.visibleToWire).reduce((n, f) => n + f.length, 0) : 0))
 const beforeOpen = ref(true)
 
-// A new message starts with nothing lit.
-watch(() => [ev.value?.seq, ev.value?.sessionId], () => { ui.litFields = [] })
+// A new message or a new view starts with nothing lit. A view can hide the row of a lit field, and then the learner could not turn it off.
+watch(() => [ev.value?.seq, ev.value?.sessionId, ui.view], () => { ui.litFields = [] })
 
 const isLit = (f: TraceField) => ui.litFields.includes(fieldKey(f))
 const readable = (f: TraceField) => !eve.value || f.visibleToWire
@@ -107,7 +107,7 @@ const canFlip = computed(() => ui.selectedByte != null && !!ev.value?.wire && !i
         </section>
       </div>
       <div class="field-list" role="group" aria-label="Fields of this message">
-        <div class="fl-hint muted">{{ fields.length ? 'Pick a field to light its bytes. Pick it again to turn it off.' : 'This message lists no fields.' }}</div>
+        <div class="fl-hint muted">{{ fields.length ? 'Pick a field to light its bytes.' : 'This message lists no fields.' }}</div>
         <div v-if="eve && unreadableBytes" class="field-row unreadable">unreadable without the key ({{ unreadableBytes }} bytes)</div>
         <template v-for="f in fields" :key="fieldKey(f)">
           <button
