@@ -230,6 +230,7 @@ In lesson 1, a free flip on a non-wire event changes nothing. `Interpreter.Apply
 | ECB, the default in some tools | `L1-use-ecb` | Equal blocks give equal cipher blocks |
 | CBC with no tag. A strong key does not fix this | `L1-flip-cbc` | In this lab, a flipped bit passes with no error. A library that checks padding raises an error on a flip in the last blocks, and it still passes a flip in the earlier blocks |
 | A repeated GCM nonce | `L1-reuse-nonce` | Two messages share a key stream. Only the lab's detector calls it out |
+
 Off-screen sources for these words. MySQL 8.4 Reference Manual, `block_encryption_mode`: default value `aes-128-ecb`. .NET 10.0.14 `Aes.Create()`, run by Jared: CBC and PKCS7 by default, and a flip in an earlier block raised no error on 384 of 384, while the second-last block raised a padding error on 128 of 128, and the last byte raised one on all 8 bits. MySQL stays off the screen.
 
 **Out of scope, named on the tab.** The modes page also lists CFB, OFB, and CTR, and it names XTS. CFB, OFB, and XTS are not in this course (grep of `src/NetSec.Core`: 0 files). CTR alone runs in lesson 8's SSH suite, and the panel points there. Lesson 1 runs counter mode only inside GCM.
