@@ -1,6 +1,6 @@
 # MMP.NetworkSecurity: walkthrough design
 
-Author: Richard. Date: 2026-11-06. Revision 9, adding true pause and resume on every motion, and the round key number on the AddRoundKey step button. Status: design only, for Jared's check and Echo's clauses. No product code.
+Author: Richard. Date: 2026-11-06. Revision 10, adding the phantom column, which shows that RotWord and SubWord work on a copy of the word before. Status: design only, for Jared's check and Echo's clauses. No product code.
 
 Sources of facts: FIPS 197, the engine, and Jared's sheet `E:\dev\ns-lesson1-facts.md`. Steve's web pages set depth and teaching order only (section 2.1).
 
@@ -265,14 +265,38 @@ Worked example, the FIPS 197 appendix A key `2b7e1516 28aed2a6 abf71588 09cf4f3c
 
 | Moment | On screen | Value from the reply |
 |---|---|---|
-| 1. Light the sources | Byte j of `w(i - Nk)`, and the source byte of `w(i - 1)`, light up in the table, and in the original key line when they are key words | Position arithmetic |
+| 1. Light the sources | Byte j of `w(i - Nk)` lights up in the table. So does the source byte of `w(i - 1)`, or byte j of the phantom column when the word has one. Both also light in the original key line when they are key words | Position arithmetic |
 | 2. The stages | The stage rows show. In the `previous` row, the source byte lights. In each row after RotWord, byte j lights | `previous`, `rotated`, `substituted`, `afterRcon`, `keyBack` |
 | 3. The equation | "2b XOR 8b = a0", with each value's bits below it | `keyBack[j]`, the last stage's byte j, and `word[j]`. The app prints these, and it computes no XOR |
 | 4. The answer flies | The byte flies to its cell, and the column fills one cell at a time | `word[j]` |
 
 **The source byte.** RotWord moves each byte left, so on a word that passes through RotWord, byte j of the stage comes from byte `(j + 1) mod 4` of the word before. On every other word, it is byte j. The last stage is `afterRcon` on a RotWord step, `substituted` at the AES-256 `i mod 8 = 4` step, and `previous` otherwise.
 
-The stage row for RotWord reads "RotWord: rotate left one byte". With reduced motion, each word lands whole, and Back mid-word leaves no marks.
+The stage row for RotWord reads "RotWord: rotate one byte, up this column". With reduced motion, each word lands whole, and Back mid-word leaves no marks.
+
+**The phantom column (Steve's item, W1b).** A word that transforms the word before gets a phantom: a copy of that column, lifted above the base. RotWord words have one, and so do AES-256's SubWord-only words. Plain words, such as w5, show none. The base column never changes, and the learner can see that.
+
+| Moment | The phantom shows | Value from the reply |
+|---|---|---|
+| 1. It lifts | A copy of `w(i - 1)`, above the base column | `previous` |
+| 2. It rotates (RotWord words only) | Each byte moves up one place, and the top byte wraps to the bottom | `rotated` |
+| 3. It flips through the S-box | Each byte changes to its S-box byte | `substituted` |
+| 4. It flips with the round constant (RotWord words only) | The top byte changes | `afterRcon` |
+| 5. It lines up | Row by row with the new word. Byte j of the phantom combines with byte j of the word back | The last stage, and `keyBack` |
+| 6. It flattens | It settles down and goes when the column is done | None |
+
+Panel words, with the word names from `i`:
+
+1. RotWord word: "RotWord works on a copy of w7, so w7 itself does not change. The copy moves up one byte, and the top byte wraps to the bottom. All 4 bytes of w8 then use this one finished copy."
+2. SubWord-only word: "SubWord works on a copy of w11, so w11 itself does not change. All 4 bytes of w12 then use this one finished copy."
+
+| Case | Rule |
+|---|---|
+| New reply fields | None. The stages already hold every value, and the app computes none |
+| Pause | Holds the phantom in place, as section 2.2a sets out. It is a CSS or Web Animations motion inside the walk's root |
+| Back, a round chip, or Show keys OFF | Removes the phantom, with none left behind |
+| Reduced motion | No phantom. The word lands whole, and the stage rows and the panel words still show |
+| A tap on a built word | Opens its stage rows, with no phantom, because the phantom belongs to the build |
 
 **The reply needs no new field.** `keyWords[]` already has every row by `i`, and each row holds `word`, `previous`, `rotated`, `substituted`, `rcon`, `afterRcon`, and `keyBack`. Grid, column, cell, and byte position come from `i` by layout: `i / 4`, `i % 4`, and `4i + r`. The two words to light are `i - 1` and `i - Nk`, with Nk from the tables route's size table. That is position arithmetic, and the app reads no byte value to do it. A clause holds it: the bytes in the lit cells must equal `previous` and `keyBack`.
 
@@ -1212,7 +1236,8 @@ If Steve does not follow it after 2 rounds of word changes, stop and re-plan the
 | Round values | Every CIPHER and INVERSE CIPHER state for FIPS C.1, C.2, C.3, by position. The vector reader skips the appendix's EQUIVALENT INVERSE CIPHER lists, which hold a different order |
 | Start view | At the start of encryption, the right-hand grid equals round key 0, and the first Next lands on AddRoundKey 0. At the start of decryption, it equals round key Nr, and the first Next lands on AddRoundKey Nr. It is gone with Show keys OFF |
 | ShiftRows roll | The roll ends on the engine state. A Back during a roll leaves no strip and no hidden cell. Row 0 does not move |
-| Key fill | The lit `w(i - Nk)` byte equals `keyBack[j]`. The lit `w(i - 1)` byte equals `previous` at the source position, which is `(j + 1) mod 4` on a RotWord step. The equation's three values equal the reply's. A Back mid-word leaves no mark and no flying byte |
+| Phantom column | At each key size, a word has a phantom only on a RotWord or SubWord-only step, so w5 at AES-128 has none. Its cells equal `previous`, then `rotated`, `substituted`, and `afterRcon`, in that order. Each base column equals its `word` through every moment. A Back, a round chip, and Show keys OFF each leave no phantom. Pause holds it, by the Pause holds clause. Reduced motion shows none. The panel names `w(i - 1)` and `wi`, and the RotWord row reads "RotWord: rotate one byte, up this column" |
+| Key fill | The lit `w(i - Nk)` byte equals `keyBack[j]`. On a word with no phantom, the lit `w(i - 1)` byte equals `previous` at byte j. On a word with a phantom, the phantom's lit byte equals the last stage's byte j, and the `previous` row lights the source position, which is `(j + 1) mod 4` on a RotWord step. The equation's three values equal the reply's. A Back mid-word leaves no mark and no flying byte |
 | Spec table | Every `url` has a host in `hosts`, and every row has a synopsis that passes reading grade |
 | Spec on screen | A scan of tour text, gloss, and copy finds each spec-shaped name in the table. At the end of each lesson walk, an e2e scan of the page finds no spec-shaped name outside a card trigger. A Host refusal naming RFC 8446 shows a card |
 | Spec card | It opens on hover, focus, and tap. It stays open with the pointer on it. Esc closes it. Tour files keep their hash |
@@ -1222,7 +1247,7 @@ If Steve does not follow it after 2 rounds of word changes, stop and re-plan the
 | Key words | FIPS appendix A rows, for all three sizes. The Rcon row equals `01 02 04 08 10 20 40 80 1b 36`, and the used counts are 10, 8, 7 |
 | End frames | Every animated step lands on the engine state for that step, for all three key sizes |
 | Reduced motion | Each step shows its end frame with no transition |
-| Pause holds | With motion on at the `slow` speed, Pause during a flying byte, a key fill, and a matrix multiply. The clause waits for each animation's `ready`, then samples. Each moving element's position stays the same for 2 seconds, within 1 pixel. At least one paused animation has a `currentTime` below its end. If nothing runs when the click lands, the clause repeats from the step before, and it reads NOT RUN after 3 tries |
+| Pause holds | With motion on at the `slow` speed, Pause during a flying byte, a key fill, a phantom column, and a matrix multiply. The clause waits for each animation's `ready`, then samples. Each moving element's position stays the same for 2 seconds, within 1 pixel. At least one paused animation has a `currentTime` below its end. If nothing runs when the click lands, the clause repeats from the step before, and it reads NOT RUN after 3 tries |
 | Resume carries on | Before the Resume click, a `requestAnimationFrame` sampler in the page logs `performance.now()` and each animation's `currentTime`. At the first frame after Resume, `currentTime` is at or above the paused value, below the end, and no further past the paused value than the elapsed page time plus 1 frame, times the speed. So the motion neither restarts nor jumps to the end. The motion then lands on the engine state |
 | Pause label | The button reads Pause during a motion from one Next, Resume when frozen, and Play when nothing runs. Play still stops at the end of a round and of a grid |
 | Next and Back while paused | Each ends the motion and acts. After Next, the next step's motion runs and the button reads Pause, and it lands on that step's engine state. Back leaves no flyer, strip, box, or mark. Play does not restart |
