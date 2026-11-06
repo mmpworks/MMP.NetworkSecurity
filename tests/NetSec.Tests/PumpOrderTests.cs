@@ -113,7 +113,7 @@ namespace NetSec.Tests
         {
             readonly IByteLink _inner;
             readonly ListSink _sink;
-            public int WireSentAtWrite = -1;
+            public volatile int WireSentAtWrite = -1;
             public SlowFinishLink(IByteLink inner, ListSink sink) { _inner = inner; _sink = sink; }
             public IFuture<int> Read(byte[] b, int off, int n) => _inner.Read(b, off, n);
             public void Close() => _inner.Close();
@@ -172,9 +172,8 @@ namespace NetSec.Tests
             IFuture<PumpResult> run = pump.Run();
 
             pump.Enqueue(new EngineCommand(EngineCommandKind.Send, 0, new byte[1], null));
-            Assert.True(SpinWait.SpinUntil(() => WireSentActors(sink).Length >= 1, 20000));
-
-            Assert.True(link.WireSentAtWrite >= 0, "the link never saw a write");
+            // The event is logged first, so the write can still be on its way when the event shows. Wait for the write itself.
+            Assert.True(SpinWait.SpinUntil(() => link.WireSentAtWrite >= 0, 20000), "the link never saw a write");
             TraceEvent[] atWrite = new TraceEvent[link.WireSentAtWrite];
             System.Array.Copy(sink.Events, atWrite, link.WireSentAtWrite);
             Assert.Contains(atWrite, e => e.Type == "wire.sent");
