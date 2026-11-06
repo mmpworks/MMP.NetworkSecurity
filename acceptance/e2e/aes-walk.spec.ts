@@ -63,6 +63,10 @@ async function openWalk(page: Page): Promise<any> {
   return await reply.json();
 }
 
+/** The one step list, in Next order. Design 2.2a: after encrypt's last step, Next lands on the decrypt Start view, a stop with no motion, where the block equals forward.output. */
+const DECRYPT_START = 'decrypt start view';
+const stopsInOrder = (reply: any): any[] => [...reply.forward.steps, { kind: DECRYPT_START, state: reply.forward.output }, ...reply.inverse.steps];
+
 const cell = (page: Page, r: number, c: number) => page.getByTestId(`aes-walk-cell-${r}-${c}`);
 
 /** The byte in each cell, read by row and column and put back in FIPS order: position r + 4c. */
@@ -104,7 +108,7 @@ test('[A19.ui.first-view-fills-by-column] block 1 drops in one byte at a time, d
 test('[A19.ui.grid-order-on-every-state] on each state of both runs, row r, column c shows byte r + 4c of the reply', async ({ page }) => {
   const reply = await openWalk(page);
   await toFirstStep(page);
-  const steps: any[] = [...reply.forward.steps, ...reply.inverse.steps];
+  const steps: any[] = stopsInOrder(reply);
   for (let i = 0; i < steps.length; i++) {
     expect(await grid(page), `step ${i + 1} of ${steps.length} (${steps[i].kind})`).toBe(steps[i].state.toLowerCase());
     if (i < steps.length - 1) await page.getByTestId('aes-walk-next').click();
@@ -114,9 +118,13 @@ test('[A19.ui.grid-order-on-every-state] on each state of both runs, row r, colu
 test('[A19.ui.step-order-by-next] Next alone meets the FIPS 197 steps in order, for encrypt and then decrypt', async ({ page }) => {
   const reply = await openWalk(page);
   await toFirstStep(page);
-  const want = [...kindOrder(reply.rounds, true), ...kindOrder(reply.rounds, false)];
+  const want = [...kindOrder(reply.rounds, true), DECRYPT_START, ...kindOrder(reply.rounds, false)];
   for (let i = 0; i < want.length; i++) {
-    expect(await kindNow(page), `step ${i + 1} of ${want.length}`).toBe(want[i]);
+    if (want[i] === DECRYPT_START) {
+      // The stop holds no step of the cipher, so its label is another word. The block is what encrypt produced.
+      expect(want.slice(0, i).concat(want.slice(i + 1)), 'the stop is not a cipher step').not.toContain(await kindNow(page));
+      expect(await grid(page), 'the decrypt Start view holds forward.output').toBe(reply.forward.output.toLowerCase());
+    } else expect(await kindNow(page), `step ${i + 1} of ${want.length}`).toBe(want[i]);
     if (i < want.length - 1) await page.getByTestId('aes-walk-next').click();
   }
 });
@@ -184,7 +192,7 @@ test('[A19.ui.end-frames-on-all-key-sizes] each step lands on the engine state, 
       expect(reply.keyBits, 'the reply names the key size').toBe(bits);
     }
     await toFirstStep(page);
-    const steps: any[] = [...reply.forward.steps, ...reply.inverse.steps];
+    const steps: any[] = stopsInOrder(reply);
     for (let i = 0; i < steps.length; i++) {
       expect(await grid(page), `${bits} bits, step ${i + 1} of ${steps.length} (${steps[i].kind})`).toBe(steps[i].state.toLowerCase());
       if (i < steps.length - 1) await page.getByTestId('aes-walk-next').click();
@@ -196,7 +204,7 @@ test('[A19.ui.reduced-motion-has-no-transition] with reduced motion each step sh
   await reduced(page);
   const reply = await openWalk(page);
   await toFirstStep(page);
-  const steps: any[] = [...reply.forward.steps, ...reply.inverse.steps];
+  const steps: any[] = stopsInOrder(reply);
   for (let i = 0; i < 12; i++) {
     await page.getByTestId('aes-walk-next').click();
     expect(await running(page), `running animations at step ${i + 2}`).toBe(0);

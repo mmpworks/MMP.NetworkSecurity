@@ -182,7 +182,7 @@ UI test ids, all ASSUMED under the design's `aes-walk-` prefix:
 | `aes-walk-first-view` | Shows on the first view. It starts on an empty grid, and each Next adds one byte in position order |
 | `aes-walk-next`, `aes-walk-back` | Next is disabled at the end of the walk |
 | `aes-walk-cell-{r}-{c}` | Row r, column c. The text starts with the byte's 2 hex digits. An empty cell on the first view shows nothing or its position number. `data-letter` holds the byte's character when it is printable |
-| `aes-walk-step-kind` | The step's name: an `AesStepKind` member. On the first view and the key rows it holds another word |
+| `aes-walk-step-kind` | The step's name: an `AesStepKind` member. On the first view, the key rows and the decrypt Start view it holds another word. The decrypt Start view is a stop in the one step list, after encrypt's last step (design 2.2a, #170) |
 | `aes-walk-readable` | At the end of the walk it reads `Pump four is ok.` |
 | `aes-walk-sbox-row`, `aes-walk-sbox-col`, `aes-walk-sbox-value` | After a click on a cell of a SubBytes or InvSubBytes step: one hex digit, one hex digit, and the 2-digit table value |
 | `aes-walk-sbox-cell-{x}-{y}` | One table cell, with x and y as hex digits |
