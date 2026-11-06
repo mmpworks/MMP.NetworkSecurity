@@ -1,6 +1,6 @@
 # MMP.NetworkSecurity: walkthrough design
 
-Author: Richard. Date: 2026-11-06. Revision 8, adding the Start view's round key, the ShiftRows roll and its colours, the key fill, the MixColumns matrix view, and spec cards. Status: design only, for Jared's check and Echo's clauses. No product code.
+Author: Richard. Date: 2026-11-06. Revision 9, adding true pause and resume on every motion, and the round key number on the AddRoundKey step button. Status: design only, for Jared's check and Echo's clauses. No product code.
 
 Sources of facts: FIPS 197, the engine, and Jared's sheet `E:\dev\ns-lesson1-facts.md`. Steve's web pages set depth and teaching order only (section 2.1).
 
@@ -148,7 +148,7 @@ What each step says:
 
 | Step | What it says, from the real bytes | Picture |
 |---|---|---|
-| AddRoundKey | Each byte is XORed with the round key. This is the only step that uses the key. It is its own inverse | State, round key, result |
+| AddRoundKey | Each byte is XORed with the round key. This is the only step that uses the key. It is its own inverse. The step button names the key: "AddRoundKey 1", and "AddRoundKey 0" in round 0. In decrypt the number counts down the same way. The number is the step's `round` | State, round key, result |
 | SubBytes | Each byte is swapped with the S-box table. The table is public and fixed | Before and after, plus the S-box view (section 2.3) |
 | ShiftRows | Row 0 stays. Rows 1, 2, 3 slide left by 1, 2, 3 | Before and after, rows marked |
 | MixColumns | Each column is replaced by a mix of its 4 bytes, by a matrix with a special multiply. Ordinary multiply gives wrong bytes | The selected column before and after, and the matrix 2, 3, 1, 1. The app runs no math |
@@ -178,7 +178,7 @@ Steve's ask: see the 16 bytes change at each stage.
 | Next and Back | They land on the same states as without animation. A click during a motion jumps to the end frame. A Back during a roll or a key fill leaves no strip, no flying byte, no mark, and no hidden cell |
 | Start view | The right-hand grid shows the round key the next step uses, in place of "Before this step": round key 0 at the start of encryption, and round key Nr at the start of decryption. Next then runs the AddRoundKey motion from it. Show keys OFF closes it, as the block walk closes |
 | `prefers-reduced-motion` | Each step jumps to its end frame |
-| Show keys flips OFF during a motion | The timeline stops, and the walk clears (section 3.5) |
+| Show keys flips OFF during a motion, or during a pause | The timeline stops, and the walk clears (section 3.5) |
 | Library | None. CSS transforms and one small composable, `useWalkTimeline`. I would add a library only if a transform cannot do the MixColumns join |
 
 **ShiftRows colours.** During the roll, only the bytes that wrap take the highlight colour: 1 in row 1, 2 in row 2, 3 in row 3. The others stay normal, and the colours stay on the end frame. On ShiftRows they form a staircase at the right, and on InvShiftRows the bytes wrap the other way, so it forms at the left:
@@ -195,7 +195,30 @@ The app marks a cell from the shift map the tables route sends, and it reads no 
 
 **ShiftRows words on screen:** "Row 0 stays. Rows 1, 2 and 3 rotate left by 1, 2 and 3 bytes. The name says shift, but no byte is lost: FIPS 197 calls it a cyclic shift, the same idea as a rotate left (ROL)."
 
-For tests: a clause reads end frames under reduced motion, so no test waits on a timer.
+For tests: a clause reads end frames under reduced motion, so no test waits on a timer. The pause clauses are the one exception, because they test motion itself.
+
+**Pause and resume (Steve's rule, for every walk motion).** Steve's words: "we should have pause and resume capability. That allows a user to pause and manually spend time on one part of the math without having to replay it."
+
+| Action | Result |
+|---|---|
+| Pause | Everything freezes in place, including a byte in mid-flight. Nothing jumps to the end of the word or the step |
+| Resume | The motion carries on from that spot, with the time it had left |
+| Next or Back while paused | The current motion ends, then the button acts. Play stops too |
+| A tap that changes the view while paused (a byte, a column, a word, a round chip, a selector) | The current motion ends, then the tap acts. Play stops too |
+| Hover or focus while paused | Tips and spec cards still work. They read the same values as when the walk is stopped |
+| Speed while paused | The new speed applies from the next motion |
+
+The one button reads by state:
+
+| State | Button |
+|---|---|
+| Nothing runs | Play |
+| Anything runs, even from a single Next | Pause |
+| Frozen | Resume |
+
+Play still stops at the end of a round or a grid. Only Pause freezes in mid-motion. This replaces the earlier words, where Pause stopped at an end point.
+
+**One clock.** `useWalkTimeline` owns every timer and every running animation. A view asks it for a delay and never calls `setTimeout` itself. Pause clears each timer and records the time left, then pauses each running animation under the walk's root element. Resume starts both again. A flying byte or bit mounts inside that root, so Pause reaches it, and Pause leaves the rest of the app running. With reduced motion, a step lands at once, so Pause freezes only the wait between steps.
 
 ### 2.2b The key schedule part
 
@@ -480,7 +503,7 @@ Dropping the bit alone gives the wrong byte, so the XOR 1b row always shows. The
 | `running`, on each mixed byte | The XOR after each term. The app runs no math, so the engine sends it. The last value equals `result` |
 | `doublings` holds `from`, `shifted`, `reduced`, `to` in place of one byte each. `picks` and `sums` join each part | Bit rows need the 9-bit `shifted` value, and the inverse factors need the picks and their running sum. `to` equals `shifted`, XOR `11b` when it overflows |
 
-**Back during play stops Play, ends every flying byte and bit, and lands on the previous whole moment,** with no box, flyer, or lit row left behind. Next during a motion jumps to that motion's end. With reduced motion, each moment lands at once. A Show keys flip stops it all, as section 3.5 sets out.
+Pause and Resume follow section 2.2a in this view too. **Back during play stops Play, ends every flying byte and bit, and lands on the previous whole moment,** with no box, flyer, or lit row left behind. Next during a motion jumps to that motion's end. With reduced motion, each moment lands at once. A Show keys flip stops it all, as section 3.5 sets out.
 
 ### 2.3 The S-box view
 
@@ -734,7 +757,7 @@ From Jared's sheet. Echo can scan for these in `walk-gloss.json` and the tour.
 | Typed text | One box. Past the used part, it marks the text as not included |
 | Longer text (W2) | A block picker and a Flip button. The modes sit side by side, so there is no mode control |
 | Move through steps | Back, Next, and round chips to jump |
-| Watch steps move | One Play and Pause button, which stops at the end of the round. Press it again for the next round. Steve can overrule this after he steps through W1b |
+| Watch steps move | One button: Play, Pause, Resume, by state (section 2.2a). Play stops at the end of the round, and pressing it again starts the next round. Pause freezes in mid-motion. Steve can overrule the stop after he steps through W1b |
 | How fast | One speed control: slow, normal, fast |
 | See one word's build | Tap a built word in the table |
 | See one byte's lookup | Click a cell |
@@ -800,7 +823,7 @@ namespace NetSec.Crypto {
     public readonly int Factor;               // 2, 3, 1 or 14, 11, 13, 9
     public readonly byte Input;
     public readonly AesDoubling[] Doublings;  // As far as the factor needs. The inverse factors need 3
-    public readonly byte[] Picks, Sums;       // The doubled values that make up the factor, and their running XOR
+    public readonly byte[] Picks, Sums;       // The input and doubled values that make up the factor, low bit first, and their running XOR
     public readonly bool Reduced;             // Any doubling needed the reduction by 11b
     public readonly byte Result;
   }
@@ -1086,7 +1109,7 @@ Limits of the spike:
 | `app/src/components/LongTextView.vue` | W2: the box, the side-by-side rows, the flip, and the picture beside it. It prints typed text as text, and never as HTML |
 | `app/src/components/PicturePanel.vue` | W2: gains the side-by-side layout. Its reads do not change |
 | `app/src/components/GhashView.vue`, `ForgeryView.vue` | W1c: the rows of section 2.4a, and the steps of section 2.4b. Values come from the engine |
-| `app/src/useWalkTimeline.ts` | Play, Pause, speed, stop at the end of a round, reduced motion. It holds states and never makes a byte |
+| `app/src/useWalkTimeline.ts` | The one clock for timers and animations: Play, Pause, Resume, speed, stop at the end of a round, reduced motion. It holds states and never makes a byte |
 | `app/src/components/AesFeedView.vue` | One mode's rows, lock and unlock, the box link, wire status |
 | `app/src/App.vue` | One more entry in the panel tab list, shown when the run holds `aes.key` |
 | `app/src/tours/lesson-01.json` | Two new steps. One follows "ECB locks each block alone" and opens chapter 1. One follows "CBC and GCM hide the shape" and opens chapter 2. They land after #145 |
@@ -1199,6 +1222,13 @@ If Steve does not follow it after 2 rounds of word changes, stop and re-plan the
 | Key words | FIPS appendix A rows, for all three sizes. The Rcon row equals `01 02 04 08 10 20 40 80 1b 36`, and the used counts are 10, 8, 7 |
 | End frames | Every animated step lands on the engine state for that step, for all three key sizes |
 | Reduced motion | Each step shows its end frame with no transition |
+| Pause holds | With motion on, Pause during a flying byte, a key fill, and a matrix multiply. One frame later, the position of each moving element stays the same for 2 seconds, within 1 pixel. No end frame shows |
+| Resume carries on | After Resume, each element moves on from its paused position and lands on the engine state. Its first position after Resume is within the distance it can travel in 100 ms, so it does not restart or jump to the end |
+| Pause label | The button reads Pause during a motion from one Next, Resume when frozen, and Play when nothing runs. Play still stops at the end of a round and of a grid |
+| Next and Back while paused | Each ends the motion and acts. Next lands on the next step's engine state. Back leaves no flyer, strip, box, or mark. Play does not restart |
+| Tips while paused | A hover tip and a spec card open while paused, and the moving elements stay still |
+| Show keys while paused | Show keys OFF clears the walk, with no frozen flyer left and no timer that fires later |
+| Key number | Each AddRoundKey button reads "AddRoundKey r", and r is the step's `round`. The grid it shows equals round key r. Encrypt counts up from 0, and decrypt counts down from Nr to 0, for all three key sizes |
 | Shift map | `state[i]` after ShiftRows equals `state[map[i]]` before it, using the map the tables route sends |
 | Matrix view | The lit row's factors and the flown column equal the part's `factor` and `input`. The landed byte equals the state after. Tapping a byte picks its column. Fill all equals the state after. A Back during Play leaves no flyer, box, or lit row. InvMixColumns shows 14, 11, 13, 9 |
 | Overflow rows | On every doubling, `to` equals `shifted`, XOR `11b` when `reduced`, and `reduced` means `shifted` is past 8 bits. An overflow shows the break-away and the XOR 1b row. The last `running` equals `result`, and the last `sums` equals the part's `result` |
