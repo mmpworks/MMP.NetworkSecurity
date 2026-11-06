@@ -441,7 +441,7 @@ Steve's ruling: show what the repeated-nonce mistake costs. An eavesdropper with
 2. This demo covers two messages that differ only in the last block. The general case needs root finding, and SP 800-38D Appendix A says only that an attacker can "likely" find H.
 3. The fault is the repeated nonce. AES and GCM are fine when each nonce is used once.
 
-**Show keys OFF closes it,** by Steve's ruling. The recovery needs no key, but H is key material, and the forged tag rests on it.
+**Closed with Show keys OFF, on Jared's recommendation, because H is key material.** Steve approved the demo and can overrule this. The recovery needs no key, and the forged tag rests on H.
 
 **Control run and goldens stay unchanged.** The row reads a new lab option, and with the option absent, `Lesson01Aes` takes the same path and draws the same random bytes. No result enters a trace or a session file.
 
@@ -726,7 +726,7 @@ Replies, trimmed. Every error carries `code`, `message`, `retryable`, and `reque
 | `/api/walk/aes/tables` | Open | The S-box tables, shift maps, round constants, size table, and dependency rule are public |
 | `/modes` | Open | A row holds no key and no round state. Each field comes from values the trace shows with the toggle OFF: `plain` and `wire`. For example, GCM's key stream equals text XOR cipher |
 | `/ghash` | **Closed**, 409 `KEYS_HIDDEN` | It holds H, and each Y value is built from H |
-| `/forge` | **Closed**, 409 `KEYS_HIDDEN` | By Steve's ruling. The recovery needs no key, and its result is key material |
+| `/forge` | **Closed**, 409 `KEYS_HIDDEN` | On Jared's recommendation, because H is key material. Steve approved the demo and can overrule this. The recovery needs no key |
 | `/block` | **Closed**, 409 `KEYS_HIDDEN` | It holds the key, the round keys, the word rows, and the MixColumns terms, whose inputs are round states. The first AddRoundKey also gives `state = input xor key`, so input and state give the key. A fingerprint per cell would teach nothing |
 
 So with the toggle OFF, chapter 1's steps close, and chapter 2's rows stay. A chapter 2 AES box stays shut. The block tab shows: "Show keys is off. These steps show the key and the round keys, so they stay closed. Turn Show keys on to walk them. The S-box table, the key size table, the round constants, the field definition, and the modes walk stay open."
@@ -984,7 +984,7 @@ If Steve does not follow it after 2 rounds of word changes, stop and re-plan the
 | `server-replaces-never-merges` | Applies. The app replaces the whole walk on each reply and clears it on a flip. Mark `walk.ts` |
 | A new gem? | No gem covers "an instrumented twin of a hot path, checked against the real path on every call". One use site so far. I record it as a candidate at W5, with Jared as SME, if the second walk type uses it too |
 
-**CrypTool, "AES (step-by-step)" on CrypTool-Online.** Read 2026-11-06. It offers "Tap on each byte to see the bytes it depends on", and it shows encode and decode rounds. Took: the tap idea. We took no code, and the page states a copyright notice with no licence. Where we differ: our rule comes from the engine and a clause flips real bytes to check it. Its page does not mention a jump to a round, so that control is ours.
+**CrypTool, "AES (step-by-step)" on CrypTool-Online,** https://www.cryptool.org/en/cto/aes-step-by-step , which redirects to https://legacy.cryptool.org/en/cto/aes-step-by-step . Read 2026-11-06. It offers "Tap on each byte to see the bytes it depends on", and it shows encode and decode rounds. Took: the tap idea. We took no code, and the page states a copyright notice with no licence. Where we differ: our rule comes from the engine and a clause flips real bytes to check it. Its page does not mention a jump to a round, so that control is ours.
 
 **CUPID, under pressure.** Predictable is the property most at risk, because a twin path can drift. The run-time guard answers that. Composable holds: `AesWalks` is pure, and lessons 5 and 7 reuse it. Domain-based holds: the types use the FIPS step names. Complexity hotspots: `describeStep` wants a lookup by step kind, and each Vue file stays thin because `walk.ts` holds the logic. SOLID adds nothing here.
 
