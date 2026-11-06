@@ -4,17 +4,17 @@ Author: Jared. Date: 2026-11-06. Base: main `7b569a1`. Owner of the gap clauses:
 
 ## Conclusion
 
-On each path that the 166 selected acceptance clauses ran, the course gave the right answers: 166 of 166 passed this session. The other 95 clauses did not run, so this page says nothing from them. One point stays undecided: the DUKPT counter limit, where the engine and the X9 Python reference differ and the unread standard decides (section 6). Most rows that fall short omit or mis-signal something the standard requires. Section 4 lists those for TLS 1.3.
+On each path that the 166 selected acceptance clauses ran, the course gave the right answers: 166 of 166 passed this session. The other 95 clauses did not run, so this page says nothing from them. One point stays undecided: the DUKPT counter limit, where the engine and the X9 Python reference differ and the unread standard decides (section 6). Most rows that fall short omit or mis-signal something the standard requires. Section 4 lists the TLS 1.3 receiver checks that a later change fixed.
 
 **The two changes I would make first:**
 
 1. **Fix one on-screen claim in lesson 6.** Claim `L6-C01` says future keys stay safe when a derived key leaks. That holds for one working key. I tested the engine: stolen registers rebuild every later sale. Lesson 6 also never names AES DUKPT or X9.24-3.
-2. **Name what each protocol engine leaves out, on screen, and fix the small TLS 1.3 misses.** TLS 1.3, TLS 1.1 and SSH each omit items the standard marks as required. The lessons name only some of them. One line per lesson turns each omitted feature into a named training simplification. Section 4 lists five TLS 1.3 receiver checks, each small to fix.
+2. **Name what each protocol engine leaves out, on screen.** TLS 1.3, TLS 1.1 and SSH each omit items the standard marks as required. The lessons name only some of them. One line per lesson turns each omitted feature into a named training simplification.
 
 | Count | Result |
 |---|---|
-| Rows conforming, with no gap and no bug | **19 of 30** |
-| Rows that run correctly on their path, with named gaps or a bug | 10 of 30 |
+| Rows conforming, with no gap and no bug | **20 of 30** |
+| Rows that run correctly on their path, with named gaps or a bug | 9 of 30 |
 | Rows UNVERIFIED | 1 of 30 (the AES walk's round states: the product code does not exist yet) |
 | Rows with official vectors that a clause ran this session | **17 of 30**: 14 with values committed in the repo (rows 3, 15 to 27), 2 fetched at run time against a pinned hash (rows 1, 2), 1 group constants only (row 28) |
 | Rows with official vectors in the repo that only a unit test ran | 1 of 30 (row 11, ML-KEM) |
@@ -75,7 +75,7 @@ These rows come first because Steve's ruling leaves them to other evidence.
 | 2 | **PIN block format 4**, ISO 9564-1 (paid, not read) | `Dukpt/PinBlock.cs` | X9 supplement | **Yes.** `A3.pinblock.format4` 27 | moov-io: opens 54 of 54 course blocks, and the course opens 54 of 54 moov blocks | None found | Not needed | CONFORMS |
 | 3 | **TLS 1.3 key schedule**, RFC 8446 section 7.1 | `Tls13/Tls13KeySchedule.cs` | RFC 8448 section 3 | **Yes.** `A4.rfc8448.*`, 10 clauses: early, handshake, master, traffic secrets, keys and IVs, Finished, transcript hashes, exporter and resumption | `A6.keylog.openssl.*`: key log equal to OpenSSL on 4 labels, both groups | None found | Not needed | CONFORMS |
 | 4 | **TLS 1.3 message order and records**, RFC 8446 sections 2, 4, 5, 9 | `Tls13/Tls13Engine.cs`, `Tls13ClientTable.cs`, `Tls13ServerTable.cs`, `Tls13Records.cs`, `Tls13Session.cs` | RFC 8448 covers one trace's values only | The order runs on live peers, not on a vector | `A5.client.openssl.*`, `A5.client.go.*`, `A5.server.openssl.*`, `A5.server.go.*`, both groups. Section 3 states how far this goes | **Simplification:** no KeyUpdate. **Gap:** no HelloRetryRequest, and so no `cookie` (section 9.2 MUST). **Gap:** no secp256r1 key exchange, no `rsa_pkcs1_sha256`, `rsa_pss_rsae_sha256` or `ecdsa_secp256r1_sha256` (section 9.1 MUST). **Gap:** no ChaCha20 (SHOULD) | KeyUpdate: yes, `L5-S14`. The rest: no | PATH OK, GAPS |
-| 5 | **TLS 1.3 checks a peer must make**, RFC 8446 sections 4.1 to 4.2, 4.4, 5, 6, 7.4.2 | `Tls13/Tls13Rules.cs`, `Tls13Codes.cs`, `KeyExchange.cs:SharedX25519` | None | Not applicable | `A7.downgrade-sentinel.tls13-client-beside-control`, `A7.alert70.*`. Section 4 maps each check to a test | **Gap:** 5 receiver misses, by reading the code against the MUST list: section 4 | Named checks show in the lab. The misses: no | PATH OK, GAPS |
+| 5 | **TLS 1.3 checks a peer must make**, RFC 8446 sections 4.1 to 4.2, 4.4, 5, 6, 7.4.2 | `Tls13/Tls13Rules.cs`, `Tls13Codes.cs`, `KeyExchange.cs:SharedX25519` | None | Not applicable | `A7.downgrade-sentinel.tls13-client-beside-control`, `A7.alert70.*`, `Tls13ReceiverMustTests` on commit `0ea9a7e`. Section 4 maps each check to a test | None found. Section 4 lists the receiver misses this row had, now fixed with tests. One note: a ClientHello with `pre_shared_key` and no groups gets alert 109, and section 9.2 exempts it. The engine has no PSK, so that hello fails either way | Named checks show in the lab | CONFORMS |
 | 6 | **Hybrid X25519MLKEM768**, RFC 10024 | `Tls13/KeyExchange.cs` | None read | Not applicable | `A5.*.x25519mlkem768`, `A6.keylog.openssl.x25519mlkem768`: OpenSSL reports the group by name. `The_hybrid_shares_have_the_sizes_rfc_10024_names`, `Nist_encapsulation_key_checks_match`, `An_all_zero_x25519_result_is_refused_on_both_roles_beside_a_good_share`. RFC 10024 sections 4.2 and 4.3 read: key check, ciphertext length, zero check, each alert 47 in `KeyExchange.cs` and `Tls13Codes.cs` | None found. Other hybrids in RFC 10024 are optional | Not needed | CONFORMS |
 | 7 | **TLS 1.1 messages and checks**, RFC 4346 sections 7 and 9 | `Tls11/Tls11Engine.cs`, `Tls11Rules.cs`, `Tls11Messages.cs` | None | Not applicable | `A7.tls11.openssl.*`, `A7.tls11.server.openssl.*`, both key exchanges, both roles. Bad RSA padding gets a random premaster (`Tls11Rules.cs:332-335`) | **Gap:** no `TLS_RSA_WITH_3DES_EDE_CBC_SHA`, RFC 4346 section 9 MUST. **Gap:** no session resumption and no client certificate. **Simplification:** no Lucky Thirteen claim | Lucky Thirteen: yes, `L7-S07`. Weak points: `L7-S10`. The rest: no | PATH OK, GAPS |
 | 8 | **TLS 1.1 PRF and CBC records**, RFC 4346 sections 5, 6.2.3 | `Tls11/Tls11Prf.cs`, `Tls11Records.cs` | None published | Not applicable | Both A7 live runs depend on them. `The_prf_gives_the_openssl_answer_for_an_even_secret`, `The_prf_shares_the_middle_byte_of_an_odd_secret`, `A_replayed_record_fails_because_the_mac_covers_the_count`, `One_flipped_bit_fails_the_record`. RFC 4346 sections 5 and 6.2.3.2 read: padding filled and checked, one code for both failures | **Simplification:** section 6.2.3.2 requires equal processing time, and the lab makes no such claim | Yes, `L7-S07` | CONFORMS |
@@ -100,17 +100,20 @@ A live run with an outside peer is strong evidence on one thing: the two sides a
 
 ## 4. Checks a conforming TLS 1.3 peer must make
 
-I listed every MUST in RFC 8446 sections 4.1, 4.2.1 to 4.2.3, 4.2.7, 4.2.8, 4.4, 5, 6 and 7.4 by script, 176 sentences, and read each one against the engine. Most bind the sender or a feature the engine does not build. These five receiver checks are missing or give another alert. I found them by reading the code, and I did not run them.
+I listed every MUST in RFC 8446 sections 4.1, 4.2.1 to 4.2.3, 4.2.7, 4.2.8, 4.4, 5, 6 and 7.4 by script, 176 sentences, and read each one against the engine. That list left out the section 4.2 introduction, where the repeated-extension row sits. I then read sections 4.2 (introduction), 4.2.4 to 4.2.6, 4.2.9 to 4.2.11, 4.3 and 4.5 to 4.6.3. Their other MUSTs bind the sender or a feature the engine does not build (PSK, tickets, post-handshake auth). The first read found five misses. Work on the fix and its review found four more rows. Each row had a failing test first in `Tls13ReceiverMustTests`, and each is now fixed on commit `0ea9a7e`, where the tests and the clause run in `A4` to `A11` passed. Each test sits beside a control.
 
-| Must | Section | The engine | Code |
+| Must | Section | The engine gave | Now |
 |---|---|---|---|
-| A server aborts with `illegal_parameter` unless the ClientHello compression is one zero byte | 4.1.2 | Takes the field and never reads it | `Tls13Messages.cs:207` |
-| A client aborts with `unsupported_extension` on an extension it did not request | 4.2 | Skips unknown ServerHello extensions, and does not parse EncryptedExtensions | `Tls13Messages.cs`, `Tls13ClientTable.cs:19` |
-| A server aborts with `missing_extension` when `signature_algorithms` is absent | 4.2.3 | Refuses by name with alert 40 | `Tls13ServerTable.cs:91` |
-| A client aborts with `illegal_parameter` on a `supported_versions` value it did not offer | 4.2.1 | Refuses by name with alert 70 | `Tls13ClientTable.cs` |
-| A client aborts with `decode_error` on an empty server Certificate | 4.4.2.4 | Refuses by name with the chain code, alert 48 | `Certificate.cs:278` |
-
-The engine refuses in three of the five. The refusal names a check, and only the alert number differs from the RFC.
+| A server aborts with `illegal_parameter` unless the ClientHello compression is one zero byte | 4.1.2 | No error | Alert 47 |
+| A client aborts with `unsupported_extension` on an extension it did not request | 4.2 | No error at that message | Alert 110, in ServerHello and EncryptedExtensions |
+| A client aborts with `illegal_parameter` on a recognised extension in the wrong message | 4.2 | No error at that message | Alert 47 |
+| A server aborts with `missing_extension` when `signature_algorithms` is absent | 4.2.3 | Alert 40 | Alert 109 |
+| A client aborts with `illegal_parameter` on a `supported_versions` value it did not offer | 4.2.1 | Alert 70 | Alert 47. With no such extension, alert 70 stays |
+| A client aborts with `decode_error` on an empty server Certificate | 4.4.2.4 | Alert 48 | Alert 50 |
+| A server aborts with `missing_extension` when `supported_groups` or `key_share` is absent | 9.2 | Alert 40 | Alert 109. An empty key share list keeps alert 40 |
+| An extension block holds one extension of each type | 4.2, alert from 6 | No error at that message | Alert 47, in ClientHello, ServerHello and EncryptedExtensions |
+| A message with bytes after its EncryptedExtensions block does not parse | 6 | No error at that message | Alert 50 |
+| A server ignores an unknown ClientHello extension | 4.1.2 | Passed, with no test | Passes, and a control pins it |
 
 The checks below are present:
 
@@ -256,7 +259,6 @@ Secondary pages, treated as leads only: Wikipedia and Futurex on DUKPT. False li
 | 3 | One on-screen line in lesson 7: no 3DES suite, no resumption, no client certificate. One in lesson 4: no revocation | Gap to simplification | Richard |
 | 4 | One on-screen line in lesson 8: no rekey, no password auth, and the algorithms RFC 4253 lists as REQUIRED that it omits | Gap to simplification | Richard |
 | 5 | Decide the counter limit from the standard's text, then pin it with a named clause | Gap | Steve, on buying the standard |
-| 5a | Fix the five TLS 1.3 receiver checks in section 4, with a test for each | Gap | Jared or Richard |
 | 5b | Add a vector clause over the SSH CTR loop, and one over `mlkem768-acvp.txt` | Evidence | Echo |
 | 5c | One on-screen line: lessons draw their random bytes from the seed the status bar shows, so a run replays, and a real system must not do this | Gap to simplification | Richard |
 | 6 | Build the walk's clauses against the 372 values, using the INVERSE CIPHER runs only | UNVERIFIED | Echo |
@@ -266,4 +268,4 @@ Echo turns each gap above into a clause. A clause can pin the named refusal, suc
 
 ## Disposition
 
-Results: rows conforming 19 of 30. Official vectors that a clause ran: 17 of 30 (14 in the repo, 2 fetched at run time, 1 constants only). 1 bug in tour text. No clause or test in this run found a wrong computed value, and the counter limit stays undecided. Recommendation: apply fix 1 now, then fixes 2 to 4, 5c and 7 together as one tour PR, and 5a as one engine PR.
+Results: rows conforming 20 of 30. Official vectors that a clause ran: 17 of 30 (14 in the repo, 2 fetched at run time, 1 constants only). 1 bug in tour text. No clause or test in this run found a wrong computed value, and the counter limit stays undecided. Recommendation: apply fix 1 now, then fixes 2 to 4, 5c and 7 together as one tour PR.

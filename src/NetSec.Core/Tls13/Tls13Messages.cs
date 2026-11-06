@@ -44,11 +44,13 @@ namespace NetSec.Tls13
     public sealed class ClientHelloInfo
     {
         public int LegacyVersion;
-        public byte[] Random, SessionId;
+        public byte[] Random, SessionId, Compression;
         public int[] Suites = new int[0];
         public int[] Versions = new int[0];
         public int[] Groups = new int[0];
         public int[] SignatureSchemes = new int[0];
+        public bool HasSignatureAlgorithms, HasSupportedGroups, HasKeyShare;
+        public readonly List<int> ExtensionTypes = new List<int>();
         public string ServerName;
         public readonly Dictionary<int, byte[]> KeyShares = new Dictionary<int, byte[]>();
         public FieldMark[] Marks;
@@ -58,6 +60,8 @@ namespace NetSec.Tls13
     {
         public int LegacyVersion, Suite, Compression, SelectedVersion, Group;
         public byte[] Random, SessionId, KeyShare;
+        public bool HasSupportedVersions;
+        public readonly List<int> ExtensionTypes = new List<int>();
         public FieldMark[] Marks;
 
         public bool IsHelloRetry { get { return Tls13Messages.SameBytes(Random, Tls13Messages.HelloRetryRandom); } }
@@ -98,6 +102,11 @@ namespace NetSec.Tls13
 
         const int ExtServerName = 0, ExtSupportedGroups = 10, ExtSignatureAlgorithms = 13, ExtSupportedVersions = 43, ExtKeyShare = 51;
         static readonly int[] Tls11Suites = { 0x002F, 0xC013 };
+
+        // What ClientHello below sends, and the section 4.2 table for the two server messages that answer it.
+        static readonly int[] RequestedByClient = { ExtServerName, ExtSupportedGroups, ExtSignatureAlgorithms, ExtSupportedVersions, ExtKeyShare };
+        static readonly int[] AllowedInServerHello = { ExtSupportedVersions, ExtKeyShare };
+        static readonly int[] AllowedInEncryptedExtensions = { ExtServerName, ExtSupportedGroups };
 
         /// <summary>RFC 8446 section 4.1.3: SHA-256 of the text "HelloRetryRequest".</summary>
         public static readonly byte[] HelloRetryRandom = Hex.Decode("cf21ad74e59a6111be1d8c021e65b891c2a211167abb8c5e079e09e2c8a8339c");
@@ -204,7 +213,7 @@ namespace NetSec.Tls13
             info.Random = r.Take("random", "random", 32);
             info.SessionId = r.Take("session_id", "id", r.U8("session_id.length", "length"));
             info.Suites = ReadU16List(r, "cipher_suites", r.U16("cipher_suites.length", "length"));
-            r.Take("compression", "header", r.U8("compression.length", "length"));
+            info.Compression = r.Take("compression", "header", r.U8("compression.length", "length"));
             int extensions = r.Remaining > 0 ? r.U16("extensions.length", "length") : 0;
             int end = r.Remaining - extensions;
             while (r.Remaining > end) ReadClientExtension(r, info);
@@ -217,6 +226,7 @@ namespace NetSec.Tls13
             int type = r.U16("extension.type", "header");
             int length = r.U16("extension.length", "length");
             int end = r.Remaining - length;
+            info.ExtensionTypes.Add(type);
             switch (type)
             {
                 case ExtServerName:
@@ -229,12 +239,15 @@ namespace NetSec.Tls13
                     info.Versions = ReadU16List(r, "supported_versions", r.U8("supported_versions.length", "length"));
                     break;
                 case ExtSupportedGroups:
+                    info.HasSupportedGroups = true;
                     info.Groups = ReadU16List(r, "supported_groups", r.U16("supported_groups.length", "length"));
                     break;
                 case ExtSignatureAlgorithms:
+                    info.HasSignatureAlgorithms = true;
                     info.SignatureSchemes = ReadU16List(r, "signature_algorithms", r.U16("signature_algorithms.length", "length"));
                     break;
                 case ExtKeyShare:
+                    info.HasKeyShare = true;
                     r.U16("key_share.list_length", "length");
                     while (r.Remaining > end)
                     {
@@ -280,6 +293,8 @@ namespace NetSec.Tls13
             int type = r.U16("extension.type", "header");
             int length = r.U16("extension.length", "length");
             int end = r.Remaining - length;
+            info.ExtensionTypes.Add(type);
+            if (type == ExtSupportedVersions) info.HasSupportedVersions = true;
             if (type == ExtSupportedVersions && length == 2)
                 info.SelectedVersion = r.U16("supported_versions", "header");
             else if (type == ExtKeyShare && length >= 4)
@@ -369,6 +384,55 @@ namespace NetSec.Tls13
             int[] items = new int[byteLength / 2];
             for (int i = 0; i < items.Length; i++) items[i] = r.U16(name, "header");
             return items;
+        }
+
+        /// <summary>The extension types in an EncryptedExtensions message, in order.</summary>
+        public static List<int> ReadEncryptedExtensionTypes(byte[] message)
+        {
+            ByteReader r = Open(message, false);
+            int end = r.Remaining - r.U16("extensions.length", "length") - 2;
+            List<int> types = new List<int>();
+            while (r.Remaining > end)
+            {
+                types.Add(r.U16("extension.type", "header"));
+                r.Take("extension.data", "data", r.U16("extension.length", "length"));
+            }
+            CheckEnd(r, end, "encrypted_extensions");
+            if (r.Remaining != 0) throw new ParseFailure(ErrorCodes.ParseTruncated, "encrypted_extensions has " + r.Remaining + " bytes after its block");
+            return types;
+        }
+
+        /// <summary>
+        /// RFC 8446 section 4.2. Null when every type is allowed. A type this client never asked for is ExtensionNotRequested. A type it asked for,
+        /// in a message the section 4.2 table does not list it in, is ExtensionWrongMessage. A repeat of any type is ExtensionRepeated. Type gives the first one at fault.
+        /// </summary>
+        public static string ServerHelloExtensionFault(List<int> types, out int type) { return ExtensionFault(types, AllowedInServerHello, out type); }
+
+        public static string EncryptedExtensionsFault(List<int> types, out int type) { return ExtensionFault(types, AllowedInEncryptedExtensions, out type); }
+
+        /// <summary>RFC 8446 section 4.2: one extension of each type in a block, known or not. True gives the first repeat.</summary>
+        public static bool HasRepeat(List<int> types, out int type)
+        {
+            for (int i = 0; i < types.Count; i++)
+            {
+                type = types[i];
+                if (types.IndexOf(type) != i) return true;
+            }
+            type = -1;
+            return false;
+        }
+
+        static string ExtensionFault(List<int> types, int[] allowed, out int type)
+        {
+            if (HasRepeat(types, out type)) return Tls13Codes.ExtensionRepeated;
+            for (int i = 0; i < types.Count; i++)
+            {
+                type = types[i];
+                if (Array.IndexOf(RequestedByClient, type) < 0) return Tls13Codes.ExtensionNotRequested;
+                if (Array.IndexOf(allowed, type) < 0) return Tls13Codes.ExtensionWrongMessage;
+            }
+            type = -1;
+            return null;
         }
 
         static void CheckEnd(ByteReader r, int end, string what)
