@@ -220,6 +220,9 @@ namespace Acceptance
             void Ok(Reply r, string what)
             {
                 Check.True(r.Ok, what + " got " + r);
+                List<string> messages = new List<string>();
+                foreach (Dictionary<string, object> e in Errors) messages.Add(MiniJson.Str(e, "message") ?? "");
+                NotRunIfOnlyPartNotBuilt(ErrorCodes, messages, what);
                 Check.True(ErrorCodes.Count == 0, what + " gave errors " + string.Join(",", ErrorCodes.ToArray()));
             }
 
@@ -423,6 +426,16 @@ namespace Acceptance
             public override string ToString() { return (Done ? "reached Done" : "stopped at the " + (Flow == null ? "?" : Flow.Kind) + " step") + (Codes.Count == 0 ? "" : " with " + string.Join(",", Codes.ToArray())); }
         }
 
+        /// <summary>The Host says WIZARD_PART_NOT_BUILT for a type with no row in FlowParts, so the clause has nothing to judge yet. Only that code reads NOT RUN: one other code in the list, or any other failure, stays FAIL.</summary>
+        public static void NotRunIfOnlyPartNotBuilt(List<string> codes, List<string> messages, string what)
+        {
+            if (codes.Count == 0) return;
+            foreach (string code in codes) if (code != "WIZARD_PART_NOT_BUILT") return;
+            List<string> owed = new List<string>();
+            foreach (string m in messages) if (!owed.Contains(m)) owed.Add(m);
+            throw new NotRunException("WIZARD_PART_NOT_BUILT", what + ": the product owes this part. " + string.Join(" ", owed.ToArray()));
+        }
+
         static bool Collect(ImportResult r, Reply reply)
         {
             if (!reply.Ok) { r.Codes.Add(reply.Code ?? ("HTTP_" + reply.Status)); r.Messages.Add(reply.ToString()); return false; }
@@ -433,6 +446,7 @@ namespace Acceptance
                 r.Codes.Add(MiniJson.Str(e, "code")); r.Messages.Add(MiniJson.Str(e, "message") ?? "");
                 blocking = true;
             }
+            if (blocking) NotRunIfOnlyPartNotBuilt(r.Codes, r.Messages, "a file import");
             return !blocking;
         }
 

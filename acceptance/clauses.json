@@ -4487,6 +4487,17 @@
    "counts": false
   },
   {
+   "id": "SELF.a17-part-not-built-is-not-run",
+   "base": "SELF.a17-part-not-built-is-not-run",
+   "assertion": "SELF",
+   "group": "selftest",
+   "build": "host",
+   "slice": "S0",
+   "referee": "stand-ins built on the BCL, python cryptography and real OpenSSL runs",
+   "roles": [],
+   "counts": false
+  },
+  {
    "id": "SELF.a17-repo-guard-bites",
    "base": "SELF.a17-repo-guard-bites",
    "assertion": "SELF",

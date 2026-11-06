@@ -101,6 +101,21 @@ namespace Acceptance
                 return Outcome(k.Run, WithFake(c, fake, tag));
         }
 
+        [Clause("SELF.a17-part-not-built-is-not-run")]
+        public static string PartNotBuiltIsNotRun(Ctx c)
+        {
+            const string Part = "WIZARD_PART_NOT_BUILT";
+            List<string> one = new List<string> { "The course cannot make x yet." };
+            bool notRun = false;
+            try { A17.NotRunIfOnlyPartNotBuilt(new List<string> { Part, Part }, one, "a step"); }
+            catch (NotRunException e) { notRun = e.Reason == Part && e.Message.Contains("cannot make x"); }
+            Check.True(notRun, "only WIZARD_PART_NOT_BUILT should read NOT RUN and name the owed part");
+            A17.NotRunIfOnlyPartNotBuilt(new List<string> { Part, "WIZARD_TYPE_NOT_IN_FLOW" }, one, "a step");
+            A17.NotRunIfOnlyPartNotBuilt(new List<string> { "KEY_FILE_UNREADABLE" }, one, "a step");
+            A17.NotRunIfOnlyPartNotBuilt(new List<string>(), one, "a step");
+            return "only WIZARD_PART_NOT_BUILT throws NOT RUN; a second code, another code, and no code each go on to the clause's own check";
+        }
+
         [Clause("SELF.a17-clauses-pass-and-bite")]
         public static string ClausesPassAndBite(Ctx c)
         {
