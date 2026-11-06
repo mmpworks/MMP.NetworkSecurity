@@ -84,7 +84,7 @@
     {
       "id": "L10-C12",
       "verdict": "accurate",
-      "note": "Tours read at origin/fix/tour-10-keys-and-names commit 61d3265 (PR 59, open); lab run at main 5440eeb (PR 69 merged). Source line changed; claim re-read. Tours read at origin/fix/tour-10-enrolment head 8e77f1f (PR 34); names doc at main 279e9a1. Claim text unchanged; source now cites f72acef, whose row still matches. Check table: 'challenge issued ... The answered challenge is the one this login issued'; Attacks: L10-unissued-challenge, CHALLENGE_NOT_ISSUED. PR 20 review not read.",
+      "note": "Tours read at origin/fix/tour-10-keys-and-names commit 61d3265 (PR 59, open); lab run at main 5440eeb (PR 69 merged). Source line changed; claim re-read. Tours read at origin/fix/tour-10-enrolment head 8e77f1f (PR 34); names doc at main 279e9a1. Claim text unchanged; source now cites f72acef, whose row still matches. Check table: 'challenge issued ... The answered challenge is the one this login issued'; Attacks: L10-unissued-challenge, CHALLENGE_NOT_ISSUED. PR 20 review not read. Re-read at main 456ae83: IssuerChallenge stores the challenge with Effect.Store; the issued check runs before any signature check.",
       "checkedAgainst": "docs/lesson-10-names.md on main 279e9a1 (read)",
       "textHash": "49dfa3d067897b835c189f1ce563ea18e6339dcb3a369702958989b5fff316d3"
     },
@@ -112,7 +112,7 @@
     {
       "id": "L10-C16",
       "verdict": "accurate",
-      "note": "Tours read at origin/fix/tour-10-keys-and-names commit 61d3265 (PR 59, open); lab run at main 5440eeb (PR 69 merged). Source line changed; claim re-read. Tours read at origin/fix/tour-10-enrolment head 8e77f1f (PR 34); names doc at main 279e9a1. Check table: proof age, iat within 60 seconds. 'No DPoP nonce': the check table lists none, and Auth.cs line 191 says 'this lab supplies no nonce, which sections 8 and 9 make optional'. 'One run only': Lesson10Auth.cs Session._seen is a per-session dictionary (line 79).",
+      "note": "Tours read at origin/fix/tour-10-keys-and-names commit 61d3265 (PR 59, open); lab run at main 5440eeb (PR 69 merged). Source line changed; claim re-read. Tours read at origin/fix/tour-10-enrolment head 8e77f1f (PR 34); names doc at main 279e9a1. Check table: proof age, iat within 60 seconds. 'No DPoP nonce': the check table lists none, and Auth.cs line 191 says 'this lab supplies no nonce, which sections 8 and 9 make optional'. 'One run only': Lesson10Auth.cs Session._seen is a per-session dictionary (line 79). Re-read at main 456ae83: AgeCheck allows 60 seconds either way (Auth.cs line 231); no nonce check exists.",
       "checkedAgainst": "docs/lesson-10-names.md on main 279e9a1 (read); src/NetSec.Core/Auth/Auth.cs, src/NetSec.Core/Labs/Lesson10Auth.cs at f72acef (read)",
       "textHash": "d0b92fd067884116f059d9753981f6b263d52b6f59d612f35326e0ac40405f4a"
     },
@@ -154,7 +154,7 @@
     {
       "id": "L10-C22",
       "verdict": "accurate",
-      "note": "Tour re-read at origin/fix/tour-10-keys-and-names commit cf7712c (PR 59, open). Claim now reads 'The login key is drawn from the run's seed (the same seed gives the same key)', which matches my runs (seeds 1, 2, 3 differ; seed 1 repeats). Tours read at origin/fix/tour-10-keys-and-names commit 61d3265 (PR 59, open); lab run at main 5440eeb (PR 69 merged). Lesson10Auth.cs: the certificate uses KeyIds.ClientTlsEd25519 (fixed); the login key is a seed drawn from the run seed. Lab run, device-key secret for seeds 1, 2, 3, 1: f5f2384c..., 9482cece..., c362923a..., f5f2384c...; so it differs per seed and repeats for the same seed. The claim says 'a different seed drawn for each run'; precise wording is 'drawn from the run's seed'. The call phase streams are auth-call, with no certificate event.",
+      "note": "Tour re-read at origin/fix/tour-10-keys-and-names commit cf7712c (PR 59, open). Claim now reads 'The login key is drawn from the run's seed (the same seed gives the same key)', which matches my runs (seeds 1, 2, 3 differ; seed 1 repeats). Tours read at origin/fix/tour-10-keys-and-names commit 61d3265 (PR 59, open); lab run at main 5440eeb (PR 69 merged). Lesson10Auth.cs: the certificate uses KeyIds.ClientTlsEd25519 (fixed); the login key is a seed drawn from the run seed. Lab run, device-key secret for seeds 1, 2, 3, 1: f5f2384c..., 9482cece..., c362923a..., f5f2384c...; so it differs per seed and repeats for the same seed. The claim says 'a different seed drawn for each run'; precise wording is 'drawn from the run's seed'. The call phase streams are auth-call, with no certificate event. Re-read at main 456ae83: Lesson10Auth.cs ClientLogin registers the device key as the only login secret; the certificate key is KeyIds.ClientTlsEd25519.",
       "checkedAgainst": "src/NetSec.Core/Labs/Lesson10Auth.cs (read); lab run on main 5440eeb",
       "textHash": "769c6a41a537884d073e817d8492e69cb60339a61a6e92f7723c216529cccc8b"
     },
@@ -202,60 +202,19 @@
     }
   ],
   "textRead": {
-    "readAt": "tour PR 59 head cf7712c against the lab at main 5440eeb (21 steps; text unchanged since 61d3265)",
-    "method": "Every sentence of every step text read against the lab. The lab ran in-process (NetSec.Core: LabCatalog, Lesson10Auth, TimingAttackLab), once as a control and once for every try-it attack row; trace events, secrets, field lists and check names were compared with the words. Code was read where the trace did not show the fact. Statements about the UI (colours, panels) and about lesson 9 (not built) were not run.",
+    "readAt": "main 456ae83 (21 steps; step L10-S11 and the secrets sentence in L10-S09 changed after the previous read)",
+    "method": "Every sentence of every step read against the lab code (Lesson10Auth.cs, Tls13ServerTable.cs, Auth.cs). The secrets-panel facts were checked against the Effect.Secret calls and the test The_control_lists_the_device_key_the_token_and_the_last_call_as_its_only_secrets. dotnet test --filter Auth|Mtls passed 49 of 49 on net10.0 and net48. Statements about UI colours and layout were not run.",
     "stepsRead": 21,
-    "stepsWithProblems": 5,
-    "problemsFound": 5,
-    "problems": [
-      {
-        "step": "L10-S07",
-        "severity": "high",
-        "wrong": "The login uses the same device key.",
-        "right": "The login uses a different key, a device key made for the login. The lab does not link it to the certificate key.",
-        "evidence": "Lesson10Auth.cs: the certificate is signed with training key client-tls-ed25519; the login and DPoP use a random seed named auth.device-key.",
-        "status": "fixed in PR 59, re-read ok at abef365"
-      },
-      {
-        "step": "L10-S03",
-        "severity": "medium",
-        "wrong": "It carries the name pump-reader-4 and the client's device key.",
-        "right": "It carries the name pump-reader-4 and the client's TLS key. This is not the login key of phase 2.",
-        "evidence": "Same code: KeyIds.ClientTlsEd25519 for the certificate.",
-        "status": "fixed in PR 59, re-read ok at abef365"
-      },
-      {
-        "step": "L10-S19",
-        "severity": "high",
-        "wrong": "By now the server has checked the certificate, the token and the proof. It knows the call came from a holder of an enrolled key and a token the issuer signed.",
-        "right": "By now the server has checked the token and the proof. It knows the call carries a token the issuer signed and a proof from the key the token names.",
-        "evidence": "Lab run: the mTLS connection ends with a close alert before the login; the calls run on separate auth-call streams, not on that TLS connection.",
-        "status": "fixed in PR 59, re-read ok at abef365"
-      },
-      {
-        "step": "L10-S12",
-        "severity": "low",
-        "wrong": "The signature is fine, the check fails, and no token is issued.",
-        "right": "The signature would verify, but the issuer fails the challenge issued check first.",
-        "evidence": "Lab run L10-unissued-challenge: only challenge issued fails; no challenge signature check runs.",
-        "status": "fixed in PR 59, re-read ok at abef365"
-      },
-      {
-        "step": "L10-S18",
-        "severity": "low",
-        "wrong": "It rejects proofs older than 60 seconds, which is the check named proof age.",
-        "right": "It rejects proofs dated more than 60 seconds from now, in either direction, which is the check named proof age.",
-        "evidence": "Auth.cs: age > MaxAgeSeconds || age < -MaxAgeSeconds.",
-        "status": "fixed in PR 59, re-read ok at abef365"
-      }
-    ],
+    "stepsWithProblems": 0,
+    "problemsFound": 0,
+    "problems": [],
     "notes": [
-      "Bind defect closed: S08 is now a concept step and the device key step binds LoginRequest; all 18 event binds hit in the control run.",
-      "New sentences read and run: S03 (TLS key, name check pointer), S07 (client name check, alert 49, name-only limit), S08 (issuer reads no certificate, separate connections), S13 (signature would verify), S19 (60 seconds either way), S20 (calls read no certificate), S21.",
-      "S07 sentence fixed: 'The chain is fine, but the name is wrong, so the server refuses before it reads the signature.' In the L10-wrong-client-name run the server fails client name and CertificateVerify never runs, so the sentence is accurate. Re-run on main 5440eeb: control and all 13 attack rows behave as the steps say; all event binds hit; device-key secret differs for seeds 1, 2, 3 and repeats for seed 1."
+      "L10-S11: the issuer sends the challenge with Effect.Store only, so the secrets panel never lists it. The text says to find it in the inspector. Accurate.",
+      "L10-S09: ClientLogin registers client auth.device-key with Effect.Secret on the LoginRequest step, and the seed is the private half. The text says to find it in the secrets panel under the client lane. Accurate.",
+      "The nonce and the signed answer are state, not secrets (Lesson10Auth.cs lines 86-87). The token and the last call are client secrets. The tour makes no wrong claim about them.",
+      "No claim text changed. All 28 claim hashes equal the previous hashes."
     ],
     "problemsOpen": 0,
-    "textHash": "bace3a42424a1bb74149f286be97be55afd4dd604f0cf913a49c8661b32475a5",
-    "boundAt": "main f43b560: the tour text and claims on main equal the versions I judged (compared step by step and claim by claim); hashes stamped by acceptance/checks/docs_checks.py --hashes logic"
+    "textHash": "9b21cb7e77720ab407cba0a6a8e0ee43021d9e0f072d168301732344bb66a5da"
   }
 }
