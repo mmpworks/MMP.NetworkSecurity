@@ -423,6 +423,12 @@ WALK_NEVER = [
     (r"matrix multiplication", r"special multiply"),
     (r"4-bit chunk", None),
     (r"AES makes the tag", None),
+    (r"adds the round key", r"\bXOR"),
+    (r"the inverse round key", None),
+    (r"unique IV", None),
+    (r"corrupted block affects", None),
+    (r"GCM must check the tag first", None),
+    (r"vulnerable to cryptanalysis", None),
 ]
 
 
@@ -431,7 +437,7 @@ def a19_words(root):
     panel = os.path.join(root, "app", "src", "components", "AesBlockWalk.vue")
     if not os.path.exists(panel):
         raise NotRun("PRODUCT_MISSING", "app/src/components/AesBlockWalk.vue does not exist yet")
-    names = [panel, os.path.join(root, "app", "src", "components", "SboxView.vue"), os.path.join(root, "app", "src", "walk-gloss.json"), os.path.join(root, "app", "src", "tours", "lesson-01.json")]
+    names = [panel, os.path.join(root, "app", "src", "components", "SboxView.vue"), os.path.join(root, "app", "src", "components", "AesFeedView.vue"), os.path.join(root, "app", "src", "walk-gloss.json"), os.path.join(root, "app", "src", "tours", "lesson-01.json")]
     bad = []
     for path in names:
         if not os.path.exists(path):

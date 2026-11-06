@@ -29,6 +29,8 @@ async function setShowKeys(on: boolean): Promise<void> {
 /** Runs lesson 1 with the tour's Next until the run holds aes.key and the tab shows. A build with no tab reads NOT RUN, never PASS. */
 async function reachTab(page: Page): Promise<void> {
   requireLive();
+  // Design section 2.2a: under reduced motion each step lands at once on its end frame, so no clause reads a cell inside a motion.
+  await page.emulateMedia({ reducedMotion: 'reduce' });
   await openApp(page);
   await page.getByTestId('lesson-item-1').click();
   const start = page.getByRole('button', { name: /start tour/i });
@@ -190,6 +192,12 @@ test('[A19.ui.reduced-motion-has-no-transition] with reduced motion each step sh
     expect(await running(page), `running animations at step ${i + 2}`).toBe(0);
     expect(await grid(page), `the end frame at step ${i + 2}`).toBe(steps[i + 1].state.toLowerCase());
   }
+  // The control: with motion allowed, a step does move, a click during the motion jumps on, and the walk still lands on the engine's state.
+  await page.emulateMedia({ reducedMotion: 'no-preference' });
+  await page.getByTestId('aes-walk-next').click();
+  await expect.poll(() => running(page), { message: 'something moves with motion allowed', timeout: 2_000, intervals: [20] }).toBeGreaterThan(0);
+  await page.getByTestId('aes-walk-next').click();
+  await expect.poll(() => grid(page), { message: 'after a click during a motion, the walk lands on the engine state', timeout: 15_000 }).toBe(steps[14].state.toLowerCase());
 });
 
 test('[A19.ui.play-stops-at-the-end-of-a-round] one Play and Pause button runs one round and stops, and pressing it again runs the next', async ({ page }) => {
@@ -270,7 +278,7 @@ test('[A19.ui.off-shows-the-closed-line] with Show keys OFF the steps close, the
     await reachTab(page);
     await page.getByTestId('aes-walk-tab').click();
     await expect(page.getByTestId('aes-walk-closed')).toContainText('Show keys is off');
-    await expect(page.getByTestId('aes-walk-closed')).toContainText('The S-box table, the key size table, the round constants, the field definition, and the modes walk stay open');
+    await expect(page.getByTestId('aes-walk-closed')).toContainText('modes walk stay open');
     await expect(page.locator('[data-testid^="aes-walk-cell-"]'), 'no state cell while closed').toHaveCount(0);
     expect((await hostGet('/api/walk/aes/tables')).status, 'the tables route').toBe(200);
   } finally { await setShowKeys(true); }

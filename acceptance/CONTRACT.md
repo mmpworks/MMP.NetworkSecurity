@@ -157,12 +157,12 @@ It reaches the two members by reflection, so it compiles against a Core that lac
 
 ## 6. A19: the AES walk, chapter 1 (what the build must show)
 
-Source: `docs/walkthrough-design.md` on `main` at f07bbd9 (Jared's pass on d1368af, PR #146), sections 2.2, 2.3, 2.6, 3.1, 3.3, 3.4, 3.5. A row marked ASSUMED is a name the design leaves open. A builder implements it or sends the acceptance author a change request.
+Source: `docs/walkthrough-design.md` on `main` at c19b151 (Jared's pass on d1368af, PR #146, then #150, #152 and #153), sections 2.2, 2.3, 2.6, 3.1, 3.3, 3.4, 3.5. A row marked ASSUMED is a name the design leaves open. A builder implements it or sends the acceptance author a change request.
 
 | Area | The suite uses | Notes |
 |---|---|---|
 | Core | `AesKey.WalkEncrypt`, `WalkDecrypt`, `WalkKeyExpansion`, static `SubstitutionTable`, `InverseSubstitutionTable`; `AesStepKind`, `AesStep`, `AesBlockWalk`, `AesKeyWord` | Design 3.3. A table call returns a copy. `AesStep.Round`: encrypt 0 to Nr. Decrypt Nr down to 0: the first AddRoundKey has Round Nr, and each later group of steps has the Round of the key it ends with |
-| Core | `WalkKeyExpansion` holds Nb * (Nr + 1) rows. A row with i below Nk holds only `Index` and `Word` | ASSUMED for the rows below Nk |
+| Core | `WalkKeyExpansion` holds Nb * (Nr + 1) rows. A row with i below Nk holds only `Index` and `Word` | Richard confirmed this shape on #154 |
 | `GET /api/walk/aes/tables` | `sbox`, `inverseSbox` as 512 hex characters. Open with Show keys OFF. `Cache-Control: no-store` | Design 3.4 |
 | `GET /api/sessions/{id}/walk/aes/block?source=text&keyBits=128` | `source`, `keyBits`, `rounds`, `keySource`, `inputHex`, `keyWords[]`, `forward`, `inverse`, `wire` | Design 3.4. `forward` and `inverse` hold `input`, `output`, `steps[]` with `kind`, `round`, `state`, `roundKey` (only on AddRoundKey). `keyWords[]` holds every row, with `i`, `previous`, `rotated`, `substituted`, `rcon`, `afterRcon`, `keyBack`, `word`. A cell the row does not use is absent |
 | Refusals | `code`, `message`, `retryable`, `requestId`. OFF: 409 `KEYS_HIDDEN`, checked before the session read. 404 `SESSION_NOT_FOUND`. Another lesson: 409 `WALK_NOT_BUILT`. Bad `source` or `keyBits`: 400 `WALK_BAD_ARGUMENT` | Design 3.4 |

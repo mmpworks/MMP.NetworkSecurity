@@ -90,6 +90,7 @@ namespace Acceptance
             string[] words = new string[]
             {
                 "SubBytes replaces each byte of the plaintext", "10 main rounds, then a final round", "Decryption reverses the steps", "This is matrix multiplication", "each 4-bit chunk", "AES makes the tag",
+                "Adds the round key", "The inverse round key", "A unique IV for CBC", "A corrupted block affects subsequent blocks", "GCM must check the tag first", "ECB is vulnerable to cryptanalysis",
             };
             foreach (string w in words)
             {
