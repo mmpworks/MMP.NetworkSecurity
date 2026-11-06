@@ -16,16 +16,18 @@ const fieldHex = computed(() => (view.value?.fieldsOn === 'before' ? view.value.
 // Without wire bytes the readable grid is the only grid, so its bytes carry the `inspector-byte-<offset>` ids.
 const beforeId = computed(() => (view.value?.after ? 'inspector-plain-byte' : 'inspector-byte'))
 const locked = computed(() => !!ev.value && isProtected(ev.value))
-const unreadableBytes = computed(() => (eve.value ? (ev.value?.fields ?? []).filter(f => !f.visibleToWire).reduce((n, f) => n + f.length, 0) : 0))
+// A hidden field with no row: it describes the readable bytes, and the event names no place for it on the wire (TLS 1.3 inner messages).
+const unreadableBytes = computed(() => (eve.value ? (ev.value?.fields ?? []).filter(f => !f.visibleToWire && !fields.value.includes(f)).reduce((n, f) => n + f.length, 0) : 0))
 const beforeOpen = ref(true)
 
 // A new message or a new view starts with nothing lit. A view can hide the row of a lit field, and then the learner could not turn it off.
 watch(() => [ev.value?.seq, ev.value?.sessionId, ui.view], () => { ui.litFields = [] })
 
 const isLit = (f: TraceField) => ui.litFields.includes(fieldKey(f))
-const readable = (f: TraceField) => !eve.value || f.visibleToWire
+// The eavesdropper cannot read this field, but its bytes are on the wire, so its row still shows where they sit.
+const sealed = (f: TraceField) => eve.value && !f.visibleToWire
 const litAt = (off: number) => fields.value.find(f => isLit(f) && off >= f.offset && off < f.offset + f.length) ?? null
-const litClassOf = (f: TraceField | null) => (f ? `k-${f.kind}` : '')
+const litClassOf = (f: TraceField | null) => (!f ? '' : sealed(f) ? 'k-sealed' : `k-${f.kind}`)
 // A field on the wire that holds the readable bytes also lights them in the Before grid: this text became these bytes.
 function beforeLit(off: number): string {
   const v = view.value
@@ -108,15 +110,16 @@ const canFlip = computed(() => ui.selectedByte != null && !!ev.value?.wire && !i
       </div>
       <div class="field-list" role="group" aria-label="Fields of this message">
         <div class="fl-hint muted">{{ fields.length ? 'Pick a field to light its bytes.' : 'This message lists no fields.' }}</div>
-        <div v-if="eve && unreadableBytes" class="field-row unreadable">unreadable without the key ({{ unreadableBytes }} bytes)</div>
+        <div v-if="eve && unreadableBytes" class="field-note">unreadable without the key ({{ unreadableBytes }} bytes)</div>
         <template v-for="f in fields" :key="fieldKey(f)">
           <button
-            v-if="readable(f)" type="button" class="field-row" :class="[`k-${f.kind}`, { on: isLit(f), hl: isHighlighted('inspector', 'field', f.name) }]"
+            type="button" class="field-row" :class="[sealed(f) ? 'k-sealed' : `k-${f.kind}`, { on: isLit(f), unreadable: sealed(f), hl: isHighlighted('inspector', 'field', f.name) }]"
             :aria-pressed="isLit(f)" :data-testid="`inspector-field-row-${f.name}`" @click="toggleField(fieldKey(f))"
           >
-            <span class="fname"><i class="swatch" :class="`k-${f.kind}`" />{{ f.name }}</span>
+            <span class="fname"><i class="swatch" :class="sealed(f) ? 'k-sealed' : `k-${f.kind}`" />{{ f.name }}</span>
             <span class="muted">{{ where(f) }}</span>
-            <span v-if="f.gloss && f.gloss.toLowerCase() !== f.name.toLowerCase()" class="fgloss">{{ f.gloss }}</span>
+            <span v-if="sealed(f)" class="fgloss">unreadable without the key</span>
+            <span v-else-if="f.gloss && f.gloss.toLowerCase() !== f.name.toLowerCase()" class="fgloss">{{ f.gloss }}</span>
             <span class="fval" :data-testid="`inspector-field-value-${f.name}`">{{ decoded(f) }}</span>
           </button>
         </template>
