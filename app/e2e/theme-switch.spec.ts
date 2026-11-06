@@ -3,20 +3,23 @@ import * as fs from 'node:fs'
 import * as path from 'node:path'
 import { open } from './walk'
 
-// The top-bar theme switch: System, Light, Dark. Default System. The choice survives a reload, and System follows the operating system live.
+// The theme switch: System, Light, Dark. A first run opens in Dark. The choice survives a reload, and System follows the operating system live.
 const OUT = path.join(__dirname, '..', 'test-results', 'theme')
 const themeOf = (page: import('@playwright/test').Page) => page.evaluate(() => document.documentElement.dataset.theme)
 
-test('the switch offers System, Light, Dark in that order, and System is the default', async ({ page }) => {
+test('the switch offers System, Light, Dark in that order, and a first run opens in Dark', async ({ page }) => {
+  await page.emulateMedia({ colorScheme: 'light' })
   await open(page)
   const sel = page.getByTestId('theme-select')
-  await expect(sel).toHaveValue('system')
+  await expect(sel).toHaveValue('dark')
+  expect(await themeOf(page)).toBe('dark')
   await expect(sel.locator('option')).toHaveText(['System', 'Light', 'Dark'])
 })
 
 test('System follows the operating system while the page stays open', async ({ page }) => {
   await page.emulateMedia({ colorScheme: 'dark' })
   await open(page)
+  await page.getByTestId('theme-select').selectOption('system')
   expect(await themeOf(page)).toBe('dark')
   await page.emulateMedia({ colorScheme: 'light' })
   await expect.poll(() => themeOf(page)).toBe('light')
@@ -45,10 +48,10 @@ test('Light and Dark ignore the operating system, and the choice survives a relo
   await expect(page.getByTestId('theme-select')).toHaveValue('system')
 })
 
-test('an unknown saved value falls back to System', async ({ page }) => {
+test('an unknown saved value falls back to Dark', async ({ page }) => {
   await page.addInitScript(() => localStorage.setItem('mmpns.theme', 'purple'))
   await open(page)
-  await expect(page.getByTestId('theme-select')).toHaveValue('system')
+  await expect(page.getByTestId('theme-select')).toHaveValue('dark')
 })
 
 for (const theme of ['light', 'dark'] as const) {

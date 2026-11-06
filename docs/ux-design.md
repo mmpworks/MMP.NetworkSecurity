@@ -188,9 +188,10 @@ Pair for readable vs encrypted: blue and amber (Okabe-Ito family). Both pass for
 
 | Token | Dark | Light | Use |
 |---|---|---|---|
-| `--bg` | `#0e1318` | `#f6f8fa` | App background |
-| `--surface` | `#151c23` | `#ffffff` | Panels |
-| `--text` | `#e6edf3` | `#1b2229` | Body text |
+| `--bg` | `#10141f` | `#eef1f7` | App background |
+| `--surface` | `#1a2030` | `#ffffff` | Panels |
+| `--accent` | `#8ea6ff` | `#2748c9` | Primary buttons and the current choice |
+| `--text` | `#e9edf6` | `#141b2d` | Body text |
 | `--readable` | `#56b4e9` | `#0072b2` | Readable bytes, plain arrows |
 | `--encrypted` | `#e69f00` | `#a85a00` | Encrypted bytes, hatched arrows |
 | `--secret` | `#b39dff` | `#6a4fc2` | Secret values and key chips |
