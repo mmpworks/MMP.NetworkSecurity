@@ -358,7 +358,11 @@ The default stays `Pump four is ok.`, so the walk that Steve first steps through
 
 **The Host's limit: 65,536 bytes of UTF-8.** That is 4,097 blocks with padding, and a reply of about 700 KiB by estimate. The app pages the rows, 64 at a time, from one reply. Past the limit, the app sends text up to the last whole character below the limit, and it marks the rest as not included. The screen says: "This view reads the first 65,536 bytes." The Host still refuses more, with `WALK_TEXT_TOO_LONG`, and it rejects a body over 512 KiB before it reads it. That body limit allows for JSON escapes.
 
-**The engine does all encryption, with the run's key,** by a query that adds no trace event. Goldens stay unchanged. Typed text enters no trace, session file, or log, and the app prints it as text, never as HTML. So a loaded replay has no typed view, because it has no run. Lone surrogates in the text get 400 `WALK_TEXT_INVALID`.
+**The engine does all encryption, with the run's key,** by a query that adds no trace event. Goldens stay unchanged. Typed text enters no trace, session file, or log, and the app prints it as text, never as HTML. A loaded replay has no run, so it has no key for typed text, and the box does not show. The panel says: "A loaded replay has no key to run your text under. Start this lesson to type your own." Lone surrogates in the text get 400 `WALK_TEXT_INVALID`.
+
+**The line for the reader:** "Your text runs under this run's key, so it closes with Show keys OFF, like the other views that use that key."
+
+With Show keys ON, the learner already sees this key, so encrypting under it reveals nothing new. Steve can overrule this. If he does, typed text moves to one fixed practice key and IV, public in the source, and both typed views stay open.
 
 | View | Show keys OFF | Why |
 |---|---|---|
@@ -367,7 +371,7 @@ The default stays `Pump four is ok.`, so the walk that Steve first steps through
 | Multi-block view | **Closed**, 409 `KEYS_HIDDEN` | See below |
 | `/tables`, `/modes` | Open, as before | No change |
 
-**Why the multi-block view closes.** Its reply holds no key byte. But it would encrypt any typed block under the run's key, and ECB of a block of 16 zero bytes is GCM's hash key H (`Gcm.cs:51`). `\u0000` is valid text, so a client could ask for it, and `/ghash` and `/forge` close to keep H off the screen. **What would change my mind:** Steve wants this view open with Show keys OFF. Then it must run on a practice key, as #158 first proposed, and the screen must say that its key differs from the run's.
+**Why the multi-block view closes.** Its reply holds no key byte. But it would encrypt any typed block under the run's key, and ECB of a block of 16 zero bytes is GCM's hash key H (`Gcm.cs:51`). `\u0000` is valid text, so a client could ask for it, and `/ghash` and `/forge` close to keep H off the screen. 
 
 ### 2.3 The S-box view
 
@@ -546,8 +550,8 @@ Steve's ask, after CrypTool 2's "Block Modes" template: a view with many blocks,
 | Question | Answer |
 |---|---|
 | Which key? | The run's key, as section 2.2g sets out |
-| Which IV? | The engine draws a new random IV per query, and the reply holds it. The flip's row uses the same IV in that one reply, so it compares like with like. A clause reads the key from the run's trace and the IV from the reply, and checks every block with the BCL |
-| The flip | One query returns both the base rows and the flipped rows, so nothing needs a repeated IV across queries |
+| Which IV? | A first query draws a new random IV, and the reply holds it. A flip sends that IV back, so the flipped text is compared under the same IV. A clause reads the key from the run's trace and the IV from the reply, and checks every block with the BCL. The panel says: "The flip reuses this IV so that the two can be compared. A real system never reuses an IV for a new message" |
+| The flip | The flip query returns the base rows and the flipped rows, both under the IV it was sent. A new text draws a new IV |
 | Show keys OFF | **Closed**, as section 2.2g sets out |
 | Session needed? | Yes, for the key. A loaded replay has no typed view |
 | Trace? | The route writes no event. The text enters no trace, session file, or log |
@@ -784,10 +788,10 @@ GET /api/sessions/{id}/walk/aes/modes?mode=ecb|cbc|gcm
 GET /api/sessions/{id}/walk/aes/ghash
 GET /api/sessions/{id}/walk/aes/forge
 POST /api/sessions/{id}/walk/aes/typed-block   { "text": "..." }
-POST /api/sessions/{id}/walk/aes/long-text     { "text": "...", "flipBlock": 1, "flipBit": 0 }
+POST /api/sessions/{id}/walk/aes/long-text     { "text": "...", "iv": "...", "flipBlock": 1, "flipBit": 0 }
 ```
 
-`/typed-block` arrives in W1b, and `/long-text` in W2. Each takes the text, so each departs from the rule that a walk route takes no bytes. That rule keeps canned keys and blocks out of the real walk. Here the text is the learner's own, the key still comes from the run, and neither route accepts a key. `/typed-block` replies as `/block?source=text` does, with `used`, `padding`, `notIncluded`, and `splitBytesIn` beside it. `/long-text` replies with `iv`, rows, and counts.
+`/typed-block` arrives in W1b, and `/long-text` in W2. Each takes the text, so each departs from the rule that a walk route takes no bytes. That rule keeps canned keys and blocks out of the real walk. Here the text is the learner's own, the key still comes from the run, and neither route accepts a key. `/typed-block` replies as `/block?source=text` does, with `used`, `padding`, `notIncluded`, and `splitBytesIn` beside it. `/long-text` replies with `iv`, rows, and counts. With no `iv` in the request, it draws a new one. An `iv` that is not 16 bytes gets 400 `WALK_BAD_ARGUMENT`.
 
 `/ghash` and `/forge` arrive in W1c. `/forge` gives a forgery only on a session that ran `L1-forge-last-block`, and any other session gets a named refusal below. The route reads the two frames from `wire.sent`, calls `GcmForgeries.Recover`, and then, as a guard, reads the run's key: the recovered H must equal AES of the zero block, or `AES_WALK_DIVERGED`. It passes the forged body to the real `Gcm.TryOpen` and returns its answer and text.
 
@@ -1082,8 +1086,8 @@ If Steve does not follow it after 2 rounds of word changes, stop and re-plan the
 | Control unchanged | The control's golden is unchanged with the new option in the code. No forgery value enters a trace or session file |
 | Binary tip | Each tip's bits equal the cell's hex. Before and after equal the engine's two states, and the count equals the differing bits. On ShiftRows the tip names the source cell, from the shift map, and shows no change |
 | Typed block | Under 16 bytes pads with n bytes of value n, equal to `Lesson01Aes.Pad`'s last block. 16 bytes adds none. A longer text uses the first 16 bytes, and `notIncluded` counts the rest. A 2-, 3-, and 4-byte character across byte 16 gives the right `splitBytesIn`, and the walk ends on those 16 bytes. The default text walk is unchanged |
-| Long text (W2) | Every ECB and CBC block equals the BCL, under the run's key from the trace and the IV in the reply. Each query has a new IV. ECB changes the flipped block only. CBC changes that block and all later ones. A flip in the last block changes one. Repeat counts equal a count from the BCL's blocks |
-| Typed limits | 65,536 bytes passes, and 65,537 gives `WALK_TEXT_TOO_LONG`. Empty gives `WALK_TEXT_EMPTY`. A lone surrogate gives `WALK_TEXT_INVALID`. Both typed routes give 409 `KEYS_HIDDEN` with Show keys OFF. Nothing typed reaches a trace, session file, or `/events`. Typed `<b>` shows as text. The goldens stay unchanged |
+| Long text (W2) | Every ECB and CBC block equals the BCL, under the run's key from the trace and the IV in the reply. A query with no `iv` draws a new one. A flip with the reply's `iv` keeps it, and its base rows equal the earlier reply. ECB changes the flipped block only. CBC changes that block and all later ones. A flip in the last block changes one. Repeat counts equal a count from the BCL's blocks |
+| Typed limits | 65,536 bytes passes, and 65,537 gives `WALK_TEXT_TOO_LONG`. Empty gives `WALK_TEXT_EMPTY`. A lone surrogate gives `WALK_TEXT_INVALID`. Both typed routes give 409 `KEYS_HIDDEN` with Show keys OFF, and a loaded replay shows the replay line and no box. Nothing typed reaches a trace, session file, or `/events`. Typed `<b>` shows as text. The goldens stay unchanged |
 | Picture (W2) | The side-by-side counts equal the run's `measure.result`. The eavesdropper view hides the clear picture |
 | Tap a byte (W2) | The flip test of section 2.2e, on every step and cell |
 | Bug versus tamper | A session with no plan never reads `differs`. A unit test gives `Feed` a wrong sender frame, and it throws `AES_WALK_DIVERGED`. A free flip on a non-wire event reads all `match` |
