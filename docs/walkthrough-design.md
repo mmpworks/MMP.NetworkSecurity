@@ -1,6 +1,6 @@
 # MMP.NetworkSecurity: walkthrough design
 
-Author: Richard. Date: 2026-11-06. Revision 2, with Steve's depth links, the S-box view, and the modes walk. Status: design only, for Jared's review and Echo's clauses. No product code. Branch `docs/walkthrough-design`, from main `7b569a1`.
+Author: Richard. Date: 2026-11-06. Revision 3, with Steve's depth links, the S-box view, the modes walk, the first grid view, and the lesson 6 steps. Status: design only, for Jared's review and Echo's clauses. No product code. Branch `docs/walkthrough-design`, from main `7b569a1`.
 
 Sources of facts: FIPS 197, the engine, and Jared's sheet `E:\dev\ns-lesson1-facts.md`. Steve's web pages set depth and teaching order only (section 2.1).
 
@@ -28,12 +28,39 @@ Sources of facts: FIPS 197, the engine, and Jared's sheet `E:\dev\ns-lesson1-fac
 | 3 Key agreement | Each side makes a pair, shares cross, each side mixes, both reach one secret. ML-KEM's open box around a random value | **Yes, by value.** `kex.share.computed` 6, `kex.secret.computed` 6, `kex.message.sent` 10. The 255-step ladder stays hidden, and it would teach nothing | One try-it (section 5). No new engine call for the walk | W3 |
 | 4 Who are you | Sign, check, and each of the chain checks | **Part.** `check.result` 8 names each check. The sides of `S*B = R + h*A` stay inside `Ed25519.Verify` | The key-pair bench (section 5). `Ed25519.WalkVerify` only if Jared wants the equation on screen | W3 |
 | 5 TLS 1.3 | The three jobs in order, the key ladder, and one sealed record | **Mostly.** `tls.handshake.*` 14, `secret.derived` 22. One record's AES-GCM is hidden | The W1 feed on a record, with its nonce (IV xor record count) and its record header as extra data. The speed bench | W4 |
-| 6 Key per sale | The KSN bit walk from the initial key to a sale's key. The PIN block, format 4, which runs inverse AES at the bank | **Part.** `dukpt.key.derived` 11 and `dukpt.key.erased` 5 show one key per sale. `WalkDown` hides the keys on the path. `PinBlock.EncryptFormat4` hides its steps | A query over public `DukptDerivation` calls, and a split of `PinBlock` into walk steps | W5 |
+| 6 Key per sale | Base key, initial key, the counter, the future keys, and each sale's key used once and erased. Then the PIN block, format 4, which runs inverse AES at the bank. Section 1.1 gives the steps | **Part.** `dukpt.key.derived` 11 and `dukpt.key.erased` 5 show one key per sale, and `measure.result` gives the held count. The register contents and `WalkDown`'s keys stay hidden. `PinBlock.EncryptFormat4` hides its steps | A query that replays `DukptPinPad` and `DukptDerivation` from the run's `dukpt.initial` and `dukpt.bdk` secrets, and a split of `PinBlock` into walk steps | W5 |
 | 7 The old world | The RSA box, the PRF, and one MAC-then-encrypt CBC record | **Part.** `secret.derived` 34 and `tls11.message.*` show values. `Pkcs1.EncryptV15` hides the padding, and the record build is one call | A record walk that reuses the W1 CBC feed | W5 |
 | 8 SSH | Key exchange, the exchange hash, and one packet's cipher and seal. `aes128-ctr` runs forward AES on both sides | **Mostly.** `ssh.message.*` 112, `secret.derived` 40, `ssh.weak.*` 6. The inputs to the hash are hidden | A query over the same bytes for one packet | W5 |
 | 9 Bridge | One PIN crossing two hops inside two channels | **Yes.** `ce.envelope.taken`, `gateway.envelope.relayed`, and `pin.block.locked` feed `OnionPanel` | Tour text only | W6 |
 | 10 Client proof | Certificate, challenge, signed token, DPoP proof, role check | **Yes.** `auth.message.*` 20, `check.result` 34, `TokenPanel`. The signature itself is lesson 4's | Tour text only | W6 |
 | 11 Timing | Each guess, its measured time, and the byte it reveals | **Yes.** `TimingPanel` reads the lab's report. This lesson has no golden trace | Tour text only | W6 |
+
+### 1.1 Lesson 6 steps (later slice, AES stays the pilot)
+
+Steve's Wikipedia page sets the order. It describes the older TDES form. **This engine runs AES DUKPT, so the page's counts do not apply.** Facts come from `DukptPinPad.cs`, `DukptDerivation.cs`, and `docs/lesson-6-names.md`. Jared's sheet has no DUKPT section yet, so I asked him to check this table.
+
+| Fact | Wikipedia page (TDES form) | This engine |
+|---|---|---|
+| Future-key registers | 21 | 32 (`RegisterCount`, `DukptPinPad.cs:30`) |
+| KSN | 80 bits | 12 bytes: 8-byte initial key id, then 4-byte counter |
+| Counter | 21 bits | The 4-byte counter of the KSN |
+
+| Step | The learner watches | Lane | Source |
+|---|---|---|---|
+| 1. Base key | One base key stays at the bank, and the reader never holds it | Bank | `dukpt.key.derived`, `dukpt.bdk` |
+| 2. Initial key | The bank derives it from the base key and the key id. The reader holds the same bytes. Compare the two sides | Both | `dukpt.key.derived`, `dukpt.initial` |
+| 3. Future keys | The reader fills its 32 registers from the initial key, then erases the initial key. A register table lights up | Reader | Replay, plus `dukpt.key.erased` |
+| 4. Counter | The next counter, in binary. Its lowest 1 bit picks the register | Reader | Replay |
+| 5. One sale | That register gives the derivation key, and the derivation key gives this sale's PIN key. The PIN block leaves with the KSN | Reader | `dukpt.key.derived`, `dukpt.pinKey.<c>` |
+| 6. Erase | The reader may fill lower registers with child keys, then erases the used register. The held count runs 32, 31, 31, 30, 31, so it does not fall on every sale | Reader | `dukpt.key.erased`, `measure.result` |
+| 7. The bank | The bank holds no per-reader key. It takes the KSN, walks from the base key through each 1 bit of the counter, and reaches the same PIN key | Bank | Replay of `DukptDerivation.WalkDown` |
+| 8. A past key | Attack `L6-ask-past-key`: the reader cannot rebuild a used key. `L6-replay-sale`: the bank refuses a repeated KSN | Both | `check.result` |
+
+**Words on screen.** "Erased" keeps the existing tour line: erasing clears a register in place, and a managed heap can keep copies.
+
+**How the query stays real.** It builds a new `DukptPinPad` from the run's `dukpt.initial` bytes and key id, steps it to each sale, and reads `HeldKeys()`. Each replayed PIN key must equal the run's `dukpt.pinKey.<c>`, or the query throws `WALK_DIVERGED`. The replay writes no event, so the golden holds.
+
+**Show keys OFF.** Unlike the AES states, this walk keeps its teaching with fingerprints: which register is full, and which keys match, needs no key byte. So OFF replaces key bytes with `TraceRedaction.Fingerprint`, as section 6.5 of `modes-design.md` does for this lesson.
 
 ## 2. The AES pilot
 
@@ -45,21 +72,49 @@ Sources of facts: FIPS 197, the engine, and Jared's sheet `E:\dev\ns-lesson1-fac
 | Wikipedia, AES | One picture per step, named in order: SubBytes, ShiftRows, MixColumns, AddRoundKey | Key schedule and inverse get little. We walk both |
 | GeeksforGeeks, S-box | A table picture is expected | It traces no byte and gives no row and column rule. We trace a byte through the table, both ways |
 | GeeksforGeeks, modes | A step-by-step feed per mode | ECB and CBC decryption are missing there. We show the unlock path for each mode |
-| cybernews, AES | **Unread.** The site refused the fetch with HTTP 403, for Jared and for me | Jared checked the lines Steve pasted (sheet 5.11). If Steve wants this page used, he can paste it |
+| cybernews, AES | **The clearest guide to the shape Steve wants.** One short phrase and one key go through each step in order, with a 4x4 grid at each step. The fetch refused me with HTTP 403. Steve pasted the page, and the lead read it and sent me its order | Its grids are made up, and ours come from the engine. Its facts stay out, and Jared's sheet governs |
 
-**Teaching order in the app:**
+**Teaching order in the app.** This follows the cybernews order, with one phrase and one key from start to end: the block of `Pump four is ok.` and this run's key.
 
-1. The block: 16 bytes in a 4x4 grid, filled by column. The key size sets the rounds: 10, 12, or 14 in total.
-2. KeyExpansion makes the round keys.
-3. Encryption, step by step, with the S-box lookup inside SubBytes.
-4. Decryption, step by step, with the inverse table.
-5. Modes: ECB, CBC, GCM, with lock and unlock for each.
+| # | Step | Where |
+|---|---|---|
+| 1 | Split the text into 16-byte blocks | Section 2.2, first view |
+| 2 | Put one block in the 4x4 grid, by columns | Section 2.2, first view |
+| 3 | KeyExpansion makes the round keys. The key size sets the rounds: 10, 12, or 14 in total | Section 2.2 |
+| 4 | AddRoundKey with round key 0 | Section 2.2 |
+| 5 | SubBytes, with one byte traced through the S-box | Sections 2.2, 2.3 |
+| 6 | ShiftRows | Section 2.2 |
+| 7 | MixColumns | Section 2.2 |
+| 8 | AddRoundKey | Section 2.2 |
+| 9 | Repeat for the other rounds | Round chips |
+| 10 | The last round, with no MixColumns | Section 2.2 |
+| 11 | Decryption, step by step, with the inverse table | Sections 2.2, 2.3 |
+| 12 | Modes: ECB, CBC, GCM, with lock and unlock for each | Section 2.4 |
 
-Jared's sheet sections 5.7, 5.9, and 5.11 list the lines on these pages that a lesson must not copy.
+Round 1 shows each step in full. So step 5 opens the S-box view by itself on the first SubBytes, with the first cell selected. Later rounds keep it one click away.
+
+Jared's sheet sections 5.7, 5.9, 5.11, and 5.13 list the lines on these pages that a lesson must not copy.
 
 ### 2.2 Chapter 1: inside the block
 
-The learner runs lesson 1, opens the **AES walk** tab, and picks text block 1 to 4.
+The learner runs lesson 1 and opens the **AES walk** tab.
+
+**The first view teaches the grid.** A reader learns the fill order here, so this view must get it right.
+
+1. The text shows split into 4 blocks of 16 bytes. The learner picks block 1 to 4.
+2. The picked block drops into the grid one byte at a time, with Next. Each cell shows its position, 0 to 15.
+3. The grid fills **down the first column, then down the next**, and the panel says so.
+
+Block 1 fills like this. `·` marks a space byte.
+
+| | Column 0 | Column 1 | Column 2 | Column 3 |
+|---|---|---|---|---|
+| Row 0 | `P` (0) | `·` (4) | `r` (8) | `·` (12) |
+| Row 1 | `u` (1) | `f` (5) | `·` (9) | `o` (13) |
+| Row 2 | `m` (2) | `o` (6) | `i` (10) | `k` (14) |
+| Row 3 | `p` (3) | `u` (7) | `s` (11) | `.` (15) |
+
+So the first column reads `Pump`, and the top row reads `P`, space, `r`, space. The round keys use the same grid. Then the steps run in the order of section 2.1:
 
 | Part | On screen | Words that carry the truth |
 |---|---|---|
@@ -68,7 +123,7 @@ The learner runs lesson 1, opens the **AES walk** tab, and picks text block 1 to
 | Encrypt | AddRoundKey 0. Rounds 1 to 9: SubBytes, ShiftRows, MixColumns, AddRoundKey. Round 10: SubBytes, ShiftRows, AddRoundKey | The first SubBytes sees letters XOR round key 0. It never sees bare letters |
 | Decrypt | AddRoundKey 10. Rounds 9 to 1: InvShiftRows, InvSubBytes, AddRoundKey, InvMixColumns. Last: InvShiftRows, InvSubBytes, AddRoundKey 0. The grid reads `Pump four is ok.` | The same key, with the round keys from last to first. This is FIPS 197 section 5.3 order, and the only order that works with these round keys (sheet 5.1) |
 
-Each state shows as a 4x4 grid. A cell shows its hex byte, and its letter when the byte is printable. Bytes fill **columns first**, by FIPS 197 section 3.4: `s[r, c] = in[r + 4c]`. So `Pump` is the first column. A row-first grid would make ShiftRows look wrong, so a clause pins this.
+Each state shows as a 4x4 grid. A cell shows its hex byte, and its letter when the byte is printable. The fill order comes from FIPS 197 section 3.4: `s[r, c] = in[r + 4c]`. A row-first grid would make ShiftRows look wrong, so a clause pins this on the first view and on every state.
 
 Key size: a selector offers 128, 192, and 256 bits. The block stays 16 bytes. Only the rounds change.
 
@@ -119,7 +174,16 @@ The chapter has one tab per mode. Each tab shows the blocks of a real message fr
 |---|---|---|---|---|
 | **ECB** | `TextEcb` on the `L1-use-ecb` fork. Else `PictureEcb`, first 4 rows of 257 | The data block | The cipher block | **Inverse AES** on the cipher block gives the data block |
 | **CBC** | `TextCbc`. On the `L1-use-ecb` fork, `PictureCbc`, first 4 rows | The data block XOR the last cipher block (the IV at the start) | The cipher block | **Inverse AES** on the cipher block, then XOR the last cipher block |
-| **GCM** | `TextGcm1` | A counter block: the nonce, then a count that starts at 2 | A key stream block, then XOR the data block gives the cipher block | **Forward AES** on the same counter gives the same key stream, then XOR. The tag is checked first |
+| **GCM** | `TextGcm1` | A counter block: the nonce, then a count that starts at 2 | A key stream block, then XOR the data block gives the cipher block | **Forward AES** on the same counter gives the same key stream, then XOR. This engine checks the tag first. The rule is that no text comes out on a failure |
+
+What each tab states, from sheet 5.12:
+
+| | ECB | CBC | GCM |
+|---|---|---|---|
+| Promise | Hides single blocks only | Hides data, catches no edits | Hides data and catches edits |
+| Starting value | None | A 16-byte IV. It must be **unpredictable**, and it is not secret | A 12-byte nonce. It must be **unique** under one key, and it is not secret |
+| Padding | Yes. The 64-byte text gets one more block of 16 bytes of `10`, so it shows 5 blocks | Yes, the same | None. XOR uses only the key stream bytes it needs |
+| Picture repeats in the run | 249 of 257 blocks in the golden trace | 0 of 257 | 0 of 256 |
 
 **Why ECB and CBC reverse the steps and GCM does not.** This is the chapter's closing step:
 
@@ -139,7 +203,7 @@ The chapter has one tab per mode. Each tab shows the blocks of a real message fr
 | Row field | Means |
 |---|---|
 | `wire: match` | The walk's cipher block equals the bytes in the run's `wire.sent` event |
-| `wire: differs` | A fork changed the bytes. CBC unlock runs on the wire bytes, so the learner sees the damage: the spike's `L1-flip-cbc` run changed 16, 1, 0, 0, 0 bytes per block. GCM shows the failed tag and no unlock, as the engine returns no bytes |
+| `wire: differs` | A fork changed the bytes. CBC unlock runs on the wire bytes, so the learner sees the damage: the spike's `L1-flip-cbc` run changed 16, 1, 0, 0, 0 bytes per block. That block turns to junk, the next block has the same bit flipped, and then it recovers. CBC raises no error. GCM shows the failed tag and no unlock, as the engine returns no bytes |
 
 **Out of scope, named on the tab.** The modes page also lists CFB, OFB, and CTR, and it names XTS. CFB, OFB, and XTS are not in this course (grep of `src/NetSec.Core`: 0 files). CTR alone runs in lesson 8's SSH suite, and the panel points there. Lesson 1 runs counter mode only inside GCM.
 
@@ -167,6 +231,10 @@ From Jared's sheet. Echo can scan for these in `walk-gloss.json` and the tour.
 | "A matrix with a special multiply" | "matrix multiplication", with no note |
 | "8 bits in, 8 bits out" | "each 4-bit chunk" |
 | "GHASH makes the tag. AES supplies the hash key and the mask" | "AES makes the tag" |
+| "The CBC IV must be unpredictable. The GCM nonce must be unique" | "Unique IV" for CBC, or one IV rule for all modes |
+| "One block turns to junk, and the next has the same bit flipped. Then it recovers" | "A corrupted block affects subsequent blocks" |
+| "This engine checks the tag first. No text comes out on a failure" | "GCM must check the tag first", as a rule of the standard |
+| "Shows patterns" for ECB | "Vulnerable to cryptanalysis" for ECB |
 
 ### 2.7 Resolution semantics
 
@@ -481,7 +549,7 @@ Sheet 5.9 lists them, and these three matter most:
 | W2 | `AesKey.SboxBuild(byte)` and "how the table was built". `flipKeyBit`. One-bit-flip spread count (4 bytes after round 1, 16 after round 2) | FIPS 5.1.1 worked example for `53`. Spread count against Jared's values | Richard, Nancy |
 | W3 | Lesson 3 try-it, lesson 4 bench | Clauses on each check result | Richard, Nancy, Jared on wording |
 | W4 | Lesson 5 record walk and speed bench | Record walk equals the wire. The number's label names the machine | Richard, Nancy |
-| W5 | Lessons 2, 6, 7, 8 queries, one PR each | A reference check per lesson, from Jared | Richard, Jared |
+| W5 | Lessons 2, 6 (section 1.1), 7, 8 queries, one PR each | A reference check per lesson, from Jared. Lesson 6: each replayed PIN key equals the run's | Richard, Jared |
 | W6 | Lessons 9, 10, 11 tour text | A15, A15a | Richard |
 
 W2 onward starts only after W1 passes the kill condition. Corrections from any slice go in `docs/learnings.md`, and later slices read it.
@@ -509,7 +577,8 @@ If Steve does not follow it after 2 rounds of word changes, stop and re-plan the
 | Real path | `WalkEncrypt` equals `EncryptBlock` on 10,000 random inputs |
 | Toggle | OFF gives 409 `KEYS_HIDDEN` on both session routes. A flip drops an in-flight reply. No state reaches a session file |
 | No app math | No S-box bytes under `app/src` |
-| Grid order | Row r, column c shows byte `r + 4c` |
+| Grid order | Row r, column c shows byte `r + 4c`, on every state. On the first view, the first column reads `Pump` and cells fill in position order 0 to 15 |
+| Step order | A walk by Next alone meets the section 2.1 steps in order |
 | Words | The section 2.6 "never write" lines are absent from `walk-gloss.json` and the lesson 1 tour |
 | Golden | `A17.mock.golden-trace-equal` still passes |
 
