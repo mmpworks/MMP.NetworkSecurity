@@ -27,7 +27,7 @@ namespace Acceptance
             new Case("A17.flow.login.walk", V0Clauses.LoginWalk, "machine-allows-any", "stale-accepted", "no-judge-facts", "device-judge-claimed"),
             new Case("A17.referee.token-issuer-go", V0Clauses.TokenIssuerGo, "token-wrong-key", "key-route-other-public", "pub-in-trace-wrong"),
             new Case("A17.show-keys.default-on", V3Clauses.DefaultOn, "default-off", "no-health-showkeys"),
-            new Case("A17.show-keys.off-holds-no-secret", V3Clauses.OffHoldsNoSecret, "off-keeps-hex-in-events", "off-keeps-hex-in-file", "off-hex-in-frames", "off-hex-in-message", "off-hex-in-plain", "hidden-missing", "keylog-served-when-off"),
+            new Case("A17.show-keys.off-holds-no-secret", V3Clauses.OffHoldsNoSecret, "off-keeps-hex-in-events", "off-keeps-hex-in-file", "off-hex-in-frames", "off-hex-in-message", "off-hex-in-plain", "wire-carries-a-key", "hidden-missing", "keylog-served-when-off"),
             new Case("A17.show-keys.mine-shows-exportable", V3Clauses.MineShowsExportable, "mine-key-route-no-hex", "no-key-in-use"),
             new Case("A17.show-keys.non-exportable-hidden-when-on", V3Clauses.NonExportableHiddenWhenOn, "exercise-key-leaks"),
             new Case("A17.show-keys.fingerprint-compare", V3Clauses.FingerprintCompare, "fingerprint-wrong"),
@@ -58,6 +58,13 @@ namespace Acceptance
             new Case("A17.lesson-7.my-keys", MyKeysClauses.L7, "mine-run-differs", "builtin-half"),
             new Case("A17.lesson-8.my-keys", MyKeysClauses.L8, "mine-run-differs", "builtin-half"),
             new Case("A17.lesson-9.my-keys", MyKeysClauses.L9, "mine-run-differs", "builtin-half"),
+            new Case("A19.host.tables-equal-fips-and-stay-open", AesWalkHostClauses.TablesEqualFips, "walk-table-flip", "walk-tables-closed-off"),
+            new Case("A19.host.block-real-run-two-seeds", AesWalkHostClauses.BlockRealRun, "walk-canned", "walk-state-flip", "walk-inverse-order", "walk-key-row-flip", "walk-input-other"),
+            new Case("A19.host.show-keys-off-closes-block-first", AesWalkHostClauses.OffClosesBlock, "walk-block-open-off", "walk-session-before-toggle", "walk-off-error-bytes", "walk-tables-closed-off"),
+            new Case("A19.host.replies-carry-no-store", AesWalkHostClauses.NoStore, "walk-no-store-missing"),
+            new Case("A19.host.errors-carry-a-code", AesWalkHostClauses.Errors, "walk-lesson-wrong-code", "walk-bad-argument-500", "walk-no-request-id"),
+            new Case("A19.host.walk-adds-no-trace-event", AesWalkHostClauses.AddsNoEvent, "walk-adds-event", "walk-state-in-events"),
+            new Case("A19.host.control-run-says-not-sent", AesWalkHostClauses.ControlNotSent, "walk-label-match"),
             new Case("A17.lesson-10.my-keys", MyKeysClauses.L10, "mine-run-differs", "builtin-half", "no-key-in-use"),
         };
 

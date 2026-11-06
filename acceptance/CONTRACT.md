@@ -154,3 +154,32 @@ It reaches the two members by reflection, so it compiles against a Core that lac
 2. **Names marked ASSUMED in 5.1 to 5.3.** Each is one line to change in `groups/a17/` and in the fake.
 3. **The state names** in `modes-design.md` 8.2 and `wizards-ux.md` 3.2 differ. The suite does not care, and the two documents should agree.
 4. **Golden traces** wait for the lead's word.
+
+## 6. A19: the AES walk, chapter 1 (what the build must show)
+
+Source: `docs/walkthrough-design.md` on `main` at c19b151 (Jared's pass on d1368af, PR #146, then #150, #152 and #153), sections 2.2, 2.3, 2.6, 3.1, 3.3, 3.4, 3.5. A row marked ASSUMED is a name the design leaves open. A builder implements it or sends the acceptance author a change request.
+
+| Area | The suite uses | Notes |
+|---|---|---|
+| Core | `AesKey.WalkEncrypt`, `WalkDecrypt`, `WalkKeyExpansion`, static `SubstitutionTable`, `InverseSubstitutionTable`; `AesStepKind`, `AesStep`, `AesBlockWalk`, `AesKeyWord` | Design 3.3. A table call returns a copy. `AesStep.Round`: encrypt 0 to Nr. Decrypt Nr down to 0: the first AddRoundKey has Round Nr, and each later group of steps has the Round of the key it ends with |
+| Core | `WalkKeyExpansion` holds Nb * (Nr + 1) rows. A row with i below Nk holds only `Index` and `Word` | Richard confirmed this shape on #154 |
+| `GET /api/walk/aes/tables` | `sbox`, `inverseSbox` as 512 hex characters. Open with Show keys OFF. `Cache-Control: no-store` | Design 3.4 |
+| `GET /api/sessions/{id}/walk/aes/block?source=text&keyBits=128` | `source`, `keyBits`, `rounds`, `keySource`, `inputHex`, `keyWords[]`, `forward`, `inverse`, `wire` | Design 3.4. `forward` and `inverse` hold `input`, `output`, `steps[]` with `kind`, `round`, `state`, `roundKey` (only on AddRoundKey). `keyWords[]` holds every row, with `i`, `previous`, `rotated`, `substituted`, `rcon`, `afterRcon`, `keyBack`, `word`. A cell the row does not use is absent |
+| Refusals | `code`, `message`, `retryable`, `requestId`. OFF: 409 `KEYS_HIDDEN`, checked before the session read. 404 `SESSION_NOT_FOUND`. Another lesson: 409 `WALK_NOT_BUILT`. Bad `source` or `keyBits`: 400 `WALK_BAD_ARGUMENT` | Design 3.4 |
+| A bare 404 on a walk route | NOT RUN `PRODUCT_MISSING` | As for `/api/security` |
+| Host source | `src/NetSec.Host/AesWalkRoutes.cs`. Each walk route is a string in the source, and is listed in `checks/walk_routes.json` | Design 3.5 |
+| App files | `app/src/walk.ts`, `app/src/components/AesBlockWalk.vue`. No part of either S-box under `app/src` | Design 3.1, 3.7 |
+
+UI test ids, all ASSUMED under the design's `aes-walk-` prefix:
+
+| Test id | Shape |
+|---|---|
+| `aes-walk-tab`, `aes-walk-panel` | The tab shows when the run holds `aes.key`. A click fetches the block |
+| `aes-walk-first-view` | Shows on the first view. It starts on an empty grid, and each Next adds one byte in position order |
+| `aes-walk-next`, `aes-walk-back` | Next is disabled at the end of the walk |
+| `aes-walk-cell-{r}-{c}` | Row r, column c. The text starts with the byte's 2 hex digits. An empty cell on the first view shows nothing or its position number. `data-letter` holds the byte's character when it is printable |
+| `aes-walk-step-kind` | The step's name: an `AesStepKind` member. On the first view and the key rows it holds another word |
+| `aes-walk-readable` | At the end of the walk it reads `Pump four is ok.` |
+| `aes-walk-sbox-row`, `aes-walk-sbox-col`, `aes-walk-sbox-value` | After a click on a cell of a SubBytes or InvSubBytes step: one hex digit, one hex digit, and the 2-digit table value |
+| `aes-walk-sbox-cell-{x}-{y}` | One table cell, with x and y as hex digits |
+| `aes-walk-closed` | Shows while Show keys is OFF, with the sentence of design 3.5. No `aes-walk-cell-*` exists then |

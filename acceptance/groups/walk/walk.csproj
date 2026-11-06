@@ -1,0 +1,7 @@
+<Project Sdk="Microsoft.NET.Sdk">
+  <Import Project="..\Group.props" />
+  <PropertyGroup>
+    <TargetFrameworks>net10.0;net48</TargetFrameworks>
+    <AssemblyName>Acceptance.Walk</AssemblyName>
+  </PropertyGroup>
+</Project>

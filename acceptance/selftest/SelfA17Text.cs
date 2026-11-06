@@ -14,14 +14,14 @@ namespace Acceptance
         static readonly string TicGate = Path.Combine(Environment.GetFolderPath(Environment.SpecialFolder.UserProfile), ".claude", "hooks", "tic-gate.py");
         const string TestKeysLine = "Use test keys only. This course shows your keys on screen and in saved files.";
 
-        static void Put(string root, string rel, string text)
+        internal static void Put(string root, string rel, string text)
         {
             string p = Path.Combine(root, rel.Replace('/', Path.DirectorySeparatorChar));
             Directory.CreateDirectory(Path.GetDirectoryName(p));
             File.WriteAllText(p, text);
         }
 
-        static Dictionary<string, string> Docs(Ctx c, string root, string ids)
+        internal static Dictionary<string, string> Docs(Ctx c, string root, string ids)
         {
             string script = Path.Combine(c.AcceptanceDir, "checks", "docs_checks.py"), output;
             Proc.Run("python", "-I \"" + script + "\" --root \"" + root + "\" --ids " + ids, null, 120000, out output);

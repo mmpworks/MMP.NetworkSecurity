@@ -8,6 +8,7 @@ Each `.nsv` group carries a `# source:` line, and `SELF.vector-provenance` fails
 | File | Holds | Source | How it was read | Second check |
 |---|---|---|---|---|
 | `aes-fips197.nsv` | AES-128/192/256 block examples | FIPS 197 (2001 edition) appendix C, fips-197-2001.pdf | pdftotext, final round output of each trace | BCL AES in SELF.reference-passes |
+| `aes-fips197-rounds.nsv` | AES-128/192/256 round states, key rows and both S-box tables (A19) | FIPS 197 (2001 edition) appendices A and C, figures 7 and 14, fips-197-2001.pdf | pdftotext, every value of the CIPHER and INVERSE CIPHER runs by position | RefAes in SELF.walk-reference-matches-fips, BCL output in the same check |
 | `aes-modes-sp800-38a.nsv` | AES ECB, CBC (128, 192), CTR examples | SP 800-38A appendix F, sp800-38a.pdf | pdftotext, four blocks per example. CBC-AES256 (F.2.5) is left out: the PDF text scrambles its key, IV and plaintext rows at a page break, and the extractor does not guess | BCL AES in SELF.reference-passes |
 | `sha-cavp.nsv` | SHA-1, SHA-256, SHA-384, SHA-512 short messages and the first 3 long messages | NIST CAVP shabytetestvectors.zip | parse of the .rsp files, bit length checked against the message | BCL hashes |
 | `sha3-cavp.nsv` | SHA3-256, SHA3-512, SHAKE128, SHAKE256 short messages, first 3 long, first 40 variable-output | NIST CAVP sha-3bytetestvectors.zip, shakebytetestvectors.zip | parse of the .rsp files | BCL SHA-3 and SHAKE |

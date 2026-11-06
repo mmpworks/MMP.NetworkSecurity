@@ -2,7 +2,7 @@
 
 Author: Echo. Date: 2026-11-05. Branch: `test/acceptance-suite`. Rule: D11. Builders never write under `acceptance/`.
 
-Conclusion: the suite has **M = 261 product clauses** (`clauses.json`): the 208 of the first release and 53 for A17 (section 8). With no product built it reports **0 of 261 PASS, 0 FAIL, 261 NOT RUN**.
+Conclusion: the suite has **M = 307 product clauses** (`clauses.json`): the 208 of the first release, 53 for A17 (section 8) and 46 for the AES walk, A19 (section 10). With no product built it reports **0 of 307 PASS, 0 FAIL, 307 NOT RUN**.
 Its 31 checks on itself all PASS. The suite is written against `docs/program-design.md` section 11, `docs/modes-design.md`, and the merged referees in `acceptance/referees`. Every group compiles against the contract stub on net10.0 and on net48 with the CF build of MMP.AsyncProxy.
 Disposition: merge this branch. Send the open items in section 7 and in `CONTRACT.md` section 5.7 to Richard and Jared.
 
@@ -187,3 +187,25 @@ Two rules from the lead. A clause on a type that no outside tool can judge (paym
 A15a: a verdict now binds to claim id plus a hash of the claim text, and to a hash of every step text and `textMine`. A verdict with no hash reads NOT RUN `ACCURACY_VERDICT_UNBOUND`, and one for changed text reads NOT RUN `ACCURACY_VERDICT_STALE`. The 12 existing verdicts carry no hash yet, so `A15a.tours.reader-verdicts` reads NOT RUN until each reader confirms and stamps the hashes (`python -I acceptance/checks/docs_checks.py --root . --hashes`).
 
 Golden traces: record with `pwsh acceptance/run.ps1 -Clauses A17.mock.golden-trace-equal -RecordGolden`, then commit `acceptance/golden/`. Compare is the default. The recorder runs each lab three times and refuses to write a lab whose runs differ.
+
+## 10. A19: the AES walk, chapter 1 (added 2026-11-06)
+
+Conclusion: A19 adds **46 clauses**, so M is **307** (261 + 46). Source: `docs/walkthrough-design.md` (Jared's pass on d1368af, PR #146), slices W1a and W1b. Every clause reads NOT RUN `PRODUCT_MISSING` until the walk exists.
+
+| Group | Clauses | Judge |
+|---|---|---|
+| `walk` (links `NetSec.Core`, net10 and CF) | 26: 13 on each build. Round states C.1 to C.3 in both directions 6, key rows 3, tables 1, step order 1, real path and RefAes 1, BCL 1 | FIPS 197 (2001) data in `vectors/aes-fips197-rounds.nsv`, RefAes, the BCL oracle |
+| `a17` (Host over HTTP and WebSocket, net10) | 7: tables 1, real run on 2 seeds 1, Show keys OFF 1, no-store 1, refusals 1, no trace event 1, control label 1 | The key from a live trace, RefAes, the BCL |
+| `docs` (Python) | 3: no table under `app/src`, the words of design 2.6, every walk route listed | Script |
+| `e2e` (Playwright) | 10: first view 1, grid order 1, step order 1, text by Next 1, S-box click 1, Show keys OFF line 1, flip race 4 | The browser against the Host's own reply |
+
+Anchor rules:
+
+1. No expected value comes from product code. `RefAes` (`lib/Harness/RefAes.cs`) shares no code with `NetSec.Core` and builds its S-box from the field inverse.
+2. `pdftotext` prints some FIPS values one line above their label, so `extract_nist.py` reads the n-th value for the n-th label. A reader that matches a label to the value on its line gets 370 values and wrong labels.
+3. `SELF.walk-vector-flip-fails` changes one hex digit of each of the 372 values in a copy of the file, and each change FAILS its clause.
+4. `SELF.walk-clauses-pass-and-bite` and the rows `A19.host.*` of `SELF.a17-clauses-pass-and-bite` run a canned walk, and the clauses FAIL it.
+
+Limit: the e2e clauses have never run against a built panel. Their test ids are ASSUMED (`CONTRACT.md` section 6).
+
+Disposition: merge. Then Richard builds W1a and Nancy builds W1b. Chapter 2 clauses arrive in a second PR.

@@ -64,6 +64,80 @@ def aes_fips197(cache, out):
           [("aes-block", "FIPS 197 appendix C.1 to C.3", recs)])
 
 
+def fips197_box(text, figure):
+    """The 16 rows above a figure caption: a row label, then 16 hex bytes."""
+    head = text[:text.index(figure, text.index("5.1 Cipher"))]
+    rows = re.findall(r"^\s*(?P<row>[0-9a-f])\s+(?P<cells>(?:[0-9a-f]{2}\s+){15}[0-9a-f]{2})\s*$", head, re.M)[-16:]
+    if [r[0] for r in rows] != list("0123456789abcdef"):
+        sys.exit("fips197: bad table above " + figure)
+    return "".join("".join(r[1].split()) for r in rows)
+
+
+def fips197_key_rows(section, nk, name):
+    """One record per word w[i] with i >= Nk. A row prints w[i] on a neighbouring line, so w[i] is read as the temp of row i+1. The last word is temp xor w[i-Nk]."""
+    rows = {}
+    for m in re.finditer(r"^\s*(?P<i>\d{1,2}) (?P<words>[0-9a-f]{8}(?:\s+[0-9a-f]{8})*)\s*$", section, re.M):
+        rows[int(m.group("i"))] = m.group("words").split()
+    first, last = nk, max(rows)
+    if sorted(rows) != list(range(first, last + 1)):
+        sys.exit("fips197: %s rows are not contiguous" % name)
+    recs = []
+    for i in range(first, last + 1):
+        w = rows[i]
+        rec = [("example", name), ("nk", str(nk)), ("i", str(i)), ("temp", w[0])]
+        if i % nk == 0:
+            rec += [("rot", w[1]), ("sub", w[2]), ("rcon", w[3]), ("after", w[4])]
+            before, back = w[4], w[5]
+        elif nk > 6 and i % nk == 4:
+            rec += [("sub", w[1])]
+            before, back = w[1], w[2]
+        else:
+            before, back = w[0], w[1]
+        word = rows[i + 1][0] if i < last else "%08x" % (int(before, 16) ^ int(back, 16))
+        if int(word, 16) != int(before, 16) ^ int(back, 16):
+            sys.exit("fips197: %s row %d does not add up" % (name, i))
+        if i == last and word not in section:
+            sys.exit("fips197: %s last word %s is not in the text" % (name, word))
+        recs.append(rec + [("keyback", back), ("word", word)])
+    return recs
+
+
+def aes_fips197_rounds(cache, out):
+    """Every listed value of the CIPHER and INVERSE CIPHER runs (appendix C), the key rows (appendix A), and both S-box tables (figures 7 and 14). The EQUIVALENT INVERSE CIPHER runs hold another order and stay out."""
+    text = pdf_text(os.path.join(cache, "fips-197-2001.pdf"))
+    groups = []
+    rounds = []
+    for part in re.split(r"\n(?=C\.\d AES-\d+ \(Nk=)", text)[1:]:
+        example = "C." + part[2]
+        key = re.search(r"KEY:\s*(?P<key>[0-9a-f]{32,64})", part).group("key")
+        # pdftotext prints some values one line above their label (C.2 and C.3 start on the CIPHER heading line). So the n-th value belongs to the n-th label, read by position.
+        start = re.search(r"CIPHER\s+\(ENCRYPT\):", part).start()
+        encrypt = part[start:part.index("INVERSE CIPHER (DECRYPT)")]
+        inverse = part[part.index("INVERSE CIPHER (DECRYPT)"):re.search(r"EQUIVALENT\s+INVERSE", part).start()]
+        for direction, body in (("encrypt", encrypt), ("inverse", inverse)):
+            labels = re.findall(r"round\[\s*(?P<r>\d+)\]\.(?P<label>\w+)", body)
+            values = re.findall(r"\b[0-9a-f]{32}\b", body)
+            if len(labels) != len(values):
+                sys.exit("fips197: %s %s has %d labels and %d values" % (example, direction, len(labels), len(values)))
+            for (r, label), value in zip(labels, values):
+                rounds.append([("example", example), ("key", key), ("direction", direction), ("round", r), ("label", label), ("value", value)])
+    if len(rounds) != 372:
+        sys.exit("fips197: expected 372 round values, got %d" % len(rounds))
+    groups.append(("round-values", "FIPS 197 (2001) appendix C.1 to C.3, CIPHER and INVERSE CIPHER runs", rounds))
+    words = []
+    a1, a2, a3 = text.index("\nA.1 Expansion"), text.index("\nA.2 Expansion"), text.index("\nA.3 Expansion")
+    end = text.index("Appendix B - Cipher Example", a3)
+    for name, nk, section in (("A.1", 4, text[a1:a2]), ("A.2", 6, text[a2:a3]), ("A.3", 8, text[a3:end])):
+        key = "".join(re.search(r"Cipher Key =\s*(?P<k>(?:[0-9a-f]{2}\s+)+)", section).group("k").split())
+        rows = fips197_key_rows(section, nk, name)
+        words += [[("key", key)] + r for r in rows]
+    groups.append(("key-rows", "FIPS 197 (2001) appendix A.1 to A.3", words))
+    sbox = fips197_box(text, "Figure 7. S-box:")
+    inverse = fips197_box(text, "Figure 14. Inverse S-box:")
+    groups.append(("tables", "FIPS 197 (2001) figures 7 and 14", [[("table", "sbox"), ("value", sbox)], [("table", "inverse"), ("value", inverse)]]))
+    write(os.path.join(out, "aes-fips197-rounds.nsv"), "AES round values, key rows and S-box tables, FIPS 197 (2001). Data only: no product code computes a value here", groups)
+
+
 def aes_modes(cache, out):
     text = pdf_text(os.path.join(cache, "sp800-38a.pdf"))
     groups = {"ecb": [], "cbc": [], "ctr": []}
@@ -272,5 +346,5 @@ def tdes(cache, out):
 
 if __name__ == "__main__":
     cache, out = sys.argv[1], sys.argv[2]
-    for fn in (aes_fips197, aes_modes, sha, sha3, gcm, tdes):
+    for fn in (aes_fips197, aes_fips197_rounds, aes_modes, sha, sha3, gcm, tdes):
         fn(cache, out)

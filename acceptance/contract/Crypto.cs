@@ -47,6 +47,35 @@ namespace NetSec.Crypto
         public AesKey(byte[] key) { throw new NotImplementedException(); }
         public void EncryptBlock(byte[] i, int io, byte[] o, int oo) { throw new NotImplementedException(); }
         public void DecryptBlock(byte[] i, int io, byte[] o, int oo) { throw new NotImplementedException(); }
+        // docs/walkthrough-design.md section 3.3 (A19)
+        public AesBlockWalk WalkEncrypt(byte[] block) { throw new NotImplementedException(); }
+        public AesBlockWalk WalkDecrypt(byte[] block) { throw new NotImplementedException(); }
+        public AesKeyWord[] WalkKeyExpansion() { throw new NotImplementedException(); }
+        public static byte[] SubstitutionTable() { throw new NotImplementedException(); }
+        public static byte[] InverseSubstitutionTable() { throw new NotImplementedException(); }
+    }
+
+    public enum AesStepKind { AddRoundKey, SubBytes, ShiftRows, MixColumns, InvShiftRows, InvSubBytes, InvMixColumns }
+
+    public sealed class AesStep
+    {
+        public readonly AesStepKind Kind = default(AesStepKind);
+        public readonly int Round = 0;
+        public readonly byte[] State = null;
+        public readonly byte[] RoundKey = null;
+    }
+
+    public sealed class AesBlockWalk
+    {
+        public readonly int Rounds = 0;
+        public readonly byte[] Input = null, Output = null;
+        public readonly AesStep[] Steps = null;
+    }
+
+    public sealed class AesKeyWord
+    {
+        public readonly int Index = 0;
+        public readonly byte[] Previous = null, Rotated = null, Substituted = null, Rcon = null, AfterRcon = null, KeyBack = null, Word = null;
     }
 
     public sealed class TdesKey

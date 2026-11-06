@@ -168,8 +168,10 @@ namespace Acceptance
             byte[] clear;
             using (SHA256 sha = SHA256.Create()) clear = Hex.Slice(sha.ComputeHash(Encoding.ASCII.GetBytes("clear:" + s.Lesson)), 0, 16);
             AddWire(s, "client", "wire.sent", "SentInTheClear", clear, clear);
-            s.Events[s.Events.Count - 1].Secrets.Add(Raw("clear.value", "client", clear));
-            foreach (SessionEv e in s.Events) if (e.Secrets.Count > 0 && e.Secrets[0].Name != "clear.value") { s.Events[s.Events.Count - 1].OffLeak = e.Secrets[0].Bytes; break; }
+            s.Events[s.Events.Count - 1].Secrets.Add(Raw("auth.last-call", "client", clear));
+            SessionEv carrier = s.Events[s.Events.Count - 1];
+            foreach (SessionEv e in s.Events) if (e.Secrets.Count > 0 && e.Secrets[0].Name != "auth.last-call") { carrier.OffLeak = e.Secrets[0].Bytes; break; }
+            if (M("wire-carries-a-key") && carrier.OffLeak != null) AddWire(s, "client", "wire.sent", "KeyInTheClear", carrier.OffLeak, carrier.OffLeak);
         }
 
         /// <summary>The defect "foreign-finish-first": another session of the same Host ends on this connection before the run's own frames, with a trace event and a session.finished of its own.</summary>
@@ -242,7 +244,8 @@ namespace Acceptance
             {
                 case 1:
                     {
-                        byte[] aes = KeyBytes(_types["lab.aes-key"]);
+                        byte[] aes = (byte[])KeyBytes(_types["lab.aes-key"]).Clone();
+                        if (seed != 20261105 && !Active(_types["lab.aes-key"])) aes[0] ^= (byte)(seed | 1);   // the real lab draws its key from the seed
                         Add(s, "client", "aes.key", Raw("aes.key", "client", aes));
                         byte[] picture = new byte[4096];
                         for (int i = 0; i < picture.Length; i++) picture[i] = (byte)(i % 7);

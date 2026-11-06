@@ -1,0 +1,3830 @@
+# AES round values, key rows and S-box tables, FIPS 197 (2001). Data only: no product code computes a value here
+
+[round-values]
+# source: FIPS 197 (2001) appendix C.1 to C.3, CIPHER and INVERSE CIPHER runs
+
+example = C.1
+key = 000102030405060708090a0b0c0d0e0f
+direction = encrypt
+round = 0
+label = input
+value = 00112233445566778899aabbccddeeff
+
+example = C.1
+key = 000102030405060708090a0b0c0d0e0f
+direction = encrypt
+round = 0
+label = k_sch
+value = 000102030405060708090a0b0c0d0e0f
+
+example = C.1
+key = 000102030405060708090a0b0c0d0e0f
+direction = encrypt
+round = 1
+label = start
+value = 00102030405060708090a0b0c0d0e0f0
+
+example = C.1
+key = 000102030405060708090a0b0c0d0e0f
+direction = encrypt
+round = 1
+label = s_box
+value = 63cab7040953d051cd60e0e7ba70e18c
+
+example = C.1
+key = 000102030405060708090a0b0c0d0e0f
+direction = encrypt
+round = 1
+label = s_row
+value = 6353e08c0960e104cd70b751bacad0e7
+
+example = C.1
+key = 000102030405060708090a0b0c0d0e0f
+direction = encrypt
+round = 1
+label = m_col
+value = 5f72641557f5bc92f7be3b291db9f91a
+
+example = C.1
+key = 000102030405060708090a0b0c0d0e0f
+direction = encrypt
+round = 1
+label = k_sch
+value = d6aa74fdd2af72fadaa678f1d6ab76fe
+
+example = C.1
+key = 000102030405060708090a0b0c0d0e0f
+direction = encrypt
+round = 2
+label = start
+value = 89d810e8855ace682d1843d8cb128fe4
+
+example = C.1
+key = 000102030405060708090a0b0c0d0e0f
+direction = encrypt
+round = 2
+label = s_box
+value = a761ca9b97be8b45d8ad1a611fc97369
+
+example = C.1
+key = 000102030405060708090a0b0c0d0e0f
+direction = encrypt
+round = 2
+label = s_row
+value = a7be1a6997ad739bd8c9ca451f618b61
+
+example = C.1
+key = 000102030405060708090a0b0c0d0e0f
+direction = encrypt
+round = 2
+label = m_col
+value = ff87968431d86a51645151fa773ad009
+
+example = C.1
+key = 000102030405060708090a0b0c0d0e0f
+direction = encrypt
+round = 2
+label = k_sch
+value = b692cf0b643dbdf1be9bc5006830b3fe
+
+example = C.1
+key = 000102030405060708090a0b0c0d0e0f
+direction = encrypt
+round = 3
+label = start
+value = 4915598f55e5d7a0daca94fa1f0a63f7
+
+example = C.1
+key = 000102030405060708090a0b0c0d0e0f
+direction = encrypt
+round = 3
+label = s_box
+value = 3b59cb73fcd90ee05774222dc067fb68
+
+example = C.1
+key = 000102030405060708090a0b0c0d0e0f
+direction = encrypt
+round = 3
+label = s_row
+value = 3bd92268fc74fb735767cbe0c0590e2d
+
+example = C.1
+key = 000102030405060708090a0b0c0d0e0f
+direction = encrypt
+round = 3
+label = m_col
+value = 4c9c1e66f771f0762c3f868e534df256
+
+example = C.1
+key = 000102030405060708090a0b0c0d0e0f
+direction = encrypt
+round = 3
+label = k_sch
+value = b6ff744ed2c2c9bf6c590cbf0469bf41
+
+example = C.1
+key = 000102030405060708090a0b0c0d0e0f
+direction = encrypt
+round = 4
+label = start
+value = fa636a2825b339c940668a3157244d17
+
+example = C.1
+key = 000102030405060708090a0b0c0d0e0f
+direction = encrypt
+round = 4
+label = s_box
+value = 2dfb02343f6d12dd09337ec75b36e3f0
+
+example = C.1
+key = 000102030405060708090a0b0c0d0e0f
+direction = encrypt
+round = 4
+label = s_row
+value = 2d6d7ef03f33e334093602dd5bfb12c7
+
+example = C.1
+key = 000102030405060708090a0b0c0d0e0f
+direction = encrypt
+round = 4
+label = m_col
+value = 6385b79ffc538df997be478e7547d691
+
+example = C.1
+key = 000102030405060708090a0b0c0d0e0f
+direction = encrypt
+round = 4
+label = k_sch
+value = 47f7f7bc95353e03f96c32bcfd058dfd
+
+example = C.1
+key = 000102030405060708090a0b0c0d0e0f
+direction = encrypt
+round = 5
+label = start
+value = 247240236966b3fa6ed2753288425b6c
+
+example = C.1
+key = 000102030405060708090a0b0c0d0e0f
+direction = encrypt
+round = 5
+label = s_box
+value = 36400926f9336d2d9fb59d23c42c3950
+
+example = C.1
+key = 000102030405060708090a0b0c0d0e0f
+direction = encrypt
+round = 5
+label = s_row
+value = 36339d50f9b539269f2c092dc4406d23
+
+example = C.1
+key = 000102030405060708090a0b0c0d0e0f
+direction = encrypt
+round = 5
+label = m_col
+value = f4bcd45432e554d075f1d6c51dd03b3c
+
+example = C.1
+key = 000102030405060708090a0b0c0d0e0f
+direction = encrypt
+round = 5
+label = k_sch
+value = 3caaa3e8a99f9deb50f3af57adf622aa
+
+example = C.1
+key = 000102030405060708090a0b0c0d0e0f
+direction = encrypt
+round = 6
+label = start
+value = c81677bc9b7ac93b25027992b0261996
+
+example = C.1
+key = 000102030405060708090a0b0c0d0e0f
+direction = encrypt
+round = 6
+label = s_box
+value = e847f56514dadde23f77b64fe7f7d490
+
+example = C.1
+key = 000102030405060708090a0b0c0d0e0f
+direction = encrypt
+round = 6
+label = s_row
+value = e8dab6901477d4653ff7f5e2e747dd4f
+
+example = C.1
+key = 000102030405060708090a0b0c0d0e0f
+direction = encrypt
+round = 6
+label = m_col
+value = 9816ee7400f87f556b2c049c8e5ad036
+
+example = C.1
+key = 000102030405060708090a0b0c0d0e0f
+direction = encrypt
+round = 6
+label = k_sch
+value = 5e390f7df7a69296a7553dc10aa31f6b
+
+example = C.1
+key = 000102030405060708090a0b0c0d0e0f
+direction = encrypt
+round = 7
+label = start
+value = c62fe109f75eedc3cc79395d84f9cf5d
+
+example = C.1
+key = 000102030405060708090a0b0c0d0e0f
+direction = encrypt
+round = 7
+label = s_box
+value = b415f8016858552e4bb6124c5f998a4c
+
+example = C.1
+key = 000102030405060708090a0b0c0d0e0f
+direction = encrypt
+round = 7
+label = s_row
+value = b458124c68b68a014b99f82e5f15554c
+
+example = C.1
+key = 000102030405060708090a0b0c0d0e0f
+direction = encrypt
+round = 7
+label = m_col
+value = c57e1c159a9bd286f05f4be098c63439
+
+example = C.1
+key = 000102030405060708090a0b0c0d0e0f
+direction = encrypt
+round = 7
+label = k_sch
+value = 14f9701ae35fe28c440adf4d4ea9c026
+
+example = C.1
+key = 000102030405060708090a0b0c0d0e0f
+direction = encrypt
+round = 8
+label = start
+value = d1876c0f79c4300ab45594add66ff41f
+
+example = C.1
+key = 000102030405060708090a0b0c0d0e0f
+direction = encrypt
+round = 8
+label = s_box
+value = 3e175076b61c04678dfc2295f6a8bfc0
+
+example = C.1
+key = 000102030405060708090a0b0c0d0e0f
+direction = encrypt
+round = 8
+label = s_row
+value = 3e1c22c0b6fcbf768da85067f6170495
+
+example = C.1
+key = 000102030405060708090a0b0c0d0e0f
+direction = encrypt
+round = 8
+label = m_col
+value = baa03de7a1f9b56ed5512cba5f414d23
+
+example = C.1
+key = 000102030405060708090a0b0c0d0e0f
+direction = encrypt
+round = 8
+label = k_sch
+value = 47438735a41c65b9e016baf4aebf7ad2
+
+example = C.1
+key = 000102030405060708090a0b0c0d0e0f
+direction = encrypt
+round = 9
+label = start
+value = fde3bad205e5d0d73547964ef1fe37f1
+
+example = C.1
+key = 000102030405060708090a0b0c0d0e0f
+direction = encrypt
+round = 9
+label = s_box
+value = 5411f4b56bd9700e96a0902fa1bb9aa1
+
+example = C.1
+key = 000102030405060708090a0b0c0d0e0f
+direction = encrypt
+round = 9
+label = s_row
+value = 54d990a16ba09ab596bbf40ea111702f
+
+example = C.1
+key = 000102030405060708090a0b0c0d0e0f
+direction = encrypt
+round = 9
+label = m_col
+value = e9f74eec023020f61bf2ccf2353c21c7
+
+example = C.1
+key = 000102030405060708090a0b0c0d0e0f
+direction = encrypt
+round = 9
+label = k_sch
+value = 549932d1f08557681093ed9cbe2c974e
+
+example = C.1
+key = 000102030405060708090a0b0c0d0e0f
+direction = encrypt
+round = 10
+label = start
+value = bd6e7c3df2b5779e0b61216e8b10b689
+
+example = C.1
+key = 000102030405060708090a0b0c0d0e0f
+direction = encrypt
+round = 10
+label = s_box
+value = 7a9f102789d5f50b2beffd9f3dca4ea7
+
+example = C.1
+key = 000102030405060708090a0b0c0d0e0f
+direction = encrypt
+round = 10
+label = s_row
+value = 7ad5fda789ef4e272bca100b3d9ff59f
+
+example = C.1
+key = 000102030405060708090a0b0c0d0e0f
+direction = encrypt
+round = 10
+label = k_sch
+value = 13111d7fe3944a17f307a78b4d2b30c5
+
+example = C.1
+key = 000102030405060708090a0b0c0d0e0f
+direction = encrypt
+round = 10
+label = output
+value = 69c4e0d86a7b0430d8cdb78070b4c55a
+
+example = C.1
+key = 000102030405060708090a0b0c0d0e0f
+direction = inverse
+round = 0
+label = iinput
+value = 69c4e0d86a7b0430d8cdb78070b4c55a
+
+example = C.1
+key = 000102030405060708090a0b0c0d0e0f
+direction = inverse
+round = 0
+label = ik_sch
+value = 13111d7fe3944a17f307a78b4d2b30c5
+
+example = C.1
+key = 000102030405060708090a0b0c0d0e0f
+direction = inverse
+round = 1
+label = istart
+value = 7ad5fda789ef4e272bca100b3d9ff59f
+
+example = C.1
+key = 000102030405060708090a0b0c0d0e0f
+direction = inverse
+round = 1
+label = is_row
+value = 7a9f102789d5f50b2beffd9f3dca4ea7
+
+example = C.1
+key = 000102030405060708090a0b0c0d0e0f
+direction = inverse
+round = 1
+label = is_box
+value = bd6e7c3df2b5779e0b61216e8b10b689
+
+example = C.1
+key = 000102030405060708090a0b0c0d0e0f
+direction = inverse
+round = 1
+label = ik_sch
+value = 549932d1f08557681093ed9cbe2c974e
+
+example = C.1
+key = 000102030405060708090a0b0c0d0e0f
+direction = inverse
+round = 1
+label = ik_add
+value = e9f74eec023020f61bf2ccf2353c21c7
+
+example = C.1
+key = 000102030405060708090a0b0c0d0e0f
+direction = inverse
+round = 2
+label = istart
+value = 54d990a16ba09ab596bbf40ea111702f
+
+example = C.1
+key = 000102030405060708090a0b0c0d0e0f
+direction = inverse
+round = 2
+label = is_row
+value = 5411f4b56bd9700e96a0902fa1bb9aa1
+
+example = C.1
+key = 000102030405060708090a0b0c0d0e0f
+direction = inverse
+round = 2
+label = is_box
+value = fde3bad205e5d0d73547964ef1fe37f1
+
+example = C.1
+key = 000102030405060708090a0b0c0d0e0f
+direction = inverse
+round = 2
+label = ik_sch
+value = 47438735a41c65b9e016baf4aebf7ad2
+
+example = C.1
+key = 000102030405060708090a0b0c0d0e0f
+direction = inverse
+round = 2
+label = ik_add
+value = baa03de7a1f9b56ed5512cba5f414d23
+
+example = C.1
+key = 000102030405060708090a0b0c0d0e0f
+direction = inverse
+round = 3
+label = istart
+value = 3e1c22c0b6fcbf768da85067f6170495
+
+example = C.1
+key = 000102030405060708090a0b0c0d0e0f
+direction = inverse
+round = 3
+label = is_row
+value = 3e175076b61c04678dfc2295f6a8bfc0
+
+example = C.1
+key = 000102030405060708090a0b0c0d0e0f
+direction = inverse
+round = 3
+label = is_box
+value = d1876c0f79c4300ab45594add66ff41f
+
+example = C.1
+key = 000102030405060708090a0b0c0d0e0f
+direction = inverse
+round = 3
+label = ik_sch
+value = 14f9701ae35fe28c440adf4d4ea9c026
+
+example = C.1
+key = 000102030405060708090a0b0c0d0e0f
+direction = inverse
+round = 3
+label = ik_add
+value = c57e1c159a9bd286f05f4be098c63439
+
+example = C.1
+key = 000102030405060708090a0b0c0d0e0f
+direction = inverse
+round = 4
+label = istart
+value = b458124c68b68a014b99f82e5f15554c
+
+example = C.1
+key = 000102030405060708090a0b0c0d0e0f
+direction = inverse
+round = 4
+label = is_row
+value = b415f8016858552e4bb6124c5f998a4c
+
+example = C.1
+key = 000102030405060708090a0b0c0d0e0f
+direction = inverse
+round = 4
+label = is_box
+value = c62fe109f75eedc3cc79395d84f9cf5d
+
+example = C.1
+key = 000102030405060708090a0b0c0d0e0f
+direction = inverse
+round = 4
+label = ik_sch
+value = 5e390f7df7a69296a7553dc10aa31f6b
+
+example = C.1
+key = 000102030405060708090a0b0c0d0e0f
+direction = inverse
+round = 4
+label = ik_add
+value = 9816ee7400f87f556b2c049c8e5ad036
+
+example = C.1
+key = 000102030405060708090a0b0c0d0e0f
+direction = inverse
+round = 5
+label = istart
+value = e8dab6901477d4653ff7f5e2e747dd4f
+
+example = C.1
+key = 000102030405060708090a0b0c0d0e0f
+direction = inverse
+round = 5
+label = is_row
+value = e847f56514dadde23f77b64fe7f7d490
+
+example = C.1
+key = 000102030405060708090a0b0c0d0e0f
+direction = inverse
+round = 5
+label = is_box
+value = c81677bc9b7ac93b25027992b0261996
+
+example = C.1
+key = 000102030405060708090a0b0c0d0e0f
+direction = inverse
+round = 5
+label = ik_sch
+value = 3caaa3e8a99f9deb50f3af57adf622aa
+
+example = C.1
+key = 000102030405060708090a0b0c0d0e0f
+direction = inverse
+round = 5
+label = ik_add
+value = f4bcd45432e554d075f1d6c51dd03b3c
+
+example = C.1
+key = 000102030405060708090a0b0c0d0e0f
+direction = inverse
+round = 6
+label = istart
+value = 36339d50f9b539269f2c092dc4406d23
+
+example = C.1
+key = 000102030405060708090a0b0c0d0e0f
+direction = inverse
+round = 6
+label = is_row
+value = 36400926f9336d2d9fb59d23c42c3950
+
+example = C.1
+key = 000102030405060708090a0b0c0d0e0f
+direction = inverse
+round = 6
+label = is_box
+value = 247240236966b3fa6ed2753288425b6c
+
+example = C.1
+key = 000102030405060708090a0b0c0d0e0f
+direction = inverse
+round = 6
+label = ik_sch
+value = 47f7f7bc95353e03f96c32bcfd058dfd
+
+example = C.1
+key = 000102030405060708090a0b0c0d0e0f
+direction = inverse
+round = 6
+label = ik_add
+value = 6385b79ffc538df997be478e7547d691
+
+example = C.1
+key = 000102030405060708090a0b0c0d0e0f
+direction = inverse
+round = 7
+label = istart
+value = 2d6d7ef03f33e334093602dd5bfb12c7
+
+example = C.1
+key = 000102030405060708090a0b0c0d0e0f
+direction = inverse
+round = 7
+label = is_row
+value = 2dfb02343f6d12dd09337ec75b36e3f0
+
+example = C.1
+key = 000102030405060708090a0b0c0d0e0f
+direction = inverse
+round = 7
+label = is_box
+value = fa636a2825b339c940668a3157244d17
+
+example = C.1
+key = 000102030405060708090a0b0c0d0e0f
+direction = inverse
+round = 7
+label = ik_sch
+value = b6ff744ed2c2c9bf6c590cbf0469bf41
+
+example = C.1
+key = 000102030405060708090a0b0c0d0e0f
+direction = inverse
+round = 7
+label = ik_add
+value = 4c9c1e66f771f0762c3f868e534df256
+
+example = C.1
+key = 000102030405060708090a0b0c0d0e0f
+direction = inverse
+round = 8
+label = istart
+value = 3bd92268fc74fb735767cbe0c0590e2d
+
+example = C.1
+key = 000102030405060708090a0b0c0d0e0f
+direction = inverse
+round = 8
+label = is_row
+value = 3b59cb73fcd90ee05774222dc067fb68
+
+example = C.1
+key = 000102030405060708090a0b0c0d0e0f
+direction = inverse
+round = 8
+label = is_box
+value = 4915598f55e5d7a0daca94fa1f0a63f7
+
+example = C.1
+key = 000102030405060708090a0b0c0d0e0f
+direction = inverse
+round = 8
+label = ik_sch
+value = b692cf0b643dbdf1be9bc5006830b3fe
+
+example = C.1
+key = 000102030405060708090a0b0c0d0e0f
+direction = inverse
+round = 8
+label = ik_add
+value = ff87968431d86a51645151fa773ad009
+
+example = C.1
+key = 000102030405060708090a0b0c0d0e0f
+direction = inverse
+round = 9
+label = istart
+value = a7be1a6997ad739bd8c9ca451f618b61
+
+example = C.1
+key = 000102030405060708090a0b0c0d0e0f
+direction = inverse
+round = 9
+label = is_row
+value = a761ca9b97be8b45d8ad1a611fc97369
+
+example = C.1
+key = 000102030405060708090a0b0c0d0e0f
+direction = inverse
+round = 9
+label = is_box
+value = 89d810e8855ace682d1843d8cb128fe4
+
+example = C.1
+key = 000102030405060708090a0b0c0d0e0f
+direction = inverse
+round = 9
+label = ik_sch
+value = d6aa74fdd2af72fadaa678f1d6ab76fe
+
+example = C.1
+key = 000102030405060708090a0b0c0d0e0f
+direction = inverse
+round = 9
+label = ik_add
+value = 5f72641557f5bc92f7be3b291db9f91a
+
+example = C.1
+key = 000102030405060708090a0b0c0d0e0f
+direction = inverse
+round = 10
+label = istart
+value = 6353e08c0960e104cd70b751bacad0e7
+
+example = C.1
+key = 000102030405060708090a0b0c0d0e0f
+direction = inverse
+round = 10
+label = is_row
+value = 63cab7040953d051cd60e0e7ba70e18c
+
+example = C.1
+key = 000102030405060708090a0b0c0d0e0f
+direction = inverse
+round = 10
+label = is_box
+value = 00102030405060708090a0b0c0d0e0f0
+
+example = C.1
+key = 000102030405060708090a0b0c0d0e0f
+direction = inverse
+round = 10
+label = ik_sch
+value = 000102030405060708090a0b0c0d0e0f
+
+example = C.1
+key = 000102030405060708090a0b0c0d0e0f
+direction = inverse
+round = 10
+label = ioutput
+value = 00112233445566778899aabbccddeeff
+
+example = C.2
+key = 000102030405060708090a0b0c0d0e0f1011121314151617
+direction = encrypt
+round = 0
+label = input
+value = 00112233445566778899aabbccddeeff
+
+example = C.2
+key = 000102030405060708090a0b0c0d0e0f1011121314151617
+direction = encrypt
+round = 0
+label = k_sch
+value = 000102030405060708090a0b0c0d0e0f
+
+example = C.2
+key = 000102030405060708090a0b0c0d0e0f1011121314151617
+direction = encrypt
+round = 1
+label = start
+value = 00102030405060708090a0b0c0d0e0f0
+
+example = C.2
+key = 000102030405060708090a0b0c0d0e0f1011121314151617
+direction = encrypt
+round = 1
+label = s_box
+value = 63cab7040953d051cd60e0e7ba70e18c
+
+example = C.2
+key = 000102030405060708090a0b0c0d0e0f1011121314151617
+direction = encrypt
+round = 1
+label = s_row
+value = 6353e08c0960e104cd70b751bacad0e7
+
+example = C.2
+key = 000102030405060708090a0b0c0d0e0f1011121314151617
+direction = encrypt
+round = 1
+label = m_col
+value = 5f72641557f5bc92f7be3b291db9f91a
+
+example = C.2
+key = 000102030405060708090a0b0c0d0e0f1011121314151617
+direction = encrypt
+round = 1
+label = k_sch
+value = 10111213141516175846f2f95c43f4fe
+
+example = C.2
+key = 000102030405060708090a0b0c0d0e0f1011121314151617
+direction = encrypt
+round = 2
+label = start
+value = 4f63760643e0aa85aff8c9d041fa0de4
+
+example = C.2
+key = 000102030405060708090a0b0c0d0e0f1011121314151617
+direction = encrypt
+round = 2
+label = s_box
+value = 84fb386f1ae1ac977941dd70832dd769
+
+example = C.2
+key = 000102030405060708090a0b0c0d0e0f1011121314151617
+direction = encrypt
+round = 2
+label = s_row
+value = 84e1dd691a41d76f792d389783fbac70
+
+example = C.2
+key = 000102030405060708090a0b0c0d0e0f1011121314151617
+direction = encrypt
+round = 2
+label = m_col
+value = 9f487f794f955f662afc86abd7f1ab29
+
+example = C.2
+key = 000102030405060708090a0b0c0d0e0f1011121314151617
+direction = encrypt
+round = 2
+label = k_sch
+value = 544afef55847f0fa4856e2e95c43f4fe
+
+example = C.2
+key = 000102030405060708090a0b0c0d0e0f1011121314151617
+direction = encrypt
+round = 3
+label = start
+value = cb02818c17d2af9c62aa64428bb25fd7
+
+example = C.2
+key = 000102030405060708090a0b0c0d0e0f1011121314151617
+direction = encrypt
+round = 3
+label = s_box
+value = 1f770c64f0b579deaaac432c3d37cf0e
+
+example = C.2
+key = 000102030405060708090a0b0c0d0e0f1011121314151617
+direction = encrypt
+round = 3
+label = s_row
+value = 1fb5430ef0accf64aa370cde3d77792c
+
+example = C.2
+key = 000102030405060708090a0b0c0d0e0f1011121314151617
+direction = encrypt
+round = 3
+label = m_col
+value = b7a53ecbbf9d75a0c40efc79b674cc11
+
+example = C.2
+key = 000102030405060708090a0b0c0d0e0f1011121314151617
+direction = encrypt
+round = 3
+label = k_sch
+value = 40f949b31cbabd4d48f043b810b7b342
+
+example = C.2
+key = 000102030405060708090a0b0c0d0e0f1011121314151617
+direction = encrypt
+round = 4
+label = start
+value = f75c7778a327c8ed8cfebfc1a6c37f53
+
+example = C.2
+key = 000102030405060708090a0b0c0d0e0f1011121314151617
+direction = encrypt
+round = 4
+label = s_box
+value = 684af5bc0acce85564bb0878242ed2ed
+
+example = C.2
+key = 000102030405060708090a0b0c0d0e0f1011121314151617
+direction = encrypt
+round = 4
+label = s_row
+value = 68cc08ed0abbd2bc642ef555244ae878
+
+example = C.2
+key = 000102030405060708090a0b0c0d0e0f1011121314151617
+direction = encrypt
+round = 4
+label = m_col
+value = 7a1e98bdacb6d1141a6944dd06eb2d3e
+
+example = C.2
+key = 000102030405060708090a0b0c0d0e0f1011121314151617
+direction = encrypt
+round = 4
+label = k_sch
+value = 58e151ab04a2a5557effb5416245080c
+
+example = C.2
+key = 000102030405060708090a0b0c0d0e0f1011121314151617
+direction = encrypt
+round = 5
+label = start
+value = 22ffc916a81474416496f19c64ae2532
+
+example = C.2
+key = 000102030405060708090a0b0c0d0e0f1011121314151617
+direction = encrypt
+round = 5
+label = s_box
+value = 9316dd47c2fa92834390a1de43e43f23
+
+example = C.2
+key = 000102030405060708090a0b0c0d0e0f1011121314151617
+direction = encrypt
+round = 5
+label = s_row
+value = 93faa123c2903f4743e4dd83431692de
+
+example = C.2
+key = 000102030405060708090a0b0c0d0e0f1011121314151617
+direction = encrypt
+round = 5
+label = m_col
+value = aaa755b34cffe57cef6f98e1f01c13e6
+
+example = C.2
+key = 000102030405060708090a0b0c0d0e0f1011121314151617
+direction = encrypt
+round = 5
+label = k_sch
+value = 2ab54bb43a02f8f662e3a95d66410c08
+
+example = C.2
+key = 000102030405060708090a0b0c0d0e0f1011121314151617
+direction = encrypt
+round = 6
+label = start
+value = 80121e0776fd1d8a8d8c31bc965d1fee
+
+example = C.2
+key = 000102030405060708090a0b0c0d0e0f1011121314151617
+direction = encrypt
+round = 6
+label = s_box
+value = cdc972c53854a47e5d64c765904cc028
+
+example = C.2
+key = 000102030405060708090a0b0c0d0e0f1011121314151617
+direction = encrypt
+round = 6
+label = s_row
+value = cd54c7283864c0c55d4c727e90c9a465
+
+example = C.2
+key = 000102030405060708090a0b0c0d0e0f1011121314151617
+direction = encrypt
+round = 6
+label = m_col
+value = 921f748fd96e937d622d7725ba8ba50c
+
+example = C.2
+key = 000102030405060708090a0b0c0d0e0f1011121314151617
+direction = encrypt
+round = 6
+label = k_sch
+value = f501857297448d7ebdf1c6ca87f33e3c
+
+example = C.2
+key = 000102030405060708090a0b0c0d0e0f1011121314151617
+direction = encrypt
+round = 7
+label = start
+value = 671ef1fd4e2a1e03dfdcb1ef3d789b30
+
+example = C.2
+key = 000102030405060708090a0b0c0d0e0f1011121314151617
+direction = encrypt
+round = 7
+label = s_box
+value = 8572a1542fe5727b9e86c8df27bc1404
+
+example = C.2
+key = 000102030405060708090a0b0c0d0e0f1011121314151617
+direction = encrypt
+round = 7
+label = s_row
+value = 85e5c8042f8614549ebca17b277272df
+
+example = C.2
+key = 000102030405060708090a0b0c0d0e0f1011121314151617
+direction = encrypt
+round = 7
+label = m_col
+value = e913e7b18f507d4b227ef652758acbcc
+
+example = C.2
+key = 000102030405060708090a0b0c0d0e0f1011121314151617
+direction = encrypt
+round = 7
+label = k_sch
+value = e510976183519b6934157c9ea351f1e0
+
+example = C.2
+key = 000102030405060708090a0b0c0d0e0f1011121314151617
+direction = encrypt
+round = 8
+label = start
+value = 0c0370d00c01e622166b8accd6db3a2c
+
+example = C.2
+key = 000102030405060708090a0b0c0d0e0f1011121314151617
+direction = encrypt
+round = 8
+label = s_box
+value = fe7b5170fe7c8e93477f7e4bf6b98071
+
+example = C.2
+key = 000102030405060708090a0b0c0d0e0f1011121314151617
+direction = encrypt
+round = 8
+label = s_row
+value = fe7c7e71fe7f807047b95193f67b8e4b
+
+example = C.2
+key = 000102030405060708090a0b0c0d0e0f1011121314151617
+direction = encrypt
+round = 8
+label = m_col
+value = 6cf5edf996eb0a069c4ef21cbfc25762
+
+example = C.2
+key = 000102030405060708090a0b0c0d0e0f1011121314151617
+direction = encrypt
+round = 8
+label = k_sch
+value = 1ea0372a995309167c439e77ff12051e
+
+example = C.2
+key = 000102030405060708090a0b0c0d0e0f1011121314151617
+direction = encrypt
+round = 9
+label = start
+value = 7255dad30fb80310e00d6c6b40d0527c
+
+example = C.2
+key = 000102030405060708090a0b0c0d0e0f1011121314151617
+direction = encrypt
+round = 9
+label = s_box
+value = 40fc5766766c7bcae1d7507f09700010
+
+example = C.2
+key = 000102030405060708090a0b0c0d0e0f1011121314151617
+direction = encrypt
+round = 9
+label = s_row
+value = 406c501076d70066e17057ca09fc7b7f
+
+example = C.2
+key = 000102030405060708090a0b0c0d0e0f1011121314151617
+direction = encrypt
+round = 9
+label = m_col
+value = 7478bcdce8a50b81d4327a9009188262
+
+example = C.2
+key = 000102030405060708090a0b0c0d0e0f1011121314151617
+direction = encrypt
+round = 9
+label = k_sch
+value = dd7e0e887e2fff68608fc842f9dcc154
+
+example = C.2
+key = 000102030405060708090a0b0c0d0e0f1011121314151617
+direction = encrypt
+round = 10
+label = start
+value = a906b254968af4e9b4bdb2d2f0c44336
+
+example = C.2
+key = 000102030405060708090a0b0c0d0e0f1011121314151617
+direction = encrypt
+round = 10
+label = s_box
+value = d36f3720907ebf1e8d7a37b58c1c1a05
+
+example = C.2
+key = 000102030405060708090a0b0c0d0e0f1011121314151617
+direction = encrypt
+round = 10
+label = s_row
+value = d37e3705907a1a208d1c371e8c6fbfb5
+
+example = C.2
+key = 000102030405060708090a0b0c0d0e0f1011121314151617
+direction = encrypt
+round = 10
+label = m_col
+value = 0d73cc2d8f6abe8b0cf2dd9bb83d422e
+
+example = C.2
+key = 000102030405060708090a0b0c0d0e0f1011121314151617
+direction = encrypt
+round = 10
+label = k_sch
+value = 859f5f237a8d5a3dc0c02952beefd63a
+
+example = C.2
+key = 000102030405060708090a0b0c0d0e0f1011121314151617
+direction = encrypt
+round = 11
+label = start
+value = 88ec930ef5e7e4b6cc32f4c906d29414
+
+example = C.2
+key = 000102030405060708090a0b0c0d0e0f1011121314151617
+direction = encrypt
+round = 11
+label = s_box
+value = c4cedcabe694694e4b23bfdd6fb522fa
+
+example = C.2
+key = 000102030405060708090a0b0c0d0e0f1011121314151617
+direction = encrypt
+round = 11
+label = s_row
+value = c494bffae62322ab4bb5dc4e6fce69dd
+
+example = C.2
+key = 000102030405060708090a0b0c0d0e0f1011121314151617
+direction = encrypt
+round = 11
+label = m_col
+value = 71d720933b6d677dc00b8f28238e0fb7
+
+example = C.2
+key = 000102030405060708090a0b0c0d0e0f1011121314151617
+direction = encrypt
+round = 11
+label = k_sch
+value = de601e7827bcdf2ca223800fd8aeda32
+
+example = C.2
+key = 000102030405060708090a0b0c0d0e0f1011121314151617
+direction = encrypt
+round = 12
+label = start
+value = afb73eeb1cd1b85162280f27fb20d585
+
+example = C.2
+key = 000102030405060708090a0b0c0d0e0f1011121314151617
+direction = encrypt
+round = 12
+label = s_box
+value = 79a9b2e99c3e6cd1aa3476cc0fb70397
+
+example = C.2
+key = 000102030405060708090a0b0c0d0e0f1011121314151617
+direction = encrypt
+round = 12
+label = s_row
+value = 793e76979c3403e9aab7b2d10fa96ccc
+
+example = C.2
+key = 000102030405060708090a0b0c0d0e0f1011121314151617
+direction = encrypt
+round = 12
+label = k_sch
+value = a4970a331a78dc09c418c271e3a41d5d
+
+example = C.2
+key = 000102030405060708090a0b0c0d0e0f1011121314151617
+direction = encrypt
+round = 12
+label = output
+value = dda97ca4864cdfe06eaf70a0ec0d7191
+
+example = C.2
+key = 000102030405060708090a0b0c0d0e0f1011121314151617
+direction = inverse
+round = 0
+label = iinput
+value = dda97ca4864cdfe06eaf70a0ec0d7191
+
+example = C.2
+key = 000102030405060708090a0b0c0d0e0f1011121314151617
+direction = inverse
+round = 0
+label = ik_sch
+value = a4970a331a78dc09c418c271e3a41d5d
+
+example = C.2
+key = 000102030405060708090a0b0c0d0e0f1011121314151617
+direction = inverse
+round = 1
+label = istart
+value = 793e76979c3403e9aab7b2d10fa96ccc
+
+example = C.2
+key = 000102030405060708090a0b0c0d0e0f1011121314151617
+direction = inverse
+round = 1
+label = is_row
+value = 79a9b2e99c3e6cd1aa3476cc0fb70397
+
+example = C.2
+key = 000102030405060708090a0b0c0d0e0f1011121314151617
+direction = inverse
+round = 1
+label = is_box
+value = afb73eeb1cd1b85162280f27fb20d585
+
+example = C.2
+key = 000102030405060708090a0b0c0d0e0f1011121314151617
+direction = inverse
+round = 1
+label = ik_sch
+value = de601e7827bcdf2ca223800fd8aeda32
+
+example = C.2
+key = 000102030405060708090a0b0c0d0e0f1011121314151617
+direction = inverse
+round = 1
+label = ik_add
+value = 71d720933b6d677dc00b8f28238e0fb7
+
+example = C.2
+key = 000102030405060708090a0b0c0d0e0f1011121314151617
+direction = inverse
+round = 2
+label = istart
+value = c494bffae62322ab4bb5dc4e6fce69dd
+
+example = C.2
+key = 000102030405060708090a0b0c0d0e0f1011121314151617
+direction = inverse
+round = 2
+label = is_row
+value = c4cedcabe694694e4b23bfdd6fb522fa
+
+example = C.2
+key = 000102030405060708090a0b0c0d0e0f1011121314151617
+direction = inverse
+round = 2
+label = is_box
+value = 88ec930ef5e7e4b6cc32f4c906d29414
+
+example = C.2
+key = 000102030405060708090a0b0c0d0e0f1011121314151617
+direction = inverse
+round = 2
+label = ik_sch
+value = 859f5f237a8d5a3dc0c02952beefd63a
+
+example = C.2
+key = 000102030405060708090a0b0c0d0e0f1011121314151617
+direction = inverse
+round = 2
+label = ik_add
+value = 0d73cc2d8f6abe8b0cf2dd9bb83d422e
+
+example = C.2
+key = 000102030405060708090a0b0c0d0e0f1011121314151617
+direction = inverse
+round = 3
+label = istart
+value = d37e3705907a1a208d1c371e8c6fbfb5
+
+example = C.2
+key = 000102030405060708090a0b0c0d0e0f1011121314151617
+direction = inverse
+round = 3
+label = is_row
+value = d36f3720907ebf1e8d7a37b58c1c1a05
+
+example = C.2
+key = 000102030405060708090a0b0c0d0e0f1011121314151617
+direction = inverse
+round = 3
+label = is_box
+value = a906b254968af4e9b4bdb2d2f0c44336
+
+example = C.2
+key = 000102030405060708090a0b0c0d0e0f1011121314151617
+direction = inverse
+round = 3
+label = ik_sch
+value = dd7e0e887e2fff68608fc842f9dcc154
+
+example = C.2
+key = 000102030405060708090a0b0c0d0e0f1011121314151617
+direction = inverse
+round = 3
+label = ik_add
+value = 7478bcdce8a50b81d4327a9009188262
+
+example = C.2
+key = 000102030405060708090a0b0c0d0e0f1011121314151617
+direction = inverse
+round = 4
+label = istart
+value = 406c501076d70066e17057ca09fc7b7f
+
+example = C.2
+key = 000102030405060708090a0b0c0d0e0f1011121314151617
+direction = inverse
+round = 4
+label = is_row
+value = 40fc5766766c7bcae1d7507f09700010
+
+example = C.2
+key = 000102030405060708090a0b0c0d0e0f1011121314151617
+direction = inverse
+round = 4
+label = is_box
+value = 7255dad30fb80310e00d6c6b40d0527c
+
+example = C.2
+key = 000102030405060708090a0b0c0d0e0f1011121314151617
+direction = inverse
+round = 4
+label = ik_sch
+value = 1ea0372a995309167c439e77ff12051e
+
+example = C.2
+key = 000102030405060708090a0b0c0d0e0f1011121314151617
+direction = inverse
+round = 4
+label = ik_add
+value = 6cf5edf996eb0a069c4ef21cbfc25762
+
+example = C.2
+key = 000102030405060708090a0b0c0d0e0f1011121314151617
+direction = inverse
+round = 5
+label = istart
+value = fe7c7e71fe7f807047b95193f67b8e4b
+
+example = C.2
+key = 000102030405060708090a0b0c0d0e0f1011121314151617
+direction = inverse
+round = 5
+label = is_row
+value = fe7b5170fe7c8e93477f7e4bf6b98071
+
+example = C.2
+key = 000102030405060708090a0b0c0d0e0f1011121314151617
+direction = inverse
+round = 5
+label = is_box
+value = 0c0370d00c01e622166b8accd6db3a2c
+
+example = C.2
+key = 000102030405060708090a0b0c0d0e0f1011121314151617
+direction = inverse
+round = 5
+label = ik_sch
+value = e510976183519b6934157c9ea351f1e0
+
+example = C.2
+key = 000102030405060708090a0b0c0d0e0f1011121314151617
+direction = inverse
+round = 5
+label = ik_add
+value = e913e7b18f507d4b227ef652758acbcc
+
+example = C.2
+key = 000102030405060708090a0b0c0d0e0f1011121314151617
+direction = inverse
+round = 6
+label = istart
+value = 85e5c8042f8614549ebca17b277272df
+
+example = C.2
+key = 000102030405060708090a0b0c0d0e0f1011121314151617
+direction = inverse
+round = 6
+label = is_row
+value = 8572a1542fe5727b9e86c8df27bc1404
+
+example = C.2
+key = 000102030405060708090a0b0c0d0e0f1011121314151617
+direction = inverse
+round = 6
+label = is_box
+value = 671ef1fd4e2a1e03dfdcb1ef3d789b30
+
+example = C.2
+key = 000102030405060708090a0b0c0d0e0f1011121314151617
+direction = inverse
+round = 6
+label = ik_sch
+value = f501857297448d7ebdf1c6ca87f33e3c
+
+example = C.2
+key = 000102030405060708090a0b0c0d0e0f1011121314151617
+direction = inverse
+round = 6
+label = ik_add
+value = 921f748fd96e937d622d7725ba8ba50c
+
+example = C.2
+key = 000102030405060708090a0b0c0d0e0f1011121314151617
+direction = inverse
+round = 7
+label = istart
+value = cd54c7283864c0c55d4c727e90c9a465
+
+example = C.2
+key = 000102030405060708090a0b0c0d0e0f1011121314151617
+direction = inverse
+round = 7
+label = is_row
+value = cdc972c53854a47e5d64c765904cc028
+
+example = C.2
+key = 000102030405060708090a0b0c0d0e0f1011121314151617
+direction = inverse
+round = 7
+label = is_box
+value = 80121e0776fd1d8a8d8c31bc965d1fee
+
+example = C.2
+key = 000102030405060708090a0b0c0d0e0f1011121314151617
+direction = inverse
+round = 7
+label = ik_sch
+value = 2ab54bb43a02f8f662e3a95d66410c08
+
+example = C.2
+key = 000102030405060708090a0b0c0d0e0f1011121314151617
+direction = inverse
+round = 7
+label = ik_add
+value = aaa755b34cffe57cef6f98e1f01c13e6
+
+example = C.2
+key = 000102030405060708090a0b0c0d0e0f1011121314151617
+direction = inverse
+round = 8
+label = istart
+value = 93faa123c2903f4743e4dd83431692de
+
+example = C.2
+key = 000102030405060708090a0b0c0d0e0f1011121314151617
+direction = inverse
+round = 8
+label = is_row
+value = 9316dd47c2fa92834390a1de43e43f23
+
+example = C.2
+key = 000102030405060708090a0b0c0d0e0f1011121314151617
+direction = inverse
+round = 8
+label = is_box
+value = 22ffc916a81474416496f19c64ae2532
+
+example = C.2
+key = 000102030405060708090a0b0c0d0e0f1011121314151617
+direction = inverse
+round = 8
+label = ik_sch
+value = 58e151ab04a2a5557effb5416245080c
+
+example = C.2
+key = 000102030405060708090a0b0c0d0e0f1011121314151617
+direction = inverse
+round = 8
+label = ik_add
+value = 7a1e98bdacb6d1141a6944dd06eb2d3e
+
+example = C.2
+key = 000102030405060708090a0b0c0d0e0f1011121314151617
+direction = inverse
+round = 9
+label = istart
+value = 68cc08ed0abbd2bc642ef555244ae878
+
+example = C.2
+key = 000102030405060708090a0b0c0d0e0f1011121314151617
+direction = inverse
+round = 9
+label = is_row
+value = 684af5bc0acce85564bb0878242ed2ed
+
+example = C.2
+key = 000102030405060708090a0b0c0d0e0f1011121314151617
+direction = inverse
+round = 9
+label = is_box
+value = f75c7778a327c8ed8cfebfc1a6c37f53
+
+example = C.2
+key = 000102030405060708090a0b0c0d0e0f1011121314151617
+direction = inverse
+round = 9
+label = ik_sch
+value = 40f949b31cbabd4d48f043b810b7b342
+
+example = C.2
+key = 000102030405060708090a0b0c0d0e0f1011121314151617
+direction = inverse
+round = 9
+label = ik_add
+value = b7a53ecbbf9d75a0c40efc79b674cc11
+
+example = C.2
+key = 000102030405060708090a0b0c0d0e0f1011121314151617
+direction = inverse
+round = 10
+label = istart
+value = 1fb5430ef0accf64aa370cde3d77792c
+
+example = C.2
+key = 000102030405060708090a0b0c0d0e0f1011121314151617
+direction = inverse
+round = 10
+label = is_row
+value = 1f770c64f0b579deaaac432c3d37cf0e
+
+example = C.2
+key = 000102030405060708090a0b0c0d0e0f1011121314151617
+direction = inverse
+round = 10
+label = is_box
+value = cb02818c17d2af9c62aa64428bb25fd7
+
+example = C.2
+key = 000102030405060708090a0b0c0d0e0f1011121314151617
+direction = inverse
+round = 10
+label = ik_sch
+value = 544afef55847f0fa4856e2e95c43f4fe
+
+example = C.2
+key = 000102030405060708090a0b0c0d0e0f1011121314151617
+direction = inverse
+round = 10
+label = ik_add
+value = 9f487f794f955f662afc86abd7f1ab29
+
+example = C.2
+key = 000102030405060708090a0b0c0d0e0f1011121314151617
+direction = inverse
+round = 11
+label = istart
+value = 84e1dd691a41d76f792d389783fbac70
+
+example = C.2
+key = 000102030405060708090a0b0c0d0e0f1011121314151617
+direction = inverse
+round = 11
+label = is_row
+value = 84fb386f1ae1ac977941dd70832dd769
+
+example = C.2
+key = 000102030405060708090a0b0c0d0e0f1011121314151617
+direction = inverse
+round = 11
+label = is_box
+value = 4f63760643e0aa85aff8c9d041fa0de4
+
+example = C.2
+key = 000102030405060708090a0b0c0d0e0f1011121314151617
+direction = inverse
+round = 11
+label = ik_sch
+value = 10111213141516175846f2f95c43f4fe
+
+example = C.2
+key = 000102030405060708090a0b0c0d0e0f1011121314151617
+direction = inverse
+round = 11
+label = ik_add
+value = 5f72641557f5bc92f7be3b291db9f91a
+
+example = C.2
+key = 000102030405060708090a0b0c0d0e0f1011121314151617
+direction = inverse
+round = 12
+label = istart
+value = 6353e08c0960e104cd70b751bacad0e7
+
+example = C.2
+key = 000102030405060708090a0b0c0d0e0f1011121314151617
+direction = inverse
+round = 12
+label = is_row
+value = 63cab7040953d051cd60e0e7ba70e18c
+
+example = C.2
+key = 000102030405060708090a0b0c0d0e0f1011121314151617
+direction = inverse
+round = 12
+label = is_box
+value = 00102030405060708090a0b0c0d0e0f0
+
+example = C.2
+key = 000102030405060708090a0b0c0d0e0f1011121314151617
+direction = inverse
+round = 12
+label = ik_sch
+value = 000102030405060708090a0b0c0d0e0f
+
+example = C.2
+key = 000102030405060708090a0b0c0d0e0f1011121314151617
+direction = inverse
+round = 12
+label = ioutput
+value = 00112233445566778899aabbccddeeff
+
+example = C.3
+key = 000102030405060708090a0b0c0d0e0f101112131415161718191a1b1c1d1e1f
+direction = encrypt
+round = 0
+label = input
+value = 00112233445566778899aabbccddeeff
+
+example = C.3
+key = 000102030405060708090a0b0c0d0e0f101112131415161718191a1b1c1d1e1f
+direction = encrypt
+round = 0
+label = k_sch
+value = 000102030405060708090a0b0c0d0e0f
+
+example = C.3
+key = 000102030405060708090a0b0c0d0e0f101112131415161718191a1b1c1d1e1f
+direction = encrypt
+round = 1
+label = start
+value = 00102030405060708090a0b0c0d0e0f0
+
+example = C.3
+key = 000102030405060708090a0b0c0d0e0f101112131415161718191a1b1c1d1e1f
+direction = encrypt
+round = 1
+label = s_box
+value = 63cab7040953d051cd60e0e7ba70e18c
+
+example = C.3
+key = 000102030405060708090a0b0c0d0e0f101112131415161718191a1b1c1d1e1f
+direction = encrypt
+round = 1
+label = s_row
+value = 6353e08c0960e104cd70b751bacad0e7
+
+example = C.3
+key = 000102030405060708090a0b0c0d0e0f101112131415161718191a1b1c1d1e1f
+direction = encrypt
+round = 1
+label = m_col
+value = 5f72641557f5bc92f7be3b291db9f91a
+
+example = C.3
+key = 000102030405060708090a0b0c0d0e0f101112131415161718191a1b1c1d1e1f
+direction = encrypt
+round = 1
+label = k_sch
+value = 101112131415161718191a1b1c1d1e1f
+
+example = C.3
+key = 000102030405060708090a0b0c0d0e0f101112131415161718191a1b1c1d1e1f
+direction = encrypt
+round = 2
+label = start
+value = 4f63760643e0aa85efa7213201a4e705
+
+example = C.3
+key = 000102030405060708090a0b0c0d0e0f101112131415161718191a1b1c1d1e1f
+direction = encrypt
+round = 2
+label = s_box
+value = 84fb386f1ae1ac97df5cfd237c49946b
+
+example = C.3
+key = 000102030405060708090a0b0c0d0e0f101112131415161718191a1b1c1d1e1f
+direction = encrypt
+round = 2
+label = s_row
+value = 84e1fd6b1a5c946fdf4938977cfbac23
+
+example = C.3
+key = 000102030405060708090a0b0c0d0e0f101112131415161718191a1b1c1d1e1f
+direction = encrypt
+round = 2
+label = m_col
+value = bd2a395d2b6ac438d192443e615da195
+
+example = C.3
+key = 000102030405060708090a0b0c0d0e0f101112131415161718191a1b1c1d1e1f
+direction = encrypt
+round = 2
+label = k_sch
+value = a573c29fa176c498a97fce93a572c09c
+
+example = C.3
+key = 000102030405060708090a0b0c0d0e0f101112131415161718191a1b1c1d1e1f
+direction = encrypt
+round = 3
+label = start
+value = 1859fbc28a1c00a078ed8aadc42f6109
+
+example = C.3
+key = 000102030405060708090a0b0c0d0e0f101112131415161718191a1b1c1d1e1f
+direction = encrypt
+round = 3
+label = s_box
+value = adcb0f257e9c63e0bc557e951c15ef01
+
+example = C.3
+key = 000102030405060708090a0b0c0d0e0f101112131415161718191a1b1c1d1e1f
+direction = encrypt
+round = 3
+label = s_row
+value = ad9c7e017e55ef25bc150fe01ccb6395
+
+example = C.3
+key = 000102030405060708090a0b0c0d0e0f101112131415161718191a1b1c1d1e1f
+direction = encrypt
+round = 3
+label = m_col
+value = 810dce0cc9db8172b3678c1e88a1b5bd
+
+example = C.3
+key = 000102030405060708090a0b0c0d0e0f101112131415161718191a1b1c1d1e1f
+direction = encrypt
+round = 3
+label = k_sch
+value = 1651a8cd0244beda1a5da4c10640bade
+
+example = C.3
+key = 000102030405060708090a0b0c0d0e0f101112131415161718191a1b1c1d1e1f
+direction = encrypt
+round = 4
+label = start
+value = 975c66c1cb9f3fa8a93a28df8ee10f63
+
+example = C.3
+key = 000102030405060708090a0b0c0d0e0f101112131415161718191a1b1c1d1e1f
+direction = encrypt
+round = 4
+label = s_box
+value = 884a33781fdb75c2d380349e19f876fb
+
+example = C.3
+key = 000102030405060708090a0b0c0d0e0f101112131415161718191a1b1c1d1e1f
+direction = encrypt
+round = 4
+label = s_row
+value = 88db34fb1f807678d3f833c2194a759e
+
+example = C.3
+key = 000102030405060708090a0b0c0d0e0f101112131415161718191a1b1c1d1e1f
+direction = encrypt
+round = 4
+label = m_col
+value = b2822d81abe6fb275faf103a078c0033
+
+example = C.3
+key = 000102030405060708090a0b0c0d0e0f101112131415161718191a1b1c1d1e1f
+direction = encrypt
+round = 4
+label = k_sch
+value = ae87dff00ff11b68a68ed5fb03fc1567
+
+example = C.3
+key = 000102030405060708090a0b0c0d0e0f101112131415161718191a1b1c1d1e1f
+direction = encrypt
+round = 5
+label = start
+value = 1c05f271a417e04ff921c5c104701554
+
+example = C.3
+key = 000102030405060708090a0b0c0d0e0f101112131415161718191a1b1c1d1e1f
+direction = encrypt
+round = 5
+label = s_box
+value = 9c6b89a349f0e18499fda678f2515920
+
+example = C.3
+key = 000102030405060708090a0b0c0d0e0f101112131415161718191a1b1c1d1e1f
+direction = encrypt
+round = 5
+label = s_row
+value = 9cf0a62049fd59a399518984f26be178
+
+example = C.3
+key = 000102030405060708090a0b0c0d0e0f101112131415161718191a1b1c1d1e1f
+direction = encrypt
+round = 5
+label = m_col
+value = aeb65ba974e0f822d73f567bdb64c877
+
+example = C.3
+key = 000102030405060708090a0b0c0d0e0f101112131415161718191a1b1c1d1e1f
+direction = encrypt
+round = 5
+label = k_sch
+value = 6de1f1486fa54f9275f8eb5373b8518d
+
+example = C.3
+key = 000102030405060708090a0b0c0d0e0f101112131415161718191a1b1c1d1e1f
+direction = encrypt
+round = 6
+label = start
+value = c357aae11b45b7b0a2c7bd28a8dc99fa
+
+example = C.3
+key = 000102030405060708090a0b0c0d0e0f101112131415161718191a1b1c1d1e1f
+direction = encrypt
+round = 6
+label = s_box
+value = 2e5bacf8af6ea9e73ac67a34c286ee2d
+
+example = C.3
+key = 000102030405060708090a0b0c0d0e0f101112131415161718191a1b1c1d1e1f
+direction = encrypt
+round = 6
+label = s_row
+value = 2e6e7a2dafc6eef83a86ace7c25ba934
+
+example = C.3
+key = 000102030405060708090a0b0c0d0e0f101112131415161718191a1b1c1d1e1f
+direction = encrypt
+round = 6
+label = m_col
+value = b951c33c02e9bd29ae25cdb1efa08cc7
+
+example = C.3
+key = 000102030405060708090a0b0c0d0e0f101112131415161718191a1b1c1d1e1f
+direction = encrypt
+round = 6
+label = k_sch
+value = c656827fc9a799176f294cec6cd5598b
+
+example = C.3
+key = 000102030405060708090a0b0c0d0e0f101112131415161718191a1b1c1d1e1f
+direction = encrypt
+round = 7
+label = start
+value = 7f074143cb4e243ec10c815d8375d54c
+
+example = C.3
+key = 000102030405060708090a0b0c0d0e0f101112131415161718191a1b1c1d1e1f
+direction = encrypt
+round = 7
+label = s_box
+value = d2c5831a1f2f36b278fe0c4cec9d0329
+
+example = C.3
+key = 000102030405060708090a0b0c0d0e0f101112131415161718191a1b1c1d1e1f
+direction = encrypt
+round = 7
+label = s_row
+value = d22f0c291ffe031a789d83b2ecc5364c
+
+example = C.3
+key = 000102030405060708090a0b0c0d0e0f101112131415161718191a1b1c1d1e1f
+direction = encrypt
+round = 7
+label = m_col
+value = ebb19e1c3ee7c9e87d7535e9ed6b9144
+
+example = C.3
+key = 000102030405060708090a0b0c0d0e0f101112131415161718191a1b1c1d1e1f
+direction = encrypt
+round = 7
+label = k_sch
+value = 3de23a75524775e727bf9eb45407cf39
+
+example = C.3
+key = 000102030405060708090a0b0c0d0e0f101112131415161718191a1b1c1d1e1f
+direction = encrypt
+round = 8
+label = start
+value = d653a4696ca0bc0f5acaab5db96c5e7d
+
+example = C.3
+key = 000102030405060708090a0b0c0d0e0f101112131415161718191a1b1c1d1e1f
+direction = encrypt
+round = 8
+label = s_box
+value = f6ed49f950e06576be74624c565058ff
+
+example = C.3
+key = 000102030405060708090a0b0c0d0e0f101112131415161718191a1b1c1d1e1f
+direction = encrypt
+round = 8
+label = s_row
+value = f6e062ff507458f9be50497656ed654c
+
+example = C.3
+key = 000102030405060708090a0b0c0d0e0f101112131415161718191a1b1c1d1e1f
+direction = encrypt
+round = 8
+label = m_col
+value = 5174c8669da98435a8b3e62ca974a5ea
+
+example = C.3
+key = 000102030405060708090a0b0c0d0e0f101112131415161718191a1b1c1d1e1f
+direction = encrypt
+round = 8
+label = k_sch
+value = 0bdc905fc27b0948ad5245a4c1871c2f
+
+example = C.3
+key = 000102030405060708090a0b0c0d0e0f101112131415161718191a1b1c1d1e1f
+direction = encrypt
+round = 9
+label = start
+value = 5aa858395fd28d7d05e1a38868f3b9c5
+
+example = C.3
+key = 000102030405060708090a0b0c0d0e0f101112131415161718191a1b1c1d1e1f
+direction = encrypt
+round = 9
+label = s_box
+value = bec26a12cfb55dff6bf80ac4450d56a6
+
+example = C.3
+key = 000102030405060708090a0b0c0d0e0f101112131415161718191a1b1c1d1e1f
+direction = encrypt
+round = 9
+label = s_row
+value = beb50aa6cff856126b0d6aff45c25dc4
+
+example = C.3
+key = 000102030405060708090a0b0c0d0e0f101112131415161718191a1b1c1d1e1f
+direction = encrypt
+round = 9
+label = m_col
+value = 0f77ee31d2ccadc05430a83f4ef96ac3
+
+example = C.3
+key = 000102030405060708090a0b0c0d0e0f101112131415161718191a1b1c1d1e1f
+direction = encrypt
+round = 9
+label = k_sch
+value = 45f5a66017b2d387300d4d33640a820a
+
+example = C.3
+key = 000102030405060708090a0b0c0d0e0f101112131415161718191a1b1c1d1e1f
+direction = encrypt
+round = 10
+label = start
+value = 4a824851c57e7e47643de50c2af3e8c9
+
+example = C.3
+key = 000102030405060708090a0b0c0d0e0f101112131415161718191a1b1c1d1e1f
+direction = encrypt
+round = 10
+label = s_box
+value = d61352d1a6f3f3a04327d9fee50d9bdd
+
+example = C.3
+key = 000102030405060708090a0b0c0d0e0f101112131415161718191a1b1c1d1e1f
+direction = encrypt
+round = 10
+label = s_row
+value = d6f3d9dda6279bd1430d52a0e513f3fe
+
+example = C.3
+key = 000102030405060708090a0b0c0d0e0f101112131415161718191a1b1c1d1e1f
+direction = encrypt
+round = 10
+label = m_col
+value = bd86f0ea748fc4f4630f11c1e9331233
+
+example = C.3
+key = 000102030405060708090a0b0c0d0e0f101112131415161718191a1b1c1d1e1f
+direction = encrypt
+round = 10
+label = k_sch
+value = 7ccff71cbeb4fe5413e6bbf0d261a7df
+
+example = C.3
+key = 000102030405060708090a0b0c0d0e0f101112131415161718191a1b1c1d1e1f
+direction = encrypt
+round = 11
+label = start
+value = c14907f6ca3b3aa070e9aa313b52b5ec
+
+example = C.3
+key = 000102030405060708090a0b0c0d0e0f101112131415161718191a1b1c1d1e1f
+direction = encrypt
+round = 11
+label = s_box
+value = 783bc54274e280e0511eacc7e200d5ce
+
+example = C.3
+key = 000102030405060708090a0b0c0d0e0f101112131415161718191a1b1c1d1e1f
+direction = encrypt
+round = 11
+label = s_row
+value = 78e2acce741ed5425100c5e0e23b80c7
+
+example = C.3
+key = 000102030405060708090a0b0c0d0e0f101112131415161718191a1b1c1d1e1f
+direction = encrypt
+round = 11
+label = m_col
+value = af8690415d6e1dd387e5fbedd5c89013
+
+example = C.3
+key = 000102030405060708090a0b0c0d0e0f101112131415161718191a1b1c1d1e1f
+direction = encrypt
+round = 11
+label = k_sch
+value = f01afafee7a82979d7a5644ab3afe640
+
+example = C.3
+key = 000102030405060708090a0b0c0d0e0f101112131415161718191a1b1c1d1e1f
+direction = encrypt
+round = 12
+label = start
+value = 5f9c6abfbac634aa50409fa766677653
+
+example = C.3
+key = 000102030405060708090a0b0c0d0e0f101112131415161718191a1b1c1d1e1f
+direction = encrypt
+round = 12
+label = s_box
+value = cfde0208f4b418ac5309db5c338538ed
+
+example = C.3
+key = 000102030405060708090a0b0c0d0e0f101112131415161718191a1b1c1d1e1f
+direction = encrypt
+round = 12
+label = s_row
+value = cfb4dbedf4093808538502ac33de185c
+
+example = C.3
+key = 000102030405060708090a0b0c0d0e0f101112131415161718191a1b1c1d1e1f
+direction = encrypt
+round = 12
+label = m_col
+value = 7427fae4d8a695269ce83d315be0392b
+
+example = C.3
+key = 000102030405060708090a0b0c0d0e0f101112131415161718191a1b1c1d1e1f
+direction = encrypt
+round = 12
+label = k_sch
+value = 2541fe719bf500258813bbd55a721c0a
+
+example = C.3
+key = 000102030405060708090a0b0c0d0e0f101112131415161718191a1b1c1d1e1f
+direction = encrypt
+round = 13
+label = start
+value = 516604954353950314fb86e401922521
+
+example = C.3
+key = 000102030405060708090a0b0c0d0e0f101112131415161718191a1b1c1d1e1f
+direction = encrypt
+round = 13
+label = s_box
+value = d133f22a1aed2a7bfa0f44697c4f3ffd
+
+example = C.3
+key = 000102030405060708090a0b0c0d0e0f101112131415161718191a1b1c1d1e1f
+direction = encrypt
+round = 13
+label = s_row
+value = d1ed44fd1a0f3f2afa4ff27b7c332a69
+
+example = C.3
+key = 000102030405060708090a0b0c0d0e0f101112131415161718191a1b1c1d1e1f
+direction = encrypt
+round = 13
+label = m_col
+value = 2c21a820306f154ab712c75eee0da04f
+
+example = C.3
+key = 000102030405060708090a0b0c0d0e0f101112131415161718191a1b1c1d1e1f
+direction = encrypt
+round = 13
+label = k_sch
+value = 4e5a6699a9f24fe07e572baacdf8cdea
+
+example = C.3
+key = 000102030405060708090a0b0c0d0e0f101112131415161718191a1b1c1d1e1f
+direction = encrypt
+round = 14
+label = start
+value = 627bceb9999d5aaac945ecf423f56da5
+
+example = C.3
+key = 000102030405060708090a0b0c0d0e0f101112131415161718191a1b1c1d1e1f
+direction = encrypt
+round = 14
+label = s_box
+value = aa218b56ee5ebeacdd6ecebf26e63c06
+
+example = C.3
+key = 000102030405060708090a0b0c0d0e0f101112131415161718191a1b1c1d1e1f
+direction = encrypt
+round = 14
+label = s_row
+value = aa5ece06ee6e3c56dde68bac2621bebf
+
+example = C.3
+key = 000102030405060708090a0b0c0d0e0f101112131415161718191a1b1c1d1e1f
+direction = encrypt
+round = 14
+label = k_sch
+value = 24fc79ccbf0979e9371ac23c6d68de36
+
+example = C.3
+key = 000102030405060708090a0b0c0d0e0f101112131415161718191a1b1c1d1e1f
+direction = encrypt
+round = 14
+label = output
+value = 8ea2b7ca516745bfeafc49904b496089
+
+example = C.3
+key = 000102030405060708090a0b0c0d0e0f101112131415161718191a1b1c1d1e1f
+direction = inverse
+round = 0
+label = iinput
+value = 8ea2b7ca516745bfeafc49904b496089
+
+example = C.3
+key = 000102030405060708090a0b0c0d0e0f101112131415161718191a1b1c1d1e1f
+direction = inverse
+round = 0
+label = ik_sch
+value = 24fc79ccbf0979e9371ac23c6d68de36
+
+example = C.3
+key = 000102030405060708090a0b0c0d0e0f101112131415161718191a1b1c1d1e1f
+direction = inverse
+round = 1
+label = istart
+value = aa5ece06ee6e3c56dde68bac2621bebf
+
+example = C.3
+key = 000102030405060708090a0b0c0d0e0f101112131415161718191a1b1c1d1e1f
+direction = inverse
+round = 1
+label = is_row
+value = aa218b56ee5ebeacdd6ecebf26e63c06
+
+example = C.3
+key = 000102030405060708090a0b0c0d0e0f101112131415161718191a1b1c1d1e1f
+direction = inverse
+round = 1
+label = is_box
+value = 627bceb9999d5aaac945ecf423f56da5
+
+example = C.3
+key = 000102030405060708090a0b0c0d0e0f101112131415161718191a1b1c1d1e1f
+direction = inverse
+round = 1
+label = ik_sch
+value = 4e5a6699a9f24fe07e572baacdf8cdea
+
+example = C.3
+key = 000102030405060708090a0b0c0d0e0f101112131415161718191a1b1c1d1e1f
+direction = inverse
+round = 1
+label = ik_add
+value = 2c21a820306f154ab712c75eee0da04f
+
+example = C.3
+key = 000102030405060708090a0b0c0d0e0f101112131415161718191a1b1c1d1e1f
+direction = inverse
+round = 2
+label = istart
+value = d1ed44fd1a0f3f2afa4ff27b7c332a69
+
+example = C.3
+key = 000102030405060708090a0b0c0d0e0f101112131415161718191a1b1c1d1e1f
+direction = inverse
+round = 2
+label = is_row
+value = d133f22a1aed2a7bfa0f44697c4f3ffd
+
+example = C.3
+key = 000102030405060708090a0b0c0d0e0f101112131415161718191a1b1c1d1e1f
+direction = inverse
+round = 2
+label = is_box
+value = 516604954353950314fb86e401922521
+
+example = C.3
+key = 000102030405060708090a0b0c0d0e0f101112131415161718191a1b1c1d1e1f
+direction = inverse
+round = 2
+label = ik_sch
+value = 2541fe719bf500258813bbd55a721c0a
+
+example = C.3
+key = 000102030405060708090a0b0c0d0e0f101112131415161718191a1b1c1d1e1f
+direction = inverse
+round = 2
+label = ik_add
+value = 7427fae4d8a695269ce83d315be0392b
+
+example = C.3
+key = 000102030405060708090a0b0c0d0e0f101112131415161718191a1b1c1d1e1f
+direction = inverse
+round = 3
+label = istart
+value = cfb4dbedf4093808538502ac33de185c
+
+example = C.3
+key = 000102030405060708090a0b0c0d0e0f101112131415161718191a1b1c1d1e1f
+direction = inverse
+round = 3
+label = is_row
+value = cfde0208f4b418ac5309db5c338538ed
+
+example = C.3
+key = 000102030405060708090a0b0c0d0e0f101112131415161718191a1b1c1d1e1f
+direction = inverse
+round = 3
+label = is_box
+value = 5f9c6abfbac634aa50409fa766677653
+
+example = C.3
+key = 000102030405060708090a0b0c0d0e0f101112131415161718191a1b1c1d1e1f
+direction = inverse
+round = 3
+label = ik_sch
+value = f01afafee7a82979d7a5644ab3afe640
+
+example = C.3
+key = 000102030405060708090a0b0c0d0e0f101112131415161718191a1b1c1d1e1f
+direction = inverse
+round = 3
+label = ik_add
+value = af8690415d6e1dd387e5fbedd5c89013
+
+example = C.3
+key = 000102030405060708090a0b0c0d0e0f101112131415161718191a1b1c1d1e1f
+direction = inverse
+round = 4
+label = istart
+value = 78e2acce741ed5425100c5e0e23b80c7
+
+example = C.3
+key = 000102030405060708090a0b0c0d0e0f101112131415161718191a1b1c1d1e1f
+direction = inverse
+round = 4
+label = is_row
+value = 783bc54274e280e0511eacc7e200d5ce
+
+example = C.3
+key = 000102030405060708090a0b0c0d0e0f101112131415161718191a1b1c1d1e1f
+direction = inverse
+round = 4
+label = is_box
+value = c14907f6ca3b3aa070e9aa313b52b5ec
+
+example = C.3
+key = 000102030405060708090a0b0c0d0e0f101112131415161718191a1b1c1d1e1f
+direction = inverse
+round = 4
+label = ik_sch
+value = 7ccff71cbeb4fe5413e6bbf0d261a7df
+
+example = C.3
+key = 000102030405060708090a0b0c0d0e0f101112131415161718191a1b1c1d1e1f
+direction = inverse
+round = 4
+label = ik_add
+value = bd86f0ea748fc4f4630f11c1e9331233
+
+example = C.3
+key = 000102030405060708090a0b0c0d0e0f101112131415161718191a1b1c1d1e1f
+direction = inverse
+round = 5
+label = istart
+value = d6f3d9dda6279bd1430d52a0e513f3fe
+
+example = C.3
+key = 000102030405060708090a0b0c0d0e0f101112131415161718191a1b1c1d1e1f
+direction = inverse
+round = 5
+label = is_row
+value = d61352d1a6f3f3a04327d9fee50d9bdd
+
+example = C.3
+key = 000102030405060708090a0b0c0d0e0f101112131415161718191a1b1c1d1e1f
+direction = inverse
+round = 5
+label = is_box
+value = 4a824851c57e7e47643de50c2af3e8c9
+
+example = C.3
+key = 000102030405060708090a0b0c0d0e0f101112131415161718191a1b1c1d1e1f
+direction = inverse
+round = 5
+label = ik_sch
+value = 45f5a66017b2d387300d4d33640a820a
+
+example = C.3
+key = 000102030405060708090a0b0c0d0e0f101112131415161718191a1b1c1d1e1f
+direction = inverse
+round = 5
+label = ik_add
+value = 0f77ee31d2ccadc05430a83f4ef96ac3
+
+example = C.3
+key = 000102030405060708090a0b0c0d0e0f101112131415161718191a1b1c1d1e1f
+direction = inverse
+round = 6
+label = istart
+value = beb50aa6cff856126b0d6aff45c25dc4
+
+example = C.3
+key = 000102030405060708090a0b0c0d0e0f101112131415161718191a1b1c1d1e1f
+direction = inverse
+round = 6
+label = is_row
+value = bec26a12cfb55dff6bf80ac4450d56a6
+
+example = C.3
+key = 000102030405060708090a0b0c0d0e0f101112131415161718191a1b1c1d1e1f
+direction = inverse
+round = 6
+label = is_box
+value = 5aa858395fd28d7d05e1a38868f3b9c5
+
+example = C.3
+key = 000102030405060708090a0b0c0d0e0f101112131415161718191a1b1c1d1e1f
+direction = inverse
+round = 6
+label = ik_sch
+value = 0bdc905fc27b0948ad5245a4c1871c2f
+
+example = C.3
+key = 000102030405060708090a0b0c0d0e0f101112131415161718191a1b1c1d1e1f
+direction = inverse
+round = 6
+label = ik_add
+value = 5174c8669da98435a8b3e62ca974a5ea
+
+example = C.3
+key = 000102030405060708090a0b0c0d0e0f101112131415161718191a1b1c1d1e1f
+direction = inverse
+round = 7
+label = istart
+value = f6e062ff507458f9be50497656ed654c
+
+example = C.3
+key = 000102030405060708090a0b0c0d0e0f101112131415161718191a1b1c1d1e1f
+direction = inverse
+round = 7
+label = is_row
+value = f6ed49f950e06576be74624c565058ff
+
+example = C.3
+key = 000102030405060708090a0b0c0d0e0f101112131415161718191a1b1c1d1e1f
+direction = inverse
+round = 7
+label = is_box
+value = d653a4696ca0bc0f5acaab5db96c5e7d
+
+example = C.3
+key = 000102030405060708090a0b0c0d0e0f101112131415161718191a1b1c1d1e1f
+direction = inverse
+round = 7
+label = ik_sch
+value = 3de23a75524775e727bf9eb45407cf39
+
+example = C.3
+key = 000102030405060708090a0b0c0d0e0f101112131415161718191a1b1c1d1e1f
+direction = inverse
+round = 7
+label = ik_add
+value = ebb19e1c3ee7c9e87d7535e9ed6b9144
+
+example = C.3
+key = 000102030405060708090a0b0c0d0e0f101112131415161718191a1b1c1d1e1f
+direction = inverse
+round = 8
+label = istart
+value = d22f0c291ffe031a789d83b2ecc5364c
+
+example = C.3
+key = 000102030405060708090a0b0c0d0e0f101112131415161718191a1b1c1d1e1f
+direction = inverse
+round = 8
+label = is_row
+value = d2c5831a1f2f36b278fe0c4cec9d0329
+
+example = C.3
+key = 000102030405060708090a0b0c0d0e0f101112131415161718191a1b1c1d1e1f
+direction = inverse
+round = 8
+label = is_box
+value = 7f074143cb4e243ec10c815d8375d54c
+
+example = C.3
+key = 000102030405060708090a0b0c0d0e0f101112131415161718191a1b1c1d1e1f
+direction = inverse
+round = 8
+label = ik_sch
+value = c656827fc9a799176f294cec6cd5598b
+
+example = C.3
+key = 000102030405060708090a0b0c0d0e0f101112131415161718191a1b1c1d1e1f
+direction = inverse
+round = 8
+label = ik_add
+value = b951c33c02e9bd29ae25cdb1efa08cc7
+
+example = C.3
+key = 000102030405060708090a0b0c0d0e0f101112131415161718191a1b1c1d1e1f
+direction = inverse
+round = 9
+label = istart
+value = 2e6e7a2dafc6eef83a86ace7c25ba934
+
+example = C.3
+key = 000102030405060708090a0b0c0d0e0f101112131415161718191a1b1c1d1e1f
+direction = inverse
+round = 9
+label = is_row
+value = 2e5bacf8af6ea9e73ac67a34c286ee2d
+
+example = C.3
+key = 000102030405060708090a0b0c0d0e0f101112131415161718191a1b1c1d1e1f
+direction = inverse
+round = 9
+label = is_box
+value = c357aae11b45b7b0a2c7bd28a8dc99fa
+
+example = C.3
+key = 000102030405060708090a0b0c0d0e0f101112131415161718191a1b1c1d1e1f
+direction = inverse
+round = 9
+label = ik_sch
+value = 6de1f1486fa54f9275f8eb5373b8518d
+
+example = C.3
+key = 000102030405060708090a0b0c0d0e0f101112131415161718191a1b1c1d1e1f
+direction = inverse
+round = 9
+label = ik_add
+value = aeb65ba974e0f822d73f567bdb64c877
+
+example = C.3
+key = 000102030405060708090a0b0c0d0e0f101112131415161718191a1b1c1d1e1f
+direction = inverse
+round = 10
+label = istart
+value = 9cf0a62049fd59a399518984f26be178
+
+example = C.3
+key = 000102030405060708090a0b0c0d0e0f101112131415161718191a1b1c1d1e1f
+direction = inverse
+round = 10
+label = is_row
+value = 9c6b89a349f0e18499fda678f2515920
+
+example = C.3
+key = 000102030405060708090a0b0c0d0e0f101112131415161718191a1b1c1d1e1f
+direction = inverse
+round = 10
+label = is_box
+value = 1c05f271a417e04ff921c5c104701554
+
+example = C.3
+key = 000102030405060708090a0b0c0d0e0f101112131415161718191a1b1c1d1e1f
+direction = inverse
+round = 10
+label = ik_sch
+value = ae87dff00ff11b68a68ed5fb03fc1567
+
+example = C.3
+key = 000102030405060708090a0b0c0d0e0f101112131415161718191a1b1c1d1e1f
+direction = inverse
+round = 10
+label = ik_add
+value = b2822d81abe6fb275faf103a078c0033
+
+example = C.3
+key = 000102030405060708090a0b0c0d0e0f101112131415161718191a1b1c1d1e1f
+direction = inverse
+round = 11
+label = istart
+value = 88db34fb1f807678d3f833c2194a759e
+
+example = C.3
+key = 000102030405060708090a0b0c0d0e0f101112131415161718191a1b1c1d1e1f
+direction = inverse
+round = 11
+label = is_row
+value = 884a33781fdb75c2d380349e19f876fb
+
+example = C.3
+key = 000102030405060708090a0b0c0d0e0f101112131415161718191a1b1c1d1e1f
+direction = inverse
+round = 11
+label = is_box
+value = 975c66c1cb9f3fa8a93a28df8ee10f63
+
+example = C.3
+key = 000102030405060708090a0b0c0d0e0f101112131415161718191a1b1c1d1e1f
+direction = inverse
+round = 11
+label = ik_sch
+value = 1651a8cd0244beda1a5da4c10640bade
+
+example = C.3
+key = 000102030405060708090a0b0c0d0e0f101112131415161718191a1b1c1d1e1f
+direction = inverse
+round = 11
+label = ik_add
+value = 810dce0cc9db8172b3678c1e88a1b5bd
+
+example = C.3
+key = 000102030405060708090a0b0c0d0e0f101112131415161718191a1b1c1d1e1f
+direction = inverse
+round = 12
+label = istart
+value = ad9c7e017e55ef25bc150fe01ccb6395
+
+example = C.3
+key = 000102030405060708090a0b0c0d0e0f101112131415161718191a1b1c1d1e1f
+direction = inverse
+round = 12
+label = is_row
+value = adcb0f257e9c63e0bc557e951c15ef01
+
+example = C.3
+key = 000102030405060708090a0b0c0d0e0f101112131415161718191a1b1c1d1e1f
+direction = inverse
+round = 12
+label = is_box
+value = 1859fbc28a1c00a078ed8aadc42f6109
+
+example = C.3
+key = 000102030405060708090a0b0c0d0e0f101112131415161718191a1b1c1d1e1f
+direction = inverse
+round = 12
+label = ik_sch
+value = a573c29fa176c498a97fce93a572c09c
+
+example = C.3
+key = 000102030405060708090a0b0c0d0e0f101112131415161718191a1b1c1d1e1f
+direction = inverse
+round = 12
+label = ik_add
+value = bd2a395d2b6ac438d192443e615da195
+
+example = C.3
+key = 000102030405060708090a0b0c0d0e0f101112131415161718191a1b1c1d1e1f
+direction = inverse
+round = 13
+label = istart
+value = 84e1fd6b1a5c946fdf4938977cfbac23
+
+example = C.3
+key = 000102030405060708090a0b0c0d0e0f101112131415161718191a1b1c1d1e1f
+direction = inverse
+round = 13
+label = is_row
+value = 84fb386f1ae1ac97df5cfd237c49946b
+
+example = C.3
+key = 000102030405060708090a0b0c0d0e0f101112131415161718191a1b1c1d1e1f
+direction = inverse
+round = 13
+label = is_box
+value = 4f63760643e0aa85efa7213201a4e705
+
+example = C.3
+key = 000102030405060708090a0b0c0d0e0f101112131415161718191a1b1c1d1e1f
+direction = inverse
+round = 13
+label = ik_sch
+value = 101112131415161718191a1b1c1d1e1f
+
+example = C.3
+key = 000102030405060708090a0b0c0d0e0f101112131415161718191a1b1c1d1e1f
+direction = inverse
+round = 13
+label = ik_add
+value = 5f72641557f5bc92f7be3b291db9f91a
+
+example = C.3
+key = 000102030405060708090a0b0c0d0e0f101112131415161718191a1b1c1d1e1f
+direction = inverse
+round = 14
+label = istart
+value = 6353e08c0960e104cd70b751bacad0e7
+
+example = C.3
+key = 000102030405060708090a0b0c0d0e0f101112131415161718191a1b1c1d1e1f
+direction = inverse
+round = 14
+label = is_row
+value = 63cab7040953d051cd60e0e7ba70e18c
+
+example = C.3
+key = 000102030405060708090a0b0c0d0e0f101112131415161718191a1b1c1d1e1f
+direction = inverse
+round = 14
+label = is_box
+value = 00102030405060708090a0b0c0d0e0f0
+
+example = C.3
+key = 000102030405060708090a0b0c0d0e0f101112131415161718191a1b1c1d1e1f
+direction = inverse
+round = 14
+label = ik_sch
+value = 000102030405060708090a0b0c0d0e0f
+
+example = C.3
+key = 000102030405060708090a0b0c0d0e0f101112131415161718191a1b1c1d1e1f
+direction = inverse
+round = 14
+label = ioutput
+value = 00112233445566778899aabbccddeeff
+
+[key-rows]
+# source: FIPS 197 (2001) appendix A.1 to A.3
+
+key = 2b7e151628aed2a6abf7158809cf4f3c
+example = A.1
+nk = 4
+i = 4
+temp = 09cf4f3c
+rot = cf4f3c09
+sub = 8a84eb01
+rcon = 01000000
+after = 8b84eb01
+keyback = 2b7e1516
+word = a0fafe17
+
+key = 2b7e151628aed2a6abf7158809cf4f3c
+example = A.1
+nk = 4
+i = 5
+temp = a0fafe17
+keyback = 28aed2a6
+word = 88542cb1
+
+key = 2b7e151628aed2a6abf7158809cf4f3c
+example = A.1
+nk = 4
+i = 6
+temp = 88542cb1
+keyback = abf71588
+word = 23a33939
+
+key = 2b7e151628aed2a6abf7158809cf4f3c
+example = A.1
+nk = 4
+i = 7
+temp = 23a33939
+keyback = 09cf4f3c
+word = 2a6c7605
+
+key = 2b7e151628aed2a6abf7158809cf4f3c
+example = A.1
+nk = 4
+i = 8
+temp = 2a6c7605
+rot = 6c76052a
+sub = 50386be5
+rcon = 02000000
+after = 52386be5
+keyback = a0fafe17
+word = f2c295f2
+
+key = 2b7e151628aed2a6abf7158809cf4f3c
+example = A.1
+nk = 4
+i = 9
+temp = f2c295f2
+keyback = 88542cb1
+word = 7a96b943
+
+key = 2b7e151628aed2a6abf7158809cf4f3c
+example = A.1
+nk = 4
+i = 10
+temp = 7a96b943
+keyback = 23a33939
+word = 5935807a
+
+key = 2b7e151628aed2a6abf7158809cf4f3c
+example = A.1
+nk = 4
+i = 11
+temp = 5935807a
+keyback = 2a6c7605
+word = 7359f67f
+
+key = 2b7e151628aed2a6abf7158809cf4f3c
+example = A.1
+nk = 4
+i = 12
+temp = 7359f67f
+rot = 59f67f73
+sub = cb42d28f
+rcon = 04000000
+after = cf42d28f
+keyback = f2c295f2
+word = 3d80477d
+
+key = 2b7e151628aed2a6abf7158809cf4f3c
+example = A.1
+nk = 4
+i = 13
+temp = 3d80477d
+keyback = 7a96b943
+word = 4716fe3e
+
+key = 2b7e151628aed2a6abf7158809cf4f3c
+example = A.1
+nk = 4
+i = 14
+temp = 4716fe3e
+keyback = 5935807a
+word = 1e237e44
+
+key = 2b7e151628aed2a6abf7158809cf4f3c
+example = A.1
+nk = 4
+i = 15
+temp = 1e237e44
+keyback = 7359f67f
+word = 6d7a883b
+
+key = 2b7e151628aed2a6abf7158809cf4f3c
+example = A.1
+nk = 4
+i = 16
+temp = 6d7a883b
+rot = 7a883b6d
+sub = dac4e23c
+rcon = 08000000
+after = d2c4e23c
+keyback = 3d80477d
+word = ef44a541
+
+key = 2b7e151628aed2a6abf7158809cf4f3c
+example = A.1
+nk = 4
+i = 17
+temp = ef44a541
+keyback = 4716fe3e
+word = a8525b7f
+
+key = 2b7e151628aed2a6abf7158809cf4f3c
+example = A.1
+nk = 4
+i = 18
+temp = a8525b7f
+keyback = 1e237e44
+word = b671253b
+
+key = 2b7e151628aed2a6abf7158809cf4f3c
+example = A.1
+nk = 4
+i = 19
+temp = b671253b
+keyback = 6d7a883b
+word = db0bad00
+
+key = 2b7e151628aed2a6abf7158809cf4f3c
+example = A.1
+nk = 4
+i = 20
+temp = db0bad00
+rot = 0bad00db
+sub = 2b9563b9
+rcon = 10000000
+after = 3b9563b9
+keyback = ef44a541
+word = d4d1c6f8
+
+key = 2b7e151628aed2a6abf7158809cf4f3c
+example = A.1
+nk = 4
+i = 21
+temp = d4d1c6f8
+keyback = a8525b7f
+word = 7c839d87
+
+key = 2b7e151628aed2a6abf7158809cf4f3c
+example = A.1
+nk = 4
+i = 22
+temp = 7c839d87
+keyback = b671253b
+word = caf2b8bc
+
+key = 2b7e151628aed2a6abf7158809cf4f3c
+example = A.1
+nk = 4
+i = 23
+temp = caf2b8bc
+keyback = db0bad00
+word = 11f915bc
+
+key = 2b7e151628aed2a6abf7158809cf4f3c
+example = A.1
+nk = 4
+i = 24
+temp = 11f915bc
+rot = f915bc11
+sub = 99596582
+rcon = 20000000
+after = b9596582
+keyback = d4d1c6f8
+word = 6d88a37a
+
+key = 2b7e151628aed2a6abf7158809cf4f3c
+example = A.1
+nk = 4
+i = 25
+temp = 6d88a37a
+keyback = 7c839d87
+word = 110b3efd
+
+key = 2b7e151628aed2a6abf7158809cf4f3c
+example = A.1
+nk = 4
+i = 26
+temp = 110b3efd
+keyback = caf2b8bc
+word = dbf98641
+
+key = 2b7e151628aed2a6abf7158809cf4f3c
+example = A.1
+nk = 4
+i = 27
+temp = dbf98641
+keyback = 11f915bc
+word = ca0093fd
+
+key = 2b7e151628aed2a6abf7158809cf4f3c
+example = A.1
+nk = 4
+i = 28
+temp = ca0093fd
+rot = 0093fdca
+sub = 63dc5474
+rcon = 40000000
+after = 23dc5474
+keyback = 6d88a37a
+word = 4e54f70e
+
+key = 2b7e151628aed2a6abf7158809cf4f3c
+example = A.1
+nk = 4
+i = 29
+temp = 4e54f70e
+keyback = 110b3efd
+word = 5f5fc9f3
+
+key = 2b7e151628aed2a6abf7158809cf4f3c
+example = A.1
+nk = 4
+i = 30
+temp = 5f5fc9f3
+keyback = dbf98641
+word = 84a64fb2
+
+key = 2b7e151628aed2a6abf7158809cf4f3c
+example = A.1
+nk = 4
+i = 31
+temp = 84a64fb2
+keyback = ca0093fd
+word = 4ea6dc4f
+
+key = 2b7e151628aed2a6abf7158809cf4f3c
+example = A.1
+nk = 4
+i = 32
+temp = 4ea6dc4f
+rot = a6dc4f4e
+sub = 2486842f
+rcon = 80000000
+after = a486842f
+keyback = 4e54f70e
+word = ead27321
+
+key = 2b7e151628aed2a6abf7158809cf4f3c
+example = A.1
+nk = 4
+i = 33
+temp = ead27321
+keyback = 5f5fc9f3
+word = b58dbad2
+
+key = 2b7e151628aed2a6abf7158809cf4f3c
+example = A.1
+nk = 4
+i = 34
+temp = b58dbad2
+keyback = 84a64fb2
+word = 312bf560
+
+key = 2b7e151628aed2a6abf7158809cf4f3c
+example = A.1
+nk = 4
+i = 35
+temp = 312bf560
+keyback = 4ea6dc4f
+word = 7f8d292f
+
+key = 2b7e151628aed2a6abf7158809cf4f3c
+example = A.1
+nk = 4
+i = 36
+temp = 7f8d292f
+rot = 8d292f7f
+sub = 5da515d2
+rcon = 1b000000
+after = 46a515d2
+keyback = ead27321
+word = ac7766f3
+
+key = 2b7e151628aed2a6abf7158809cf4f3c
+example = A.1
+nk = 4
+i = 37
+temp = ac7766f3
+keyback = b58dbad2
+word = 19fadc21
+
+key = 2b7e151628aed2a6abf7158809cf4f3c
+example = A.1
+nk = 4
+i = 38
+temp = 19fadc21
+keyback = 312bf560
+word = 28d12941
+
+key = 2b7e151628aed2a6abf7158809cf4f3c
+example = A.1
+nk = 4
+i = 39
+temp = 28d12941
+keyback = 7f8d292f
+word = 575c006e
+
+key = 2b7e151628aed2a6abf7158809cf4f3c
+example = A.1
+nk = 4
+i = 40
+temp = 575c006e
+rot = 5c006e57
+sub = 4a639f5b
+rcon = 36000000
+after = 7c639f5b
+keyback = ac7766f3
+word = d014f9a8
+
+key = 2b7e151628aed2a6abf7158809cf4f3c
+example = A.1
+nk = 4
+i = 41
+temp = d014f9a8
+keyback = 19fadc21
+word = c9ee2589
+
+key = 2b7e151628aed2a6abf7158809cf4f3c
+example = A.1
+nk = 4
+i = 42
+temp = c9ee2589
+keyback = 28d12941
+word = e13f0cc8
+
+key = 2b7e151628aed2a6abf7158809cf4f3c
+example = A.1
+nk = 4
+i = 43
+temp = e13f0cc8
+keyback = 575c006e
+word = b6630ca6
+
+key = 8e73b0f7da0e6452c810f32b809079e562f8ead2522c6b7b
+example = A.2
+nk = 6
+i = 6
+temp = 522c6b7b
+rot = 2c6b7b52
+sub = 717f2100
+rcon = 01000000
+after = 707f2100
+keyback = 8e73b0f7
+word = fe0c91f7
+
+key = 8e73b0f7da0e6452c810f32b809079e562f8ead2522c6b7b
+example = A.2
+nk = 6
+i = 7
+temp = fe0c91f7
+keyback = da0e6452
+word = 2402f5a5
+
+key = 8e73b0f7da0e6452c810f32b809079e562f8ead2522c6b7b
+example = A.2
+nk = 6
+i = 8
+temp = 2402f5a5
+keyback = c810f32b
+word = ec12068e
+
+key = 8e73b0f7da0e6452c810f32b809079e562f8ead2522c6b7b
+example = A.2
+nk = 6
+i = 9
+temp = ec12068e
+keyback = 809079e5
+word = 6c827f6b
+
+key = 8e73b0f7da0e6452c810f32b809079e562f8ead2522c6b7b
+example = A.2
+nk = 6
+i = 10
+temp = 6c827f6b
+keyback = 62f8ead2
+word = 0e7a95b9
+
+key = 8e73b0f7da0e6452c810f32b809079e562f8ead2522c6b7b
+example = A.2
+nk = 6
+i = 11
+temp = 0e7a95b9
+keyback = 522c6b7b
+word = 5c56fec2
+
+key = 8e73b0f7da0e6452c810f32b809079e562f8ead2522c6b7b
+example = A.2
+nk = 6
+i = 12
+temp = 5c56fec2
+rot = 56fec25c
+sub = b1bb254a
+rcon = 02000000
+after = b3bb254a
+keyback = fe0c91f7
+word = 4db7b4bd
+
+key = 8e73b0f7da0e6452c810f32b809079e562f8ead2522c6b7b
+example = A.2
+nk = 6
+i = 13
+temp = 4db7b4bd
+keyback = 2402f5a5
+word = 69b54118
+
+key = 8e73b0f7da0e6452c810f32b809079e562f8ead2522c6b7b
+example = A.2
+nk = 6
+i = 14
+temp = 69b54118
+keyback = ec12068e
+word = 85a74796
+
+key = 8e73b0f7da0e6452c810f32b809079e562f8ead2522c6b7b
+example = A.2
+nk = 6
+i = 15
+temp = 85a74796
+keyback = 6c827f6b
+word = e92538fd
+
+key = 8e73b0f7da0e6452c810f32b809079e562f8ead2522c6b7b
+example = A.2
+nk = 6
+i = 16
+temp = e92538fd
+keyback = 0e7a95b9
+word = e75fad44
+
+key = 8e73b0f7da0e6452c810f32b809079e562f8ead2522c6b7b
+example = A.2
+nk = 6
+i = 17
+temp = e75fad44
+keyback = 5c56fec2
+word = bb095386
+
+key = 8e73b0f7da0e6452c810f32b809079e562f8ead2522c6b7b
+example = A.2
+nk = 6
+i = 18
+temp = bb095386
+rot = 095386bb
+sub = 01ed44ea
+rcon = 04000000
+after = 05ed44ea
+keyback = 4db7b4bd
+word = 485af057
+
+key = 8e73b0f7da0e6452c810f32b809079e562f8ead2522c6b7b
+example = A.2
+nk = 6
+i = 19
+temp = 485af057
+keyback = 69b54118
+word = 21efb14f
+
+key = 8e73b0f7da0e6452c810f32b809079e562f8ead2522c6b7b
+example = A.2
+nk = 6
+i = 20
+temp = 21efb14f
+keyback = 85a74796
+word = a448f6d9
+
+key = 8e73b0f7da0e6452c810f32b809079e562f8ead2522c6b7b
+example = A.2
+nk = 6
+i = 21
+temp = a448f6d9
+keyback = e92538fd
+word = 4d6dce24
+
+key = 8e73b0f7da0e6452c810f32b809079e562f8ead2522c6b7b
+example = A.2
+nk = 6
+i = 22
+temp = 4d6dce24
+keyback = e75fad44
+word = aa326360
+
+key = 8e73b0f7da0e6452c810f32b809079e562f8ead2522c6b7b
+example = A.2
+nk = 6
+i = 23
+temp = aa326360
+keyback = bb095386
+word = 113b30e6
+
+key = 8e73b0f7da0e6452c810f32b809079e562f8ead2522c6b7b
+example = A.2
+nk = 6
+i = 24
+temp = 113b30e6
+rot = 3b30e611
+sub = e2048e82
+rcon = 08000000
+after = ea048e82
+keyback = 485af057
+word = a25e7ed5
+
+key = 8e73b0f7da0e6452c810f32b809079e562f8ead2522c6b7b
+example = A.2
+nk = 6
+i = 25
+temp = a25e7ed5
+keyback = 21efb14f
+word = 83b1cf9a
+
+key = 8e73b0f7da0e6452c810f32b809079e562f8ead2522c6b7b
+example = A.2
+nk = 6
+i = 26
+temp = 83b1cf9a
+keyback = a448f6d9
+word = 27f93943
+
+key = 8e73b0f7da0e6452c810f32b809079e562f8ead2522c6b7b
+example = A.2
+nk = 6
+i = 27
+temp = 27f93943
+keyback = 4d6dce24
+word = 6a94f767
+
+key = 8e73b0f7da0e6452c810f32b809079e562f8ead2522c6b7b
+example = A.2
+nk = 6
+i = 28
+temp = 6a94f767
+keyback = aa326360
+word = c0a69407
+
+key = 8e73b0f7da0e6452c810f32b809079e562f8ead2522c6b7b
+example = A.2
+nk = 6
+i = 29
+temp = c0a69407
+keyback = 113b30e6
+word = d19da4e1
+
+key = 8e73b0f7da0e6452c810f32b809079e562f8ead2522c6b7b
+example = A.2
+nk = 6
+i = 30
+temp = d19da4e1
+rot = 9da4e1d1
+sub = 5e49f83e
+rcon = 10000000
+after = 4e49f83e
+keyback = a25e7ed5
+word = ec1786eb
+
+key = 8e73b0f7da0e6452c810f32b809079e562f8ead2522c6b7b
+example = A.2
+nk = 6
+i = 31
+temp = ec1786eb
+keyback = 83b1cf9a
+word = 6fa64971
+
+key = 8e73b0f7da0e6452c810f32b809079e562f8ead2522c6b7b
+example = A.2
+nk = 6
+i = 32
+temp = 6fa64971
+keyback = 27f93943
+word = 485f7032
+
+key = 8e73b0f7da0e6452c810f32b809079e562f8ead2522c6b7b
+example = A.2
+nk = 6
+i = 33
+temp = 485f7032
+keyback = 6a94f767
+word = 22cb8755
+
+key = 8e73b0f7da0e6452c810f32b809079e562f8ead2522c6b7b
+example = A.2
+nk = 6
+i = 34
+temp = 22cb8755
+keyback = c0a69407
+word = e26d1352
+
+key = 8e73b0f7da0e6452c810f32b809079e562f8ead2522c6b7b
+example = A.2
+nk = 6
+i = 35
+temp = e26d1352
+keyback = d19da4e1
+word = 33f0b7b3
+
+key = 8e73b0f7da0e6452c810f32b809079e562f8ead2522c6b7b
+example = A.2
+nk = 6
+i = 36
+temp = 33f0b7b3
+rot = f0b7b333
+sub = 8ca96dc3
+rcon = 20000000
+after = aca96dc3
+keyback = ec1786eb
+word = 40beeb28
+
+key = 8e73b0f7da0e6452c810f32b809079e562f8ead2522c6b7b
+example = A.2
+nk = 6
+i = 37
+temp = 40beeb28
+keyback = 6fa64971
+word = 2f18a259
+
+key = 8e73b0f7da0e6452c810f32b809079e562f8ead2522c6b7b
+example = A.2
+nk = 6
+i = 38
+temp = 2f18a259
+keyback = 485f7032
+word = 6747d26b
+
+key = 8e73b0f7da0e6452c810f32b809079e562f8ead2522c6b7b
+example = A.2
+nk = 6
+i = 39
+temp = 6747d26b
+keyback = 22cb8755
+word = 458c553e
+
+key = 8e73b0f7da0e6452c810f32b809079e562f8ead2522c6b7b
+example = A.2
+nk = 6
+i = 40
+temp = 458c553e
+keyback = e26d1352
+word = a7e1466c
+
+key = 8e73b0f7da0e6452c810f32b809079e562f8ead2522c6b7b
+example = A.2
+nk = 6
+i = 41
+temp = a7e1466c
+keyback = 33f0b7b3
+word = 9411f1df
+
+key = 8e73b0f7da0e6452c810f32b809079e562f8ead2522c6b7b
+example = A.2
+nk = 6
+i = 42
+temp = 9411f1df
+rot = 11f1df94
+sub = 82a19e22
+rcon = 40000000
+after = c2a19e22
+keyback = 40beeb28
+word = 821f750a
+
+key = 8e73b0f7da0e6452c810f32b809079e562f8ead2522c6b7b
+example = A.2
+nk = 6
+i = 43
+temp = 821f750a
+keyback = 2f18a259
+word = ad07d753
+
+key = 8e73b0f7da0e6452c810f32b809079e562f8ead2522c6b7b
+example = A.2
+nk = 6
+i = 44
+temp = ad07d753
+keyback = 6747d26b
+word = ca400538
+
+key = 8e73b0f7da0e6452c810f32b809079e562f8ead2522c6b7b
+example = A.2
+nk = 6
+i = 45
+temp = ca400538
+keyback = 458c553e
+word = 8fcc5006
+
+key = 8e73b0f7da0e6452c810f32b809079e562f8ead2522c6b7b
+example = A.2
+nk = 6
+i = 46
+temp = 8fcc5006
+keyback = a7e1466c
+word = 282d166a
+
+key = 8e73b0f7da0e6452c810f32b809079e562f8ead2522c6b7b
+example = A.2
+nk = 6
+i = 47
+temp = 282d166a
+keyback = 9411f1df
+word = bc3ce7b5
+
+key = 8e73b0f7da0e6452c810f32b809079e562f8ead2522c6b7b
+example = A.2
+nk = 6
+i = 48
+temp = bc3ce7b5
+rot = 3ce7b5bc
+sub = eb94d565
+rcon = 80000000
+after = 6b94d565
+keyback = 821f750a
+word = e98ba06f
+
+key = 8e73b0f7da0e6452c810f32b809079e562f8ead2522c6b7b
+example = A.2
+nk = 6
+i = 49
+temp = e98ba06f
+keyback = ad07d753
+word = 448c773c
+
+key = 8e73b0f7da0e6452c810f32b809079e562f8ead2522c6b7b
+example = A.2
+nk = 6
+i = 50
+temp = 448c773c
+keyback = ca400538
+word = 8ecc7204
+
+key = 8e73b0f7da0e6452c810f32b809079e562f8ead2522c6b7b
+example = A.2
+nk = 6
+i = 51
+temp = 8ecc7204
+keyback = 8fcc5006
+word = 01002202
+
+key = 603deb1015ca71be2b73aef0857d77811f352c073b6108d72d9810a30914dff4
+example = A.3
+nk = 8
+i = 8
+temp = 0914dff4
+rot = 14dff409
+sub = fa9ebf01
+rcon = 01000000
+after = fb9ebf01
+keyback = 603deb10
+word = 9ba35411
+
+key = 603deb1015ca71be2b73aef0857d77811f352c073b6108d72d9810a30914dff4
+example = A.3
+nk = 8
+i = 9
+temp = 9ba35411
+keyback = 15ca71be
+word = 8e6925af
+
+key = 603deb1015ca71be2b73aef0857d77811f352c073b6108d72d9810a30914dff4
+example = A.3
+nk = 8
+i = 10
+temp = 8e6925af
+keyback = 2b73aef0
+word = a51a8b5f
+
+key = 603deb1015ca71be2b73aef0857d77811f352c073b6108d72d9810a30914dff4
+example = A.3
+nk = 8
+i = 11
+temp = a51a8b5f
+keyback = 857d7781
+word = 2067fcde
+
+key = 603deb1015ca71be2b73aef0857d77811f352c073b6108d72d9810a30914dff4
+example = A.3
+nk = 8
+i = 12
+temp = 2067fcde
+sub = b785b01d
+keyback = 1f352c07
+word = a8b09c1a
+
+key = 603deb1015ca71be2b73aef0857d77811f352c073b6108d72d9810a30914dff4
+example = A.3
+nk = 8
+i = 13
+temp = a8b09c1a
+keyback = 3b6108d7
+word = 93d194cd
+
+key = 603deb1015ca71be2b73aef0857d77811f352c073b6108d72d9810a30914dff4
+example = A.3
+nk = 8
+i = 14
+temp = 93d194cd
+keyback = 2d9810a3
+word = be49846e
+
+key = 603deb1015ca71be2b73aef0857d77811f352c073b6108d72d9810a30914dff4
+example = A.3
+nk = 8
+i = 15
+temp = be49846e
+keyback = 0914dff4
+word = b75d5b9a
+
+key = 603deb1015ca71be2b73aef0857d77811f352c073b6108d72d9810a30914dff4
+example = A.3
+nk = 8
+i = 16
+temp = b75d5b9a
+rot = 5d5b9ab7
+sub = 4c39b8a9
+rcon = 02000000
+after = 4e39b8a9
+keyback = 9ba35411
+word = d59aecb8
+
+key = 603deb1015ca71be2b73aef0857d77811f352c073b6108d72d9810a30914dff4
+example = A.3
+nk = 8
+i = 17
+temp = d59aecb8
+keyback = 8e6925af
+word = 5bf3c917
+
+key = 603deb1015ca71be2b73aef0857d77811f352c073b6108d72d9810a30914dff4
+example = A.3
+nk = 8
+i = 18
+temp = 5bf3c917
+keyback = a51a8b5f
+word = fee94248
+
+key = 603deb1015ca71be2b73aef0857d77811f352c073b6108d72d9810a30914dff4
+example = A.3
+nk = 8
+i = 19
+temp = fee94248
+keyback = 2067fcde
+word = de8ebe96
+
+key = 603deb1015ca71be2b73aef0857d77811f352c073b6108d72d9810a30914dff4
+example = A.3
+nk = 8
+i = 20
+temp = de8ebe96
+sub = 1d19ae90
+keyback = a8b09c1a
+word = b5a9328a
+
+key = 603deb1015ca71be2b73aef0857d77811f352c073b6108d72d9810a30914dff4
+example = A.3
+nk = 8
+i = 21
+temp = b5a9328a
+keyback = 93d194cd
+word = 2678a647
+
+key = 603deb1015ca71be2b73aef0857d77811f352c073b6108d72d9810a30914dff4
+example = A.3
+nk = 8
+i = 22
+temp = 2678a647
+keyback = be49846e
+word = 98312229
+
+key = 603deb1015ca71be2b73aef0857d77811f352c073b6108d72d9810a30914dff4
+example = A.3
+nk = 8
+i = 23
+temp = 98312229
+keyback = b75d5b9a
+word = 2f6c79b3
+
+key = 603deb1015ca71be2b73aef0857d77811f352c073b6108d72d9810a30914dff4
+example = A.3
+nk = 8
+i = 24
+temp = 2f6c79b3
+rot = 6c79b32f
+sub = 50b66d15
+rcon = 04000000
+after = 54b66d15
+keyback = d59aecb8
+word = 812c81ad
+
+key = 603deb1015ca71be2b73aef0857d77811f352c073b6108d72d9810a30914dff4
+example = A.3
+nk = 8
+i = 25
+temp = 812c81ad
+keyback = 5bf3c917
+word = dadf48ba
+
+key = 603deb1015ca71be2b73aef0857d77811f352c073b6108d72d9810a30914dff4
+example = A.3
+nk = 8
+i = 26
+temp = dadf48ba
+keyback = fee94248
+word = 24360af2
+
+key = 603deb1015ca71be2b73aef0857d77811f352c073b6108d72d9810a30914dff4
+example = A.3
+nk = 8
+i = 27
+temp = 24360af2
+keyback = de8ebe96
+word = fab8b464
+
+key = 603deb1015ca71be2b73aef0857d77811f352c073b6108d72d9810a30914dff4
+example = A.3
+nk = 8
+i = 28
+temp = fab8b464
+sub = 2d6c8d43
+keyback = b5a9328a
+word = 98c5bfc9
+
+key = 603deb1015ca71be2b73aef0857d77811f352c073b6108d72d9810a30914dff4
+example = A.3
+nk = 8
+i = 29
+temp = 98c5bfc9
+keyback = 2678a647
+word = bebd198e
+
+key = 603deb1015ca71be2b73aef0857d77811f352c073b6108d72d9810a30914dff4
+example = A.3
+nk = 8
+i = 30
+temp = bebd198e
+keyback = 98312229
+word = 268c3ba7
+
+key = 603deb1015ca71be2b73aef0857d77811f352c073b6108d72d9810a30914dff4
+example = A.3
+nk = 8
+i = 31
+temp = 268c3ba7
+keyback = 2f6c79b3
+word = 09e04214
+
+key = 603deb1015ca71be2b73aef0857d77811f352c073b6108d72d9810a30914dff4
+example = A.3
+nk = 8
+i = 32
+temp = 09e04214
+rot = e0421409
+sub = e12cfa01
+rcon = 08000000
+after = e92cfa01
+keyback = 812c81ad
+word = 68007bac
+
+key = 603deb1015ca71be2b73aef0857d77811f352c073b6108d72d9810a30914dff4
+example = A.3
+nk = 8
+i = 33
+temp = 68007bac
+keyback = dadf48ba
+word = b2df3316
+
+key = 603deb1015ca71be2b73aef0857d77811f352c073b6108d72d9810a30914dff4
+example = A.3
+nk = 8
+i = 34
+temp = b2df3316
+keyback = 24360af2
+word = 96e939e4
+
+key = 603deb1015ca71be2b73aef0857d77811f352c073b6108d72d9810a30914dff4
+example = A.3
+nk = 8
+i = 35
+temp = 96e939e4
+keyback = fab8b464
+word = 6c518d80
+
+key = 603deb1015ca71be2b73aef0857d77811f352c073b6108d72d9810a30914dff4
+example = A.3
+nk = 8
+i = 36
+temp = 6c518d80
+sub = 50d15dcd
+keyback = 98c5bfc9
+word = c814e204
+
+key = 603deb1015ca71be2b73aef0857d77811f352c073b6108d72d9810a30914dff4
+example = A.3
+nk = 8
+i = 37
+temp = c814e204
+keyback = bebd198e
+word = 76a9fb8a
+
+key = 603deb1015ca71be2b73aef0857d77811f352c073b6108d72d9810a30914dff4
+example = A.3
+nk = 8
+i = 38
+temp = 76a9fb8a
+keyback = 268c3ba7
+word = 5025c02d
+
+key = 603deb1015ca71be2b73aef0857d77811f352c073b6108d72d9810a30914dff4
+example = A.3
+nk = 8
+i = 39
+temp = 5025c02d
+keyback = 09e04214
+word = 59c58239
+
+key = 603deb1015ca71be2b73aef0857d77811f352c073b6108d72d9810a30914dff4
+example = A.3
+nk = 8
+i = 40
+temp = 59c58239
+rot = c5823959
+sub = a61312cb
+rcon = 10000000
+after = b61312cb
+keyback = 68007bac
+word = de136967
+
+key = 603deb1015ca71be2b73aef0857d77811f352c073b6108d72d9810a30914dff4
+example = A.3
+nk = 8
+i = 41
+temp = de136967
+keyback = b2df3316
+word = 6ccc5a71
+
+key = 603deb1015ca71be2b73aef0857d77811f352c073b6108d72d9810a30914dff4
+example = A.3
+nk = 8
+i = 42
+temp = 6ccc5a71
+keyback = 96e939e4
+word = fa256395
+
+key = 603deb1015ca71be2b73aef0857d77811f352c073b6108d72d9810a30914dff4
+example = A.3
+nk = 8
+i = 43
+temp = fa256395
+keyback = 6c518d80
+word = 9674ee15
+
+key = 603deb1015ca71be2b73aef0857d77811f352c073b6108d72d9810a30914dff4
+example = A.3
+nk = 8
+i = 44
+temp = 9674ee15
+sub = 90922859
+keyback = c814e204
+word = 5886ca5d
+
+key = 603deb1015ca71be2b73aef0857d77811f352c073b6108d72d9810a30914dff4
+example = A.3
+nk = 8
+i = 45
+temp = 5886ca5d
+keyback = 76a9fb8a
+word = 2e2f31d7
+
+key = 603deb1015ca71be2b73aef0857d77811f352c073b6108d72d9810a30914dff4
+example = A.3
+nk = 8
+i = 46
+temp = 2e2f31d7
+keyback = 5025c02d
+word = 7e0af1fa
+
+key = 603deb1015ca71be2b73aef0857d77811f352c073b6108d72d9810a30914dff4
+example = A.3
+nk = 8
+i = 47
+temp = 7e0af1fa
+keyback = 59c58239
+word = 27cf73c3
+
+key = 603deb1015ca71be2b73aef0857d77811f352c073b6108d72d9810a30914dff4
+example = A.3
+nk = 8
+i = 48
+temp = 27cf73c3
+rot = cf73c327
+sub = 8a8f2ecc
+rcon = 20000000
+after = aa8f2ecc
+keyback = de136967
+word = 749c47ab
+
+key = 603deb1015ca71be2b73aef0857d77811f352c073b6108d72d9810a30914dff4
+example = A.3
+nk = 8
+i = 49
+temp = 749c47ab
+keyback = 6ccc5a71
+word = 18501dda
+
+key = 603deb1015ca71be2b73aef0857d77811f352c073b6108d72d9810a30914dff4
+example = A.3
+nk = 8
+i = 50
+temp = 18501dda
+keyback = fa256395
+word = e2757e4f
+
+key = 603deb1015ca71be2b73aef0857d77811f352c073b6108d72d9810a30914dff4
+example = A.3
+nk = 8
+i = 51
+temp = e2757e4f
+keyback = 9674ee15
+word = 7401905a
+
+key = 603deb1015ca71be2b73aef0857d77811f352c073b6108d72d9810a30914dff4
+example = A.3
+nk = 8
+i = 52
+temp = 7401905a
+sub = 927c60be
+keyback = 5886ca5d
+word = cafaaae3
+
+key = 603deb1015ca71be2b73aef0857d77811f352c073b6108d72d9810a30914dff4
+example = A.3
+nk = 8
+i = 53
+temp = cafaaae3
+keyback = 2e2f31d7
+word = e4d59b34
+
+key = 603deb1015ca71be2b73aef0857d77811f352c073b6108d72d9810a30914dff4
+example = A.3
+nk = 8
+i = 54
+temp = e4d59b34
+keyback = 7e0af1fa
+word = 9adf6ace
+
+key = 603deb1015ca71be2b73aef0857d77811f352c073b6108d72d9810a30914dff4
+example = A.3
+nk = 8
+i = 55
+temp = 9adf6ace
+keyback = 27cf73c3
+word = bd10190d
+
+key = 603deb1015ca71be2b73aef0857d77811f352c073b6108d72d9810a30914dff4
+example = A.3
+nk = 8
+i = 56
+temp = bd10190d
+rot = 10190dbd
+sub = cad4d77a
+rcon = 40000000
+after = 8ad4d77a
+keyback = 749c47ab
+word = fe4890d1
+
+key = 603deb1015ca71be2b73aef0857d77811f352c073b6108d72d9810a30914dff4
+example = A.3
+nk = 8
+i = 57
+temp = fe4890d1
+keyback = 18501dda
+word = e6188d0b
+
+key = 603deb1015ca71be2b73aef0857d77811f352c073b6108d72d9810a30914dff4
+example = A.3
+nk = 8
+i = 58
+temp = e6188d0b
+keyback = e2757e4f
+word = 046df344
+
+key = 603deb1015ca71be2b73aef0857d77811f352c073b6108d72d9810a30914dff4
+example = A.3
+nk = 8
+i = 59
+temp = 046df344
+keyback = 7401905a
+word = 706c631e
+
+[tables]
+# source: FIPS 197 (2001) figures 7 and 14
+
+table = sbox
+value = 637c777bf26b6fc53001672bfed7ab76ca82c97dfa5947f0add4a2af9ca472c0b7fd9326363ff7cc34a5e5f171d8311504c723c31896059a071280e2eb27b27509832c1a1b6e5aa0523bd6b329e32f8453d100ed20fcb15b6acbbe394a4c58cfd0efaafb434d338545f9027f503c9fa851a3408f929d38f5bcb6da2110fff3d2cd0c13ec5f974417c4a77e3d645d197360814fdc222a908846eeb814de5e0bdbe0323a0a4906245cc2d3ac629195e479e7c8376d8dd54ea96c56f4ea657aae08ba78252e1ca6b4c6e8dd741f4bbd8b8a703eb5664803f60e613557b986c11d9ee1f8981169d98e949b1e87e9ce5528df8ca1890dbfe6426841992d0fb054bb16
+
+table = inverse
+value = 52096ad53036a538bf40a39e81f3d7fb7ce339829b2fff87348e4344c4dee9cb547b9432a6c2233dee4c950b42fac34e082ea16628d924b2765ba2496d8bd12572f8f66486689816d4a45ccc5d65b6926c704850fdedb9da5e154657a78d9d8490d8ab008cbcd30af7e45805b8b34506d02c1e8fca3f0f02c1afbd0301138a6b3a9111414f67dcea97f2cfcef0b4e67396ac7422e7ad3585e2f937e81c75df6e47f11a711d29c5896fb7620eaa18be1bfc563e4bc6d279209adbc0fe78cd5af41fdda8338807c731b11210592780ec5f60517fa919b54a0d2de57a9f93c99cefa0e03b4dae2af5b0c8ebbb3c83539961172b047eba77d626e169146355210c7d

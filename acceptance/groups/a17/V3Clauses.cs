@@ -182,6 +182,9 @@ namespace Acceptance
                 }
                 if (covered == 0) throw new NotRunException("LESSON_NOT_BUILT", "the Host reports every lab as not built yet");
                 if (secretsSeen == 0) throw new FailException("no lab produced a secrets[] entry with Show keys ON, so the OFF scan has nothing to look for");
+                // The two lesson 10 values that travel on the wire by design. A key on the wire must FAIL here, and never earn the exemption.
+                foreach (string name in onTheWire.Keys)
+                    Check.True(name == "auth.token" || name == "auth.last-call", "the ON run put the secret " + name + " on the wire. Only auth.token and auth.last-call travel in the clear");
                 return covered + " labs, ON then OFF: no hex in any OFF frame, /events or file; the ON bytes left /events at once after the flip; key log refused with KEYS_HIDDEN. "
                     + "Text scan for ON bytes on labs " + (textScanned.Count == 0 ? "none" : string.Join(",", textScanned.ToArray()))
                     + "; structure only on labs " + (structuralOnly.Count == 0 ? "none" : string.Join(",", structuralOnly.ToArray()))
