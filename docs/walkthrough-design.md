@@ -223,6 +223,14 @@ In lesson 1, a free flip on a non-wire event changes nothing. `Interpreter.Apply
 | GCM tag | All `match`, `damage: tag` | None | The cipher blocks arrived intact, and the tag failed |
 | Frame header, type or length | All `match`, `damage: type` or `length` | None | The receiver could not read this frame as sent. The run's own events show what happened |
 
+**The chapter ends with "Mistakes people make".** Each row points at an attack the lesson already runs, so this adds no route and no engine code. Steve's links show these habits in real writing. The on-screen words name the habit and never a person or a page, and Jared checks them first.
+
+| Mistake | What the learner runs | What the learner sees |
+|---|---|---|
+| ECB, often as a tool's default | `L1-use-ecb` | Equal blocks give equal cipher blocks |
+| CBC with no tag. A strong key does not fix this | `L1-flip-cbc` | A flipped bit passes with no error |
+| A repeated GCM nonce | `L1-reuse-nonce` | Two messages share a key stream. Only the lab's detector calls it out |
+
 **Out of scope, named on the tab.** The modes page also lists CFB, OFB, and CTR, and it names XTS. CFB, OFB, and XTS are not in this course (grep of `src/NetSec.Core`: 0 files). CTR alone runs in lesson 8's SSH suite, and the panel points there. Lesson 1 runs counter mode only inside GCM.
 
 ### 2.5 Decision: ECB carries chapter 1
@@ -302,6 +310,8 @@ Both use the same `Sbox`, `InverseSbox`, `ShiftRowsMap`, and `InverseShiftRowsMa
 2. **In acceptance.** Echo's FIPS clauses compare every state, and a random clause compares each walk with the BCL.
 
 **What would change my mind:** a benchmark that shows an observer branch costs nothing measurable on both builds, and a reason to walk more paths than these two.
+
+**Other projects, read as leads only.** `kokke/tiny-AES-c`, `SergeyBel/AES`, and `abdouskamel/aes-csharp` split SubBytes and ShiftRows in their one real path, in the same order as FIPS 197 and this design. None of their cipher calls takes an observer or returns round states, so none offers a better shape for the walk. Nothing here copies their code.
 
 ### 3.3 Core types: C# 3, both builds
 
@@ -601,7 +611,7 @@ Sheet 5.9 lists them, and these three matter most:
 | **W1a** skeleton | `AesKey.Walk.cs`, `AesWalks.Block`, the tables route and the block route. No UI | FIPS, table, BCL, toggle, and golden clauses pass on both builds. `tools/gate.ps1` green | Richard |
 | **W1b** small section | `walk.ts`, `AesBlockWalk.vue`, `SboxView.vue`, chapter 1 at 128 bits, encrypt and decrypt, the flip guard | e2e: a learner reaches `Pump four is ok.` by Next alone. A clicked cell's lookup equals the next state, both tables. Grid order clause. S-box scan | Nancy |
 | **Stop: show Steve** | Steve steps through chapter 1 in the app and reacts. CBC and modes work starts after this | His reaction goes in `docs/learnings.md`, and later slices read it | Lead |
-| **W1c** | `Gcm.CounterBlock`, `AesWalks.Feed`, the modes route, `AesFeedView.vue`, chapter 2 with ECB, CBC, GCM. Key sizes, two tour steps, gloss | Wire clauses per mode. e2e on wire match and on damage. A15, A15a by a reader who did not write it | Richard, Nancy |
+| **W1c** | `Gcm.CounterBlock`, `AesWalks.Feed`, the modes route, `AesFeedView.vue`, chapter 2 with ECB, CBC, GCM, and "Mistakes people make". Key sizes, two tour steps, gloss | Wire clauses per mode. e2e on wire match and on damage. A15, A15a by a reader who did not write it | Richard, Nancy |
 | W2 | `AesKey.SboxBuild(byte)` and "how the table was built". `flipKeyBit`. One-bit-flip spread count (4 bytes after round 1, 16 after round 2) | FIPS 5.1.1 worked example for `53`. Spread count against Jared's values | Richard, Nancy |
 | W3 | Lesson 3 try-it, lesson 4 bench | Clauses on each check result | Richard, Nancy, Jared on wording |
 | W4 | Lesson 5 record walk and speed bench | Record walk equals the wire. The number's label names the machine and table AES | Richard, Nancy |
