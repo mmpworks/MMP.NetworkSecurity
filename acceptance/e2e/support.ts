@@ -14,7 +14,7 @@ export class NotRun extends Error {
 
 export function stateFile(): string { return path.join(OUT, 'state.json'); }
 
-export function readState(): { hostUp: boolean; previewUp: boolean; note: string } {
+export function readState(): { hostUp: boolean; previewUp: boolean; note: string; reason?: string } {
   try { return JSON.parse(fs.readFileSync(stateFile(), 'utf8')); } catch { return { hostUp: false, previewUp: false, note: 'no state file: global setup did not run' }; }
 }
 
@@ -35,7 +35,7 @@ export async function hostGet(pathname: string): Promise<{ status: number; body:
 
 export function requireLive(): void {
   const s = readState();
-  if (!s.hostUp || !s.previewUp) throw new NotRun('PRODUCT_MISSING', s.note);
+  if (!s.hostUp || !s.previewUp) throw new NotRun(s.reason ?? 'PRODUCT_MISSING', s.note);
 }
 
 /** Tour steps of a lesson, from the tour file. Array of steps, or { steps: [] }. */

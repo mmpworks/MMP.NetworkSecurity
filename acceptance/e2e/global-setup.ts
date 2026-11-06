@@ -16,6 +16,29 @@ function waitPort(port: number, ms: number, host = '127.0.0.1'): Promise<boolean
   });
 }
 
+/** True when something already answers on the port. A port like that belongs to another tree, so a spec there would judge that tree's screens. */
+function answers(port: number, host: string): Promise<boolean> {
+  return new Promise(resolve => {
+    const s = net.connect(port, host);
+    const done = (open: boolean) => { s.destroy(); resolve(open); };
+    s.setTimeout(1_000, () => done(false));
+    s.once('connect', () => done(true));
+    s.once('error', () => done(false));
+  });
+}
+
+/** Waits for the child's own words: vite prints the address it bound. A port that answers proves nothing, since another tree can hold it. */
+async function previewOwnsPort(log: string, port: number, exited: () => boolean, ms: number): Promise<boolean> {
+  const end = Date.now() + ms;
+  while (Date.now() < end) {
+    if (exited()) return false;
+    const text = (fs.existsSync(log) ? fs.readFileSync(log, 'utf8') : '').replace(/\x1b\[[0-9;]*m/g, '');   // vite colours the port number
+    if (text.includes(`localhost:${port}`)) return true;
+    await new Promise(r => setTimeout(r, 250));
+  }
+  return false;
+}
+
 /**
  * Starts the Host and `vite preview` from the product tree, the way program-design.md section 9 says lesson walks run:
  * vite preview on 4180, a live Host, one worker. If the product is not there yet it records why and the specs report NOT RUN.
@@ -23,11 +46,21 @@ function waitPort(port: number, ms: number, host = '127.0.0.1'): Promise<boolean
  */
 export default async function globalSetup(): Promise<void> {
   fs.mkdirSync(OUT, { recursive: true });
-  const state = { hostUp: false, previewUp: false, note: '', pids: [] as number[] };
+  const state = { hostUp: false, previewUp: false, note: '', reason: 'PRODUCT_MISSING', pids: [] as number[] };
   const hostDll = process.env.ACC_HOST ?? '';
   const appDir = path.join(ROOT, 'app');
   if (!hostDll || !fs.existsSync(hostDll)) { state.note = `NetSec.Host is not built (ACC_HOST=${hostDll})`; fs.writeFileSync(stateFile(), JSON.stringify(state)); return; }
   if (!fs.existsSync(path.join(appDir, 'dist', 'index.html'))) { state.note = `app/dist is not built in ${appDir}`; fs.writeFileSync(stateFile(), JSON.stringify(state)); return; }
+
+  // A busy port stops the group by name, before anything starts. Without this check a run reads another tree's renderer and reports it as its own.
+  for (const [port, host, what] of [[HOST_PORT, '127.0.0.1', 'Host'], [PREVIEW_PORT, 'localhost', 'preview']] as [number, string, string][]) {
+    if (await answers(port, host)) {
+      state.reason = 'PORT_BUSY';
+      state.note = `the ${what} port ${port} already answers, and this run did not start it. A spec there would judge another tree`;
+      fs.writeFileSync(stateFile(), JSON.stringify(state));
+      return;
+    }
+  }
 
   const localAppData = path.join(OUT, 'localappdata');
   fs.mkdirSync(localAppData, { recursive: true });
@@ -40,16 +73,22 @@ export default async function globalSetup(): Promise<void> {
   const host = hostDll.toLowerCase().endsWith('.dll')
     ? spawn('dotnet', [hostDll, ...hostArgs], { cwd: path.dirname(hostDll), detached: false, stdio: 'ignore', env: { ...process.env, NETSEC_PORT: String(HOST_PORT), NETSEC_TOKEN: TOKEN, LOCALAPPDATA: localAppData, NETSEC_SECURITY_DIR: securityDir } })
     : spawn(hostDll, hostArgs, { cwd: path.dirname(hostDll), detached: false, stdio: 'ignore', env: { ...process.env, NETSEC_PORT: String(HOST_PORT), NETSEC_TOKEN: TOKEN, LOCALAPPDATA: localAppData, NETSEC_SECURITY_DIR: securityDir } });
+  let hostGone = false;
+  host.on('exit', () => { hostGone = true; });
   host.on('error', () => { /* a start failure shows as hostUp false */ });
   if (host.pid) state.pids.push(host.pid);
-  state.hostUp = await waitPort(HOST_PORT, 60_000);
+  state.hostUp = await waitPort(HOST_PORT, 60_000) && !hostGone;
 
-  const previewLog = fs.openSync(path.join(OUT, 'preview.log'), 'a');   // vite's own words, kept so a dead preview can be explained
+  const previewLogPath = path.join(OUT, 'preview.log');
+  fs.rmSync(previewLogPath, { force: true });
+  let previewGone = false;
+  const previewLog = fs.openSync(previewLogPath, 'a');   // vite's own words, kept so a dead preview can be explained
   const preview = spawn('npx', ['vite', 'preview', '--port', String(PREVIEW_PORT), '--strictPort', '--host', 'localhost'], { cwd: appDir, shell: true, detached: false, stdio: ['ignore', previewLog, previewLog] });
-  preview.on('exit', (code, sig) => { try { fs.appendFileSync(path.join(OUT, 'preview.log'), `\n[preview exited code=${code} signal=${sig} at ${new Date().toISOString()}]\n`); } catch { /* ignore */ } });
+  preview.on('exit', (code, sig) => { previewGone = true; try { fs.appendFileSync(path.join(OUT, 'preview.log'), `\n[preview exited code=${code} signal=${sig} at ${new Date().toISOString()}]\n`); } catch { /* ignore */ } });
   preview.on('error', () => { /* a start failure shows as previewUp false */ });
   if (preview.pid) state.pids.push(preview.pid);
-  state.previewUp = await waitPort(PREVIEW_PORT, 60_000, 'localhost');   // vite preview listens on localhost, which can be ::1 only
-  state.note = state.hostUp && state.previewUp ? 'live' : `host up: ${state.hostUp}, preview up: ${state.previewUp}`;
+  state.previewUp = await previewOwnsPort(previewLogPath, PREVIEW_PORT, () => previewGone, 60_000) && await waitPort(PREVIEW_PORT, 60_000, 'localhost');   // vite preview listens on localhost, which can be ::1 only
+  if (!state.previewUp && previewGone) { state.reason = 'PORT_BUSY'; state.note = `this run's preview exited before it bound port ${PREVIEW_PORT}. See preview.log`; }
+  if (!state.note) state.note = state.hostUp && state.previewUp ? 'live' : `host up: ${state.hostUp}, preview up: ${state.previewUp}`;
   fs.writeFileSync(stateFile(), JSON.stringify(state));
 }
