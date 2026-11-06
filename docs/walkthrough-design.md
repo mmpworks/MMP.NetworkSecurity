@@ -95,7 +95,7 @@ Steve's Wikipedia page sets the order. It describes the older TDES form. **This 
 |---|---|---|
 | 1 | Split the text into 16-byte blocks | Section 2.2, first view |
 | 2 | Put one block in the 4x4 grid, by columns | Section 2.2, first view |
-| 3 | The key schedule: the word wall, then one word built step by step. The key size sets the rounds: 10, 12, or 14 in total | Section 2.2b |
+| 3 | The key schedule: the key as words, then the expanded table, built one word at a time. The key size sets the rounds: 10, 12, or 14 in total | Section 2.2b |
 | 4 | AddRoundKey with round key 0. This comes before round 1, and it is not a round | Section 2.2 |
 | 5 | SubBytes, with one byte traced through the S-box | Sections 2.2, 2.3 |
 | 6 | ShiftRows | Section 2.2 |
@@ -136,7 +136,7 @@ So the first column reads `Pump`, and the top row reads `P`, space, `r`, space. 
 | Part | On screen | Words that carry the truth |
 |---|---|---|
 | Label | The panel names the input | "A teaching example. AES runs on this text block alone, the way ECB uses it. This run did not send this block in ECB." The label changes to `match` on the `L1-use-ecb` fork |
-| Key schedule | The word wall, then one word built step by step (section 2.2b) | The key makes 11 round keys for AES-128 (13 for 192, 15 for 256) |
+| Key schedule | The key as words, then the expanded table, built one word at a time (section 2.2b) | The key makes 11 round keys for AES-128 (13 for 192, 15 for 256) |
 | Encrypt | AddRoundKey 0. Rounds 1 to 9: SubBytes, ShiftRows, MixColumns, AddRoundKey. Round 10: SubBytes, ShiftRows, AddRoundKey | The first SubBytes sees letters XOR round key 0. It never sees bare letters |
 | Decrypt | AddRoundKey 10. Rounds 9 to 1: InvShiftRows, InvSubBytes, AddRoundKey, InvMixColumns. Last: InvShiftRows, InvSubBytes, AddRoundKey 0. The grid reads `Pump four is ok.` | The same key, with the round keys from last to first. This is FIPS 197 section 5.3 order, and the only order that works with these round keys (sheet 5.1) |
 
@@ -186,15 +186,30 @@ For tests: a clause reads end frames under reduced motion, so no test waits on a
 
 Steve's ask: how the key schedule is created. FIPS 197 section 5.2 is the source of record. None of Steve's five videos walks it, by the lead's reading. This part comes before the first AddRoundKey.
 
-**View 1, the word wall.** A row of words, grouped in fours. Each group of 4 words is one round key. The learner sees which group each AddRoundKey uses.
+**View 1, the key and the expanded table.**
 
-| Key | Nk (key words) | Rounds | Round keys | Words | Round constants used |
-|---|---|---|---|---|---|
-| AES-128 | 4 | 10 | 11 | 44 | 10 |
-| AES-192 | 6 | 12 | 13 | 52 | 8 |
-| AES-256 | 8 | 14 | 15 | 60 | 7 |
+1. The original key shows as its words: `w0` to `w3` at AES-128.
+2. The whole expanded table shows as one grid of 16 cells per round key: 11 grids at AES-128. Each column of a grid is one word, so the columns fill in the same order as the block (section 2.2).
+3. Each cell looks like a block cell: its byte position at top left, hex in the centre, its word name at lower left, and no letter at lower right, because key bytes are not text.
 
-**View 2, build one word.** The first Nk words are the key itself. Each later word comes from two earlier words: the one before it, and the one Nk back. Every Nk words, the word before it first passes through three steps. Next walks each word of round key 1. After that, Next moves one round key at a time, and the learner can click any word to open its build.
+The byte position runs through the whole table, 0 to 175 at AES-128. `w4` is positions 16 to 19, in round key 1's first column.
+
+| Key | Nk (key words) | Rounds | Round keys, so grids | Words | Byte positions | Round constants used | Where the key ends |
+|---|---|---|---|---|---|---|---|
+| AES-128 | 4 | 10 | 11 | 44 | 0 to 175 | 10 | The end of round key 0 |
+| AES-192 | 6 | 12 | 13 | 52 | 0 to 207 | 8 | The second column of round key 1 |
+| AES-256 | 8 | 14 | 15 | 60 | 0 to 239 | 7 | The end of round key 1 |
+
+**At AES-192 and AES-256, the key runs past round key 0.** The grids stay one per round key, because each grid is what one AddRoundKey uses. A band marks the key's words across the grids: `w0` to `w5` at AES-192, and `w0` to `w7` at AES-256. Those cells start filled, and the panel says: "The first 6 words are the key, so round key 1 starts with key bytes." At AES-256 it says the first 8 words. The build starts at the next column: `w6` at AES-192, and `w8` at AES-256.
+
+**View 2, build one word.** The first Nk words are the key itself. Each later word comes from two earlier words: the one before it, and the one Nk back. Every Nk words, the word before it first passes through three steps. Next and Play build one word at a time.
+
+| Moment | On screen |
+|---|---|
+| A word builds | The word before it and the word Nk back light up in the table. Each one matches its stage row by colour, and the stage row also names it, such as `w3` and `w0`, so colour is never the only sign |
+| Play | Stops when a grid fills, by the rule of section 2.8. Press it again for the next grid. A round chip jumps to a grid |
+| Tap a built word | Its stage rows open, and the two words behind it light up. A word not yet built does nothing |
+| A key word | It has no stage rows, so a tap says "This word is part of the key" |
 
 Worked example, the FIPS 197 appendix A key `2b7e1516 28aed2a6 abf71588 09cf4f3c`. The app shows the run's own key, with the same steps.
 
@@ -207,6 +222,8 @@ Worked example, the FIPS 197 appendix A key `2b7e1516 28aed2a6 abf71588 09cf4f3c
 | XOR w0 (`2b7e1516`) | `a0fafe17`, which is w4 | `keyBack`, `word` |
 
 **AES-256 only:** at `i mod 8 = 4`, the word before passes through SubWord alone. The panel says so when the learner picks 256.
+
+**The reply needs no new field.** `keyWords[]` already has every row by `i`, and each row holds `word`, `previous`, `rotated`, `substituted`, `rcon`, `afterRcon`, and `keyBack`. Grid, column, cell, and byte position come from `i` by layout: `i / 4`, `i % 4`, and `4i + r`. The two words to light are `i - 1` and `i - Nk`, with Nk from the tables route's size table. That is position arithmetic, and the app reads no byte value to do it. A clause holds it: the bytes in the lit cells must equal `previous` and `keyBack`.
 
 **Rcon row.** `01 02 04 08 10 20 40 80 1b 36`. Each value is the one before it, doubled in the field. Ordinary doubling of `80` gives `100`, which does not fit in a byte. Field doubling gives `1b`. This row is the first place the learner meets the field in real use. The row comes from the tables route, because the app holds no crypto values.
 
@@ -511,7 +528,7 @@ From Jared's sheet. Echo can scan for these in `walk-gloss.json` and the tour.
 | Move through steps | Back, Next, and round chips to jump |
 | Watch steps move | One Play and Pause button, which stops at the end of the round. Press it again for the next round. Steve can overrule this after he steps through W1b |
 | How fast | One speed control: slow, normal, fast |
-| See one word's build | Click a word on the word wall |
+| See one word's build | Tap a built word in the table |
 | See one byte's lookup | Click a cell |
 | Open an AES box (chapter 2) | Click the box |
 
@@ -817,7 +834,7 @@ Limits of the spike:
 | `app/src/components/AesWalkPanel.vue` | Chapter tabs. Holds the two views below |
 | `app/src/components/AesBlockWalk.vue` | Picker, grid, Back, Next, round chips |
 | `app/src/components/SboxView.vue` | The 16 by 16 table, row and column lights, for both tables |
-| `app/src/components/KeySchedulePanel.vue` | The word wall, one word's build, the Rcon row |
+| `app/src/components/KeySchedulePanel.vue` | The key as words, the expanded table of grids, one word's stage rows, the Rcon row |
 | `app/src/components/FieldPanel.vue` | The definition lines, and one multiply from the engine's terms |
 | `app/src/components/GhashView.vue`, `ForgeryView.vue` | W1c: the rows of section 2.4a, and the steps of section 2.4b. Values come from the engine |
 | `app/src/useWalkTimeline.ts` | Play, Pause, speed, stop at the end of a round, reduced motion. It holds states and never makes a byte |
@@ -920,6 +937,8 @@ If Steve does not follow it after 2 rounds of word changes, stop and re-plan the
 | Theme | What a clause checks |
 |---|---|
 | Round values | Every CIPHER and INVERSE CIPHER state for FIPS C.1, C.2, C.3, by position. The vector reader skips the appendix's EQUIVALENT INVERSE CIPHER lists, which hold a different order |
+| Expanded table | 11, 13, and 15 grids of 16 cells. The cell at byte position n shows byte n of the expanded key, and its word name is `w(n / 4)`. No cell shows a letter. The key band ends where section 2.2b says, and those cells start filled |
+| Word build | Next adds one word. The lit cells equal that row's `previous` and `keyBack`. A tap on a built word opens its stage rows, and a tap on an unbuilt word does nothing. Each `aes-walk-*` key schedule cell is gone with Show keys OFF |
 | Key words | FIPS appendix A rows, for all three sizes. The Rcon row equals `01 02 04 08 10 20 40 80 1b 36`, and the used counts are 10, 8, 7 |
 | End frames | Every animated step lands on the engine state for that step, for all three key sizes |
 | Reduced motion | Each step shows its end frame with no transition |
