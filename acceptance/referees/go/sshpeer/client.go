@@ -71,6 +71,10 @@ func (c *clientOptions) config(hostKeyCode *string) (*ssh.ClientConfig, error) {
 		HostKeyAlgorithms: c.algorithms.HostKeyAlgs(),
 	}
 	c.algorithms.Apply(&cfg.Config)
+	if c.password != "" {
+		cfg.Auth = []ssh.AuthMethod{ssh.Password(c.password)}
+	}
+	cfg.RekeyThreshold = c.rekeyBytes
 	return cfg, nil
 }
 

@@ -21,6 +21,7 @@ type Options struct {
 	ServerName string
 	KeyLog     string
 	Insecure   bool
+	Tls11Suite string
 }
 
 // Register adds the shared flags to fs. defaultGroup is the group a tool uses
@@ -33,6 +34,7 @@ func (o *Options) Register(fs *flag.FlagSet, defaultGroup string) {
 	fs.StringVar(&o.ServerName, "server-name", "", "name to verify on the server certificate (default: the host dialed)")
 	fs.StringVar(&o.KeyLog, "keylog", "", "append NSS key log lines to this file")
 	fs.BoolVar(&o.Insecure, "insecure", false, "client: skip server certificate verification")
+	fs.StringVar(&o.Tls11Suite, "tls11-suite", "", "client: speak TLS 1.1 and offer only this suite, by its Go name. OpenSSL 3.5 has no 3DES, so A18 asks Go")
 }
 
 // Client returns a client configuration pinned to TLS 1.3 and the named group.
@@ -42,6 +44,13 @@ func (o *Options) Client(host string) (*tls.Config, error) {
 	cfg, err := o.base()
 	if err != nil {
 		return nil, err
+	}
+	if o.Tls11Suite != "" {
+		id, err := insecureSuite(o.Tls11Suite)
+		if err != nil {
+			return nil, err
+		}
+		cfg.MinVersion, cfg.MaxVersion, cfg.CipherSuites = tls.VersionTLS11, tls.VersionTLS11, []uint16{id}
 	}
 	cfg.ServerName = o.ServerName
 	if cfg.ServerName == "" {
@@ -76,6 +85,16 @@ func (o *Options) Server(requireClientCert bool) (*tls.Config, error) {
 	cfg.ClientAuth = tls.RequireAndVerifyClientCert
 	cfg.ClientCAs, err = loadPool(o.CA)
 	return cfg, err
+}
+
+// insecureSuite finds a suite by name in the library's lists.
+func insecureSuite(name string) (uint16, error) {
+	for _, s := range append(tls.CipherSuites(), tls.InsecureCipherSuites()...) {
+		if s.Name == name {
+			return s.ID, nil
+		}
+	}
+	return 0, errors.New("the library has no suite named " + name)
 }
 
 func (o *Options) base() (*tls.Config, error) {
