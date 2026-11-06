@@ -5,8 +5,11 @@ import { defineConfig } from '@playwright/test';
 //   ACC_ROOT    repo root of the product (the folder that holds app/ and src/)
 //   ACC_HOST    path of NetSec.Host.dll
 //   ACC_OUT     folder for screenshots and the state file
+//   ACC_E2E_GREP  the selected clause ids as one regular expression. Absent means every clause. A test outside the selection does not run,
+//                 so its result cannot be lost from a report that lists only the selection
 export default defineConfig({
   testDir: '.',
+  grep: process.env.ACC_E2E_GREP ? new RegExp(process.env.ACC_E2E_GREP) : undefined,
   testMatch: /.*\.spec\.ts/,
   workers: 1,
   fullyParallel: false,

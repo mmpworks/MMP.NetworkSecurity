@@ -1,6 +1,6 @@
 # MMP.NetworkSecurity: walkthrough design
 
-Author: Richard. Date: 2026-11-06. Revision 11, adding the round constant doubling. Revision 10 added the phantom column. Status: design only, for Jared's check and Echo's clauses. No product code.
+Author: Richard. Date: 2026-11-06. Revision 13, adding the test that decides each word, with its numbers from the engine. Status: design only, for Jared's check and Echo's clauses. No product code.
 
 Sources of facts: FIPS 197, the engine, and Jared's sheet `E:\dev\ns-lesson1-facts.md`. Steve's web pages set depth and teaching order only (section 2.1).
 
@@ -165,7 +165,7 @@ Steve's ask: see the 16 bytes change at each stage.
 
 | Step | What moves | End frame |
 |---|---|---|
-| AddRoundKey | The round key grid slides over the state. Each cell shows its new byte | Engine state after AddRoundKey |
+| AddRoundKey | In order: the round key grid fills on the right, column by column, and holds with the block unchanged. It then slides over the block, each byte changes one at a time, and the key returns. An AddRoundKey that runs from a Start view skips the fill, because that view already shows its key. That is round 0 on encrypt, and round Nr on decrypt. Every other AddRoundKey fills, including one reached by a round chip, and decrypt's AddRoundKey 0 | Step's `roundKey`, then the engine state after AddRoundKey |
 | SubBytes | Each cell flips to its new byte, one cell at a time on the first pass, then all cells at once | Engine state after SubBytes |
 | ShiftRows | A smooth roll, one row at a time, like a ticker tape. Row 0 stays. Rows 1, 2, 3 rotate left by 1, 2, 3: bytes leave the left edge and enter at the right edge. No fade and no lift | Engine state after ShiftRows |
 | MixColumns | One column at a time lifts, its 4 bytes join, and 4 new bytes come out | Engine state after MixColumns |
@@ -176,7 +176,7 @@ Steve's ask: see the 16 bytes change at each stage.
 | Where a byte came from | Each cell shows a small mark with its position before this step, 0 to 15. The marks reset at each step, because a byte has no single source after MixColumns |
 | Which way ShiftRows moves | The engine's `ShiftRowsMap` and `InverseShiftRowsMap` come from the tables route (section 3.4), so a motion cannot disagree with the real map |
 | Next and Back | They land on the same states as without animation. A click during a motion jumps to the end frame. A Back during a roll or a key fill leaves no strip, no flying byte, no mark, and no hidden cell |
-| Start view | The right-hand grid shows the round key the next step uses, in place of "Before this step": round key 0 at the start of encryption, and round key Nr at the start of decryption. Next then runs the AddRoundKey motion from it. Show keys OFF closes it, as the block walk closes |
+| Start view | The right-hand grid shows the round key the next step uses, in place of "Before this step": round key 0 at the start of encryption, and round key Nr at the start of decryption. Next then runs the AddRoundKey motion from it. **The decrypt Start view is a stop in the one step list:** after encrypt's last step, Next lands on it with no motion, and the block shows the ciphertext. The app builds both Start views from the reply, so `steps` holds no extra entry. Show keys OFF closes it, as the block walk closes |
 | `prefers-reduced-motion` | Each step jumps to its end frame |
 | Show keys flips OFF during a motion, or during a pause | The timeline stops, and the walk clears (section 3.5) |
 | Library | None. CSS transforms and one small composable, `useWalkTimeline`. I would add a library only if a transform cannot do the MixColumns join |
@@ -261,6 +261,19 @@ Worked example, the FIPS 197 appendix A key `2b7e1516 28aed2a6 abf71588 09cf4f3c
 
 **AES-256 only:** at `i mod 8 = 4`, the word before passes through SubWord alone. The panel says so when the learner picks 256.
 
+**Each word's panel shows the test that decided it (Steve's item, W1b).** FIPS 197 section 5.2 picks a word's steps by dividing its index by Nk.
+
+| The word | Words on screen, by example |
+|---|---|
+| Has `rotated` | "18 ÷ 6 = 3, no remainder, so w18 rotates. It is rotation 3, so it takes round constant 3: 04." |
+| Has `substituted` and no `rotated` | "12 ÷ 8 leaves 4, so w12 gets the S-box step only. AES-256 adds this rule." |
+| Has no stages, past the key | "19 ÷ 6 leaves 1, so w19 is plain: no rotation." |
+| Part of the key | "w3 is part of the key, so nothing is calculated." |
+
+**A new field: yes, on each `keyWords` row.** The row gains `divisor`, `quotient`, and `remainder`, and the app prints them. They are not layout, which the app can work out from `i`. They are the rule itself, so an app that worked them out would be a second copy of the engine's branch, and the sentence could then disagree with the word it describes.
+
+The app picks the sentence from which stages the row holds, so the sentence cannot name a step the engine did not run. "Round constant 3" prints `quotient`, and "04" prints the first byte of the row's `rcon`. At AES-192, a word with remainder 4 is plain, and its sentence says so: "10 ÷ 6 leaves 4, so w10 is plain: no rotation."
+
 **A new word builds byte by byte.** For byte j of word i:
 
 | Moment | On screen | Value from the reply |
@@ -274,7 +287,7 @@ Worked example, the FIPS 197 appendix A key `2b7e1516 28aed2a6 abf71588 09cf4f3c
 
 The stage row for RotWord reads "RotWord: rotate one byte, up this column". With reduced motion, each word lands whole, and Back mid-word leaves no marks.
 
-**The phantom column (Steve's item, W1b).** A word that transforms the word before gets a phantom: a copy of that column, lifted above the base. RotWord words have one, and so do AES-256's SubWord-only words. Plain words, such as w5, show none. The base column never changes, and the learner can see that.
+**The phantom column (Steve's item, W1b).** A word that transforms a copy of the word before gets a phantom: a copy of that column, lifted above the base. RotWord words have one, and so do AES-256's SubWord-only words. Plain words, such as w5, show none. The base column never changes, and the learner can see that.
 
 | Moment | The phantom shows | Value from the reply |
 |---|---|---|
@@ -298,7 +311,7 @@ Panel words, with the word names from `i`:
 | Reduced motion | No phantom. The word lands whole, and the stage rows and the panel words still show |
 | A tap on a built word | Opens its stage rows, with no phantom, because the phantom belongs to the build |
 
-**The reply needs no new field.** `keyWords[]` already has every row by `i`, and each row holds `word`, `previous`, `rotated`, `substituted`, `rcon`, `afterRcon`, and `keyBack`. Grid, column, cell, and byte position come from `i` by layout: `i / 4`, `i % 4`, and `4i + r`. The two words to light are `i - 1` and `i - Nk`, with Nk from the tables route's size table. That is position arithmetic, and the app reads no byte value to do it. A clause holds it: the bytes in the lit cells must equal `previous` and `keyBack`.
+**The reply needs no other new field.** `keyWords[]` already has every row by `i`, and each row holds `word`, `previous`, `rotated`, `substituted`, `rcon`, `afterRcon`, and `keyBack`, beside the 3 numbers of the word test above. Grid, column, cell, and byte position come from `i` by layout: `i / 4`, `i % 4`, and `4i + r`. The two words to light are `i - 1` and `i - Nk`, with Nk from the tables route's size table. That is position arithmetic, and the app reads no byte value to do it. A clause holds it: the bytes in the lit cells must equal `previous` and `keyBack`.
 
 **Rcon row.** `01 02 04 08 10 20 40 80 1b 36`. Each value is the one before it, doubled in the field. Ordinary doubling of `80` gives `100`, which does not fit in a byte. Field doubling gives `1b`. This row is the first place the learner meets the field in real use. The row comes from the tables route, because the app holds no crypto values.
 
@@ -856,6 +869,7 @@ namespace NetSec.Crypto {
   public sealed class GhashWalk { public readonly byte[] Hash, CounterBlock, Mask, Tag; public readonly GhashRow[] Rows; }
   public sealed class AesKeyWord {            // One row of the FIPS 197 appendix A tables. An unused cell is null
     public readonly int Index;
+    public readonly int Divisor, Quotient, Remainder;   // Index / Nk, the test FIPS 197 section 5.2 applies to this word
     public readonly byte[] Previous, Rotated, Substituted, Rcon, AfterRcon, KeyBack, Word;
   }
   public sealed class AesDoubling {          // One field multiply by 2
@@ -1014,7 +1028,7 @@ Replies, trimmed. Every error carries `code`, `message`, `retryable`, and `reque
 {
   "source": "text", "keyBits": 128, "rounds": 10, "keySource": "run",
   "inputHex": "50756d7020666f7572206973206f6b2e",
-  "keyWords": [ { "i": 4, "previous": "...", "rotated": "...", "substituted": "...", "rcon": "...", "afterRcon": "...", "keyBack": "...", "word": "..." } ],
+  "keyWords": [ { "i": 4, "divisor": 4, "quotient": 1, "remainder": 0, "previous": "...", "rotated": "...", "substituted": "...", "rcon": "...", "afterRcon": "...", "keyBack": "...", "word": "..." } ],
   "forward": { "input": "...", "output": "...", "steps": [ { "kind": "AddRoundKey", "round": 0, "state": "...", "roundKey": "..." },
                                                  { "kind": "MixColumns", "round": 1, "state": "...", "terms": [ { "result": "04", "running": ["b3", "69", "34", "04"], "parts": [ { "factor": 2, "input": "d4", "doublings": [ { "from": "d4", "shifted": "1a8", "reduced": true, "to": "b3" } ], "picks": ["b3"], "sums": ["b3"], "reduced": true, "result": "b3" } ] } ] } ] },
   "inverse": { "input": "...", "output": "...", "steps": [] },
@@ -1254,7 +1268,7 @@ If Steve does not follow it after 2 rounds of word changes, stop and re-plan the
 | Theme | What a clause checks |
 |---|---|
 | Round values | Every CIPHER and INVERSE CIPHER state for FIPS C.1, C.2, C.3, by position. The vector reader skips the appendix's EQUIVALENT INVERSE CIPHER lists, which hold a different order |
-| Start view | At the start of encryption, the right-hand grid equals round key 0, and the first Next lands on AddRoundKey 0. At the start of decryption, it equals round key Nr, and the first Next lands on AddRoundKey Nr. It is gone with Show keys OFF |
+| Start view | At the start of encryption, the right-hand grid equals round key 0, and the first Next lands on AddRoundKey 0. At the start of decryption, it equals round key Nr, and the first Next lands on AddRoundKey Nr. After encrypt's last step, Next lands on the decrypt Start view, and the block equals `forward.output`. So the list holds one Start view before each direction's steps. It is gone with Show keys OFF |
 | ShiftRows roll | The roll ends on the engine state. A Back during a roll leaves no strip and no hidden cell. Row 0 does not move |
 | Phantom column | At each key size, a word has a phantom only on a RotWord or SubWord-only step, so w5 at AES-128 has none. Its cells equal `previous`, then `rotated`, `substituted`, and `afterRcon`, in that order. Each base column equals its `word` through every moment. A Back, a round chip, and Show keys OFF each leave no phantom. Pause holds it, by the Pause holds clause. Reduced motion shows none. The panel names `w(i - 1)` and `wi`, and the RotWord row reads "RotWord: rotate one byte, up this column" |
 | Key fill | The lit `w(i - Nk)` byte equals `keyBack[j]`. On a word with no phantom, the lit `w(i - 1)` byte equals `previous` at byte j. On a word with a phantom, the phantom's lit byte equals the last stage's byte j, and the `previous` row lights the source position, which is `(j + 1) mod 4` on a RotWord step. The equation's three values equal the reply's. A Back mid-word leaves no mark and no flying byte |
@@ -1264,7 +1278,9 @@ If Steve does not follow it after 2 rounds of word changes, stop and re-plan the
 | Spec link | A new window is always denied, and so is `will-navigate`. A link opens outside only for `https:` and a listed host. A test URL on another host does not open, and `file://` with a listed host does not open |
 | Expanded table | 11, 13, and 15 grids of 16 cells. The cell at byte position n shows byte n of the expanded key, and its word name is `w(n / 4)`. No cell shows a letter. The key band ends where section 2.2b says, and those cells start filled |
 | Word build | Next adds one word. The lit cells equal that row's `previous` and `keyBack`. A tap on a built word opens its stage rows, and a tap on an unbuilt word does nothing. Each `aes-walk-*` key schedule cell is gone with Show keys OFF |
+| Word test | On every row at all three sizes, `divisor` is Nk, and `divisor` x `quotient` + `remainder` equals `i`. `rotated` is set only when `i` is at or past Nk and `remainder` is 0. `substituted` alone is set only at AES-256 with `remainder` 4. W1a holds this part. In W1b, the panel prints those numbers in the sentence that matches the row's stages, for a RotWord word, a SubWord-only word, a plain word, and a key word. At AES-192, a word with remainder 4 reads plain |
 | Key words | FIPS appendix A rows, for all three sizes. The Rcon row equals `01 02 04 08 10 20 40 80 1b 36`, and the used counts are 10, 8, 7 |
+| AddRoundKey order | With motion on, the key grid equals the step's `roundKey` while the block still equals the state before the step, then the block changes. An AddRoundKey that runs from a Start view shows no fill, on encrypt and on decrypt. Every other one fills first, including one reached by a round chip, and decrypt's AddRoundKey 0. Pause holds the fill and the slide, by the Pause holds clause |
 | End frames | Every animated step lands on the engine state for that step, for all three key sizes |
 | Reduced motion | Each step shows its end frame with no transition |
 | Pause holds | With motion on at the `slow` speed, Pause during a flying byte, a key fill, a phantom column, and a matrix multiply. The clause waits for each animation's `ready`, then samples. Each moving element's position stays the same for 2 seconds, within 1 pixel. At least one paused animation has a `currentTime` below its end. If nothing runs when the click lands, the clause repeats from the step before, and it reads NOT RUN after 3 tries |

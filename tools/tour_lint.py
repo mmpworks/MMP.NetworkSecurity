@@ -61,6 +61,12 @@ def lint(path, max_grade, max_concept):
                 problems.append("%s: %s binds an event with no eventType" % (path, sid))
         else:
             problems.append("%s: %s has bind.kind '%s'" % (path, sid, kind))
+        # An action unlock names the try-it of its own step. The app ignores ref today, so a wrong ref passes every walk.
+        unlock = step.get("unlock") or {}
+        if unlock.get("mode") == "action":
+            try_id = (step.get("tryIt") or {}).get("id")
+            if unlock.get("ref") != try_id:
+                problems.append("%s: %s unlock.ref '%s' does not name its try-it '%s'" % (path, sid, unlock.get("ref"), try_id))
         for text in step.get("text", []):
             texts.append(TERM.sub(lambda m: m.group("id").replace("-", " "), text))
             declared = set(step.get("glossary", []))
