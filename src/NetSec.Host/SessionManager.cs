@@ -177,13 +177,14 @@ public sealed class SessionManager
 
     /// <summary>
     /// session.save. While Show keys is OFF, a saved trace holds no key bytes: a file written while ON gets a hidden copy, and the original stays.
-    /// savedFrame builds the session.saved frame from the file it names.
+    /// savedFrame builds the session.saved frame from the file it names. The toggle read, the file choice and the frame run under one Announce,
+    /// so the flip frame lands ahead of or behind the whole save.
     /// </summary>
-    public void Save(LabSession session, Func<string, string> savedFrame)
+    public void Save(LabSession session, Func<string, string> savedFrame) => _fence.Announce(() =>
     {
         string file = !_fence.ShowKeys && session.FileHoldsShownKeys ? TraceLines.WriteHiddenCopy(session.SessionFile) : session.SessionFile;
-        Broadcast(savedFrame(file));
-    }
+        Fanout(savedFrame(file));
+    });
 
     void Fanout(string frame)
     {
