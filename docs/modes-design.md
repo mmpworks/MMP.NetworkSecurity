@@ -582,7 +582,7 @@ Every lesson runs with the toggle OFF. Each one loses the bytes and keeps the co
 
 **Nancy, a trap.** `SecretsPanel.vue:36` decides a match with `v.every(r => r.hex === v[0].hex)`. With `hex` empty that is always true, so two different keys would show as a match. The compare must use the fingerprint when `hidden` is set. `:70` counts bytes from `hex`, and must read `length`. `:73` copy has nothing to copy. `:81` and `lab.ts:107` draw from `hex`. `host.ts:48` must carry the three new fields.
 
-**Tours and the toggle.** No tour branches on it. Tour bindings match `type`, `actor`, `message`, and `step` (design section 5), so A14 holds. While OFF, the tour panel shows one banner: "Show keys is off, so you see a short fingerprint of each key. Two keys with the same fingerprint are the same key."
+**Tours and the toggle.** No tour branches on it. Tour bindings match `type`, `actor`, `message`, and `step` (design section 5), so A14 holds. While OFF, one banner under the top bar (`show-keys-off-banner`) shows in tour mode and in free play: "Show keys is off, so you see a short fingerprint of each key. Two keys with the same fingerprint are the same key."
 
 ### 6.6 Replay and the suite
 
