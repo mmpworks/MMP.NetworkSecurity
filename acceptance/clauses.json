@@ -2211,6 +2211,17 @@
    "counts": true
   },
   {
+   "id": "A19.ui.expanded-table-layout",
+   "base": "A19.ui.expanded-table-layout",
+   "assertion": "A19",
+   "group": "e2e",
+   "build": "host",
+   "slice": "W1",
+   "referee": "FIPS 197 (2001) data, the suite's RefAes, and the .NET library",
+   "roles": [],
+   "counts": true
+  },
+  {
    "id": "A19.ui.first-view-fills-by-column",
    "base": "A19.ui.first-view-fills-by-column",
    "assertion": "A19",
@@ -2255,8 +2266,8 @@
    "counts": true
   },
   {
-   "id": "A19.ui.key-schedule-shows-each-word",
-   "base": "A19.ui.key-schedule-shows-each-word",
+   "id": "A19.ui.key-band-on-192-and-256",
+   "base": "A19.ui.key-band-on-192-and-256",
    "assertion": "A19",
    "group": "e2e",
    "build": "host",
@@ -2367,6 +2378,17 @@
   {
    "id": "A19.ui.step-order-by-next",
    "base": "A19.ui.step-order-by-next",
+   "assertion": "A19",
+   "group": "e2e",
+   "build": "host",
+   "slice": "W1",
+   "referee": "FIPS 197 (2001) data, the suite's RefAes, and the .NET library",
+   "roles": [],
+   "counts": true
+  },
+  {
+   "id": "A19.ui.word-build-lights-its-two-words",
+   "base": "A19.ui.word-build-lights-its-two-words",
    "assertion": "A19",
    "group": "e2e",
    "build": "host",
