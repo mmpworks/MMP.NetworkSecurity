@@ -23,7 +23,10 @@ namespace Acceptance
             if (Defect == "row-first") foreach (WalkStep s in r.Steps) s.State = RowFirst(s.State);
             if (Defect == "output-other") r.Output = Hex.Encode(new byte[16]);
             if (Defect == "steps-carry-no-terms") foreach (WalkStep s in r.Steps) s.Terms = null;
-            if (Defect == "step-term-flip") foreach (WalkStep s in r.Steps) if (s.Terms != null) s.Terms[3].Parts[1].Result = "00";
+            if (Defect == "step-term-flip") foreach (WalkStep s in r.Steps) if (s.Terms != null) { s.Terms[3].Parts[1].Result = "00"; }
+            if (Defect == "step-doubling-drops-the-bit") foreach (WalkStep s in r.Steps) if (s.Terms != null) foreach (ColumnByte b in s.Terms) foreach (TermPart p in b.Parts) foreach (Doubling d in p.Doublings) if (d.Reduced) d.To = (d.Shifted & 0xff).ToString("x2");
+            if (Defect == "step-running-wrong") foreach (WalkStep s in r.Steps) if (s.Terms != null) s.Terms[5].Running[0] = "00";
+            if (Defect == "step-sums-wrong") foreach (WalkStep s in r.Steps) if (s.Terms != null) s.Terms[6].Parts[0].Sums[0] = "00";
             if (Defect == "no-spread") { r.Steps[4].State = new RefAes(new byte[16]).Encrypt(new byte[16]).Steps[4].State; }
             return r;
         }
@@ -65,6 +68,10 @@ namespace Acceptance
             if (Defect == "term-not-reduced") t[0].Parts[0].Reduced = false;
             if (Defect == "term-no-doublings") foreach (TermPart p in t[0].Parts) p.Doublings.Clear();
             if (Defect == "term-plain-multiply") t[0].Result = "ff";
+            if (Defect == "doubling-drops-the-bit") foreach (ColumnByte b in t) foreach (TermPart p in b.Parts) foreach (Doubling d in p.Doublings) if (d.Reduced) d.To = (d.Shifted & 0xff).ToString("x2");
+            if (Defect == "doubling-shifted-cut") foreach (TermPart p in t[0].Parts) foreach (Doubling d in p.Doublings) d.Shifted &= 0xff;
+            if (Defect == "running-is-the-terms") { t[0].Running.Clear(); foreach (TermPart p in t[0].Parts) t[0].Running.Add(p.Result); }
+            if (Defect == "picks-empty") foreach (TermPart p in t[0].Parts) p.Picks.Clear();
             return t;
         }
 

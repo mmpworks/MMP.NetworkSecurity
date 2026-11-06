@@ -61,6 +61,9 @@ namespace Acceptance
             }
             Check.True(mix[0].Parts[0].Reduced && mix[0].Parts[1].Reduced, "2 x d4 and 3 x bf both need the reduction by 11b");
             Check.True(!mix[0].Parts[2].Reduced && mix[0].Parts[2].Doublings.Count == 0, "1 x 5d needs no doubling");
+            Doubling first = mix[0].Parts[0].Doublings[0];
+            Check.True(first.From == "d4" && first.Shifted == 0x1a8 && first.Reduced && first.To == "b3", "2 x d4: from " + first.From + ", shifted " + first.Shifted.ToString("x") + ", to " + first.To + ", expected d4, 1a8, b3");
+            Check.True(string.Join(" ", mix[0].Running.ToArray()) == "b3 69 34 04", "running is " + string.Join(" ", mix[0].Running.ToArray()) + ", expected b3 69 34 04");
 
             byte[] back = new byte[16];
             Array.Copy(Hex.Decode("046681e5"), back, 4);
@@ -70,11 +73,15 @@ namespace Acceptance
             for (int j = 0; j < 4; j++)
             {
                 TermPart p = inv[0].Parts[j];
-                string d = string.Join(" ", p.Doublings.ToArray());
+                List<string> tos = new List<string>();
+                foreach (Doubling x in p.Doublings) tos.Add(x.To);
+                string d = string.Join(" ", tos.ToArray());
                 Check.True(p.Factor.ToString() == inverse[j, 0] && p.Input == inverse[j, 1] && p.Result == inverse[j, 2] && d == inverse[j, 3],
                     "inverse term " + j + " is " + p.Factor + " x " + p.Input + " = " + p.Result + " with doublings " + d + ", expected " + inverse[j, 0] + " x " + inverse[j, 1] + " = " + inverse[j, 2] + " with " + inverse[j, 3]);
             }
-            return "d4 bf 5d 30 gives 04 66 81 e5 with its 4 terms, and the inverse's 4 terms and their doublings give d4 back";
+            Check.True(string.Join(" ", inv[0].Parts[0].Picks.ToArray()) == "08 10 20", "14 x 04 picks " + string.Join(" ", inv[0].Parts[0].Picks.ToArray()) + ", expected 08 10 20");
+            Check.True(string.Join(" ", inv[0].Parts[0].Sums.ToArray()) == "08 18 38", "14 x 04 sums " + string.Join(" ", inv[0].Parts[0].Sums.ToArray()) + ", expected 08 18 38");
+            return "d4 bf 5d 30 gives 04 66 81 e5 with its 4 terms and running XOR, and the inverse's 4 terms, doublings, picks and sums give d4 back";
         }
 
         [Clause("A19.walk.round-constants", PerBuild = true)]

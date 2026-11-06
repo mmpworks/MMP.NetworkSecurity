@@ -39,10 +39,15 @@ namespace Acceptance
                         foreach (TermPart p in b.Parts)
                         {
                             List<object> doublings = new List<object>();
-                            foreach (string x in p.Doublings) doublings.Add(x);
-                            parts.Add(D("factor", (double)p.Factor, "input", p.Input, "doublings", doublings, "reduced", p.Reduced, "result", p.Result));
+                            foreach (Doubling x in p.Doublings) doublings.Add(D("from", x.From, "shifted", x.Shifted.ToString("x3"), "reduced", x.Reduced, "to", x.To));
+                            List<object> picks = new List<object>(), sums = new List<object>();
+                            foreach (string q in p.Picks) picks.Add(q);
+                            foreach (string q in p.Sums) sums.Add(q);
+                            parts.Add(D("factor", (double)p.Factor, "input", p.Input, "doublings", doublings, "picks", picks, "sums", sums, "reduced", p.Reduced, "result", p.Result));
                         }
-                        terms.Add(D("result", b.Result, "parts", parts));
+                        List<object> running = new List<object>();
+                        foreach (string q in b.Running) running.Add(q);
+                        terms.Add(D("result", b.Result, "running", running, "parts", parts));
                     }
                     d["terms"] = terms;
                 }
@@ -113,6 +118,8 @@ namespace Acceptance
             WalkRun forward = reference.Encrypt(block), inverse = reference.Decrypt(Hex.Decode(forward.Output));
             if (M("walk-state-flip")) forward.Steps[2].State = (forward.Steps[2].State[0] == '0' ? "1" : "0") + forward.Steps[2].State.Substring(1);
             if (M("walk-term-flip")) foreach (WalkStep t in forward.Steps) if (t.Terms != null) { t.Terms[2].Parts[0].Result = "00"; break; }
+            if (M("walk-doubling-bytes")) foreach (WalkStep t in forward.Steps) if (t.Terms != null) foreach (ColumnByte b in t.Terms) foreach (TermPart p in b.Parts) foreach (Doubling d in p.Doublings) if (d.Reduced) d.To = (d.Shifted & 0xff).ToString("x2");
+            if (M("walk-running-wrong")) foreach (WalkStep t in inverse.Steps) if (t.Terms != null) t.Terms[1].Running[2] = "00";
             if (M("walk-no-terms")) foreach (WalkStep t in inverse.Steps) t.Terms = null;
             if (M("walk-inverse-order")) { WalkStep a = inverse.Steps[1]; inverse.Steps[1] = inverse.Steps[2]; inverse.Steps[2] = a; }
             List<object> words = new List<object>();

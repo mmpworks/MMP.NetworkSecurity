@@ -232,9 +232,20 @@ namespace Acceptance
                     Dictionary<string, object> m = MiniJson.AsObject(q);
                     TermPart p = new TermPart();
                     p.Factor = (int)MiniJson.Num(m, "factor", -1); p.Input = MiniJson.Str(m, "input"); p.Reduced = MiniJson.Bool(m, "reduced", false); p.Result = MiniJson.Str(m, "result");
-                    foreach (object d in MiniJson.Arr(m, "doublings") ?? new List<object>()) p.Doublings.Add((string)d);
+                    foreach (object d in MiniJson.Arr(m, "doublings") ?? new List<object>())
+                    {
+                        Dictionary<string, object> o2 = MiniJson.AsObject(d);
+                        Check.True(o2 != null, "a doubling is not an object with from, shifted, reduced and to");
+                        Doubling y = new Doubling();
+                        y.From = MiniJson.Str(o2, "from"); y.To = MiniJson.Str(o2, "to"); y.Reduced = MiniJson.Bool(o2, "reduced", false);
+                        y.Shifted = Convert.ToInt32(MiniJson.Str(o2, "shifted") ?? "-1", 16);
+                        p.Doublings.Add(y);
+                    }
+                    foreach (object q2 in MiniJson.Arr(m, "picks") ?? new List<object>()) p.Picks.Add((string)q2);
+                    foreach (object q2 in MiniJson.Arr(m, "sums") ?? new List<object>()) p.Sums.Add((string)q2);
                     x.Parts.Add(p);
                 }
+                foreach (object q3 in MiniJson.Arr(b, "running") ?? new List<object>()) x.Running.Add((string)q3);
                 all.Add(x);
             }
             return all;
@@ -344,7 +355,7 @@ namespace Acceptance
                 Check.True(block.Status == 409 && block.Code == "KEYS_HIDDEN", "OFF: GET block got " + block + ", expected 409 KEYS_HIDDEN");
                 Check.True(tables.Ok, "OFF: GET tables got " + tables);
                 // A term is one byte, so no byte search can find it. The field names of the word rows and the terms mark them instead, in either reply.
-                foreach (string field in new string[] { "keyWords", "terms", "parts", "doublings", "afterRcon" })
+                foreach (string field in new string[] { "keyWords", "terms", "parts", "doublings", "picks", "sums", "running", "afterRcon" })
                 {
                     Check.True(!HasField(block.Json, field), "OFF: the block error holds the field " + field);
                     Check.True(!HasField(tables.Json, field), "OFF: the tables reply holds the field " + field);

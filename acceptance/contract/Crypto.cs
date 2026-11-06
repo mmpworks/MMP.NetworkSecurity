@@ -69,11 +69,20 @@ namespace NetSec.Crypto
         public readonly AesColumnByte[] Terms = null;
     }
 
+    public sealed class AesDoubling
+    {
+        public readonly byte From = 0;
+        public readonly int Shifted = 0;
+        public readonly bool Reduced = false;
+        public readonly byte To = 0;
+    }
+
     public sealed class AesTerm
     {
         public readonly int Factor = 0;
         public readonly byte Input = 0;
-        public readonly byte[] Doublings = null;
+        public readonly AesDoubling[] Doublings = null;
+        public readonly byte[] Picks = null, Sums = null;
         public readonly bool Reduced = false;
         public readonly byte Result = 0;
     }
@@ -81,6 +90,7 @@ namespace NetSec.Crypto
     public sealed class AesColumnByte
     {
         public readonly AesTerm[] Terms = null;
+        public readonly byte[] Running = null;
         public readonly byte Result = 0;
     }
 

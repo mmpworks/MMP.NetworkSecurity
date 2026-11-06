@@ -47,9 +47,17 @@ namespace Acceptance
                 {
                     TermPart p = new TermPart();
                     p.Factor = t.Factor; p.Input = t.Input.ToString("x2"); p.Reduced = t.Reduced; p.Result = t.Result.ToString("x2");
-                    foreach (byte d in t.Doublings ?? new byte[0]) p.Doublings.Add(d.ToString("x2"));
+                    foreach (AesDoubling d in t.Doublings ?? new AesDoubling[0])
+                    {
+                        Doubling y = new Doubling();
+                        y.From = d.From.ToString("x2"); y.Shifted = d.Shifted; y.Reduced = d.Reduced; y.To = d.To.ToString("x2");
+                        p.Doublings.Add(y);
+                    }
+                    foreach (byte q in t.Picks ?? new byte[0]) p.Picks.Add(q.ToString("x2"));
+                    foreach (byte q in t.Sums ?? new byte[0]) p.Sums.Add(q.ToString("x2"));
                     x.Parts.Add(p);
                 }
+                foreach (byte q in b.Running ?? new byte[0]) x.Running.Add(q.ToString("x2"));
                 all.Add(x);
             }
             return all;
