@@ -70,6 +70,25 @@ async function makeLoginKeys() {
   }
 }
 const backToBuiltin = async () => { for (const t of ['token.issuer', 'device.enrolment']) await api('PUT', `/api/security/types/${t}/mode`, { mode: 'BuiltIn' }) }
+// A built-in type with a training key carries it in key.in-use. Lesson 10 reads pki.root-ca, so its chip shows the key ON and the fingerprint OFF.
+test('built-in keys: lesson 10 names pki.root-ca in the strip with its key ON and its fingerprint OFF', async ({ page }) => {
+  await freePlay(page, 10)
+  const chip = page.getByTestId('key-in-use-pki.root-ca')
+  await expect(chip).toContainText('Built-in key')
+  await expect(page.getByTestId('key-in-use-value-pki.root-ca')).toHaveText(/[0-9a-f]{16}/i)
+  await page.getByTestId('show-keys-switch').uncheck()
+  await expect.poll(hostOn).toBe(false)
+  await expect(page.getByTestId('key-in-use-value-pki.root-ca')).toHaveText(/^fp:[0-9a-f]{16}$/)
+  await shot(page, '07-builtin-key-off')
+})
+
+// A built-in type with no long-term key (lab.aes-key makes a fresh key each run) gets a chip with no value.
+test('built-in keys with no long-term key: lesson 1 names lab.aes-key with no value', async ({ page }) => {
+  await freePlay(page, 1)
+  await expect(page.getByTestId('key-in-use-lab.aes-key')).toBeVisible()
+  await expect(page.getByTestId('key-in-use-value-lab.aes-key')).toHaveCount(0)
+})
+
 
 test('own keys: lesson 10 names token.issuer in the strip with its key ON and its fingerprint OFF, and the bytes come back', async ({ page }) => {
   await makeLoginKeys()
