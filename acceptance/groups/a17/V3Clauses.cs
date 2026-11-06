@@ -8,7 +8,7 @@ namespace Acceptance
     /// <summary>
     /// A17, slice V3: the Show keys toggle (modes-design.md section 6). The suite runs with it ON. These clauses turn it OFF on purpose, each in its own Host.
     /// The anchor is the bytes: the suite reads secrets while ON, flips the toggle, and looks for those same bytes. It computes fingerprints itself.
-    /// Two exclusions, named by the design: the bearer token of lesson 10 (it travels in the clear on purpose) and lesson 11's lab-secret (it is stored in plain).
+    /// One exclusion by name: lesson 11's lab-secret (it is stored in plain). Lesson 10's bearer token has no exclusion by name: the on-the-wire rule below exempts it only while it travels on the wire.
     /// A public key is no secret either, so a secret whose name holds "public" is left out of the text scan.
     /// </summary>
     public static class V3Clauses
@@ -17,7 +17,27 @@ namespace Acceptance
 
         static bool Excluded(string name)
         {
-            return name == "auth.token" || name == "lab-secret" || (name ?? "").IndexOf("public", StringComparison.OrdinalIgnoreCase) >= 0;
+            return name == "lab-secret" || (name ?? "").IndexOf("public", StringComparison.OrdinalIgnoreCase) >= 0;
+        }
+
+        /// <summary>
+        /// Show keys OFF hides secrets[] and leaves wire and plain alone (design 6.2, limit 2). So a secret whose bytes the ON run already put in a wire.* event's "wire" field
+        /// went over the network, and OFF cannot hide it: that is a public protocol value the lab stores as a secret (lesson 10: a challenge, a signature, a token, a call).
+        /// The exemption is per secret and comes from the ON run. Every other secret is scanned over the whole OFF text, wire and plain included.
+        /// </summary>
+        static string WireText(SessionRun run)
+        {
+            StringBuilder sb = new StringBuilder();
+            foreach (Dictionary<string, object> ev in run.Events)
+                if ((MiniJson.Str(ev, "type") ?? "").StartsWith("wire.", StringComparison.Ordinal)) sb.Append(MiniJson.Str(ev, "wire") ?? "").Append(' ');
+            return sb.ToString();
+        }
+
+        static bool OnTheWire(string onWire, A17.SecretRef s, SortedDictionary<string, bool> seen)
+        {
+            bool onNet = onWire.IndexOf(s.Hex, StringComparison.OrdinalIgnoreCase) >= 0;
+            if (onNet) seen[s.Name] = true;
+            return onNet;
         }
 
         static List<string> HexEntries(string ndjsonOrJson)
@@ -108,6 +128,7 @@ namespace Acceptance
             {
                 List<string> skipped = new List<string>(), textScanned = new List<string>(), structuralOnly = new List<string>();
                 int covered = 0, secretsSeen = 0;
+                SortedDictionary<string, bool> onTheWire = new SortedDictionary<string, bool>();
                 foreach (int lesson in AllLabs)
                 {
                     A17.SetShowKeys(h, true);
@@ -122,8 +143,9 @@ namespace Acceptance
                     A17.SetShowKeys(h, false);
                     string flipped = HostHttp.Get(h, "/api/sessions/" + on.SessionId + "/events?after=0").Body ?? "";
                     Check.True(HexEntries(flipped).Count == 0, "lesson " + lesson + ": after the flip to OFF, /events of the open session still holds hex");
+                    string onWire = WireText(on);
                     foreach (A17.SecretRef s in onSecrets)
-                        if (!Excluded(s.Name) && s.Hex.Length >= 8)
+                        if (!Excluded(s.Name) && s.Hex.Length >= 8 && !OnTheWire(onWire, s, onTheWire))
                             Check.True(flipped.IndexOf(s.Hex, StringComparison.OrdinalIgnoreCase) < 0, "lesson " + lesson + ": the secret " + s.Name + " (" + s.Hex.Substring(0, 8) + "..) is still in /events after the flip to OFF");
 
                     // 2. A new session started OFF: frames, /events and the file.
@@ -148,7 +170,7 @@ namespace Acceptance
                     if (sameBytes)
                     {
                         foreach (A17.SecretRef s in onSecrets)
-                            if (!Excluded(s.Name) && s.Hex.Length >= 8)
+                            if (!Excluded(s.Name) && s.Hex.Length >= 8 && !OnTheWire(onWire, s, onTheWire))
                                 Check.True(offAll.IndexOf(s.Hex, StringComparison.OrdinalIgnoreCase) < 0, "lesson " + lesson + ": the ON secret " + s.Name + " (" + s.Hex.Substring(0, 8) + "..) appears in an OFF session");
                         textScanned.Add(lesson.ToString());
                     }
@@ -164,7 +186,7 @@ namespace Acceptance
                     + "Text scan for ON bytes on labs " + (textScanned.Count == 0 ? "none" : string.Join(",", textScanned.ToArray()))
                     + "; structure only on labs " + (structuralOnly.Count == 0 ? "none" : string.Join(",", structuralOnly.ToArray()))
                     + (skipped.Count > 0 ? "; not built: " + string.Join(",", skipped.ToArray()) : "")
-                    + ". Left out of the byte scan by name: auth.token (on the wire on purpose), lab-secret (stored in plain), public keys";
+                    + ". Left out of the byte scan: " + (onTheWire.Count == 0 ? "no secret that travels on the wire" : "the secrets whose bytes the ON run put on the wire (" + string.Join(", ", new List<string>(onTheWire.Keys).ToArray()) + "), which OFF cannot hide (design 6.2 limit 2)") + "; lab-secret (stored in plain); public keys";
             }
         }
 
