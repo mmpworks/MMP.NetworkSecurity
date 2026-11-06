@@ -309,6 +309,20 @@ namespace Acceptance
             return cells + " terms on 2 seeds equal RefField and XOR to the state byte";
         }
 
+        /// <summary>True when a field of this name holds data anywhere in the JSON value. A number is no data here: the open size table has a keyWords count, sizes[].keyWords, and the word rows are an array of the same name.</summary>
+        static bool HasField(object value, string name)
+        {
+            Dictionary<string, object> d = value as Dictionary<string, object>;
+            if (d != null)
+            {
+                foreach (KeyValuePair<string, object> kv in d) if ((kv.Key == name && !(kv.Value is double)) || HasField(kv.Value, name)) return true;
+                return false;
+            }
+            List<object> list = value as List<object>;
+            if (list != null) foreach (object o in list) if (HasField(o, name)) return true;
+            return false;
+        }
+
         [Clause("A19.host.off-holds-no-word-or-term")]
         public static string OffHoldsNoWord(Ctx c)
         {
@@ -329,12 +343,18 @@ namespace Acceptance
                 Reply block = HostHttp.Get(h, BlockPath(run.SessionId)), tables = HostHttp.Get(h, Tables);
                 Check.True(block.Status == 409 && block.Code == "KEYS_HIDDEN", "OFF: GET block got " + block + ", expected 409 KEYS_HIDDEN");
                 Check.True(tables.Ok, "OFF: GET tables got " + tables);
+                // A term is one byte, so no byte search can find it. The field names of the word rows and the terms mark them instead, in either reply.
+                foreach (string field in new string[] { "keyWords", "terms", "parts", "doublings", "afterRcon" })
+                {
+                    Check.True(!HasField(block.Json, field), "OFF: the block error holds the field " + field);
+                    Check.True(!HasField(tables.Json, field), "OFF: the tables reply holds the field " + field);
+                }
                 foreach (string needle in needles)
                 {
                     Check.True((block.Body ?? "").ToLowerInvariant().IndexOf(needle, StringComparison.Ordinal) < 0, "OFF: the block error holds " + needle);
                     Check.True((tables.Body ?? "").ToLowerInvariant().IndexOf(needle, StringComparison.Ordinal) < 0, "OFF: the tables reply holds " + needle);
                 }
-                return needles.Count + " key, word and state values from the ON reply are absent from the OFF error and the OFF tables reply";
+                return needles.Count + " key, word and state values from the ON reply, and every word-row and term field, are absent from the OFF error and the OFF tables reply";
             }
         }
 
