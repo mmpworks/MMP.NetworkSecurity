@@ -5,7 +5,7 @@ Stack: Electron + Vue 3 + Vuetify + splitpanes + raw SVG, the same shell as `MMP
 
 ## Conclusion
 
-1. One screen, five panels: lesson rail, live sequence diagram, byte inspector, secrets panel, tour panel.
+1. One screen, five panels: lesson rail, live sequence diagram, Message bytes panel, secrets panel, tour panel.
 2. Every pixel that moves comes from one trace event. The UI invents no bytes, no secrets, and no check results.
 3. The tour sits on top of a step-gated engine. A step waits for the learner. Back and replay read the saved trace.
 4. Five wow moments (section 2). Each names the event that drives it.
@@ -77,13 +77,15 @@ The rail collapses to numbers below 1100 px width. Finished means the learner re
 6. Clicking an arrow selects its event. The inspector and the secrets panel jump to that event. Keys `Up` and `Down` move the selection.
 7. A check badge sits at the receiving lane when a `check` event follows. Pass is a check mark in the pass color. Fail is the red X plus the check name.
 
-### 1.4 Byte inspector
+### 1.4 Message bytes panel (was "Byte inspector")
+
+The panel's visible name is **Message bytes** (tab label and panel title). Code, testids, and the highlight grammar keep the key `inspector`.
 
 1. Hex dump, 16 bytes per row, offset column, ASCII column. Virtualized. Records up to 16 KB render without lag.
-2. Each parsed field is a colored span from `fields[]`. Span color follows `kind` (table in section 4). A field name label sits under the first byte of its span.
-3. Hovering a span or its name in the field list highlights both, and shows the field's `gloss` in a popover.
-4. A toggle shows `wire` or `plain`. Default is `wire` in Eavesdropper view and `plain` in Endpoints view.
-5. A field list (right side of the inspector) shows name, offset, length, and decoded value. Clicking a row selects the bytes.
+2. Two grids, one over the other. **Before** shows `plain`, the readable bytes the sender wrote. **After** shows `wire`, the bytes that travel. When `plain` equals `wire`, only After shows. An event with no wire shows only the readable bytes.
+3. The fields in `fields[]` describe one buffer. The panel draws them on the buffer they fit (`app/src/bytes.ts`, `bytesView`). Lesson 1 lists its fields against the wire.
+4. Each field in the field list is a toggle. Nothing is lit by default. A lit field fills its bytes with the color of its `kind` (table in section 4). A wire field that holds the readable bytes (the cipher span, or the payload in the clear) also lights those bytes in Before.
+5. The field list (right side) shows name, byte range, `gloss` when it says more than the name, and the decoded value from the field's own buffer. A tour highlight `inspector:field=<name>` rings the toggle and lights nothing.
 6. Byte selection plus the `Flip this byte` button starts an attack (section 7).
 7. In Eavesdropper view the inspector parses only fields where `visibleToWire` is true. The rest is one block labeled `unreadable without the key (N bytes)`.
 
@@ -255,7 +257,7 @@ Pattern: kebab-case. Lists use `-<n>` for index or `-<name>` for a stable key. T
 | App | `app-root`, `host-chip`, `training-only-label`, `mode-switch`, `view-switch`, `speed-select`, `theme-select`, `status-bar`, `engine-state`, `replay-chip` |
 | Rail | `lesson-rail`, `lesson-item-<1..11>`, `lesson-status-<1..11>` |
 | Diagram | `diagram`, `diagram-lane-<actor>`, `diagram-message-<seq>`, `diagram-chip`, `diagram-check-<seq>`, `diagram-follow`, `diagram-zoom-in`, `diagram-zoom-out`, `diagram-zoom-fit`, `lightbox`, `lightbox-close` |
-| Inspector | `inspector`, `inspector-toggle-wire-plain`, `inspector-byte-<offset>`, `inspector-span-<fieldName>`, `inspector-field-row-<fieldName>`, `flip-byte-button` |
+| Inspector (Message bytes) | `inspector`, `inspector-title`, `inspector-toggle-wire-plain` (the Before heading, opens and shuts the Before grid), `inspector-before`, `inspector-before-count`, `inspector-before-hidden`, `inspector-after`, `inspector-after-count`, `inspector-byte-<offset>` (wire bytes), `inspector-plain-byte-<offset>` (readable bytes), `inspector-span-<fieldName>`, `inspector-field-row-<fieldName>` (a toggle with `aria-pressed`), `inspector-field-value-<fieldName>`, `flip-byte-button` |
 | Secrets | `secrets-panel`, `secrets-col-<actor>`, `secret-row-<actor>-<name>`, `secret-reveal-<actor>-<name>`, `convergence-grid-<actor>`, `convergence-match` |
 | Tour | `tour-panel`, `tour-step-id`, `tour-progress`, `tour-text`, `tour-try-it`, `tour-try-it-action`, `tour-back`, `tour-next`, `next-reason`, `tour-replay`, `tour-run-to-end` |
 | Free play | `event-log`, `event-row-<seq>`, `event-filter-actor`, `event-filter-type`, `free-run`, `free-pause`, `free-step`, `free-restart`, `seed-input`, `open-trace` |

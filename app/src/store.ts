@@ -57,7 +57,8 @@ export const ui = reactive({
   viewUpTo: null as number | null,
   selectedSeq: null as number | null,
   selectedByte: null as number | null,
-  showPlain: null as boolean | null,
+  /** Fields the learner lit in the Message bytes panel, as `name@offset`. Nothing is lit until a field is picked. */
+  litFields: [] as string[],
   error: null as HostError | null,
   engine: 'idle' as 'idle' | 'running' | 'stepping' | 'waiting' | 'finished',
   shortcuts: false,
@@ -383,7 +384,7 @@ export function doTryIt() {
     case 'press-run': runEngine(); break
     case 'run-attack': if (a.attackId) attack({ attackId: a.attackId }); break
     case 'flip-byte': if (bound) attack({ atSeq: bound.seq, kind: 'flip-byte', offset: ui.selectedByte ?? Math.max(0, Math.floor(bound.wire.length / 4)), xor: 1 }); break
-    case 'toggle-field': break
+    case 'toggle-field': if (a.value) toggleFieldName(a.value); break
   }
   tour.actionDone = true
 }
@@ -400,6 +401,15 @@ export function flipSelectedByte() {
 }
 
 export function selectEvent(seq: number | null) { ui.selectedSeq = seq; ui.selectedByte = null }
+
+export const fieldKey = (f: { name: string; offset: number }): string => `${f.name}@${f.offset}`
+export function toggleField(key: string) { ui.litFields = ui.litFields.includes(key) ? ui.litFields.filter(k => k !== key) : [...ui.litFields, key] }
+/** Lights or darkens every field of this name on the shown event. A tour try-it names a field, not an offset. */
+function toggleFieldName(name: string) {
+  const keys = (selectedEvent.value?.fields ?? []).filter(f => f.name === name).map(fieldKey)
+  const on = keys.some(k => ui.litFields.includes(k))
+  ui.litFields = on ? ui.litFields.filter(k => !keys.includes(k)) : [...ui.litFields, ...keys]
+}
 
 export function switchSession(id: string) { ui.activeId = id; ui.viewUpTo = null; ui.selectedSeq = null }
 

@@ -21,7 +21,7 @@
       "title": "ClientHello: the client offers",
       "text": [
         "The client speaks first. The ClientHello lists the lock suites it can use, the one group it offers for key exchange (the hybrid), and a key share for that group.",
-        "Open the inspector. The hybrid share holds an ML-KEM key and an X25519 share side by side, 1,216 bytes in all. The message travels in the clear, so an eavesdropper reads it.",
+        "Open the Message bytes panel. The hybrid share holds an ML-KEM key and an X25519 share side by side, 1,216 bytes in all. The message travels in the clear, so an eavesdropper reads it.",
         "Try it: swap the client's X25519 share on the way out. The two sides will end up with different keys, and the first sealed record will not open.",
         "This failure does not point at the key share alone. A flip in most bytes of either hello gives the same AEAD tag failure (245 of the 315 flips tested), because each hello is part of the transcript the keys come from. The others fail at once with a parse or parameter check. Only the shared secret tells the cases apart: it differs between the sides after a key share flip, and it matches after a flip of the hello's random."
       ],

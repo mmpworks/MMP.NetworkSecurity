@@ -47,9 +47,13 @@ watch(() => layout.value.rows.length, async () => {
   await nextTick()
   box.value.scrollTop = box.value.scrollHeight
 })
+const scrollTop = ref(0)
+// The lane names stay at the top of the visible part. The SVG is scaled by zoom, so the scroll offset converts back to SVG units.
+const headTop = computed(() => scrollTop.value / zoom.value)
 function onScroll() {
   const b = box.value
   if (!b) return
+  scrollTop.value = b.scrollTop
   ui.follow = b.scrollTop + b.clientHeight >= b.scrollHeight - 8
 }
 function follow() { ui.follow = true; if (box.value) box.value.scrollTop = box.value.scrollHeight }
@@ -86,11 +90,7 @@ const pulse = computed(() => replayTick.value)
           <pattern id="hatch" width="6" height="6" patternUnits="userSpaceOnUse" patternTransform="rotate(45)"><line x1="0" y1="0" x2="0" y2="6" class="hatch-line" /></pattern>
           <marker id="arr" viewBox="0 0 10 10" refX="9" refY="5" markerWidth="7" markerHeight="7" orient="auto-start-reverse"><path d="M0,0 L10,5 L0,10 z" fill="context-stroke" /></marker>
         </defs>
-        <g v-for="l in layout.lanes" :key="l.name" :data-testid="`diagram-lane-${l.name}`" :class="{ hl: isHighlighted('diagram', 'lane', l.name) }">
-          <rect :x="l.x - 70" y="8" width="140" height="34" rx="8" class="lane-head" />
-          <text :x="l.x" y="30" text-anchor="middle" class="lane-name">{{ l.name }}</text>
-          <line :x1="l.x" :x2="l.x" :y1="HEAD_H" :y2="layout.height" class="lane-line" />
-        </g>
+        <line v-for="l in layout.lanes" :key="l.name" :x1="l.x" :x2="l.x" :y1="HEAD_H" :y2="layout.height" class="lane-line" />
         <circle v-if="waitingLane" :cx="waitingLane.x" :cy="HEAD_H + 12" r="9" class="wait-ring" data-testid="engine-waiting-ring" />
         <g v-for="r in layout.rows.filter(x => x.kind === 'divider')" :key="r.seq" class="divider-row">
           <line :x1="20" :x2="layout.width - 20" :y1="r.y" :y2="r.y" class="divider-line" />
@@ -121,6 +121,14 @@ const pulse = computed(() => replayTick.value)
           <text :x="last.fromX + 43" :y="last.y + 4" text-anchor="middle" class="chip-text">{{ last.head.slice(0, 8) }}
             <animate attributeName="x" :from="last.fromX + 43" :to="last.toX" :dur="dur" fill="freeze" />
           </text>
+        </g>
+        <!-- Lane names ride the top edge of the scroll box, so a long run never hides who sends what. Drawn last, so they sit on top. -->
+        <g class="lane-heads" :transform="`translate(0, ${headTop})`">
+          <rect x="0" y="0" :width="layout.width" :height="HEAD_H - 4" class="lane-band" />
+          <g v-for="l in layout.lanes" :key="l.name" :data-testid="`diagram-lane-${l.name}`" :class="{ hl: isHighlighted('diagram', 'lane', l.name) }">
+            <rect :x="l.x - 70" y="8" width="140" height="34" rx="8" class="lane-head" />
+            <text :x="l.x" y="30" text-anchor="middle" class="lane-name">{{ l.name }}</text>
+          </g>
         </g>
       </svg>
     </div>
