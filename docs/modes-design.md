@@ -516,7 +516,7 @@ The clause runs beside a control: on a temp clone, a planted PEM file and a plan
 Limits, stated:
 
 1. Files written while ON stay on disk with their bytes. OFF does not rewrite them. The file itself is still readable in `%LOCALAPPDATA%`.
-2. OFF hides `secrets[]`. It does not touch `wire` or `plain`. The bearer token in lesson 10 still shows, because that lab sends it in the clear on purpose. `keys.installed` carries no bytes (`Interpreter.cs:204-208`).
+2. OFF hides `secrets[]`. It does not touch `wire` or `plain`. The bearer token in lesson 10 still shows, because that lab sends it in the clear on purpose. The secret `auth.last-call` carries that token with the DPoP proof of each call. The challenge nonce and its signature are public protocol values, so lesson 10 does not list them as secrets. `keys.installed` carries no bytes (`Interpreter.cs:204-208`).
 3. Lesson 11 stores the guessed bytes in `plain` (`TimingReport.cs:71`), since the attack result is the lesson. A 4-byte `lab-secret` also falls to a brute-force search of its fingerprint.
 4. OFF is a setting for a shared screen or a shared trace. It is not a security boundary. The Host still holds the bytes in memory.
 
