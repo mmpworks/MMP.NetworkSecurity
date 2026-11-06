@@ -58,7 +58,7 @@ Steve's Wikipedia page sets the order. It describes the older TDES form. **This 
 
 **Words on screen.** "Erased" keeps the existing tour line: erasing clears a register in place, and a managed heap can keep copies.
 
-**How the query stays real.** It builds a new `DukptPinPad` from the run's `dukpt.initial` bytes and key id, steps it to each sale, and reads `HeldKeys()`. Each replayed PIN key must equal the run's `dukpt.pinKey.<c>`, or the query throws `WALK_DIVERGED`. The replay writes no event, so the golden holds.
+**How the query stays real.** It builds a new `DukptPinPad` from the run's `dukpt.initial` bytes and key id, steps it to each sale, and reads its registers. `HeldKeys()` gives no register numbers, so W5 adds a read that does. Each replayed PIN key must equal the run's `dukpt.pinKey.<c>`, or the query throws `WALK_DIVERGED`. The replay writes no event, so the golden holds.
 
 **Show keys OFF.** Unlike the AES states, this walk keeps its teaching with fingerprints: which register is full, and which keys match, needs no key byte. So OFF replaces key bytes with `TraceRedaction.Fingerprint`, as section 6.5 of `modes-design.md` does for this lesson.
 
