@@ -175,6 +175,13 @@ namespace NetSec.Bridge
             }
             IFuture sent = link.Send(envelope.Bytes);
             yield return Futures.Observe(sent);
+            if (sent.IsFaulted || sent.IsCanceled)
+            {
+                result.Code = CodeOf(sent);
+                yield return Futures.Observe(link.Close());
+                pad.Close();
+                yield break;
+            }
             IFuture<byte[]> replyRead = link.Receive();
             yield return Futures.Observe(replyRead);
             if (replyRead.IsFaulted || replyRead.IsCanceled)
