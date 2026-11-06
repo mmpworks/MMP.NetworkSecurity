@@ -166,6 +166,10 @@ Source: `docs/walkthrough-design.md` on `main` at f07bbd9 (Jared's pass on d1368
 | `GET /api/walk/aes/tables` | `sbox`, `inverseSbox` as 512 hex characters. Open with Show keys OFF. `Cache-Control: no-store` | Design 3.4 |
 | `GET /api/sessions/{id}/walk/aes/block?source=text&keyBits=128` | `source`, `keyBits`, `rounds`, `keySource`, `inputHex`, `keyWords[]`, `forward`, `inverse`, `wire` | Design 3.4. `forward` and `inverse` hold `input`, `output`, `steps[]` with `kind`, `round`, `state`, `roundKey` (only on AddRoundKey). `keyWords[]` holds every row, with `i`, `previous`, `rotated`, `substituted`, `rcon`, `afterRcon`, `keyBack`, `word`. A cell the row does not use is absent |
 | Refusals | `code`, `message`, `retryable`, `requestId`. OFF: 409 `KEYS_HIDDEN`, checked before the session read. 404 `SESSION_NOT_FOUND`. Another lesson: 409 `WALK_NOT_BUILT`. Bad `source` or `keyBits`: 400 `WALK_BAD_ARGUMENT` | Design 3.4 |
+| Core, added at c19b151 | `AesStep.Terms` (`AesColumnByte[]`, one per state byte in r + 4c order, only on a mix step), `AesTerm`, `AesColumnByte`; static `AesKey.ShiftMap`, `RoundConstants`, `MixTerms` | Design 3.3. `ShiftMap` returns a copy |
+| Tables reply, added at c19b151 | `shiftRows`, `inverseShiftRows` (16 integers), `rcon` (hex), `sizes[]` with `keyBits`, `keyWords`, `rounds`, `roundKeys`, `words`, `rconUsed` | Design 3.4. All open with Show keys OFF |
+| Block reply, added at c19b151 | A mix step carries `terms[]`, one per state byte, with `result` and `parts[]`: `factor`, `input`, `doublings[]`, `reduced`, `result` | Design 3.4. Another step has no `terms` |
+| App words | `app/src/components/FieldPanel.vue` or `app/src/walk-gloss.json` holds the 5 lines of `checks/walk_lines.json`, in order. The GCM line sits in `components/AesFeedView.vue` or `walk-gloss.json` | Design 2.2c, 2.4 |
 | A bare 404 on a walk route | NOT RUN `PRODUCT_MISSING` | As for `/api/security` |
 | Host source | `src/NetSec.Host/AesWalkRoutes.cs`. Each walk route is a string in the source, and is listed in `checks/walk_routes.json` | Design 3.5 |
 | App files | `app/src/walk.ts`, `app/src/components/AesBlockWalk.vue`. No part of either S-box under `app/src` | Design 3.1, 3.7 |
@@ -182,4 +186,11 @@ UI test ids, all ASSUMED under the design's `aes-walk-` prefix:
 | `aes-walk-readable` | At the end of the walk it reads `Pump four is ok.` |
 | `aes-walk-sbox-row`, `aes-walk-sbox-col`, `aes-walk-sbox-value` | After a click on a cell of a SubBytes or InvSubBytes step: one hex digit, one hex digit, and the 2-digit table value |
 | `aes-walk-sbox-cell-{x}-{y}` | One table cell, with x and y as hex digits |
+| `aes-walk-play`, `aes-walk-speed` | One Play and Pause button. One speed control holding `slow`, `normal`, `fast`. No `aes-walk-play-round` exists |
+| `aes-walk-key-size-{bits}` | Picks 128, 192 or 256. It arrives in W1c. Until then `A19.ui.end-frames-on-all-key-sizes` reads NOT RUN |
+| `aes-walk-word-{i}`, `aes-walk-round-key-group-{n}` | The word wall: each word's hex, inside its group of 4. A click opens its build |
+| `aes-walk-build-{previous,rotated,substituted,rcon,after-rcon,key-back,word}` | One word's build |
+| `aes-walk-rcon` | The Rcon row. Without its spaces, it holds the tables route's `rcon` |
+| `aes-walk-field-panel` | The definition lines |
+| `aes-walk-term-{0..3}`, `aes-walk-term-result` | After a click on a cell of a mix step: factor, input and result of each term, `data-reduced` as true or false, and the XOR |
 | `aes-walk-closed` | Shows while Show keys is OFF, with the sentence of design 3.5. No `aes-walk-cell-*` exists then |

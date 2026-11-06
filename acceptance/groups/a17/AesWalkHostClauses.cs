@@ -218,6 +218,150 @@ namespace Acceptance
             return "a walk changes neither GET events nor the session file, and no round state reaches either";
         }
 
+        static List<ColumnByte> ReadTerms(List<object> terms)
+        {
+            if (terms == null) return null;
+            List<ColumnByte> all = new List<ColumnByte>();
+            foreach (object o in terms)
+            {
+                Dictionary<string, object> b = MiniJson.AsObject(o);
+                ColumnByte x = new ColumnByte();
+                x.Result = MiniJson.Str(b, "result");
+                foreach (object q in MiniJson.Arr(b, "parts") ?? new List<object>())
+                {
+                    Dictionary<string, object> m = MiniJson.AsObject(q);
+                    TermPart p = new TermPart();
+                    p.Factor = (int)MiniJson.Num(m, "factor", -1); p.Input = MiniJson.Str(m, "input"); p.Reduced = MiniJson.Bool(m, "reduced", false); p.Result = MiniJson.Str(m, "result");
+                    foreach (object d in MiniJson.Arr(m, "doublings") ?? new List<object>()) p.Doublings.Add((string)d);
+                    x.Parts.Add(p);
+                }
+                all.Add(x);
+            }
+            return all;
+        }
+
+        [Clause("A19.host.tables-carry-maps-rcon-sizes")]
+        public static string TablesCarryMaps(Ctx c)
+        {
+            using (HostProc h = A17.Host(c, "walk-tables2"))
+            {
+                foreach (bool on in new bool[] { true, false })
+                {
+                    SetShowKeys(h, on);
+                    Reply r = HostHttp.Get(h, Tables);
+                    string state = on ? "Show keys ON" : "Show keys OFF";
+                    Check.True(r.Ok && r.Json != null, state + ": GET tables got " + r);
+                    Map(r.Json, "shiftRows", RefField.ShiftMap(false), state);
+                    Map(r.Json, "inverseShiftRows", RefField.ShiftMap(true), state);
+                    Check.True(string.Equals(MiniJson.Str(r.Json, "rcon"), "01020408102040801b36", StringComparison.OrdinalIgnoreCase), state + ": rcon is " + MiniJson.Str(r.Json, "rcon"));
+                    List<object> sizes = MiniJson.Arr(r.Json, "sizes");
+                    Check.True(sizes != null && sizes.Count == 3, state + ": sizes should hold 3 rows");
+                    double[,] want = { { 128, 4, 10, 11, 44, 10 }, { 192, 6, 12, 13, 52, 8 }, { 256, 8, 14, 15, 60, 7 } };
+                    string[] names = new string[] { "keyBits", "keyWords", "rounds", "roundKeys", "words", "rconUsed" };
+                    for (int n = 0; n < 3; n++)
+                        for (int f = 0; f < 6; f++)
+                            Check.True(MiniJson.Num(MiniJson.AsObject(sizes[n]), names[f], -1) == want[n, f], state + ": sizes[" + n + "]." + names[f] + " is " + MiniJson.Num(MiniJson.AsObject(sizes[n]), names[f], -1) + ", expected " + want[n, f]);
+                }
+            }
+            return "both shift maps, the round constants and the size table are right and open, with Show keys ON and OFF";
+        }
+
+        static void Map(Dictionary<string, object> d, string name, int[] want, string state)
+        {
+            List<object> got = MiniJson.Arr(d, name);
+            Check.True(got != null && got.Count == 16, state + ": " + name + " should hold 16 entries");
+            for (int i = 0; i < 16; i++) Check.True(Convert.ToInt32(got[i]) == want[i], state + ": " + name + "[" + i + "] is " + got[i] + ", expected " + want[i]);
+        }
+
+        [Clause("A19.host.block-terms-real-run")]
+        public static string BlockTerms(Ctx c)
+        {
+            int cells = 0;
+            using (HostProc h = A17.Host(c, "walk-terms"))
+            {
+                foreach (int seed in new int[] { 20261105, 7 })
+                {
+                    SessionRun run = HostSession.RunSeeded(h, 1, "glass", seed);
+                    Check.True(run.SessionId != null, "seed " + seed + ": no session: " + run.ErrorCode);
+                    Reply r = Block(h, run);
+                    // The terms must come from this run's key. Terms that only agree with their own reply would pass on a stored walk.
+                    RefAes reference = new RefAes(Hex.Decode(KeyOf(run)));
+                    byte[] block = Encoding.ASCII.GetBytes(TextBlock);
+                    WalkRun forwardRun = reference.Encrypt(block);
+                    foreach (string side in new string[] { "forward", "inverse" })
+                    {
+                        WalkRun want = side == "forward" ? forwardRun : reference.Decrypt(Hex.Decode(forwardRun.Output));
+                        Dictionary<string, object> walk = MiniJson.Obj(r.Json, side);
+                        Check.True(walk != null && MiniJson.Arr(walk, "steps") != null, side + ": no steps");
+                        List<object> steps = MiniJson.Arr(walk, "steps");
+                        Check.True(steps.Count == want.Steps.Count, "seed " + seed + " " + side + ": " + steps.Count + " steps, expected " + want.Steps.Count);
+                        for (int i = 0; i < steps.Count; i++)
+                        {
+                            Dictionary<string, object> s = MiniJson.AsObject(steps[i]);
+                            List<ColumnByte> terms = ReadTerms(MiniJson.Arr(s, "terms"));
+                            string where = "seed " + seed + " " + side + " " + want.Steps[i];
+                            if (want.Steps[i].Terms != null) cells += RefField.Compare(where, want.Steps[i].Terms, terms, want.Steps[i].State);
+                            else Check.True(terms == null, where + ": carries terms");
+                        }
+                    }
+                }
+            }
+            return cells + " terms on 2 seeds equal RefField and XOR to the state byte";
+        }
+
+        [Clause("A19.host.off-holds-no-word-or-term")]
+        public static string OffHoldsNoWord(Ctx c)
+        {
+            using (HostProc h = A17.Host(c, "walk-off2"))
+            {
+                SessionRun run = HostSession.Run(h, 1, "glass", null);
+                Check.True(run.SessionId != null, "no session: " + run.ErrorCode);
+                Reply on = Block(h, run);
+                List<string> needles = new List<string>();
+                needles.Add(KeyOf(run));
+                foreach (KeyRow k in ReadRows(on.Json)) needles.Add(k.Word.ToLowerInvariant());
+                foreach (object o in MiniJson.Arr(MiniJson.Obj(on.Json, "forward"), "steps"))
+                {
+                    Dictionary<string, object> s = MiniJson.AsObject(o);
+                    needles.Add(MiniJson.Str(s, "state").ToLowerInvariant());
+                }
+                SetShowKeys(h, false);
+                Reply block = HostHttp.Get(h, BlockPath(run.SessionId)), tables = HostHttp.Get(h, Tables);
+                Check.True(block.Status == 409 && block.Code == "KEYS_HIDDEN", "OFF: GET block got " + block + ", expected 409 KEYS_HIDDEN");
+                Check.True(tables.Ok, "OFF: GET tables got " + tables);
+                foreach (string needle in needles)
+                {
+                    Check.True((block.Body ?? "").ToLowerInvariant().IndexOf(needle, StringComparison.Ordinal) < 0, "OFF: the block error holds " + needle);
+                    Check.True((tables.Body ?? "").ToLowerInvariant().IndexOf(needle, StringComparison.Ordinal) < 0, "OFF: the tables reply holds " + needle);
+                }
+                return needles.Count + " key, word and state values from the ON reply are absent from the OFF error and the OFF tables reply";
+            }
+        }
+
+        /// <summary>Design 2.2: the label reads match on the L1-use-ecb fork. The fork's wire holds the block's forward output, so the claim can be checked against the bytes sent.</summary>
+        [Clause("A19.host.ecb-fork-says-match")]
+        public static string EcbForkMatches(Ctx c)
+        {
+            using (HostProc h = A17.Host(c, "walk-fork"))
+            {
+                SessionRun parent = HostSession.Run(h, 1, "glass", null);
+                Check.True(parent.SessionId != null, "no session: " + parent.ErrorCode);
+                SessionRun fork = HostSession.Fork(h, parent.SessionId, "L1-use-ecb");
+                Check.True(fork.SessionId != null, "no fork: " + fork.ErrorCode);
+                Reply r = Block(h, fork);
+                Dictionary<string, object> wire = MiniJson.Obj(r.Json, "wire");
+                Check.True(wire != null && MiniJson.Str(wire, "status") == "match", "wire.status on the L1-use-ecb fork is " + MiniJson.Str(wire, "status") + ", expected match");
+                string output = (MiniJson.Str(MiniJson.Obj(r.Json, "forward"), "output") ?? "").ToLowerInvariant();
+                string expected = new RefAes(Hex.Decode(KeyOf(fork))).Encrypt(Encoding.ASCII.GetBytes(TextBlock)).Output;
+                Check.True(output == expected, "the fork's forward output is " + output + ", RefAes on the fork's key gives " + expected);
+                bool sent = false;
+                foreach (Dictionary<string, object> ev in fork.Events)
+                    if (MiniJson.Str(ev, "type") == "wire.sent" && (MiniJson.Str(ev, "wire") ?? "").ToLowerInvariant().IndexOf(expected, StringComparison.Ordinal) >= 0) sent = true;
+                Check.True(sent, "no wire.sent event of the fork holds the forward output " + expected);
+            }
+            return "the L1-use-ecb fork says match, and its wire holds the block's forward output";
+        }
+
         [Clause("A19.host.control-run-says-not-sent")]
         public static string ControlNotSent(Ctx c)
         {

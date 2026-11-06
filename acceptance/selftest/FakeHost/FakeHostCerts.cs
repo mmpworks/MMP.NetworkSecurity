@@ -163,6 +163,21 @@ namespace Acceptance
                 Session parent;
                 string pid = MiniJson.Str(m, "sessionId") ?? "", aid = MiniJson.Str(m, "attackId");
                 if (!_sessions.TryGetValue(pid, out parent)) { SendText(ws, D("type", "error", "requestId", MiniJson.Str(m, "requestId"), "code", "SESSION_NOT_FOUND", "message", "No session to fork.")); return false; }
+                if (aid == "L1-use-ecb")
+                {
+                    Session ecb = new Session { Id = "s" + (++_next), Lesson = parent.Lesson, Seed = parent.Seed, EcbFork = true };
+                    BuildEvents(ecb, parent.Seed);
+                    byte[] ecbKey = RunKey(ecb), ecbText = Encoding.ASCII.GetBytes("Pump four is ok.");
+                    AddWire(ecb, "client", "wire.sent", "TextEcb", Hex.Decode(new RefAes(ecbKey).Encrypt(ecbText).Output), ecbText);
+                    _sessions[ecb.Id] = ecb;
+                    ecb.File = Path.Combine(Dir, "session-" + ecb.Id + ".ndjson");
+                    File.WriteAllText(ecb.File, "\n");
+                    SendText(ws, D("type", "session.started", "sessionId", ecb.Id, "transportKind", "glass", "trainingOnly", true, "sessionFile", ecb.File, "showKeys", _showKeys));
+                    SendText(ws, D("type", "session.forked", "sessionId", ecb.Id, "parentId", parent.Id, "attackId", aid));
+                    foreach (SessionEv e in ecb.Events) SendText(ws, D("type", "trace", "event", Render(e, _showKeys)));
+                    SendText(ws, D("type", "session.finished", "sessionId", ecb.Id, "outcome", "accepted", "code", "LAB_OK"));
+                    return true;
+                }
                 if (aid != "L4-flip-cert-byte") { SendText(ws, D("type", "error", "requestId", MiniJson.Str(m, "requestId"), "code", "ATTACK_NOT_FOUND", "message", "No such attack, or that byte cannot be flipped.")); return false; }
                 Session fork = new Session { Id = "s" + (++_next), Lesson = parent.Lesson, Seed = parent.Seed };
                 BuildEvents(fork, parent.Seed);

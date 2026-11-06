@@ -154,6 +154,114 @@ test('[A19.ui.sbox-click-matches-next-state] a clicked cell lights its row and c
   await checkLookups(page, tables.body.inverseSbox.toLowerCase(), 'InvSubBytes', reply.inverse.steps);
 });
 
+/** Under reduced motion each step lands at once on its end frame, so a clause reads end frames and never waits on a timer (design section 2.2a). */
+async function reduced(page: Page): Promise<void> { await page.emulateMedia({ reducedMotion: 'reduce' }); }
+
+const running = (page: Page) => page.evaluate(() => document.getAnimations().filter(a => a.playState === 'running').length);
+
+test('[A19.ui.end-frames-on-all-key-sizes] each step lands on the engine state, for 128, 192 and 256 bits', async ({ page }) => {
+  await reduced(page);
+  let reply = await openWalk(page);
+  for (const bits of [128, 192, 256]) {
+    if (bits !== 128) {
+      const pick = page.getByTestId(`aes-walk-key-size-${bits}`);
+      if (!(await pick.isVisible().catch(() => false))) throw new NotRun('PRODUCT_MISSING', `no aes-walk-key-size-${bits}. Key sizes arrive in W1c`);
+      const [r] = await Promise.all([page.waitForResponse(WALK_BLOCK, { timeout: 30_000 }), pick.click()]);
+      expect(r.status(), `GET block at ${bits} bits`).toBe(200);
+      reply = await r.json();
+      expect(reply.keyBits, 'the reply names the key size').toBe(bits);
+    }
+    await toFirstStep(page);
+    const steps: any[] = [...reply.forward.steps, ...reply.inverse.steps];
+    for (let i = 0; i < steps.length; i++) {
+      expect(await grid(page), `${bits} bits, step ${i + 1} of ${steps.length} (${steps[i].kind})`).toBe(steps[i].state.toLowerCase());
+      if (i < steps.length - 1) await page.getByTestId('aes-walk-next').click();
+    }
+  }
+});
+
+test('[A19.ui.reduced-motion-has-no-transition] with reduced motion each step shows its end frame, and nothing moves', async ({ page }) => {
+  await reduced(page);
+  const reply = await openWalk(page);
+  await toFirstStep(page);
+  const steps: any[] = [...reply.forward.steps, ...reply.inverse.steps];
+  for (let i = 0; i < 12; i++) {
+    await page.getByTestId('aes-walk-next').click();
+    expect(await running(page), `running animations at step ${i + 2}`).toBe(0);
+    expect(await grid(page), `the end frame at step ${i + 2}`).toBe(steps[i + 1].state.toLowerCase());
+  }
+});
+
+test('[A19.ui.play-stops-at-the-end-of-a-round] one Play and Pause button runs one round and stops, and pressing it again runs the next', async ({ page }) => {
+  await reduced(page);
+  const reply = await openWalk(page);
+  await toFirstStep(page);
+  const speed = page.getByTestId('aes-walk-speed');
+  await expect(speed, 'the one speed control').toBeVisible();
+  for (const name of ['slow', 'normal', 'fast']) await expect(speed.getByRole('radio', { name }).or(speed.getByRole('option', { name })).or(speed.getByRole('button', { name })).first(), `speed ${name}`).toBeAttached();
+  const play = page.getByTestId('aes-walk-play');
+  await expect(page.getByTestId('aes-walk-play-round'), 'no separate Play this round button').toHaveCount(0);
+  const lastOfRound = (r: number) => reply.forward.steps.find((s: any) => s.kind === 'AddRoundKey' && s.round === r);
+  for (const round of [1, 2]) {
+    await play.click();
+    await expect.poll(async () => await kindNow(page) === 'AddRoundKey' && (await grid(page)) === lastOfRound(round).state.toLowerCase(), { message: `Play stops at the end of round ${round}`, timeout: 15_000 }).toBe(true);
+    const held = await grid(page);
+    await page.waitForTimeout(800);
+    expect(await grid(page), `the walk holds at the end of round ${round}`).toBe(held);
+  }
+});
+
+test('[A19.ui.flip-during-play-stops-the-timeline] a flip to OFF during Play stops the motion and clears the walk', async ({ page }) => {
+  try {
+    await openWalk(page);
+    await toFirstStep(page);
+    await page.getByTestId('aes-walk-play').click();
+    await page.getByTestId('show-keys-switch').click();
+    await expect(page.locator('[data-testid^="aes-walk-cell-"]'), 'no state cell after the flip').toHaveCount(0, { timeout: 5_000 });
+    await expect(page.getByTestId('aes-walk-closed')).toBeVisible();
+    await page.waitForTimeout(800);
+    await expect(page.locator('[data-testid^="aes-walk-cell-"]'), 'the timeline stays stopped').toHaveCount(0);
+  } finally { await setShowKeys(true); }
+});
+
+test('[A19.ui.key-schedule-shows-each-word] the word wall holds every word in fours, a click opens a word, and the Rcon row comes from the Host', async ({ page }) => {
+  const reply = await openWalk(page);
+  const tables = await hostGet('/api/walk/aes/tables');
+  expect(tables.status, 'GET tables').toBe(200);
+  for (let i = 0; i < 40 && !(await page.getByTestId('aes-walk-word-0').isVisible().catch(() => false)); i++) await page.getByTestId('aes-walk-next').click();
+  const rows: any[] = reply.keyWords;
+  expect(rows.length, 'word rows in the reply').toBe(44);
+  for (const row of rows) await expect(page.getByTestId(`aes-walk-word-${row.i}`), `w${row.i}`).toContainText(row.word, { ignoreCase: true });
+  await expect(page.locator('[data-testid^="aes-walk-round-key-group-"]'), 'one group per round key').toHaveCount(11);
+  await expect(page.getByTestId('aes-walk-round-key-group-1').locator('[data-testid^="aes-walk-word-"]'), 'each group holds 4 words').toHaveCount(4);
+  const row = rows.find(r => r.i === 4);
+  await page.getByTestId('aes-walk-word-4').click();
+  for (const [id, value] of [['previous', row.previous], ['rotated', row.rotated], ['substituted', row.substituted], ['rcon', row.rcon], ['after-rcon', row.afterRcon], ['key-back', row.keyBack], ['word', row.word]])
+    await expect(page.getByTestId(`aes-walk-build-${id}`), `build of w4: ${id}`).toContainText(value, { ignoreCase: true });
+  const rcon: string = tables.body.rcon;
+  const shown = ((await page.getByTestId('aes-walk-rcon').textContent()) ?? '').replace(/\s+/g, '').toLowerCase();
+  expect(shown, 'the Rcon row').toContain(rcon.toLowerCase());
+});
+
+test('[A19.ui.multiply-shows-the-engine-terms] the field panel states the definition, and a MixColumns step prints one real multiply from the reply', async ({ page }) => {
+  const reply = await openWalk(page);
+  await toFirstStep(page);
+  for (let n = 0; n < 200 && (await kindNow(page)) !== 'MixColumns'; n++) await page.getByTestId('aes-walk-next').click();
+  expect(await kindNow(page)).toBe('MixColumns');
+  await expect(page.getByTestId('aes-walk-field-panel'), 'the definition').toContainText('Add is XOR.');
+  const step = reply.forward.steps.find((s: any) => s.kind === 'MixColumns');
+  await cell(page, 0, 0).click();
+  const parts: any[] = step.terms[0].parts;
+  for (let j = 0; j < 4; j++) {
+    const t = page.getByTestId(`aes-walk-term-${j}`);
+    await expect(t, `term ${j}: the input`).toContainText(parts[j].input, { ignoreCase: true });
+    await expect(t, `term ${j}: the result`).toContainText(parts[j].result, { ignoreCase: true });
+    await expect(t, `term ${j}: the factor`).toContainText(String(parts[j].factor));
+    await expect(t, `term ${j}: whether it reduced`).toHaveAttribute('data-reduced', String(parts[j].reduced));
+  }
+  await expect(page.getByTestId('aes-walk-term-result'), 'the XOR of the terms').toContainText(step.terms[0].result, { ignoreCase: true });
+});
+
 test('[A19.ui.off-shows-the-closed-line] with Show keys OFF the steps close, the line says why, and the table stays open', async ({ page }) => {
   try {
     await reachTab(page);
@@ -162,7 +270,7 @@ test('[A19.ui.off-shows-the-closed-line] with Show keys OFF the steps close, the
     await reachTab(page);
     await page.getByTestId('aes-walk-tab').click();
     await expect(page.getByTestId('aes-walk-closed')).toContainText('Show keys is off');
-    await expect(page.getByTestId('aes-walk-closed')).toContainText('The S-box table and the modes walk stay open');
+    await expect(page.getByTestId('aes-walk-closed')).toContainText('The S-box table, the key size table, the round constants, the field definition, and the modes walk stay open');
     await expect(page.locator('[data-testid^="aes-walk-cell-"]'), 'no state cell while closed').toHaveCount(0);
     expect((await hostGet('/api/walk/aes/tables')).status, 'the tables route').toBe(200);
   } finally { await setShowKeys(true); }

@@ -462,6 +462,48 @@ def a19_routes_listed(root):
     return "%d walk routes in the Host, each listed with its Show keys OFF rule" % len(found)
 
 
+def walk_lines():
+    return json.load(open(os.path.join(os.path.dirname(os.path.abspath(__file__)), "walk_lines.json"), encoding="utf-8"))
+
+
+def text_of_app(root, names):
+    """The text of the named app files that exist, with backticks and repeated spaces taken out, so a code span in a line still matches."""
+    parts = []
+    for name in names:
+        path = os.path.join(root, "app", "src", *name.split("/"))
+        if os.path.exists(path):
+            parts.append(open(path, encoding="utf-8").read())
+    return " ".join("\n".join(parts).replace("`", "").split())
+
+
+def a19_definition(root, max_grade):
+    """Design section 2.2c: the 5 lines appear in order, and pass the reading grade."""
+    if not os.path.exists(os.path.join(root, "app", "src", "components", "FieldPanel.vue")):
+        raise NotRun("PRODUCT_MISSING", "app/src/components/FieldPanel.vue does not exist yet")
+    data = walk_lines()
+    text = text_of_app(root, data["definitionFiles"])
+    at = -1
+    for n, line in enumerate(data["definition"]):
+        found = text.find(line, at + 1)
+        if found < 0:
+            raise Fail("definition line %d is missing or out of order: %s" % (n + 1, line))
+        at = found
+    g = grade(" ".join(data["definition"]))[0]
+    if g > max_grade:
+        raise Fail("the definition reads at grade %.1f, above %.1f" % (g, max_grade))
+    return "the %d definition lines appear in order, at grade %.1f" % (len(data["definition"]), g)
+
+
+def a19_gcm_line(root):
+    """Design section 2.4: the GCM panel names the Galois field. It arrives with chapter 2."""
+    if not os.path.exists(os.path.join(root, "app", "src", "components", "AesFeedView.vue")):
+        raise NotRun("PRODUCT_MISSING", "app/src/components/AesFeedView.vue does not exist yet")
+    data = walk_lines()
+    if data["gcmPanel"] not in text_of_app(root, data["gcmFiles"]):
+        raise Fail("the GCM panel does not say: %s" % data["gcmPanel"])
+    return "the GCM panel names the Galois field"
+
+
 NON_GOAL_HEADING = re.compile(r"(?i)^#{1,6}\s.*\b(non-?goals?|out of scope|not in scope|will not do)\b")
 
 
@@ -667,6 +709,8 @@ def main():
         "A19.app.no-table-under-src": lambda: a19_no_table_in_app(root),
         "A19.app.words-follow-the-rules": lambda: a19_words(root),
         "A19.repo.walk-routes-listed": lambda: a19_routes_listed(root),
+        "A19.app.field-definition-lines": lambda: a19_definition(root, a.max_grade),
+        "A19.app.gcm-panel-names-the-field": lambda: a19_gcm_line(root),
     }
     if a.list:
         print("\n".join(sorted(clauses)))

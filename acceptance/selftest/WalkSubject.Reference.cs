@@ -22,6 +22,9 @@ namespace Acceptance
             if (Defect == "extra-mix") r.Steps.Insert(r.Steps.Count - 1, new WalkStep { Kind = "MixColumns", Round = r.Rounds, State = r.Steps[r.Steps.Count - 2].State });
             if (Defect == "row-first") foreach (WalkStep s in r.Steps) s.State = RowFirst(s.State);
             if (Defect == "output-other") r.Output = Hex.Encode(new byte[16]);
+            if (Defect == "steps-carry-no-terms") foreach (WalkStep s in r.Steps) s.Terms = null;
+            if (Defect == "step-term-flip") foreach (WalkStep s in r.Steps) if (s.Terms != null) s.Terms[3].Parts[1].Result = "00";
+            if (Defect == "no-spread") { r.Steps[4].State = new RefAes(new byte[16]).Encrypt(new byte[16]).Steps[4].State; }
             return r;
         }
 
@@ -37,6 +40,7 @@ namespace Acceptance
             if (Defect == "canned") return new RefAes(CannedKey).Decrypt(Hex.Decode("69c4e0d86a7b0430d8cdb78070b4c55a"));
             WalkRun r = new RefAes(key).Decrypt(block);
             if (Defect == "inverse-flip") Flip(r.Steps[1]);
+            if (Defect == "inverse-terms-forward") foreach (WalkStep s in r.Steps) if (s.Terms != null) s.Terms[0].Parts[0].Factor = 2;
             if (Defect == "equivalent-order")
             {
                 // FIPS 197 section 5.3.5 order: the two steps change places in each middle round.
@@ -52,6 +56,34 @@ namespace Acceptance
             if (Defect == "key-row-flip") rows[rows.Count - 1].Word = "00000000";
             if (Defect == "rcon-empty") rows[rows.Count / 2 / 4 * 4].Rcon = null;
             return rows;
+        }
+
+        public static IList<ColumnByte> MixTerms(byte[] before, bool inverse)
+        {
+            List<ColumnByte> t = RefField.MixTerms(before, inverse);
+            if (Defect == "term-wrong-result") t[0].Parts[0].Result = "00";
+            if (Defect == "term-not-reduced") t[0].Parts[0].Reduced = false;
+            if (Defect == "term-no-doublings") foreach (TermPart p in t[0].Parts) p.Doublings.Clear();
+            if (Defect == "term-plain-multiply") t[0].Result = "ff";
+            return t;
+        }
+
+        static readonly int[] SharedMap = RefField.ShiftMap(false);
+
+        public static int[] ShiftMap(bool inverse)
+        {
+            if (Defect == "map-shared" && !inverse) return SharedMap;
+            int[] m = RefField.ShiftMap(inverse);
+            if (Defect == "map-swapped") { int a = m[1]; m[1] = m[5]; m[5] = a; }
+            if (Defect == "map-right-for-left") return RefField.ShiftMap(!inverse);
+            return m;
+        }
+
+        public static byte[] RoundConstants(int count)
+        {
+            byte[] r = RefField.RoundConstants(count);
+            if (Defect == "rcon-plain-double" && count > 8) r[8] = 0x00;
+            return r;
         }
 
         public static byte[] Sbox()

@@ -14,6 +14,7 @@ namespace Acceptance
             {
                 WalkStep x = new WalkStep();
                 x.Kind = s.Kind.ToString(); x.Round = s.Round; x.State = WalkCheck.Lower(s.State); x.RoundKey = WalkCheck.Lower(s.RoundKey);
+                x.Terms = s.Terms == null ? null : MapTerms(s.Terms);
                 r.Steps.Add(x);
             }
             return r;
@@ -34,6 +35,29 @@ namespace Acceptance
             }
             return rows;
         }
+
+        static List<ColumnByte> MapTerms(AesColumnByte[] terms)
+        {
+            List<ColumnByte> all = new List<ColumnByte>();
+            foreach (AesColumnByte b in terms)
+            {
+                ColumnByte x = new ColumnByte();
+                x.Result = b.Result.ToString("x2");
+                foreach (AesTerm t in b.Terms)
+                {
+                    TermPart p = new TermPart();
+                    p.Factor = t.Factor; p.Input = t.Input.ToString("x2"); p.Reduced = t.Reduced; p.Result = t.Result.ToString("x2");
+                    foreach (byte d in t.Doublings ?? new byte[0]) p.Doublings.Add(d.ToString("x2"));
+                    x.Parts.Add(p);
+                }
+                all.Add(x);
+            }
+            return all;
+        }
+
+        public static IList<ColumnByte> MixTerms(byte[] before, bool inverse) { return MapTerms(AesKey.MixTerms(before, inverse)); }
+        public static int[] ShiftMap(bool inverse) { return AesKey.ShiftMap(inverse); }
+        public static byte[] RoundConstants(int count) { return AesKey.RoundConstants(count); }
 
         public static byte[] Sbox() { return AesKey.SubstitutionTable(); }
         public static byte[] InverseSbox() { return AesKey.InverseSubstitutionTable(); }

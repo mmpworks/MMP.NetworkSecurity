@@ -16,7 +16,7 @@ namespace Acceptance
 
         sealed class SessionEv { public Dictionary<string, object> Base; public List<RawSecret> Secrets = new List<RawSecret>(); public byte[] OffLeak; }
 
-        sealed class Session { public string Id; public int Lesson, Seed; public string FinishCode; public List<SessionEv> Events = new List<SessionEv>(); public string File; }
+        sealed class Session { public bool EcbFork; public string Id; public int Lesson, Seed; public string FinishCode; public List<SessionEv> Events = new List<SessionEv>(); public string File; }
 
         Dictionary<string, object> RenderSecret(RawSecret s, bool showKeys)
         {

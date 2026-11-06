@@ -2024,6 +2024,28 @@
    "counts": true
   },
   {
+   "id": "A19.app.field-definition-lines",
+   "base": "A19.app.field-definition-lines",
+   "assertion": "A19",
+   "group": "docs",
+   "build": "host",
+   "slice": "W1",
+   "referee": "FIPS 197 (2001) data, the suite's RefAes, and the .NET library",
+   "roles": [],
+   "counts": true
+  },
+  {
+   "id": "A19.app.gcm-panel-names-the-field",
+   "base": "A19.app.gcm-panel-names-the-field",
+   "assertion": "A19",
+   "group": "docs",
+   "build": "host",
+   "slice": "W1",
+   "referee": "FIPS 197 (2001) data, the suite's RefAes, and the .NET library",
+   "roles": [],
+   "counts": true
+  },
+  {
    "id": "A19.app.no-table-under-src",
    "base": "A19.app.no-table-under-src",
    "assertion": "A19",
@@ -2057,6 +2079,17 @@
    "counts": true
   },
   {
+   "id": "A19.host.block-terms-real-run",
+   "base": "A19.host.block-terms-real-run",
+   "assertion": "A19",
+   "group": "a17",
+   "build": "host",
+   "slice": "W1",
+   "referee": "FIPS 197 (2001) data, the suite's RefAes, and the .NET library",
+   "roles": [],
+   "counts": true
+  },
+  {
    "id": "A19.host.control-run-says-not-sent",
    "base": "A19.host.control-run-says-not-sent",
    "assertion": "A19",
@@ -2068,8 +2101,30 @@
    "counts": true
   },
   {
+   "id": "A19.host.ecb-fork-says-match",
+   "base": "A19.host.ecb-fork-says-match",
+   "assertion": "A19",
+   "group": "a17",
+   "build": "host",
+   "slice": "W1",
+   "referee": "FIPS 197 (2001) data, the suite's RefAes, and the .NET library",
+   "roles": [],
+   "counts": true
+  },
+  {
    "id": "A19.host.errors-carry-a-code",
    "base": "A19.host.errors-carry-a-code",
+   "assertion": "A19",
+   "group": "a17",
+   "build": "host",
+   "slice": "W1",
+   "referee": "FIPS 197 (2001) data, the suite's RefAes, and the .NET library",
+   "roles": [],
+   "counts": true
+  },
+  {
+   "id": "A19.host.off-holds-no-word-or-term",
+   "base": "A19.host.off-holds-no-word-or-term",
    "assertion": "A19",
    "group": "a17",
    "build": "host",
@@ -2092,6 +2147,17 @@
   {
    "id": "A19.host.show-keys-off-closes-block-first",
    "base": "A19.host.show-keys-off-closes-block-first",
+   "assertion": "A19",
+   "group": "a17",
+   "build": "host",
+   "slice": "W1",
+   "referee": "FIPS 197 (2001) data, the suite's RefAes, and the .NET library",
+   "roles": [],
+   "counts": true
+  },
+  {
+   "id": "A19.host.tables-carry-maps-rcon-sizes",
+   "base": "A19.host.tables-carry-maps-rcon-sizes",
    "assertion": "A19",
    "group": "a17",
    "build": "host",
@@ -2134,6 +2200,17 @@
    "counts": true
   },
   {
+   "id": "A19.ui.end-frames-on-all-key-sizes",
+   "base": "A19.ui.end-frames-on-all-key-sizes",
+   "assertion": "A19",
+   "group": "e2e",
+   "build": "host",
+   "slice": "W1",
+   "referee": "FIPS 197 (2001) data, the suite's RefAes, and the .NET library",
+   "roles": [],
+   "counts": true
+  },
+  {
    "id": "A19.ui.first-view-fills-by-column",
    "base": "A19.ui.first-view-fills-by-column",
    "assertion": "A19",
@@ -2156,6 +2233,17 @@
    "counts": true
   },
   {
+   "id": "A19.ui.flip-during-play-stops-the-timeline",
+   "base": "A19.ui.flip-during-play-stops-the-timeline",
+   "assertion": "A19",
+   "group": "e2e",
+   "build": "host",
+   "slice": "W1",
+   "referee": "FIPS 197 (2001) data, the suite's RefAes, and the .NET library",
+   "roles": [],
+   "counts": true
+  },
+  {
    "id": "A19.ui.grid-order-on-every-state",
    "base": "A19.ui.grid-order-on-every-state",
    "assertion": "A19",
@@ -2167,8 +2255,30 @@
    "counts": true
   },
   {
+   "id": "A19.ui.key-schedule-shows-each-word",
+   "base": "A19.ui.key-schedule-shows-each-word",
+   "assertion": "A19",
+   "group": "e2e",
+   "build": "host",
+   "slice": "W1",
+   "referee": "FIPS 197 (2001) data, the suite's RefAes, and the .NET library",
+   "roles": [],
+   "counts": true
+  },
+  {
    "id": "A19.ui.late-reply-is-dropped",
    "base": "A19.ui.late-reply-is-dropped",
+   "assertion": "A19",
+   "group": "e2e",
+   "build": "host",
+   "slice": "W1",
+   "referee": "FIPS 197 (2001) data, the suite's RefAes, and the .NET library",
+   "roles": [],
+   "counts": true
+  },
+  {
+   "id": "A19.ui.multiply-shows-the-engine-terms",
+   "base": "A19.ui.multiply-shows-the-engine-terms",
    "assertion": "A19",
    "group": "e2e",
    "build": "host",
@@ -2200,8 +2310,30 @@
    "counts": true
   },
   {
+   "id": "A19.ui.play-stops-at-the-end-of-a-round",
+   "base": "A19.ui.play-stops-at-the-end-of-a-round",
+   "assertion": "A19",
+   "group": "e2e",
+   "build": "host",
+   "slice": "W1",
+   "referee": "FIPS 197 (2001) data, the suite's RefAes, and the .NET library",
+   "roles": [],
+   "counts": true
+  },
+  {
    "id": "A19.ui.reconnect-reads-the-toggle-first",
    "base": "A19.ui.reconnect-reads-the-toggle-first",
+   "assertion": "A19",
+   "group": "e2e",
+   "build": "host",
+   "slice": "W1",
+   "referee": "FIPS 197 (2001) data, the suite's RefAes, and the .NET library",
+   "roles": [],
+   "counts": true
+  },
+  {
+   "id": "A19.ui.reduced-motion-has-no-transition",
+   "base": "A19.ui.reduced-motion-has-no-transition",
    "assertion": "A19",
    "group": "e2e",
    "build": "host",
@@ -2332,6 +2464,28 @@
    "counts": true
   },
   {
+   "id": "A19.walk.one-bit-spread.cf",
+   "base": "A19.walk.one-bit-spread",
+   "assertion": "A19",
+   "group": "walk",
+   "build": "cf",
+   "slice": "W1",
+   "referee": "FIPS 197 (2001) data, the suite's RefAes, and the .NET library",
+   "roles": [],
+   "counts": true
+  },
+  {
+   "id": "A19.walk.one-bit-spread.net10",
+   "base": "A19.walk.one-bit-spread",
+   "assertion": "A19",
+   "group": "walk",
+   "build": "net10",
+   "slice": "W1",
+   "referee": "FIPS 197 (2001) data, the suite's RefAes, and the .NET library",
+   "roles": [],
+   "counts": true
+  },
+  {
    "id": "A19.walk.output-equals-bcl.cf",
    "base": "A19.walk.output-equals-bcl",
    "assertion": "A19",
@@ -2345,6 +2499,50 @@
   {
    "id": "A19.walk.output-equals-bcl.net10",
    "base": "A19.walk.output-equals-bcl",
+   "assertion": "A19",
+   "group": "walk",
+   "build": "net10",
+   "slice": "W1",
+   "referee": "FIPS 197 (2001) data, the suite's RefAes, and the .NET library",
+   "roles": [],
+   "counts": true
+  },
+  {
+   "id": "A19.walk.round-constants.cf",
+   "base": "A19.walk.round-constants",
+   "assertion": "A19",
+   "group": "walk",
+   "build": "cf",
+   "slice": "W1",
+   "referee": "FIPS 197 (2001) data, the suite's RefAes, and the .NET library",
+   "roles": [],
+   "counts": true
+  },
+  {
+   "id": "A19.walk.round-constants.net10",
+   "base": "A19.walk.round-constants",
+   "assertion": "A19",
+   "group": "walk",
+   "build": "net10",
+   "slice": "W1",
+   "referee": "FIPS 197 (2001) data, the suite's RefAes, and the .NET library",
+   "roles": [],
+   "counts": true
+  },
+  {
+   "id": "A19.walk.shift-map.cf",
+   "base": "A19.walk.shift-map",
+   "assertion": "A19",
+   "group": "walk",
+   "build": "cf",
+   "slice": "W1",
+   "referee": "FIPS 197 (2001) data, the suite's RefAes, and the .NET library",
+   "roles": [],
+   "counts": true
+  },
+  {
+   "id": "A19.walk.shift-map.net10",
+   "base": "A19.walk.shift-map",
    "assertion": "A19",
    "group": "walk",
    "build": "net10",
@@ -2521,6 +2719,50 @@
   {
    "id": "A19.walk.tables-equal-fips.net10",
    "base": "A19.walk.tables-equal-fips",
+   "assertion": "A19",
+   "group": "walk",
+   "build": "net10",
+   "slice": "W1",
+   "referee": "FIPS 197 (2001) data, the suite's RefAes, and the .NET library",
+   "roles": [],
+   "counts": true
+  },
+  {
+   "id": "A19.walk.terms-equal-reference-and-xor.cf",
+   "base": "A19.walk.terms-equal-reference-and-xor",
+   "assertion": "A19",
+   "group": "walk",
+   "build": "cf",
+   "slice": "W1",
+   "referee": "FIPS 197 (2001) data, the suite's RefAes, and the .NET library",
+   "roles": [],
+   "counts": true
+  },
+  {
+   "id": "A19.walk.terms-equal-reference-and-xor.net10",
+   "base": "A19.walk.terms-equal-reference-and-xor",
+   "assertion": "A19",
+   "group": "walk",
+   "build": "net10",
+   "slice": "W1",
+   "referee": "FIPS 197 (2001) data, the suite's RefAes, and the .NET library",
+   "roles": [],
+   "counts": true
+  },
+  {
+   "id": "A19.walk.terms-worked-example.cf",
+   "base": "A19.walk.terms-worked-example",
+   "assertion": "A19",
+   "group": "walk",
+   "build": "cf",
+   "slice": "W1",
+   "referee": "FIPS 197 (2001) data, the suite's RefAes, and the .NET library",
+   "roles": [],
+   "counts": true
+  },
+  {
+   "id": "A19.walk.terms-worked-example.net10",
+   "base": "A19.walk.terms-worked-example",
    "assertion": "A19",
    "group": "walk",
    "build": "net10",

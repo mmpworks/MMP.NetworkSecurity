@@ -21,6 +21,46 @@ namespace Acceptance
             Check.True(r.ContainsKey(id) && r[id].StartsWith(prefix), id + " should read " + prefix + " when " + change + ", gave " + (r.ContainsKey(id) ? r[id] : "nothing"));
         }
 
+        static int FieldLines(Ctx c, string tmp)
+        {
+            const string Def = "A19.app.field-definition-lines", Gcm = "A19.app.gcm-panel-names-the-field";
+            string root = Path.Combine(tmp, "field");
+            Dictionary<string, object> data = MiniJson.AsObject(MiniJson.Parse(File.ReadAllText(Path.Combine(c.AcceptanceDir, "checks", "walk_lines.json"))));
+            List<string> lines = new List<string>();
+            foreach (object o in MiniJson.Arr(data, "definition")) lines.Add((string)o);
+            string gcm = MiniJson.Str(data, "gcmPanel");
+            Dictionary<string, string> r = SelfA17Text.Docs(c, root, Def + "," + Gcm);
+            Check.True(r[Def].StartsWith("NOT RUN:PRODUCT_MISSING") && r[Gcm].StartsWith("NOT RUN:PRODUCT_MISSING"), "an empty tree should read NOT RUN, gave " + r[Def] + " and " + r[Gcm]);
+            SelfA17Text.Put(root, "app/src/components/FieldPanel.vue", "<p>" + string.Join("</p><p>", lines.ToArray()) + "</p>");
+            SelfA17Text.Put(root, "app/src/components/AesFeedView.vue", "<p>" + gcm + "</p>");
+            r = SelfA17Text.Docs(c, root, Def + "," + Gcm);
+            Check.True(r[Def].StartsWith("PASS") && r[Gcm].StartsWith("PASS"), "the good tree should PASS, gave " + r[Def] + " and " + r[Gcm]);
+            int bites = 0;
+            for (int i = 0; i < lines.Count; i++)
+            {
+                List<string> less = new List<string>(lines);
+                less.RemoveAt(i);
+                SelfA17Text.Put(root, "app/src/components/FieldPanel.vue", "<p>" + string.Join("</p><p>", less.ToArray()) + "</p>");
+                Expect2(c, root, Def, "definition line " + (i + 1) + " is gone");
+                bites++;
+            }
+            List<string> swapped = new List<string>(lines);
+            swapped.Reverse();
+            SelfA17Text.Put(root, "app/src/components/FieldPanel.vue", "<p>" + string.Join("</p><p>", swapped.ToArray()) + "</p>");
+            Expect2(c, root, Def, "the lines are out of order");
+            bites++;
+            SelfA17Text.Put(root, "app/src/components/AesFeedView.vue", "<p>GHASH makes the tag.</p>");
+            Expect2(c, root, Gcm, "the GCM panel lacks the line");
+            bites++;
+            return bites;
+        }
+
+        static void Expect2(Ctx c, string root, string id, string change)
+        {
+            Dictionary<string, string> r = SelfA17Text.Docs(c, root, id);
+            Check.True(r[id].StartsWith("FAIL"), id + " should FAIL when " + change + ", gave " + r[id]);
+        }
+
         [Clause("SELF.walk-text-checks-bite")]
         public static string TextChecksBite(Ctx c)
         {
@@ -62,6 +102,7 @@ namespace Acceptance
             SelfA17Text.Put(root, "src/NetSec.Host/AesWalkRoutes.cs", "class R { string a = \"/api/walk/aes/secret-new-route\"; }");
             Expect(c, root, "A19.repo.walk-routes-listed", "FAIL", "the Host has a walk route that is not listed");
             bites++;
+            bites += FieldLines(c, tmp);
             return "an empty tree reads NOT RUN, a good tree PASSES, and " + bites + " one-change trees each FAIL";
         }
     }
