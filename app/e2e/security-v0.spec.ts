@@ -3,19 +3,25 @@ import * as fs from 'node:fs'
 import * as os from 'node:os'
 import * as path from 'node:path'
 import { generateKeyPairSync } from 'node:crypto'
-import { PORT, TOKEN, open } from './walk'
+import { startOwnHost, type OwnHost } from './own-host'
+import { open } from './walk'
 
 // V0 UI against a real Host: the keys chip, the Security setup screen, the five-screen path of the sign-in flow (token.issuer and the device key),
 // the refusal banner, and the Show keys switch. The Host owns every rule. This spec drives the screens and reads what the Host sent.
 const OUT = path.join(__dirname, '..', 'test-results', 'security-v0')
 const shot = async (page: Page, name: string) => { fs.mkdirSync(OUT, { recursive: true }); await page.screenshot({ path: path.join(OUT, `${name}.png`) }) }
 const api = (method: string, p: string, body?: unknown) =>
-  fetch(`http://127.0.0.1:${PORT}${p}`, { method, headers: { Authorization: `Bearer ${TOKEN}`, 'Content-Type': 'application/json' }, body: body === undefined ? undefined : JSON.stringify(body) })
+  fetch(`http://127.0.0.1:${host.port}${p}`, { method, headers: { Authorization: `Bearer ${host.token}`, 'Content-Type': 'application/json' }, body: body === undefined ? undefined : JSON.stringify(body) })
 
 test.describe.configure({ mode: 'serial' })
 
+// This file reads key state step by step and makes keys for good, so it starts on a clean Host of its own.
+let host: OwnHost
+test.beforeAll(async () => { host = await startOwnHost() })
+test.afterAll(async () => { await host.stop() })
+
 test('the top bar shows the keys chip, the security button, the Show keys switch and the OS transport button', async ({ page }) => {
-  await open(page)
+  await open(page, host)
   await expect(page.getByTestId('keys-chip')).toHaveText(/Keys: built-in/)
   await expect(page.getByTestId('security-setup-button')).toBeVisible()
   await expect(page.getByTestId('show-keys-switch')).toBeChecked()
@@ -25,7 +31,7 @@ test('the top bar shows the keys chip, the security button, the Show keys switch
 })
 
 test('the Show keys switch is on and locked in V0, because the Host hides nothing yet', async ({ page }) => {
-  await open(page)
+  await open(page, host)
   await expect(page.getByTestId('show-keys-switch')).toBeChecked()
   await expect(page.getByTestId('show-keys-switch')).toBeDisabled()
   await page.getByTestId('security-setup-button').click()
@@ -34,7 +40,7 @@ test('the Show keys switch is on and locked in V0, because the Host hides nothin
 })
 
 test('the Security setup screen lists 15 types with the two-button mode switch and the states', async ({ page }) => {
-  await open(page)
+  await open(page, host)
   await page.getByTestId('security-setup-button').click()
   await expect(page.getByTestId('sec-page')).toBeVisible()
   await expect(page.locator('[data-testid^="type-row-"]')).toHaveCount(15)
@@ -49,7 +55,7 @@ test('the Security setup screen lists 15 types with the two-button mode switch a
 
 test('a lesson whose key is not ready shows the refusal banner, and the built-in button runs the lesson', async ({ page }) => {
   expect((await api('PUT', '/api/security/types/token.issuer/mode', { mode: 'Mine' })).status).toBeLessThan(300)
-  await open(page)
+  await open(page, host)
   await expect(page.getByTestId('keys-chip')).toHaveText(/Keys: 1 of mine/)
   await expect(page.getByTestId('security-badge')).toHaveText('1')
   await expect(page.getByTestId('lesson-keys-badge-10')).toBeVisible()
@@ -69,7 +75,7 @@ test('a lesson whose key is not ready shows the refusal banner, and the built-in
 })
 
 test('walks the five screens of Make my sign-in set and ends with the two chips', async ({ page }) => {
-  await open(page)
+  await open(page, host)
   await page.getByTestId('security-setup-button').click()
   await page.getByTestId('flow-my-login').click()
   const sheet = page.getByTestId('wizard-sheet')
@@ -126,7 +132,7 @@ test('walks the five screens of Make my sign-in set and ends with the two chips'
 test('Keep my place leaves the run open and the row reads Setup paused', async ({ page }) => {
   await api('PUT', '/api/security/types/token.issuer/mode', { mode: 'BuiltIn' })
   await api('PUT', '/api/security/types/device.enrolment/mode', { mode: 'BuiltIn' })
-  await open(page)
+  await open(page, host)
   await page.getByTestId('security-setup-button').click()
   await page.getByTestId('flow-my-login').click()
   await page.getByTestId('wizard-next').click()
@@ -153,7 +159,7 @@ test('the files branch refuses the wrong kind of key and a file that is no key, 
   fs.writeFileSync(good, generateKeyPairSync('ed25519').privateKey.export({ type: 'pkcs8', format: 'pem' }))
   await api('PUT', '/api/security/types/token.issuer/mode', { mode: 'BuiltIn' })
   await api('PUT', '/api/security/types/device.enrolment/mode', { mode: 'BuiltIn' })
-  await open(page)
+  await open(page, host)
   await page.getByTestId('security-setup-button').click()
   await page.getByTestId('flow-my-login').click()
   await page.getByTestId('wizard-next').click()
