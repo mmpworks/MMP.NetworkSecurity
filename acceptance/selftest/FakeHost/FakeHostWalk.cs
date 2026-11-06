@@ -79,6 +79,7 @@ namespace Acceptance
                 Dictionary<string, object> tables = D("sbox", Hex.Encode(sbox), "inverseSbox", Hex.Encode(RefAes.InverseSbox), "shiftRows", forwardMap, "inverseShiftRows", inverseMap,
                     "rcon", M("walk-rcon-wrong") ? "01020408102040800036" : "01020408102040801b36", "sizes", sizes);
                 if (M("walk-tables-leak-terms")) tables["terms"] = new List<object> { D("result", "04") };
+                if (M("walk-tables-leak-words")) tables["keyWords"] = new List<object> { D("i", 4.0) };
                 if (M("walk-tables-leak-key"))
                     foreach (Session open in _sessions.Values) { byte[] k = RunKey(open); if (k != null) tables["note"] = Hex.Encode(k); }
                 WalkWrite(ctx, 200, tables, M("walk-no-store-missing"));

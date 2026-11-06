@@ -309,13 +309,13 @@ namespace Acceptance
             return cells + " terms on 2 seeds equal RefField and XOR to the state byte";
         }
 
-        /// <summary>True when a field of this name sits anywhere in the JSON value.</summary>
+        /// <summary>True when a field of this name holds data anywhere in the JSON value. A number is no data here: the open size table has a keyWords count, sizes[].keyWords, and the word rows are an array of the same name.</summary>
         static bool HasField(object value, string name)
         {
             Dictionary<string, object> d = value as Dictionary<string, object>;
             if (d != null)
             {
-                foreach (KeyValuePair<string, object> kv in d) if (kv.Key == name || HasField(kv.Value, name)) return true;
+                foreach (KeyValuePair<string, object> kv in d) if ((kv.Key == name && !(kv.Value is double)) || HasField(kv.Value, name)) return true;
                 return false;
             }
             List<object> list = value as List<object>;
