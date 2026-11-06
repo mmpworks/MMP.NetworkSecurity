@@ -27,7 +27,7 @@ namespace Acceptance
             new Case("A17.flow.login.walk", V0Clauses.LoginWalk, "machine-allows-any", "stale-accepted", "no-judge-facts", "device-judge-claimed"),
             new Case("A17.referee.token-issuer-go", V0Clauses.TokenIssuerGo, "token-wrong-key", "key-route-other-public", "pub-in-trace-wrong"),
             new Case("A17.show-keys.default-on", V3Clauses.DefaultOn, "default-off", "no-health-showkeys"),
-            new Case("A17.show-keys.off-holds-no-secret", V3Clauses.OffHoldsNoSecret, "off-keeps-hex-in-events", "off-keeps-hex-in-file", "off-hex-in-frames", "off-hex-in-message", "hidden-missing", "keylog-served-when-off"),
+            new Case("A17.show-keys.off-holds-no-secret", V3Clauses.OffHoldsNoSecret, "off-keeps-hex-in-events", "off-keeps-hex-in-file", "off-hex-in-frames", "off-hex-in-message", "off-hex-in-plain", "hidden-missing", "keylog-served-when-off"),
             new Case("A17.show-keys.mine-shows-exportable", V3Clauses.MineShowsExportable, "mine-key-route-no-hex", "no-key-in-use"),
             new Case("A17.show-keys.non-exportable-hidden-when-on", V3Clauses.NonExportableHiddenWhenOn, "exercise-key-leaks"),
             new Case("A17.show-keys.fingerprint-compare", V3Clauses.FingerprintCompare, "fingerprint-wrong"),

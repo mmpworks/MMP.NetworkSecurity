@@ -14,7 +14,7 @@ namespace Acceptance
     {
         sealed class RawSecret { public string Name, Holder; public byte[] Bytes; public bool NonExportable; public string PublicFingerprint; }
 
-        sealed class SessionEv { public Dictionary<string, object> Base; public List<RawSecret> Secrets = new List<RawSecret>(); }
+        sealed class SessionEv { public Dictionary<string, object> Base; public List<RawSecret> Secrets = new List<RawSecret>(); public byte[] OffLeak; }
 
         sealed class Session { public string Id; public int Lesson, Seed; public string FinishCode; public List<SessionEv> Events = new List<SessionEv>(); public string File; }
 
@@ -40,6 +40,7 @@ namespace Acceptance
             foreach (RawSecret s in e.Secrets) secrets.Add(RenderSecret(s, showKeys));
             r["secrets"] = secrets;
             if (!showKeys && M("off-hex-in-message") && e.Secrets.Count > 0) r["message"] = "key " + Hex.Encode(e.Secrets[0].Bytes);
+            if (!showKeys && M("off-hex-in-plain") && e.OffLeak != null) r["plain"] = (string)e.Base["plain"] + Hex.Encode(e.OffLeak);
             return r;
         }
 
@@ -159,15 +160,16 @@ namespace Acceptance
         }
 
         /// <summary>
-        /// Faithful to design 6.2 limit 2: a lab sends some secret in the clear (a challenge, a token), so its hex is in a plain field whatever Show keys says.
-        /// Without it the byte scan could never meet a secret on the wire and a rule that exempts wire and plain would be untested.
+        /// Faithful to design 6.2 limit 2: a lab sends a value in the clear that it stores as a secret (a challenge, a token), so its hex is in the wire and plain fields
+        /// whatever Show keys says. Without it the byte scan could never meet such a value and its exemption would be untested.
         /// </summary>
         void CarryOnWire(Session s)
         {
-            RawSecret carried = null;
-            foreach (SessionEv e in s.Events) if (e.Secrets.Count > 0 && carried == null && e.Secrets[0].Bytes.Length >= 8) carried = e.Secrets[0];
-            if (carried == null) return;
-            AddWire(s, "client", "wire.sent", "SentInTheClear", carried.Bytes, carried.Bytes);
+            byte[] clear;
+            using (SHA256 sha = SHA256.Create()) clear = Hex.Slice(sha.ComputeHash(Encoding.ASCII.GetBytes("clear:" + s.Lesson)), 0, 16);
+            AddWire(s, "client", "wire.sent", "SentInTheClear", clear, clear);
+            s.Events[s.Events.Count - 1].Secrets.Add(Raw("clear.value", "client", clear));
+            foreach (SessionEv e in s.Events) if (e.Secrets.Count > 0 && e.Secrets[0].Name != "clear.value") { s.Events[s.Events.Count - 1].OffLeak = e.Secrets[0].Bytes; break; }
         }
 
         /// <summary>The defect "foreign-finish-first": another session of the same Host ends on this connection before the run's own frames, with a trace event and a session.finished of its own.</summary>
