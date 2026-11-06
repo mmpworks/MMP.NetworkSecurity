@@ -1,6 +1,6 @@
 # MMP.NetworkSecurity: walkthrough design
 
-Author: Richard. Date: 2026-11-06. Revision 6, adding Steve's rulings: jump to a round, tap a byte, the GHASH walk, and the forgery demo. Status: design only, for Jared's check and Echo's clauses. No product code.
+Author: Richard. Date: 2026-11-06. Revision 7, adding binary on hover and the longer text view. Status: design only, for Jared's check and Echo's clauses. No product code.
 
 Sources of facts: FIPS 197, the engine, and Jared's sheet `E:\dev\ns-lesson1-facts.md`. Steve's web pages set depth and teaching order only (section 2.1).
 
@@ -200,7 +200,7 @@ The byte position runs through the whole table, 0 to 175 at AES-128. `w4` is pos
 | AES-192 | 6 | 12 | 13 | 52 | 0 to 207 | 8 | The second column of round key 1 |
 | AES-256 | 8 | 14 | 15 | 60 | 0 to 239 | 7 | The end of round key 1 |
 
-**At AES-192 and AES-256, the key runs past round key 0.** The grids stay one per round key, because each grid is what one AddRoundKey uses. A band marks the key's words across the grids: `w0` to `w5` at AES-192, and `w0` to `w7` at AES-256. Those cells start filled, and the panel says: "The first 6 words are the key, so round key 1 starts with key bytes." At AES-256 it says the first 8 words. The build starts at the next column: `w6` at AES-192, and `w8` at AES-256.
+**At AES-192 and AES-256, the key runs past round key 0.** The grids stay one per round key, because each grid is what one AddRoundKey uses. A band marks the key's words across the grids: `w0` to `w5` at AES-192, and `w0` to `w7` at AES-256. Those cells start filled, and the panel says: "The first 6 words are the key, so round key 1 starts with key bytes." At AES-256 it says: "The first 8 words are the key, so round key 1 is all key bytes." The build starts at the next column: `w6` at AES-192, and `w8` at AES-256.
 
 **View 2, build one word.** The first Nk words are the key itself. Each later word comes from two earlier words: the one before it, and the one Nk back. Every Nk words, the word before it first passes through three steps. Next and Play build one word at a time.
 
@@ -314,6 +314,22 @@ These two ideas come from CrypTool's "AES (step-by-step)" page. We take the idea
 3. Nothing in W1a or W1b depends on it, and the rule adds one call to `AesKey`.
 
 **What would change my mind:** Steve asks for it during his W1b look, or the new look gives each gesture its own place.
+
+### 2.2f Binary on hover (W1b)
+
+Steve's ask: see any hex value in binary.
+
+**Hover or keyboard focus on any hex value shows its bits.** A touch screen uses the same tip on a long press, because a tap already has a meaning on a cell.
+
+| Target | The tip shows |
+|---|---|
+| Any hex value | Its bits in two groups of 4, such as `53  0101 0011` |
+| A state cell, on SubBytes, MixColumns, AddRoundKey, and their inverses | Before and after the step, changed bits marked, and a count: "3 of 8 bits changed" |
+| A state cell, on ShiftRows and InvShiftRows | The position it came from, and "This byte moved. No bits changed." A same-position compare would show a false change, so the tip compares nothing here |
+
+**The app only formats bytes the engine sent.** The tip turns a hex string into a bit string and compares two bit strings, character by character. It computes no crypto value. `binaryOf` and `bitsChanged` are pure functions in `walk.ts`. Marked bits also change weight or underline, so colour is never the only sign.
+
+With Show keys OFF, the closed views show no hex, so they offer no tip.
 
 ### 2.3 The S-box view
 
@@ -475,6 +491,41 @@ Steve's ruling: show what the repeated-nonce mistake costs. An eavesdropper with
 | Forged last block | `ec21213913e7f998f016eda68a166119` |
 | Forged tag | `4207b367ff74886a6fec40259d3939e0` |
 
+### 2.4c A longer text, and the picture (W2)
+
+Steve's ask, after CrypTool 2's "Block Modes" template: a view with many blocks, where the mode's effect shows. We take the idea and no code or image.
+
+**The view:**
+
+1. The text, cut into blocks, with the last block marked "+ padding".
+2. ECB and CBC cipher blocks side by side. Repeats are shaded, with a count.
+3. A control flips one bit of the text in a chosen block. The view counts changed cipher blocks, and changed bits per block.
+4. The picture beside it: clear, ECB, and CBC, from the run.
+
+**Decision: the learner can type their own text, up to 1,024 bytes.** 1,024 bytes gives at most 65 blocks with padding, which still reads as one table. A longer text adds no new lesson. The box starts with a built-in text that holds repeats on block boundaries. The panel says: "Equal text shows as equal blocks only when it starts on a block boundary", because a typed repeat often does not.
+
+**What would change my mind on typing:** the new look has no room for a text box, or a reader finds the boundary rule loses more people than typing gains.
+
+| Question | Answer |
+|---|---|
+| Which key? | A fixed practice key and one fixed IV, both derived from a label by SHAKE256, as `TrainingKeySource` does. The run's key stays out |
+| Why not the run's key? | A typed text under the run's key would make an encrypt-anything service for that key, which can be a learner's own test key (`lab.aes-key`). It would also add nothing, because the typed text never ran in the lesson |
+| Why one fixed IV? | So a flip compares like with like, and a clause can recompute every value with the BCL. The panel says: "This view uses one fixed IV so that a flip compares fairly. A real system uses a new unpredictable IV for each message" |
+| Show keys OFF | **Open.** The reply holds the text and cipher blocks, and no key byte. The key is public in the source, and the screen does not show it |
+| Session needed? | No. The route takes the text and reads no run. It also works beside a loaded replay |
+| Trace? | The route writes no event. The text enters no trace, session file, or log |
+| The picture | No route. `PicturePanel.vue` already reads the run's `PictureEcb` and `PictureCbc`. It gains a side-by-side layout. The counts come from the run's `measure.result` events. The eavesdropper view still hides the clear picture |
+
+**Words on screen, from Jared (sheet 5.19):**
+
+1. "Both views use the same AES on each block. The mode is the difference: ECB locks each block alone, so equal text gives equal cipher blocks. CBC mixes in the block before, so these repeats do not show."
+2. With engine values: "One text bit changed. ECB: {n} block changed. CBC: {n} blocks changed, this block and all after it. Bits changed in each block: {list} of 128."
+3. Only if the panel names the words: "Shannon named two goals in 1949: confusion and diffusion. Teachers often credit the S-box with the first, and ShiftRows and MixColumns with the second. Both are at work inside one block here, in both views."
+
+Jared's run on the claim, off screen: 400 random keys, IVs, and flips on the lesson text. ECB changed the flipped block only, 400 of 400. CBC changed that block and all later ones, 400 of 400. Bits changed per changed block: 1,402 blocks, mean 63.8 of 128, range 45 to 84.
+
+The flip here is a **text** bit. Section 2.4's damage pattern is a **cipher** bit, and it differs. Each view carries its own label.
+
 ### 2.5 Decision: ECB carries chapter 1
 
 | Option | Readable letters at both ends of AES | Sent in the control run | Result |
@@ -505,6 +556,11 @@ From Jared's sheet. Echo can scan for these in `walk-gloss.json` and the tour.
 | "One block turns to junk, and the next has the same bit flipped. Then it recovers" | "A corrupted block affects subsequent blocks" |
 | "This engine checks the tag first. No text comes out on a failure" | "GCM must check the tag first", as a rule of the standard |
 | "Shows patterns" for ECB | "Vulnerable to cryptanalysis" for ECB |
+| "The same AES runs inside both. The mode is the difference" | "ECB has no confusion" or "ECB lacks diffusion". AES supplies both inside a block, and a mode shows or hides repeats across blocks |
+| "CBC carries a change forward" | "CBC adds diffusion" |
+| Measured bit counts from the engine | A fixed half, or a fixed 64. Diffusion defined as "one bit changes half the output" |
+| "This block and all after it". A flip in the last block changes only that block | "A change spreads to all blocks" in CBC |
+| "CBC hides these repeats. It still needs an unpredictable IV, and it has no tag" | "CBC is safe", or "CBC fixes ECB" |
 
 ### 2.7 Resolution semantics
 
@@ -525,11 +581,13 @@ From Jared's sheet. Echo can scan for these in `walk-gloss.json` and the tour.
 | Which chapter | Two tabs |
 | Which key size (chapter 1) | One selector |
 | Which mode (chapter 2) | Three tabs |
+| Longer text (W2) | One text box, a block picker and a Flip button. The modes sit side by side, so there is no mode control |
 | Move through steps | Back, Next, and round chips to jump |
 | Watch steps move | One Play and Pause button, which stops at the end of the round. Press it again for the next round. Steve can overrule this after he steps through W1b |
 | How fast | One speed control: slow, normal, fast |
 | See one word's build | Tap a built word in the table |
 | See one byte's lookup | Click a cell |
+| See a value in binary | Hover or focus. No control |
 | Open an AES box (chapter 2) | Click the box |
 
 Cut: a separate "Play this round" button, because Play already stops there, a separate encrypt/decrypt switch (decrypt follows encrypt in one step list), and a stand-alone S-box page.
@@ -633,6 +691,16 @@ namespace NetSec.Labs {
     public AesTagState Tag;
     public int TotalBlocks, ForwardCalls, InverseCalls; public AesFeedRow[] Rows;
   }
+  public sealed class AesLongTextRow {       // One padded block, ECB and CBC. Flipped holds the same row after the flip
+    public int Block; public byte[] Data, Ecb, Cbc;
+    public bool EcbRepeat, CbcRepeat;
+    public int EcbBitsChanged, CbcBitsChanged;   // Zero when no flip was asked
+  }
+  public sealed class AesLongTextView { public AesLongTextRow[] Rows; public int EcbRepeats, CbcRepeats, EcbBlocksChanged, CbcBlocksChanged; }
+  public static class AesLongText {           // Pure. Uses the real Modes.EcbEncrypt, Modes.CbcEncrypt and Lesson01Aes.Pad
+    public const int MaxBytes = 1024;
+    public static AesLongTextView Build(byte[] key, byte[] iv, byte[] text, int flipBlock, int flipBit);   // flipBlock -1 means no flip
+  }
   public sealed class GcmForgery {            // Every value comes from the two frames and the known text
     public byte[] Hash, Mask, ForgedBlock, ForgedTag, ForgedBody;
   }
@@ -652,7 +720,7 @@ namespace NetSec.Labs {
 
 `Gf128` gains `Inverse` and `SquareRoot`, built from repeated `Multiply`. The field's 1 is `80 00 ... 00` in GCM's bit order, which is the trap in the power loop. `Gcm.WalkTag` runs beside `ComputeTag`, and the real path does not change. `Lesson01Aes` gains `OptionForgeLastBlock`, and `AttackCatalog` gains the row.
 
-`Gcm.CounterBlock` is new and pure. `CounterCrypt` stays as it is. The lock guard catches a drift between the two. `Lesson01Aes.Pad` changes from private to internal, so the feed uses the lesson's own padding. Its bytes and the lab's trace stay as they are. `ErrorCodes` gains `AesWalkDiverged`, `WalkNotBuilt`, `WalkWaitingForWire`, `WalkMessageNotSent`, `WalkMessageReplaced`, `WalkKeySizeNotInRun`, `WalkBadArgument`, `WalkForgeSameText`, `WalkForgeNonceDiffers`, and `WalkForgeTooManyBlocks`.
+`Gcm.CounterBlock` is new and pure. `CounterCrypt` stays as it is. The lock guard catches a drift between the two. `Lesson01Aes.Pad` changes from private to internal, so the feed uses the lesson's own padding. Its bytes and the lab's trace stay as they are. `ErrorCodes` gains `AesWalkDiverged`, `WalkNotBuilt`, `WalkWaitingForWire`, `WalkMessageNotSent`, `WalkMessageReplaced`, `WalkKeySizeNotInRun`, `WalkBadArgument`, `WalkTextEmpty`, `WalkTextTooLong`, `WalkForgeSameText`, `WalkForgeNonceDiffers`, and `WalkForgeTooManyBlocks`.
 
 **`AesWalks.Feed` is a third copy of the mode logic,** after `Modes.cs` and `Gcm.cs`. The lock guard is its run-time pin. A row cannot read `differs` for a Feed bug, because a Feed bug fails the guard first.
 
@@ -669,7 +737,10 @@ GET /api/sessions/{id}/walk/aes/block?source=ecb|cbc|gcm&block=0..rows-1
 GET /api/sessions/{id}/walk/aes/modes?mode=ecb|cbc|gcm
 GET /api/sessions/{id}/walk/aes/ghash
 GET /api/sessions/{id}/walk/aes/forge
+POST /api/walk/aes/long-text   { "text": "...", "flipBlock": 1, "flipBit": 0 }
 ```
+
+`/long-text` arrives in W2. It takes the text, so it departs from the rule that a walk route takes no bytes. That rule keeps canned keys and blocks out of the real walk, and here the text is the learner's own and no key comes with it. The reply holds rows and counts. The route rejects a body over 8 KiB before it reads it.
 
 `/ghash` and `/forge` arrive in W1c. `/forge` gives a forgery only on a session that ran `L1-forge-last-block`, and any other session gets a named refusal below. The route reads the two frames from `wire.sent`, calls `GcmForgeries.Recover`, and then, as a guard, reads the run's key: the recovered H must equal AES of the zero block, or `AES_WALK_DIVERGED`. It passes the forged body to the real `Gcm.TryOpen` and returns its answer and text.
 
@@ -728,7 +799,8 @@ Replies, trimmed. Every error carries `code`, `message`, `retryable`, and `reque
 | A running session has not sent the message yet | 409 `WALK_WAITING_FOR_WIRE`, `retryable: true` |
 | A finished session never sent the message | 409 `WALK_MESSAGE_NOT_SENT` |
 | The plan holds a `Replacement` | 409 `WALK_MESSAGE_REPLACED` |
-| A bad mode, source, block, or key size | 400 `WALK_BAD_ARGUMENT` |
+| A bad mode, source, block, or key size, or a flip outside the text | 400 `WALK_BAD_ARGUMENT` |
+| Long text: empty, or over 1,024 bytes as UTF-8 | 400 `WALK_TEXT_EMPTY`, 400 `WALK_TEXT_TOO_LONG` |
 | Forge: the two frames are the same text, as on `L1-reuse-nonce` | 409 `WALK_FORGE_SAME_TEXT` |
 | Forge: the two frames have different nonces, as on a control run | 409 `WALK_FORGE_NONCE_DIFFERS`, with no H shown |
 | Forge: anything other than one changed last block | 409 `WALK_FORGE_TOO_MANY_BLOCKS`. This covers more than the last block differing (which needs root finding, and the pilot does not build it), only an earlier block differing (the divisor would be zero), and different lengths (H would come out wrong). No lab row reaches the last two, and `Recover` is public, so it refuses them |
@@ -742,6 +814,7 @@ Replies, trimmed. Every error carries `code`, `message`, `retryable`, and `reque
 |---|---|---|
 | `/api/walk/aes/tables` | Open | The S-box tables, shift maps, round constants, size table, and dependency rule are public |
 | `/modes` | Open | A row holds no key and no round state. Each field comes from values the trace shows with the toggle OFF: `plain` and `wire`. For example, GCM's key stream equals text XOR cipher |
+| `/long-text` | Open | The reply holds the text and cipher blocks under a practice key, and no key byte (section 2.4c) |
 | `/ghash` | **Closed**, 409 `KEYS_HIDDEN` | It holds H, and each Y value is built from H |
 | `/forge` | **Closed**, 409 `KEYS_HIDDEN` | On Jared's recommendation, because H is key material. Steve approved the demo and can overrule this. The recovery needs no key |
 | `/block` | **Closed**, 409 `KEYS_HIDDEN` | It holds the key, the round keys, the word rows, and the MixColumns terms, whose inputs are round states. The first AddRoundKey also gives `state = input xor key`, so input and state give the key. A fingerprint per cell would teach nothing |
@@ -836,6 +909,8 @@ Limits of the spike:
 | `app/src/components/SboxView.vue` | The 16 by 16 table, row and column lights, for both tables |
 | `app/src/components/KeySchedulePanel.vue` | The key as words, the expanded table of grids, one word's stage rows, the Rcon row |
 | `app/src/components/FieldPanel.vue` | The definition lines, and one multiply from the engine's terms |
+| `app/src/components/LongTextView.vue` | W2: the box, the side-by-side rows, the flip, and the picture beside it. It prints typed text as text, and never as HTML |
+| `app/src/components/PicturePanel.vue` | W2: gains the side-by-side layout. Its reads do not change |
 | `app/src/components/GhashView.vue`, `ForgeryView.vue` | W1c: the rows of section 2.4a, and the steps of section 2.4b. Values come from the engine |
 | `app/src/useWalkTimeline.ts` | Play, Pause, speed, stop at the end of a round, reduced motion. It holds states and never makes a byte |
 | `app/src/components/AesFeedView.vue` | One mode's rows, lock and unlock, the box link, wire status |
@@ -914,10 +989,10 @@ Sheet 5.9 lists them, and these three matter most:
 | W0 | This doc and Jared's review. **After Jared passes the head,** Echo writes clauses from sections 2 to 4, red | Jared's pass on a named head. Clauses exist and fail with a named code | Richard, Jared, Echo |
 | **W1a** skeleton | `AesKey.Walk.cs` with word rows and MixColumns terms, `AesWalks.Block`, the tables route and the block route. No UI | FIPS, table, BCL, toggle, term, and golden clauses pass on both builds. `tools/gate.ps1` green | Richard |
 | **Hold on W1b** | Do not start the walk screens until the lead says the new look is set. Steve wants a major UX refresh. W1a is engine work, and it is not affected | | Lead |
-| **W1b** small section | `walk.ts`, `useWalkTimeline.ts`, `AesBlockWalk.vue`, `SboxView.vue`, `KeySchedulePanel.vue`, `FieldPanel.vue`, chapter 1 at 128 bits with animation, encrypt and decrypt, the flip guard | e2e: a learner reaches `Pump four is ok.` by Next alone. A clicked cell's lookup equals the next state, both tables. Grid order clause. S-box scan. Measure the block reply time at AES-128 and AES-256, and record both in `docs/learnings.md`, because section 7 keeps one reply until this shows a visible delay | Nancy |
+| **W1b** small section | `walk.ts`, `useWalkTimeline.ts`, `AesBlockWalk.vue`, `SboxView.vue`, `KeySchedulePanel.vue`, `FieldPanel.vue`, chapter 1 at 128 bits with animation and binary on hover, encrypt and decrypt, the flip guard | e2e: a learner reaches `Pump four is ok.` by Next alone. A clicked cell's lookup equals the next state, both tables. Grid order clause. S-box scan. Measure the block reply time at AES-128 and AES-256, and record both in `docs/learnings.md`, because section 7 keeps one reply until this shows a visible delay | Nancy |
 | **Stop: show Steve** | Steve steps through chapter 1 in the app and reacts. CBC and modes work starts after this | His reaction goes in `docs/learnings.md`, and later slices read it | Lead |
 | **W1c** | `Gcm.CounterBlock`, `AesWalks.Feed`, the modes route, `AesFeedView.vue`, chapter 2 with ECB, CBC, GCM, and "Mistakes people make". `Gcm.WalkTag`, `Gf128.Inverse` and `SquareRoot`, `GcmForgeries`, `OptionForgeLastBlock`, the attack row, `/ghash`, `/forge`, `GhashView.vue`, `ForgeryView.vue`. Key sizes, two tour steps, gloss | Wire clauses per mode. e2e on wire match and on damage. A15, A15a by a reader who did not write it | Richard, Nancy |
-| W2 | `AesKey.SboxBuild(byte)` and "how the table was built". `flipKeyBit`. `AesKey.DependsOn` and tap-a-byte. One-bit-flip spread count (4 bytes after round 1, 16 after round 2) | FIPS 5.1.1 worked example for `53`. Spread count against Jared's values | Richard, Nancy |
+| W2 | `AesKey.SboxBuild(byte)` and "how the table was built". `flipKeyBit`. `AesKey.DependsOn` and tap-a-byte. `AesLongText`, `/long-text`, `LongTextView.vue`, and the picture side by side. One-bit-flip spread count (4 bytes after round 1, 16 after round 2) | FIPS 5.1.1 worked example for `53`. Spread count against Jared's values | Richard, Nancy |
 | W3 | Lesson 3 try-it, lesson 4 bench | Clauses on each check result | Richard, Nancy, Jared on wording |
 | W4 | Lesson 5 record walk and speed bench | Record walk equals the wire. The number's label names the machine and table AES | Richard, Nancy |
 | W5 | Lessons 2, 6 (section 1.1), 7, 8 queries, one PR each | A reference check per lesson, from Jared. Lesson 6: each replayed PIN key equals the run's | Richard, Jared |
@@ -958,6 +1033,10 @@ If Steve does not follow it after 2 rounds of word changes, stop and re-plan the
 | Forgery refusals | Same text twice gives `WALK_FORGE_SAME_TEXT`, never a divide by zero or a wrong H. Two nonces give `WALK_FORGE_NONCE_DIFFERS`, with no H. More than the last block differing, only an earlier block differing, and different lengths each give `WALK_FORGE_TOO_MANY_BLOCKS` |
 | Forgery reads no key | `GcmForgeries.Recover` takes frames and known text only. A test calls it with no key in scope |
 | Control unchanged | The control's golden is unchanged with the new option in the code. No forgery value enters a trace or session file |
+| Binary tip | Each tip's bits equal the cell's hex. Before and after equal the engine's two states, and the count equals the differing bits. On ShiftRows the tip names the source cell, from the shift map, and shows no change |
+| Long text (W2) | Every ECB and CBC block equals the BCL under the practice key and IV. ECB changes the flipped block only. CBC changes that block and all later ones. A flip in the last block changes one. Repeat counts equal a count from the BCL's blocks |
+| Long text limits (W2) | 1,024 bytes passes, and 1,025 gives `WALK_TEXT_TOO_LONG`. Empty gives `WALK_TEXT_EMPTY`. The route answers with Show keys OFF, and its reply holds no key byte. Nothing typed reaches a trace, session file, or `/events`. Typed `<b>` shows as text |
+| Picture (W2) | The side-by-side counts equal the run's `measure.result`. The eavesdropper view hides the clear picture |
 | Tap a byte (W2) | The flip test of section 2.2e, on every step and cell |
 | Bug versus tamper | A session with no plan never reads `differs`. A unit test gives `Feed` a wrong sender frame, and it throws `AES_WALK_DIVERGED`. A free flip on a non-wire event reads all `match` |
 | Box rows | `/block` answers for every row of `/modes`, including the padding row, and gives 400 one past it |
@@ -1004,6 +1083,8 @@ If Steve does not follow it after 2 rounds of word changes, stop and re-plan the
 | A new gem? | No gem covers "an instrumented twin of a hot path, checked against the real path on every call". One use site so far. I record it as a candidate at W5, with Jared as SME, if the second walk type uses it too |
 
 **CrypTool, "AES (step-by-step)" on CrypTool-Online,** https://www.cryptool.org/en/cto/aes-step-by-step , which redirects to https://legacy.cryptool.org/en/cto/aes-step-by-step . Read 2026-11-06. It offers "Tap on each byte to see the bytes it depends on", and it shows encode and decode rounds. Took: the tap idea. We took no code, and the page states a copyright notice with no licence. Where we differ: our rule comes from the engine and a clause flips real bytes to check it. Its page does not mention a jump to a round, so that control is ours.
+
+**CrypTool 2, the "Block Modes" template.** Source: `E:/dev/refs/CrypTool-2/documentation/images/blockmode_visualization.png`, read 2026-11-06. It shows a picture under AES with ECB and with CBC, side by side. Took: the side-by-side idea, with repeats marked. Where we differ: we add a typed text, a flip with counts, and engine values, and we use our own picture. We took no code or image.
 
 **CUPID, under pressure.** Predictable is the property most at risk, because a twin path can drift. The run-time guard answers that. Composable holds: `AesWalks` is pure, and lessons 5 and 7 reuse it. Domain-based holds: the types use the FIPS step names. Complexity hotspots: `describeStep` wants a lookup by step kind, and each Vue file stays thin because `walk.ts` holds the logic. SOLID adds nothing here.
 
