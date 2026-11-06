@@ -131,6 +131,13 @@ namespace NetSec.Tests
         }
 
         [Fact]
+        public void Control_a_server_ignores_an_unknown_client_hello_extension()
+        {
+            // Section 4.1.2: "Servers MUST ignore unrecognized extensions." The client-side rule must not spill into the server.
+            Assert.Null(FeedServer(WithExtra(ClientHelloBytes(), Extension(ExtUnknown))).Error);
+        }
+
+        [Fact]
         public void A_client_hello_compression_value_other_than_zero_gets_illegal_parameter()
         {
             byte[] hello = ClientHelloBytes();
