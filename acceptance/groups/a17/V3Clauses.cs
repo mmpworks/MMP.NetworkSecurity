@@ -20,6 +20,44 @@ namespace Acceptance
             return name == "auth.token" || name == "lab-secret" || (name ?? "").IndexOf("public", StringComparison.OrdinalIgnoreCase) >= 0;
         }
 
+        /// <summary>
+        /// The text with every "wire" and "plain" field taken out. Show keys OFF hides secrets[] and leaves wire and plain alone (design 6.2, limit 2): a value the lab
+        /// sends in the clear (a challenge, a token, a request) is on the wire whatever the switch says. A rule, not a list of names: the byte scan looks everywhere else,
+        /// so a secret in secrets[], in a message, in the file or in a key log still fails it.
+        /// </summary>
+        static string WithoutWire(string text)
+        {
+            string whole = (text ?? "").Trim();
+            try { if (whole.StartsWith("[") || whole.StartsWith("{")) return MiniJson.Write(Strip(MiniJson.Parse(whole))); } catch (FormatException) { }
+            StringBuilder sb = new StringBuilder();
+            foreach (string line in (text ?? "").Split('\n'))
+            {
+                string t = line.Trim();
+                if (t.StartsWith("{") || t.StartsWith("["))
+                {
+                    try { sb.Append(MiniJson.Write(Strip(MiniJson.Parse(t)))).Append('\n'); continue; } catch (FormatException) { }
+                }
+                sb.Append(line).Append('\n');
+            }
+            return sb.ToString();
+        }
+
+        static object Strip(object o)
+        {
+            Dictionary<string, object> d = o as Dictionary<string, object>;
+            if (d != null)
+            {
+                Dictionary<string, object> kept = new Dictionary<string, object>();
+                foreach (KeyValuePair<string, object> kv in d) if (kv.Key != "wire" && kv.Key != "plain") kept[kv.Key] = Strip(kv.Value);
+                return kept;
+            }
+            List<object> l = o as List<object>;
+            if (l == null) return o;
+            List<object> items = new List<object>();
+            foreach (object v in l) items.Add(Strip(v));
+            return items;
+        }
+
         static List<string> HexEntries(string ndjsonOrJson)
         {
             // Every "hex" value in secrets[] entries, found by parsing, never by pattern.
@@ -122,9 +160,10 @@ namespace Acceptance
                     A17.SetShowKeys(h, false);
                     string flipped = HostHttp.Get(h, "/api/sessions/" + on.SessionId + "/events?after=0").Body ?? "";
                     Check.True(HexEntries(flipped).Count == 0, "lesson " + lesson + ": after the flip to OFF, /events of the open session still holds hex");
+                    string flippedScan = WithoutWire(flipped);
                     foreach (A17.SecretRef s in onSecrets)
                         if (!Excluded(s.Name) && s.Hex.Length >= 8)
-                            Check.True(flipped.IndexOf(s.Hex, StringComparison.OrdinalIgnoreCase) < 0, "lesson " + lesson + ": the secret " + s.Name + " (" + s.Hex.Substring(0, 8) + "..) is still in /events after the flip to OFF");
+                            Check.True(flippedScan.IndexOf(s.Hex, StringComparison.OrdinalIgnoreCase) < 0, "lesson " + lesson + ": the secret " + s.Name + " (" + s.Hex.Substring(0, 8) + "..) is still in /events after the flip to OFF");
 
                     // 2. A new session started OFF: frames, /events and the file.
                     SessionRun off = HostSession.Run(h, lesson, "glass", null);
@@ -147,9 +186,10 @@ namespace Acceptance
                     }
                     if (sameBytes)
                     {
+                        string offScan = WithoutWire(offAll);
                         foreach (A17.SecretRef s in onSecrets)
                             if (!Excluded(s.Name) && s.Hex.Length >= 8)
-                                Check.True(offAll.IndexOf(s.Hex, StringComparison.OrdinalIgnoreCase) < 0, "lesson " + lesson + ": the ON secret " + s.Name + " (" + s.Hex.Substring(0, 8) + "..) appears in an OFF session");
+                                Check.True(offScan.IndexOf(s.Hex, StringComparison.OrdinalIgnoreCase) < 0, "lesson " + lesson + ": the ON secret " + s.Name + " (" + s.Hex.Substring(0, 8) + "..) appears in an OFF session");
                         textScanned.Add(lesson.ToString());
                     }
                     else structuralOnly.Add(lesson.ToString());
@@ -164,7 +204,7 @@ namespace Acceptance
                     + "Text scan for ON bytes on labs " + (textScanned.Count == 0 ? "none" : string.Join(",", textScanned.ToArray()))
                     + "; structure only on labs " + (structuralOnly.Count == 0 ? "none" : string.Join(",", structuralOnly.ToArray()))
                     + (skipped.Count > 0 ? "; not built: " + string.Join(",", skipped.ToArray()) : "")
-                    + ". Left out of the byte scan by name: auth.token (on the wire on purpose), lab-secret (stored in plain), public keys";
+                    + ". Left out of the byte scan: the wire and plain fields of every event (Show keys OFF leaves them alone, design 6.2 limit 2), lab-secret (stored in plain), public keys";
             }
         }
 

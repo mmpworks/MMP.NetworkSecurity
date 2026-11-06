@@ -39,6 +39,7 @@ namespace Acceptance
             List<object> secrets = new List<object>();
             foreach (RawSecret s in e.Secrets) secrets.Add(RenderSecret(s, showKeys));
             r["secrets"] = secrets;
+            if (!showKeys && M("off-hex-in-message") && e.Secrets.Count > 0) r["message"] = "key " + Hex.Encode(e.Secrets[0].Bytes);
             return r;
         }
 
@@ -93,6 +94,7 @@ namespace Acceptance
                         session = new Session { Id = "s" + (++_next), Lesson = lesson, Seed = (int)MiniJson.Num(m, "seed", 20261105) };
                         BuildEvents(session, session.Seed);
                         LeakBuiltIn(session);
+                        CarryOnWire(session);
                         session.FinishCode = ClockCode(lesson);
                         _sessions[session.Id] = session;
                         session.File = Path.Combine(Dir, "session-" + session.Id + ".ndjson");
@@ -154,6 +156,18 @@ namespace Acceptance
             SessionEv e = new SessionEv { Base = D("type", type, "eventId", "e" + n, "actor", stream, "streamId", s.Id + "/" + stream, "streamSeq", (double)n) };
             e.Secrets.AddRange(secrets);
             s.Events.Add(e);
+        }
+
+        /// <summary>
+        /// Faithful to design 6.2 limit 2: a lab sends some secret in the clear (a challenge, a token), so its hex is in a plain field whatever Show keys says.
+        /// Without it the byte scan could never meet a secret on the wire and a rule that exempts wire and plain would be untested.
+        /// </summary>
+        void CarryOnWire(Session s)
+        {
+            RawSecret carried = null;
+            foreach (SessionEv e in s.Events) if (e.Secrets.Count > 0 && carried == null && e.Secrets[0].Bytes.Length >= 8) carried = e.Secrets[0];
+            if (carried == null) return;
+            AddWire(s, "client", "wire.sent", "SentInTheClear", carried.Bytes, carried.Bytes);
         }
 
         /// <summary>The defect "foreign-finish-first": another session of the same Host ends on this connection before the run's own frames, with a trace event and a session.finished of its own.</summary>
