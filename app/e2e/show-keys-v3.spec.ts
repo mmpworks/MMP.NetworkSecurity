@@ -29,6 +29,9 @@ async function freePlay(page: Page, lesson: number) {
   await expect(page.getByTestId('engine-state')).toContainText(/finished/, { timeout: 60_000 })
 }
 const rowText = async (page: Page) => (await page.locator('[data-testid^="secret-row-"]').allInnerTexts()).join('\n')
+// The panel shortens long hex to 16 characters, an ellipsis and 8. A value that starts with hex is key bytes; a fingerprint starts with `fp:`.
+const bytesShown = async (page: Page) => (await page.locator('[data-testid^="secret-value-"]').allInnerTexts()).some(t => /^[0-9a-f]{16}/i.test(t.trim()))
+const noBytesOnScreen = async (page: Page) => expect.poll(() => bytesShown(page)).toBe(false)
 
 async function contrast(page: Page, theme: string, screen: string) {
   await page.evaluate(() => Promise.all(document.getAnimations().filter(a => a.effect?.getComputedTiming().iterations !== Infinity).map(a => a.finished.catch(() => null))))
@@ -52,7 +55,7 @@ test('OFF: bytes leave the panel at once, fingerprints stay, the banner shows, a
   await freePlay(page, 1)
   await page.getByTestId('show-keys-switch').uncheck()
   await expect.poll(hostOn).toBe(false)
-  await expect.poll(async () => /[0-9a-f]{32,}/i.test(await rowText(page))).toBe(false)
+  await noBytesOnScreen(page)
   expect(await rowText(page)).toMatch(/fp:[0-9a-f]{16}/)
   await expect(page.getByTestId('show-keys-off-banner')).toContainText('Show keys is off, so you see a short fingerprint of each key.')
   await expect(page.getByTestId('key-in-use-lab.aes-key')).toContainText('Built-in key')
@@ -124,7 +127,7 @@ test('OFF: two sides that hold one key still show a match, from the fingerprints
   await freePlay(page, 3)
   await page.getByTestId('show-keys-switch').uncheck()
   await expect.poll(hostOn).toBe(false)
-  await expect.poll(async () => /[0-9a-f]{32,}/i.test(await rowText(page))).toBe(false)
+  await noBytesOnScreen(page)
   await expect(page.getByTestId('convergence-match').first()).toBeVisible()
   await shot(page, '03-lesson3-off')
 })
@@ -140,6 +143,87 @@ test('OFF at 1440 x 760: the banner cuts no row of the Message bytes panel', asy
   const grids = await page.locator('.hex-scroll').evaluateAll(all => all.map(e => ({ shown: e.clientHeight, whole: e.scrollHeight })))
   expect(grids).toHaveLength(2)
   for (const g of grids) expect(g.whole, 'a hex row is cut').toBeLessThanOrEqual(g.shown)
+})
+
+// Forced timing, by route.
+const eventsRoute = /\/api\/sessions\/[^/]+\/events/
+
+test('a late reply from an ON read cannot put key bytes back after OFF', async ({ page }) => {
+  await freePlay(page, 1)
+  await page.route(eventsRoute, async route => {
+    const reply = await route.fetch()
+    const body = await reply.text()
+    if (/"hex":"[0-9a-f]{16}/i.test(body)) await page.waitForTimeout(2000)
+    await route.fulfill({ response: reply, body })
+  })
+  const sw = page.getByTestId('show-keys-switch')
+  await sw.click()
+  await page.waitForTimeout(400)
+  await sw.click()
+  await page.waitForTimeout(100)
+  await sw.click()
+  await expect.poll(hostOn).toBe(false)
+  await page.waitForTimeout(3500)
+  await expect(sw).not.toBeChecked()
+  await noBytesOnScreen(page)
+  expect(await rowText(page)).toContain('fp:')
+})
+
+test('a failed read after OFF leaves no key bytes, and it claims no match', async ({ page }) => {
+  await freePlay(page, 1)
+  await page.route(eventsRoute, route => route.abort())
+  await page.getByTestId('show-keys-switch').click()
+  await expect.poll(hostOn).toBe(false)
+  await noBytesOnScreen(page)
+  await expect(page.locator('[data-testid^="secret-value-"]').first()).toHaveText('Fingerprint not available')
+  await expect(page.getByTestId('convergence-match')).toHaveCount(0)
+  await expect(page.locator('.converge').first()).not.toContainText('the values differ')
+  await page.unroute(eventsRoute)
+  await page.getByTestId('show-keys-switch').click()
+  await expect.poll(hostOn).toBe(true)
+  await expect.poll(async () => /[0-9a-f]{16,}/i.test(await rowText(page))).toBe(true)
+})
+
+test('a flip during a run loses no event', async ({ page }) => {
+  await open(page, host)
+  await page.route(eventsRoute, async route => {
+    const reply = await route.fetch()
+    const body = await reply.text()
+    await page.waitForTimeout(1500)
+    await route.fulfill({ response: reply, body })
+  })
+  await page.getByTestId('lesson-item-1').click()
+  await page.getByTestId('mode-free').click()
+  await page.getByTestId('free-start').click()
+  await page.waitForTimeout(300)
+  await page.getByTestId('show-keys-switch').click()
+  await page.waitForTimeout(200)
+  await page.getByTestId('free-run').click()
+  await expect(page.getByTestId('engine-state')).toContainText(/finished/, { timeout: 60_000 })
+  await page.waitForTimeout(3000)
+  const id = await page.locator('.statusbar').innerText().then(t => /session (?<id>\S+)/.exec(t)?.groups?.id ?? '')
+  const held = (await (await api('GET', `/api/sessions/${id}/events`)).json()) as { events?: unknown[] } | unknown[]
+  const count = (Array.isArray(held) ? held : held.events ?? []).length
+  expect(count).toBeGreaterThan(10)
+  await expect(page.getByText(`${count} events`)).toBeVisible()
+})
+
+test('a saved trace opens as a replay, and a flip to OFF takes its key bytes off the screen', async ({ page }) => {
+  await freePlay(page, 1)
+  const id = await page.locator('.statusbar').innerText().then(t => /session (?<id>\S+)/.exec(t)?.groups?.id ?? '')
+  const file = await new Promise<string>((resolve, reject) => {
+    const ws = new WebSocket(`ws://127.0.0.1:${host.port}/ws?token=${host.token}`)
+    ws.onopen = () => ws.send(JSON.stringify({ type: 'session.save', sessionId: id }))
+    ws.onmessage = m => { const f = JSON.parse(String(m.data)); if (f.type === 'session.saved') { ws.close(); resolve(String(f.sessionFile)) } }
+    ws.onerror = () => reject(new Error('the socket failed'))
+  })
+  await page.getByTestId('open-trace-path').fill(file)
+  await page.getByTestId('open-trace').click()
+  await expect(page.getByTestId('replay-chip')).toBeVisible()
+  await expect.poll(async () => /[0-9a-f]{16,}/i.test(await rowText(page))).toBe(true)
+  await page.getByTestId('show-keys-switch').click()
+  await expect.poll(hostOn).toBe(false)
+  await noBytesOnScreen(page)
 })
 
 test('OFF: the key log is refused by name', async ({ page }) => {
