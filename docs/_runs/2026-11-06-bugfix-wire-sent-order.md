@@ -48,13 +48,13 @@ Not run: `e2e/lesson-7.spec.ts`, which needs a turn on the test ports. The other
 
 ## Scope ledger
 
-One behaviour change: `wire.sent` reaches the sink before the link write, in place of after it. `raceStats` does not change. The diagram's arrow order improves by the same change.
+Two behaviour changes. `wire.sent` reaches the sink before the link write, in place of after it. A failed write logs `wire.write.failed` on the wire stream (red `dc73c97`: 3 of 7 order tests fail on both builds, on the pump before this fix). The second change adds no event to a run with no failed write. `raceStats` does not change. The diagram's arrow order improves by the same change.
 
 Not built: a client-stream rule in `raceStats`. It gave the right count on 200 of 200 traces, and it would leave the diagram wrong. The cause is in the pump.
 
 ## New hole
 
-A write that fails now leaves a `wire.sent` for bytes that did not fully leave. The link error that follows names the failure, and such a run ends failed. `acceptance/CONTRACT.md` line 61 says `wire.sent` is for "the bytes it wrote". That holds on a run that succeeds. Echo owns that text.
+A write that fails now leaves a `wire.sent` for bytes that may not have left. A `wire.write.failed` event follows it, with the error code and the `wire.sent` event id, and such a run ends failed. The run's result alone cannot say this: when the engine has already failed, `Conclude` drops the link error, so a lost alert ends with no error. Jared found this. His harness gave `wire.sent Alert`, status Failed, error none, bytes sent 0. `acceptance/CONTRACT.md` line 61 says `wire.sent` is for "the bytes it wrote". That holds on a run that succeeds. Echo owns that text.
 
 A tap log can now lag the trace, where before the trace lagged the tap. `#70`'s test waits for equal lengths, so either order passes.
 
@@ -64,7 +64,7 @@ A tap log can now lag the trace, where before the trace lagged the tap. `#70`'s 
 |---|---|
 | Normal run | "round trips before data" reads 2 for TLS 1.1 and 1 for TLS 1.3 |
 | A slow machine | The same counts, and arrows in cause order |
-| A write fails | The run ends with its link error, and the message it tried stays in the list |
+| A write fails | The run ends failed. The message it tried stays in the list, its arrow still draws, and the event log shows `wire.write.failed` after it. `raceStats` still counts the message |
 
 ## Class sweep, closed
 

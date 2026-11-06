@@ -345,7 +345,7 @@ namespace NetSec.Io
             TraceEvent sent = WireEvent("wire.sent", _engine.Stream.Actor, _engine.Peer, item.Event.Message, wire, item.Event.Plain, item.Event.Fields);
             yield return _gate.Pass(sent);
             // Logged before the write. Once the bytes leave, the peer can answer and log its reply, and the session list is one order across both pumps.
-            // A write that then fails leaves this event behind, and the link error that follows it names the failure.
+            // A write that then fails leaves this event behind, so a wire.write.failed event follows it. The run's result cannot say so on the alert path (see Conclude).
             _sink.Write(sent);
             IFuture write = _link.Write(wire, 0, wire.Length);
             foreach (IFuture wait in AwaitWrite(write)) yield return wait;
@@ -353,14 +353,25 @@ namespace NetSec.Io
             {
                 _linkError = NetSecError.Of(ErrorCodes.LinkDeadline, "the peer took no bytes for " + _deadlineMs + " ms");
                 _linkError.CheckName = "write deadline";
+                LogLostWrite(sent, _linkError.Code);
                 yield break;
             }
             if (write.IsFaulted || write.IsCanceled)
             {
                 _linkError = NetSecError.Of(ErrorCodes.LinkLost, write.IsFaulted ? write.Exception.Message : "write canceled");
+                LogLostWrite(sent, _linkError.Code);
                 yield break;
             }
             _bytesSent += wire.Length;
+        }
+
+        /// <summary>Names the wire.sent event whose bytes may not have left. It carries no Wire, because only bytes that left carry Wire.</summary>
+        void LogLostWrite(TraceEvent sent, string code)
+        {
+            TraceEventDraft draft = new TraceEventDraft();
+            draft.Type = "wire.write.failed"; draft.From = sent.From; draft.To = sent.To; draft.Message = sent.Message;
+            draft.Detail = code + ": the write for event " + sent.EventId + " failed, so its bytes may not have left";
+            _sink.Write(_wireStream.Stamp(draft));
         }
 
         void Deliver(EngineOutput output)
