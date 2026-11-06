@@ -16,7 +16,7 @@ namespace NetSec.Tls13
         public static readonly StepTable<Tls13Session> Table = new StepTable<Tls13Session>(
             new StepRow<Tls13Session>("tls13.c.ch", Start, InboundMessage.StartType, ClientHello, WaitServerHello),
             new StepRow<Tls13Session>("tls13.c.sh", WaitServerHello, HandshakeType.ServerHello, ServerHello, WaitEE),
-            new StepRow<Tls13Session>("tls13.c.ee", WaitEE, HandshakeType.EncryptedExtensions, Absorb, WaitCertOrReq),
+            new StepRow<Tls13Session>("tls13.c.ee", WaitEE, HandshakeType.EncryptedExtensions, EncryptedExtensions, WaitCertOrReq),
             new StepRow<Tls13Session>("tls13.c.creq", WaitCertOrReq, HandshakeType.CertificateRequest, CertificateRequest, WaitCert),
             new StepRow<Tls13Session>("tls13.c.cert", WaitCertOrReq, HandshakeType.Certificate, Certificate, WaitCertVerify),
             new StepRow<Tls13Session>("tls13.c.cert", WaitCert, HandshakeType.Certificate, Certificate, WaitCertVerify),
@@ -49,9 +49,13 @@ namespace NetSec.Tls13
             ServerHelloInfo hello = Tls13Messages.ReadServerHello(message.Bytes);
             if (hello.IsHelloRetry) return Tls13Rules.Refuse(Tls13Codes.HrrUnsupported, "the server asked for a second key share round, and this engine offers one group");
             if (hello.HasDowngradeSentinel) return Tls13Rules.Refuse(Tls13Codes.DowngradeSentinel, "the server random ends in DOWNGRD, so a TLS 1.3 server was pushed to an older version");
+            if (hello.HasSupportedVersions && hello.SelectedVersion != Tls13Messages.Tls13Version) return Tls13Rules.Refuse(Tls13Codes.IllegalParameter, "supported_versions names " + hello.SelectedVersion + ", and this client offered only TLS 1.3");
             if (hello.SelectedVersion != Tls13Messages.Tls13Version) return Tls13Rules.Refuse(Tls13Codes.VersionRefused, "the server chose legacy version " + hello.LegacyVersion + " and no TLS 1.3");
             if (session.Offer == null) return Tls13Rules.Refuse(Tls13Codes.IllegalParameter, "the server chose TLS 1.3, and this client offered only TLS 1.1");
             if (hello.LegacyVersion != 0x0303 || hello.Compression != 0) return Tls13Rules.Refuse(Tls13Codes.IllegalParameter, "RFC 8446 section 4.1.3 fixes legacy_version at 0x0303 and compression at 0");
+            int extension;
+            string extensionFault = Tls13Messages.ServerHelloExtensionFault(hello.ExtensionTypes, out extension);
+            if (extensionFault != null) return Tls13Rules.Refuse(extensionFault, "ServerHello carries extension " + extension + ", which RFC 8446 section 4.2 does not allow here");
 
             Tls13Options o = session.Options;
             Tls13Suite suite = Tls13Suite.Find(hello.Suite);
@@ -74,6 +78,14 @@ namespace NetSec.Tls13
             return StepDecision.Advance(effects.ToArray());
         }
 
+        static StepDecision EncryptedExtensions(Tls13Session session, InboundMessage message)
+        {
+            int extension;
+            string fault = Tls13Messages.EncryptedExtensionsFault(Tls13Messages.ReadEncryptedExtensionTypes(message.Bytes), out extension);
+            if (fault != null) return Tls13Rules.Refuse(fault, "EncryptedExtensions carries extension " + extension + ", which RFC 8446 section 4.2 does not allow here");
+            return Absorb(session, message);
+        }
+
         static StepDecision Absorb(Tls13Session session, InboundMessage message)
         {
             return StepDecision.Advance(Effect.Absorb(message.Bytes));
@@ -87,6 +99,7 @@ namespace NetSec.Tls13
         static StepDecision Certificate(Tls13Session session, InboundMessage message)
         {
             CertificateInfo info = Tls13Messages.ReadCertificate(message.Bytes, false);
+            if (info.Chain.Length == 0) return Tls13Rules.Refuse(Tls13Codes.EmptyCertificate, "the server sent an empty Certificate message");
             Tls13Options o = session.Options;
             Certificate[] chain = ParseAll(info.Chain);
             ChainVerdict verdict = ChainCheck.Run(chain, ParseAll(o.TrustAnchors), o.ServerName, o.Now);

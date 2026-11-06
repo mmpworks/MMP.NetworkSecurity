@@ -87,7 +87,9 @@ namespace NetSec.Tls13
         {
             int code = Tls13GroupInfo.Code(group);
             if (System.Array.IndexOf(hello.Versions, Tls13Messages.Tls13Version) < 0) return Tls13Rules.Refuse(Tls13Codes.VersionRefused, "the client did not offer TLS 1.3");
+            if (hello.Compression.Length != 1 || hello.Compression[0] != 0) return Tls13Rules.Refuse(Tls13Codes.CompressionNotNull, "RFC 8446 section 4.1.2 fixes ClientHello compression at one zero byte");
             if (PickSuite(hello) == null) return Tls13Rules.Refuse(Tls13Codes.NoCommonSuite, "the client offered no suite this server has");
+            if (!hello.HasSignatureAlgorithms || !hello.HasSupportedGroups || !hello.HasKeyShare) return Tls13Rules.Refuse(Tls13Codes.MissingExtension, "RFC 8446 section 9.2: a ClientHello with no pre_shared_key needs signature_algorithms, supported_groups and key_share");
             if (System.Array.IndexOf(hello.SignatureSchemes, Tls13Messages.Ed25519Scheme) < 0) return Tls13Rules.Refuse(Tls13Codes.NoCommonSignature, "the client did not offer ed25519");
             if (System.Array.IndexOf(hello.Groups, code) < 0) return Tls13Rules.Refuse(Tls13Codes.NoCommonGroup, "the client did not offer group " + Tls13GroupInfo.Name(group));
             if (!hello.KeyShares.ContainsKey(code)) return Tls13Rules.Refuse(Tls13Codes.HrrUnsupported, "the client sent no key share for group " + Tls13GroupInfo.Name(group) + ", and this engine does not ask twice");

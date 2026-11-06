@@ -200,6 +200,30 @@ namespace NetSec.Tests
             AssertAlert(HandshakeFailure, FeedServer(hello));
         }
 
+        // ---------------------------------------------------------------- section 9.2, supported_groups and key_share go together
+
+        [Theory]
+        [InlineData(ExtSupportedGroups)]
+        [InlineData(ExtKeyShare)]
+        public void A_client_hello_with_only_one_of_supported_groups_and_key_share_gets_missing_extension(int removed)
+        {
+            AssertAlert(MissingExtension, FeedServer(WithoutExtension(ClientHelloBytes(), removed)));
+        }
+
+        [Fact]
+        public void A_client_hello_with_neither_supported_groups_nor_key_share_gets_missing_extension()
+        {
+            AssertAlert(MissingExtension, FeedServer(WithoutExtension(WithoutExtension(ClientHelloBytes(), ExtSupportedGroups), ExtKeyShare)));
+        }
+
+        [Fact]
+        public void Control_an_empty_key_share_list_is_not_a_missing_extension()
+        {
+            // Section 9.2 allows an empty client_shares vector. This engine asks for no second round, so it keeps its own refusal.
+            byte[] hello = WithExtra(WithoutExtension(ClientHelloBytes(), ExtKeyShare), Extension(ExtKeyShare, 0, 0));
+            AssertAlert(HandshakeFailure, FeedServer(hello));
+        }
+
         // ---------------------------------------------------------------- section 4.2.1, supported_versions
 
         [Theory]

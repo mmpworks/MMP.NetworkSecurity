@@ -26,6 +26,11 @@ namespace NetSec.Tls13
         public const string ClientNameRefused = "TLS13_CLIENT_NAME_REFUSED";
         public const string CertRequired = "TLS13_CERT_REQUIRED";
         public const string BadCertificate = "TLS13_BAD_CERTIFICATE";
+        public const string CompressionNotNull = "TLS13_COMPRESSION_NOT_NULL";
+        public const string MissingExtension = "TLS13_MISSING_EXTENSION";
+        public const string ExtensionNotRequested = "TLS13_EXTENSION_NOT_REQUESTED";
+        public const string ExtensionWrongMessage = "TLS13_EXTENSION_WRONG_MESSAGE";
+        public const string EmptyCertificate = "TLS13_EMPTY_CERTIFICATE";
 
         sealed class Row
         {
@@ -50,6 +55,11 @@ namespace NetSec.Tls13
             new Row(X25519Zero, "X25519 result not zero", 47),
             new Row(KeyShareInvalid, "key share shape", 47),
             new Row(IllegalParameter, "ServerHello matches the offer", 47),
+            new Row(CompressionNotNull, "ClientHello compression is null", 47),
+            new Row(MissingExtension, "required extension present", 109),
+            new Row(ExtensionNotRequested, "extension was requested", 110),
+            new Row(ExtensionWrongMessage, "extension allowed in this message", 47),
+            new Row(EmptyCertificate, "server certificate present", 50),
             new Row(NoCommonGroup, "common group", 40),
             new Row(NoCommonSuite, "common cipher suite", 40),
             new Row(NoCommonSignature, "common signature scheme", 40),
