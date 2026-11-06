@@ -1,0 +1,116 @@
+{
+  "_about": "A18 line clauses. Each entry names what one lesson must say on screen about what its engine leaves out. Source: docs/conformance-matrix.md (PR #148). 'require' patterns must all match the text of ONE tour step, and that step must carry a claim whose source matches 'source'. 'banInLine' applies to that step. 'banAnywhere' applies to the whole tour, claims included. 'example' is a line that passes, for the self-check. The words of the real line belong to the tour author. 'readClaims' adds the text of the step's own claims to the line, for a line that lives in a claim.",
+  "absent": "\\b(?:no|not|leaves? out|omits?|without|skips?)\\b",
+  "lines": [
+    {
+      "id": "A18.screen.l5-tls13-leaves-out",
+      "lesson": 5,
+      "row": 4,
+      "require": [
+        "HelloRetryRequest",
+        "P-256",
+        "\\bRSA\\b",
+        "\\bECDSA\\b",
+        "ChaCha20"
+      ],
+      "source": "RFC 8446",
+      "example": "This engine leaves out HelloRetryRequest, P-256, RSA and ECDSA signatures, and ChaCha20."
+    },
+    {
+      "id": "A18.screen.l7-tls11-leaves-out",
+      "lesson": 7,
+      "row": 7,
+      "require": [
+        "\\b3DES\\b",
+        "resum",
+        "client certificate"
+      ],
+      "source": "RFC 4346",
+      "example": "This engine leaves out the 3DES suite, session resumption, and the client certificate."
+    },
+    {
+      "id": "A18.screen.l7-rsa-padding",
+      "lesson": 7,
+      "row": 29,
+      "require": [
+        "\\bRSA\\b",
+        "padding",
+        "\\b(?:hides?|random)\\b",
+        "do not copy"
+      ],
+      "source": "RFC 8017",
+      "example": "The RSA class says false on bad padding. It does not stay quiet, so the TLS 1.1 server hides the answer. Do not copy this class."
+    },
+    {
+      "id": "A18.screen.l8-ssh-leaves-out",
+      "lesson": 8,
+      "row": 9,
+      "require": [
+        "\\brekey|key re-?exchange",
+        "password",
+        "3des-cbc",
+        "group1",
+        "ssh-dss"
+      ],
+      "banInLine": [
+        "\\b(?:standard|RFC(?: \\d+)?) (?:requires|demands)\\b"
+      ],
+      "source": "RFC 4253",
+      "example": "This engine leaves out rekey, password login, 3des-cbc, diffie-hellman-group1-sha1 and ssh-dss."
+    },
+    {
+      "id": "A18.screen.l4-pki-leaves-out",
+      "lesson": 4,
+      "row": 12,
+      "require": [
+        "revo[ck]",
+        "polic(?:y|ies)",
+        "name constraints"
+      ],
+      "source": "RFC 5280",
+      "example": "This check leaves out revocation, policy processing, and name constraints."
+    },
+    {
+      "id": "A18.screen.l10-dpop-subset",
+      "lesson": 10,
+      "row": 13,
+      "require": [
+        "\\bDPoP\\b",
+        "\\bEdDSA\\b",
+        "\\breplay\\b",
+        "\\b(?:only|some|part|subset)\\b"
+      ],
+      "source": "RFC 9449",
+      "example": "This lab does not run every DPoP step. It runs only some of them, with EdDSA only, and the caller stops a replay."
+    },
+    {
+      "id": "A18.screen.l6-names-variant",
+      "lesson": 6,
+      "row": 1,
+      "require": [
+        "AES DUKPT",
+        "X9\\.24-3"
+      ],
+      "source": "X9\\.24-3",
+      "needsAbsent": false,
+      "example": "This lesson runs AES DUKPT, from ANSI X9.24-3."
+    },
+    {
+      "id": "A18.screen.l6-c01-corrected",
+      "lesson": 6,
+      "row": 1,
+      "require": [
+        "(?:single|one)[^.]*\\bkey\\b[^.]*\\b(?:that|one) sale",
+        "\\bregisters\\b[^.]*\\bleak",
+        "\\blater (?:keys?|sales?)\\b"
+      ],
+      "banAnywhere": [
+        "past and future keys stay"
+      ],
+      "source": "conformance-matrix|X9\\.24-3",
+      "needsAbsent": false,
+      "example": "If a reader's registers leak, past keys stay safe and later keys do not. A single leaked PIN key exposes only that sale.",
+      "readClaims": true
+    }
+  ]
+}
