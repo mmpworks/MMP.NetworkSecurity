@@ -114,6 +114,6 @@ public sealed class VaultStoreTests : IDisposable
         DirectoryInfo dir = new(AppContext.BaseDirectory);
         while (dir.Parent is not null && !File.Exists(Path.Combine(dir.FullName, "app", "src", "wizard-copy.json"))) dir = dir.Parent;
         string copy = JsonDocument.Parse(File.ReadAllText(Path.Combine(dir.FullName, "app", "src", "wizard-copy.json"))).RootElement.GetProperty("wizard.vault.audit.limits").GetString()!;
-        Assert.Equal(copy, VaultExercise.ChainLimits);
+        Assert.Equal(VaultExercise.ChainLimits, copy);
     }
 }
