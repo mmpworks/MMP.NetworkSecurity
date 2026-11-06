@@ -56,14 +56,24 @@ namespace NetSec.Bridge
 
         public IFuture Send(byte[] frame)
         {
+            return AsyncProxy.Run(SendBody(frame));
+        }
+
+        IEnumerable<IFuture> SendBody(byte[] frame)
+        {
             TraceEventDraft draft = new TraceEventDraft();
             draft.Type = "wire.sent";
             draft.From = "ce";
             draft.To = "gateway";
             draft.Message = "PinEnvelope";
             draft.Wire = frame;
-            _sink.Write(_stream.Stamp(draft));
-            return FrameIo.WriteFrame(_link, frame);
+            TraceEvent sent = _stream.Stamp(draft);
+            _sink.Write(sent);
+            IFuture write = FrameIo.WriteFrame(_link, frame);
+            yield return Futures.Observe(write);
+            if (write.IsFaulted || write.IsCanceled) _sink.Write(_stream.Stamp(TraceEventDraft.LostWrite(sent, ErrorCodes.LinkLost)));
+            // The caller still sees the write's fault.
+            yield return write;
         }
 
         public IFuture<byte[]> Receive()
