@@ -237,7 +237,7 @@ namespace NetSec.Host
                 // The OS transport reads no course key, so no key decides whether it may run.
                 ILab? osLab = osTransport.LabFor(lesson, out NetSecError? osError);
                 if (osLab is null) Fail(requestId, osError!.Code, osError.Message);
-                else Begin(lesson, seed, Text(m, "mode") ?? "run", null, null, security.Credentials([]), requestId, null, osLab);
+                else Begin(lesson, seed, Text(m, "mode") ?? "run", null, null, security.Credentials([], "host/os-lab-" + lesson), requestId, null, osLab);
                 return;
             }
             // GEM:decide-at-authoritative-boundary: the one place a lesson may refuse a key, before any event. A lab never falls back to built-in keys in silence.

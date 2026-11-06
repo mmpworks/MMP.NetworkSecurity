@@ -62,3 +62,9 @@ The rename also fixes a live bug: `isReal` compared the session's `transportKind
 Left out: Jared's IPv6 note (`[::1]:4433` keeps its brackets). He did not run it, and neither did I.
 
 After the fix: Host tests 101 of 101. `npm run build` (vue-tsc, then vite) passes. Acceptance A1 to A8 147 of 147, A9 to A12 31 of 31, A16 8 of 8, A17 13 of 52 (no change). A13 to A15a were not rerun in this round. They gave 21 of 22 at `68c4ea7`. Counting that run, the total is 220 of 260.
+
+## Rebase on main d2b8678 (after #125 and #128)
+
+The rebase was clean. One call changed: the OS session's empty credential set now passes the caller `host/os-lab-<n>`, as V1's `Credentials(types, caller)` asks. The set is empty, so no vault row is written.
+
+After the rebase: Host tests 150 of 150 (`main` 134, V2 16). `npm run build` passes. Acceptance A1 to A8 147 of 147, A9 to A12 31 of 31, A13 to A15a 21 of 22 (`NOT_A_FRESH_RUN`), A16 8 of 8, A17 21 of 53. Total 228 of 261. M is 261 because Echo added `A17.vault.audit-check-names-limits`.
