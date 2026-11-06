@@ -54,7 +54,7 @@ test('a view switch turns off a lit field, so a hidden row can never stay lit', 
   await expect(page.getByTestId('inspector-after').locator('.hb.lit')).toHaveCount(0)
 })
 
-test('real Electron at 1440 x 770 shows all 5 fields and no cut row, in Free play and on tour step L1-S03', async () => {
+test('real Electron at 1440 x 770 shows all 5 fields and no cut row, in Free play and on tour step L1-S04', async () => {
   const dir = fs.mkdtempSync(path.join(os.tmpdir(), 'ns-e2e-fit-'))
   const app = await electron.launch({ args: ['.'], cwd: path.join(__dirname, '..'), env: { ...process.env, NETSEC_PORT: '5192', NETSEC_TOKEN: '', NETSEC_SECURITY_DIR: dir } })
   try {
@@ -74,11 +74,11 @@ test('real Electron at 1440 x 770 shows all 5 fields and no cut row, in Free pla
     await expect(win.getByTestId('host-chip')).toContainText(/connected/i, { timeout: 60_000 })
     await win.getByTestId('lesson-item-1').click()
     await win.getByRole('button', { name: /start tour/i }).click()
-    for (let i = 0; i < 6 && !(await win.getByTestId('tour-step-id').textContent())?.includes('L1-S03'); i++) {
+    for (let i = 0; i < 6 && !(await win.getByTestId('tour-step-id').textContent())?.includes('L1-S04'); i++) {
       await win.getByTestId('tour-next').click()
       await win.waitForTimeout(1200)
     }
-    await expect(win.getByTestId('tour-step-id')).toContainText('L1-S03')
+    await expect(win.getByTestId('tour-step-id')).toContainText('L1-S04')
     await win.waitForTimeout(1500)
     expectWholePanel(await measure(win))
   } finally { await app.close() }
