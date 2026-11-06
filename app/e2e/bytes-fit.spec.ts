@@ -54,9 +54,10 @@ test('a view switch turns off a lit field, so a hidden row can never stay lit', 
   await expect(page.getByTestId('inspector-after').locator('.hb.lit')).toHaveCount(0)
 })
 
+const FIT_TOKEN = 'bytes-fit-token'
 test('real Electron at 1440 x 770 shows all 5 fields and no cut row, in Free play and on the first tour step that shows TextGcm1', async ({}, testInfo) => {
   const dir = fs.mkdtempSync(path.join(os.tmpdir(), 'ns-e2e-fit-'))
-  const app = await electron.launch({ args: ['.'], cwd: path.join(__dirname, '..'), env: { ...process.env, NETSEC_PORT: '5192', NETSEC_TOKEN: '', NETSEC_SECURITY_DIR: dir } })
+  const app = await electron.launch({ args: ['.'], cwd: path.join(__dirname, '..'), env: { ...process.env, NETSEC_PORT: '5192', NETSEC_TOKEN: FIT_TOKEN, NETSEC_SECURITY_DIR: dir } })
   try {
     const win = await app.firstWindow()
     await app.evaluate(({ BrowserWindow }) => BrowserWindow.getAllWindows()[0].setContentSize(1440, 770))
@@ -78,12 +79,26 @@ test('real Electron at 1440 x 770 shows all 5 fields and no cut row, in Free pla
     await win.waitForTimeout(1500)
     expectWholePanel(await measure(win))
   } catch (e) {
-    // A Playwright trace holds no snapshots of an Electron window, so a failure saves what the window showed.
-    const win = await app.firstWindow()
-    await win.screenshot({ path: testInfo.outputPath('electron-at-failure.png') }).catch(() => {})
-    const shown = await win.locator('.statusbar').innerText().catch(() => 'no status bar')
-    await testInfo.attach('electron-status', { body: shown })
-    console.log(`electron status at failure: ${shown.replace(/\s+/g, ' ')}`)
+    // A Playwright trace holds no snapshots of an Electron window, so a failure saves what the window showed and what the Host holds.
+    // Host holds TextGcm1 and the screen does not: a delivery fault. Host lacks it: the engine or the session start. The catch must keep the real error.
+    const win = await app.firstWindow().catch(() => null)
+    if (win) {
+      const text = (id: string) => win.getByTestId(id).first().innerText({ timeout: 2000 }).catch(() => 'absent')
+      await win.screenshot({ path: testInfo.outputPath('electron-at-failure.png') }).catch(() => {})
+      const shown = await win.locator('.statusbar').innerText({ timeout: 2000 }).catch(() => 'no status bar')
+      const session = /session (?<id>\S+)/.exec(shown)?.groups?.id ?? ''
+      const host = (p: string) => fetch(`http://127.0.0.1:5192${p}`, { headers: { Authorization: `Bearer ${FIT_TOKEN}` } }).then(r => r.json(), () => null)
+      const body = session ? await host(`/api/sessions/${session}/events`) : null
+      const held: any[] = Array.isArray(body) ? body : body?.events ?? []
+      const report = {
+        step: await text('tour-step-id'), nextReason: await text('next-reason'), engine: await text('engine-state'), shown: shown.replace(/\s+/g, ' '),
+        hostEvents: held.length, hostHasTextGcm1: held.some(f => (f.event ?? f).message === 'TextGcm1'),
+        screenArrows: await win.locator('[data-testid^=diagram-message-]').count().catch(() => -1),
+        droppedEvents: (await host('/api/health'))?.droppedEvents ?? 'no answer',
+      }
+      await testInfo.attach('electron-report', { body: JSON.stringify(report) })
+      console.log(`electron report at failure: ${JSON.stringify(report)}`)
+    }
     throw e
   } finally { await app.close() }
 })
