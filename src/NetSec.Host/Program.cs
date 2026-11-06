@@ -33,7 +33,6 @@ builder.WebHost.UseUrls($"http://127.0.0.1:{port}");
 builder.Logging.SetMinimumLevel(LogLevel.Warning);
 
 WebApplication app = builder.Build();
-SessionManager sessions = new(sessionsDir);
 CeProcess ce = new();
 HostGuard guard = new(token);
 LessonRows lessons = new();
@@ -49,6 +48,7 @@ catch (InvalidDataException e)
     Console.Error.WriteLine("HOST_SECURITY_FILE_BAD: " + e.Message);
     return 2;
 }
+SessionManager sessions = new(sessionsDir, () => security.ShowKeys);
 FlowRuns flowRuns = new(wizardTable, security, new FlowParts(security, Environment.GetEnvironmentVariable), Environment.GetFolderPath(Environment.SpecialFolder.UserProfile));
 
 app.Use(guard.Invoke);
@@ -69,19 +69,20 @@ app.MapGet("/api/lessons/{n:int}", (int n) => lessons.One(n) is { } row
 // GEM:server-replaces-never-merges: on reconnect the UI replaces its copy of a session from this list.
 app.MapGet("/api/sessions/{id}/events", (string id, long? after) =>
     sessions.Find(id) is { } s
-        ? Results.Content("[" + string.Join(",", s.After(after ?? 0).Select(e => e.Line)) + "]", "application/json")
+        ? Results.Content("[" + string.Join(",", s.LinesAfter(after ?? 0)) + "]", "application/json")
         : NoSuchSession(id));
 // An os session's secrets live inside Windows, and the course never sees them, so it has no key log to give.
 app.MapGet("/api/sessions/{id}/keylog", (string id) => sessions.Find(id) switch
 {
     null => NoSuchSession(id),
     { TransportKind: OsTransportFactory.Kind } => Results.Json(new { code = ErrorCodes.KeylogNotKept, message = "This session ran on the OS transport. Windows holds its secrets, and the course never sees them, so there is no key log.", retryable = false, requestId = Guid.NewGuid().ToString("N") }, statusCode: 409),
+    _ when !security.ShowKeys => Results.Json(new { code = ErrorCodes.KeysHidden, message = "Show keys is off, so the key log is not given. Turn Show keys on to read it.", retryable = false, requestId = Guid.NewGuid().ToString("N") }, statusCode: 409),
     _ => Results.Text("", "text/plain"),
 });
 app.MapGet("/api/ce", () => Results.Json(ce.Status()));
 app.MapPost("/api/ce/start", async () => Results.Json(await ce.StartAsync()));
 app.MapPost("/api/ce/stop", () => { ce.Stop(); return Results.Json(ce.Status()); });
-SecurityRoutes.Map(app, security, flowRuns);
+SecurityRoutes.Map(app, security, flowRuns, on => sessions.Broadcast(JsonSerializer.Serialize(new { type = "security.show-keys", on })));
 VaultRoutes.Map(app, security.Vault, new VaultExercise(security.Vault, new OpenSslTool(Environment.GetEnvironmentVariable), Path.Combine(security.Root, "proof")));
 
 app.Map("/ws", async ctx =>
@@ -306,7 +307,9 @@ namespace NetSec.Host
         {
             LabSession? session = Text(m, "sessionId") is { } id ? sessions.Find(id) : _current;
             if (session is null) { Fail(requestId, "SESSION_NOT_FOUND", "No session to save."); return; }
-            Send(new { type = "session.saved", requestId, sessionId = session.SessionId, sessionFile = session.SessionFile });
+            // While Show keys is OFF, a saved trace holds no key bytes: a file written while ON gets a hidden copy, and the original stays.
+            string file = !security.ShowKeys && session.FileHoldsShownKeys ? TraceLines.WriteHiddenCopy(session.SessionFile) : session.SessionFile;
+            Send(new { type = "session.saved", requestId, sessionId = session.SessionId, sessionFile = file });
         }
 
         void Load(JsonElement m, string? requestId)
@@ -320,10 +323,13 @@ namespace NetSec.Host
                 return;
             }
             string sessionId = SessionManager.NewId();
-            Send(new { type = "session.started", requestId, sessionId, replay = true, sessionFile = path });
+            string[] lines = File.ReadAllLines(path);
+            // fileHidesKeys: the file was saved with Show keys OFF, so its bytes are gone and ON cannot bring them back.
+            Send(new { type = "session.started", requestId, sessionId, replay = true, sessionFile = path, fileHidesKeys = lines.Any(TraceLines.HoldsHiddenKeys) });
+            bool show = security.ShowKeys;
             long seq = 0;
-            foreach (string line in File.ReadLines(path))
-                sessions.Broadcast($"{{\"type\":\"trace\",\"sessionId\":{JsonSerializer.Serialize(sessionId)},\"seq\":{++seq},\"event\":{line}}}");
+            foreach (string line in lines)
+                sessions.Broadcast($"{{\"type\":\"trace\",\"sessionId\":{JsonSerializer.Serialize(sessionId)},\"seq\":{++seq},\"event\":{(show ? line : TraceLines.HideLine(line))}}}");
             Send(new { type = "session.finished", sessionId, outcome = "replay", code = (string?)null, check = (string?)null });
         }
 

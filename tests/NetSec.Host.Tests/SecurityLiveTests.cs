@@ -57,6 +57,12 @@ public class SecurityLiveTests
             return ((int)r.StatusCode, await r.Content.ReadAsStringAsync());
         }
 
+        public async Task<(int Status, string Body)> Put(string path, string json)
+        {
+            HttpResponseMessage r = await _http.PutAsync("http://127.0.0.1:" + Port + path, new StringContent(json, Encoding.UTF8, "application/json"));
+            return ((int)r.StatusCode, await r.Content.ReadAsStringAsync());
+        }
+
         async Task<(int Status, string Body)> Post(string path, string json)
         {
             HttpResponseMessage r = await _http.PostAsync("http://127.0.0.1:" + Port + path, new StringContent(json, Encoding.UTF8, "application/json"));
