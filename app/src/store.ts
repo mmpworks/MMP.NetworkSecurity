@@ -166,19 +166,37 @@ async function resync() {
     const last = s.events.length ? s.events[s.events.length - 1].seq : 0
     const body = await hostGet(addr, `/api/sessions/${s.id}/events?after=${last}`)
     const rows: any[] = Array.isArray(body) ? body : body?.events ?? []
-    s.events = [...s.events, ...rows.map(normalizeEvent).filter(e => e.seq > last)]
+    const read = rows.map(normalizeEvent).filter(e => e.seq > last)
+    s.events = [...s.events, ...(keysHidden ? read.map(withoutBytes) : read)]
   } catch { /* the live feed keeps going */ }
 }
 
 
-/** The Host redacts at its boundary, so after a flip of Show keys every open session is read again and its copy replaced, never merged. A replay keeps its file. */
-export async function replaceOpenSessions() {
+let flipGeneration = 0
+let keysHidden = false
+/** The app's copy of an event with its key bytes gone. A secret keeps its length and says why it has no hex. */
+const withoutBytes = (e: TraceEvent): TraceEvent => (e.secrets.some(x => x.hex)
+  ? { ...e, secrets: e.secrets.map(x => (x.hex ? { ...x, hex: '', length: x.length || x.hex.length >> 1, hidden: x.hidden || 'toggle' } : x)) }
+  : e)
+/**
+ * The Host redacts at its boundary, so after a flip of Show keys every open session is read again.
+ * OFF takes the bytes out of the app's copy first, so a slow or failed read can never leave them on screen.
+ * A reply from an older flip is dropped. Events newer than the reply came after the read, so the Host already sent them under this flip.
+ * A replay has no session on the Host to read: OFF takes its bytes, and only opening the file again brings them back.
+ */
+export async function replaceOpenSessions(on: boolean) {
+  const generation = ++flipGeneration
+  keysHidden = !on
+  if (!on) for (const s of ui.sessions) s.events = s.events.map(withoutBytes)
   for (const s of ui.sessions.filter(x => !x.replay)) {
     try {
       const body = await hostGet(addr, `/api/sessions/${s.id}/events`)
+      if (generation !== flipGeneration) return
       const rows: any[] = Array.isArray(body) ? body : body?.events ?? []
-      s.events = rows.map(normalizeEvent).sort((a, b) => a.seq - b.seq)
-    } catch { /* the session stays as it is */ }
+      const read = rows.map(normalizeEvent).sort((a, b) => a.seq - b.seq)
+      const last = read.length ? read[read.length - 1].seq : 0
+      s.events = [...read, ...s.events.filter(e => e.seq > last)]
+    } catch { /* The live feed keeps going. On OFF the bytes are already gone. */ }
   }
 }
 
@@ -213,7 +231,7 @@ function onFrame(f: any) {
     case 'session.forked': return mySessions.has(String(f.sessionId)) || mySessions.has(String(f.parentId)) ? onForked(f) : undefined
     case 'security.show-keys':
       showKeysHandler?.(f.on !== false)
-      void replaceOpenSessions()
+      void replaceOpenSessions(f.on !== false)
       return
     case 'error':
       if (f.requestId && !myRequests.has(String(f.requestId))) return
@@ -226,7 +244,8 @@ function onStarted(f: any) {
   const lesson = ui.lesson ?? 0
   const rec: SessionRec = {
     id: String(f.sessionId), parentId: '', label: `lesson ${lesson}`, lesson, seed: Number(f.seed ?? 0),
-    trainingOnly: !!f.trainingOnly, transportKind: String(f.transportKind ?? (f.trainingOnly ? 'glass' : 'os')), events: [], finished: null, replay: false, fileHidesKeys: !!f.fileHidesKeys,
+    // The Host names no transport for a replay. It reads a saved file and opens no OS socket, so its rows show as a training run's rows do.
+    trainingOnly: !!f.trainingOnly || !!f.replay, transportKind: String(f.transportKind ?? (f.trainingOnly || f.replay ? 'glass' : 'os')), events: [], finished: null, replay: !!f.replay, fileHidesKeys: !!f.fileHidesKeys,
   }
   ui.sessions = [...ui.sessions.filter(s => s.id !== rec.id), rec]
   ui.activeId = rec.id
@@ -241,7 +260,7 @@ function onTrace(f: any) {
   const ev = normalizeEvent(f)
   const s = ui.sessions.find(x => x.id === ev.sessionId)
   if (!s) return
-  if (!s.events.some(e => e.seq === ev.seq)) s.events = [...s.events, ev]
+  if (!s.events.some(e => e.seq === ev.seq)) s.events = [...s.events, keysHidden ? withoutBytes(ev) : ev]
   if (ev.waiting) ui.engine = 'waiting'
   wake()
 }
@@ -317,7 +336,7 @@ export function runEngine() { sock?.send({ type: 'session.run', sessionId: ui.ac
 export function pauseEngine() { sock?.send({ type: 'session.pause', sessionId: ui.activeId }); ui.engine = 'stepping' }
 export function restartSession() { if (ui.lesson != null) startSession(ui.mode) }
 export function saveSession() { if (ui.activeId) sock?.send({ type: 'session.save', sessionId: ui.activeId }) }
-export function loadTrace(file: string) { if (file) sock?.send({ type: 'session.load', file }) }
+export function loadTrace(file: string) { if (file) sock?.send({ type: 'session.load', requestId: nextReq(), file }) }
 
 // ---- tour driver ----
 

@@ -6,7 +6,8 @@ import KeysInUse from './KeysInUse.vue'
 // With Show keys OFF a row holds no hex. It shows its fingerprint and its length, and two rows are the same key when their fingerprints match.
 interface Row { holder: string; name: string; hex: string; fingerprint: string; length: number; hidden: string; derivedFrom: string[]; fresh: boolean }
 const valueOf = (r: Row) => r.hex || r.fingerprint
-const sameKey = (a: Row, b: Row) => valueOf(a) === valueOf(b)
+// A row with no hex and no fingerprint holds no value to compare, so it never counts as a match.
+const sameKey = (a: Row, b: Row) => !!valueOf(a) && valueOf(a) === valueOf(b)
 
 const upTo = upToSeq
 // A row exists only when the holder gained the value at or before the selected event.
@@ -37,7 +38,7 @@ const publicValues = computed(() => {
 const pairs = computed(() => {
   const byName = new Map<string, Row[]>()
   for (const r of rows.value) byName.set(r.name, [...(byName.get(r.name) ?? []), r])
-  return [...byName.entries()].filter(([, v]) => new Set(v.map(r => r.holder)).size >= 2).map(([name, v]) => ({ name, rows: v, match: v.every(r => sameKey(r, v[0])) }))
+  return [...byName.entries()].filter(([, v]) => new Set(v.map(r => r.holder)).size >= 2).map(([name, v]) => ({ name, rows: v, known: v.every(r => !!valueOf(r)), match: v.every(r => sameKey(r, v[0])) }))
 })
 const cellText = (r: Row) => (r.hex || r.fingerprint.replace(/^fp:/, ''))
 const cells = (hex: string) => Array.from({ length: Math.min(64, hex.length >> 1) }, (_, i) => hex.slice(i * 2, i * 2 + 2))
@@ -72,7 +73,7 @@ const copy = (hex: string) => { try { void navigator.clipboard?.writeText(hex) }
             :data-testid="`secret-row-${r.holder}-${r.name}`"
           >
             <span class="sname">{{ r.name }}</span>
-            <code :data-testid="`secret-value-${r.holder}-${r.name}`">{{ open.has(h + r.name) && r.hex ? r.hex : short(valueOf(r)) }}</code>
+            <code :data-testid="`secret-value-${r.holder}-${r.name}`">{{ open.has(h + r.name) && r.hex ? r.hex : short(valueOf(r)) || 'Fingerprint not available' }}</code>
             <span class="muted">{{ r.hex ? r.hex.length >> 1 : r.length }} bytes</span>
             <span v-for="d in r.derivedFrom" :key="d" class="chip-from">{{ d }}</span>
             <v-btn v-if="r.hex" size="x-small" variant="text" :data-testid="`secret-reveal-${r.holder}-${r.name}`" @click="toggle(h + r.name)">{{ open.has(h + r.name) ? 'Hide' : 'Show all' }}</v-btn>
@@ -81,7 +82,7 @@ const copy = (hex: string) => { try { void navigator.clipboard?.writeText(hex) }
         </div>
       </div>
       <div v-for="p in pairs" :key="p.name" class="converge" :class="{ match: p.match }">
-        <div class="muted">{{ p.name }}: {{ p.match ? 'both sides hold the same value' : 'the values differ' }}</div>
+        <div class="muted">{{ p.name }}: {{ !p.known ? 'no fingerprint to compare yet' : p.match ? 'both sides hold the same value' : 'the values differ' }}</div>
         <div class="grids">
           <div v-for="r in p.rows" :key="r.holder" class="grid32" :data-testid="`convergence-grid-${r.holder}`">
             <span v-for="(c, i) in cells(cellText(r))" :key="i" class="cell">{{ c }}</span>

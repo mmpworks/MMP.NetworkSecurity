@@ -138,7 +138,7 @@ export function closeSecurity() { sec.open = false; sec.run = null; sec.returnLe
 
 export async function setShowKeys(on: boolean) {
   const r = await hostSend(addr, 'PUT', '/api/security/show-keys', { on })
-  if (r.status < 300) { sec.showKeys = on; await replaceOpenSessions() }
+  if (r.status < 300) { sec.showKeys = on; await replaceOpenSessions(on) }
   else fault(str(r.body?.code) || 'SHOW_KEYS_FAILED', str(r.body?.message))
 }
 
