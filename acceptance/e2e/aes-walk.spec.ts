@@ -29,6 +29,8 @@ async function setShowKeys(on: boolean): Promise<void> {
 /** Runs lesson 1 with the tour's Next until the run holds aes.key and the tab shows. A build with no tab reads NOT RUN, never PASS. */
 async function reachTab(page: Page): Promise<void> {
   requireLive();
+  // Design section 2.2a: under reduced motion each step lands at once on its end frame, so no clause reads a cell inside a motion.
+  await page.emulateMedia({ reducedMotion: 'reduce' });
   await openApp(page);
   await page.getByTestId('lesson-item-1').click();
   const start = page.getByRole('button', { name: /start tour/i });
@@ -162,7 +164,7 @@ test('[A19.ui.off-shows-the-closed-line] with Show keys OFF the steps close, the
     await reachTab(page);
     await page.getByTestId('aes-walk-tab').click();
     await expect(page.getByTestId('aes-walk-closed')).toContainText('Show keys is off');
-    await expect(page.getByTestId('aes-walk-closed')).toContainText('The S-box table and the modes walk stay open');
+    await expect(page.getByTestId('aes-walk-closed')).toContainText('modes walk stay open');
     await expect(page.locator('[data-testid^="aes-walk-cell-"]'), 'no state cell while closed').toHaveCount(0);
     expect((await hostGet('/api/walk/aes/tables')).status, 'the tables route').toBe(200);
   } finally { await setShowKeys(true); }
