@@ -72,6 +72,7 @@ async function makeLoginKeys() {
 const backToBuiltin = async () => { for (const t of ['token.issuer', 'device.enrolment']) await api('PUT', `/api/security/types/${t}/mode`, { mode: 'BuiltIn' }) }
 // A built-in type with a training key carries it in key.in-use. Lesson 10 reads pki.root-ca, so its chip shows the key ON and the fingerprint OFF.
 test('built-in keys: lesson 10 names pki.root-ca in the strip with its key ON and its fingerprint OFF', async ({ page }) => {
+  await backToBuiltin() // an earlier spec file can leave the my-login types in own-key mode
   await freePlay(page, 10)
   const chip = page.getByTestId('key-in-use-pki.root-ca')
   await expect(chip).toContainText('Built-in key')
@@ -97,7 +98,11 @@ test('own keys: lesson 10 names token.issuer in the strip with its key ON and it
     const chip = page.getByTestId('key-in-use-token.issuer')
     await expect(chip).toBeVisible()
     await expect(chip).toContainText('My test key')
-    await expect(chip).toContainText('version 1')
+    // The version counts up across runs that share one security folder, so the spec reads it from the Host.
+    const rows = ((await (await api('GET', '/api/security')).json()) as { types: { typeId: string; version: number }[] }).types
+    const version = rows.find(r => r.typeId === 'token.issuer')?.version ?? 0
+    expect(version).toBeGreaterThan(0)
+    await expect(chip).toContainText(`version ${version}`)
     await expect(page.getByTestId('key-in-use-value-token.issuer')).toHaveText(/[0-9a-f]{16}/i)
     await shot(page, '05-own-key-on')
     await page.getByTestId('show-keys-switch').uncheck()
