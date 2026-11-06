@@ -25,7 +25,7 @@ Owner: Nancy. Decision owner: Steve. Date: 2026-11-06.
 The work ends when all of these are true, by 2026-11-13:
 
 1. All 5 slices are merged.
-2. `npx playwright test` passes every spec on one head, and `acceptance/run.ps1 -Clauses All` has no new failure against main.
+2. `npx playwright test` passes every spec on one head, and `acceptance/run.ps1 -Clauses All` has no new failure against main. The real-Electron fit test failed 2 times in 33 runs with no cause yet (#181). That red closes first, by a fix or Steve's waiver.
 3. Real Electron at 1440 x 770 and 1280 x 640 shows 0 cut panels, 0 cut lesson names, and 1 row of top-bar controls.
 4. Steve has seen slice 2 and slice 3 in the app and reacted.
 
@@ -62,7 +62,7 @@ Reason: the approved mock needs about 1180 px of width. The bottom panel has abo
 | A gate refuses | Stop and report the command and the refusal text |
 | A spec fails after a move | Fix the code or the spec in that slice. Never skip a spec |
 | Two sources disagree | The approved mock wins on look. `ux-design.md` wins on behaviour. Report the conflict |
-| Port use | Only at a turn from the lead. Side ports 5173 and 5193 are free for short runs |
+| Port use | Only at a turn from the lead. Side ports 5173 and 5193 serve short runs. Other agents use 5173 too, so check it first: the side run's renderer refuses a busy port |
 
 ## 5. Slices
 
