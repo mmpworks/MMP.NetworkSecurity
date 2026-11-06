@@ -1,6 +1,6 @@
 # MMP.NetworkSecurity: walkthrough design
 
-Author: Richard. Date: 2026-11-06. Revision 7, adding binary on hover, typed text by Steve's ruling, and the longer text view. Status: design only, for Jared's check and Echo's clauses. No product code.
+Author: Richard. Date: 2026-11-06. Revision 8, adding the Start view's round key, the ShiftRows roll, the key fill, and spec cards. Status: design only, for Jared's check and Echo's clauses. No product code.
 
 Sources of facts: FIPS 197, the engine, and Jared's sheet `E:\dev\ns-lesson1-facts.md`. Steve's web pages set depth and teaching order only (section 2.1).
 
@@ -167,7 +167,7 @@ Steve's ask: see the 16 bytes change at each stage.
 |---|---|---|
 | AddRoundKey | The round key grid slides over the state. Each cell shows its new byte | Engine state after AddRoundKey |
 | SubBytes | Each cell flips to its new byte, one cell at a time on the first pass, then all cells at once | Engine state after SubBytes |
-| ShiftRows | Row 0 stays. Rows 1, 2, 3 slide left by 1, 2, 3 and wrap around | Engine state after ShiftRows |
+| ShiftRows | A smooth roll, one row at a time, like a ticker tape. Row 0 stays. Rows 1, 2, 3 rotate left by 1, 2, 3: bytes leave the left edge and enter at the right edge. No fade and no lift | Engine state after ShiftRows |
 | MixColumns | One column at a time lifts, its 4 bytes join, and 4 new bytes come out | Engine state after MixColumns |
 | Inverse steps | The same motion, in the inverse direction | Engine state after the inverse step |
 
@@ -175,10 +175,13 @@ Steve's ask: see the 16 bytes change at each stage.
 |---|---|
 | Where a byte came from | Each cell shows a small mark with its position before this step, 0 to 15. The marks reset at each step, because a byte has no single source after MixColumns |
 | Which way ShiftRows moves | The engine's `ShiftRowsMap` and `InverseShiftRowsMap` come from the tables route (section 3.4), so a motion cannot disagree with the real map |
-| Next and Back | They land on the same states as without animation. A click during a motion jumps to the end frame |
+| Next and Back | They land on the same states as without animation. A click during a motion jumps to the end frame. A Back during a roll or a key fill leaves no strip, no flying byte, no mark, and no hidden cell |
+| Start view | The right-hand grid shows round key 0, in place of "Before this step". Next then runs the AddRoundKey motion from it. Show keys OFF closes it, as the block walk closes |
 | `prefers-reduced-motion` | Each step jumps to its end frame |
 | Show keys flips OFF during a motion | The timeline stops, and the walk clears (section 3.5) |
 | Library | None. CSS transforms and one small composable, `useWalkTimeline`. I would add a library only if a transform cannot do the MixColumns join |
+
+**ShiftRows words on screen:** "Row 0 stays. Rows 1, 2 and 3 rotate left by 1, 2 and 3 bytes. The name says shift, but no byte is lost: FIPS 197 calls it a cyclic shift, the same idea as a rotate left (ROL)."
 
 For tests: a clause reads end frames under reduced motion, so no test waits on a timer.
 
@@ -222,6 +225,19 @@ Worked example, the FIPS 197 appendix A key `2b7e1516 28aed2a6 abf71588 09cf4f3c
 | XOR w0 (`2b7e1516`) | `a0fafe17`, which is w4 | `keyBack`, `word` |
 
 **AES-256 only:** at `i mod 8 = 4`, the word before passes through SubWord alone. The panel says so when the learner picks 256.
+
+**A new word builds byte by byte.** For byte j of word i:
+
+| Moment | On screen | Value from the reply |
+|---|---|---|
+| 1. Light the sources | Byte j of `w(i - Nk)`, and the source byte of `w(i - 1)`, light up in the table, and in the original key line when they are key words | Position arithmetic |
+| 2. The stages | The stage rows show, and byte j lights in each | `previous`, `rotated`, `substituted`, `afterRcon`, `keyBack` |
+| 3. The equation | "2b XOR 8b = a0", with each value's bits below it | `keyBack[j]`, the last stage's byte j, and `word[j]`. The app prints these, and it computes no XOR |
+| 4. The answer flies | The byte flies to its cell, and the column fills one cell at a time | `word[j]` |
+
+**The source byte.** RotWord moves each byte left, so on a word that passes through RotWord, byte j of the stage comes from byte `(j + 1) mod 4` of the word before. On every other word, it is byte j. The last stage is `afterRcon` on a RotWord step, `substituted` at the AES-256 `i mod 8 = 4` step, and `previous` otherwise.
+
+The stage row for RotWord reads "RotWord: rotate left one byte". With reduced motion, each word lands whole, and Back mid-word leaves no marks.
 
 **The reply needs no new field.** `keyWords[]` already has every row by `i`, and each row holds `word`, `previous`, `rotated`, `substituted`, `rcon`, `afterRcon`, and `keyBack`. Grid, column, cell, and byte position come from `i` by layout: `i / 4`, `i % 4`, and `4i + r`. The two words to light are `i - 1` and `i - Nk`, with Nk from the tables route's size table. That is position arithmetic, and the app reads no byte value to do it. A clause holds it: the bytes in the lit cells must equal `previous` and `keyBack`.
 
@@ -372,6 +388,40 @@ The default stays `Pump four is ok.`, so the walk that Steve first steps through
 `keySource` names this key `typed-practice`, apart from section 2.7's `practice` key at 192 and 256 bits, which comes from the session seed and closes with Show keys OFF.
 
 **Typing changes the key on screen.** While a typed block is in chapter 1, the key schedule part and the grids use the practice key, and the panel says: "This key differs from the run's." Clearing the box goes back to the run's key, and Show keys OFF closes that walk again. **What would change my mind on open:** a reader takes a key on screen with Show keys OFF as a broken toggle. Then the typed walk closes too, and only the multi-block view stays open.
+
+### 2.2h Spec cards: a standing rule for every screen
+
+Steve's rule: any mention of a named spec on any screen, in any lesson, is a hover card with a short synopsis and a link to a page that explains it. This covers FIPS 197, SP 800-38A, SP 800-38D, RFC 8446, X9.24, and the rest. It binds the new look too, so `docs/ux-design.md` carries it.
+
+| Behaviour | Rule |
+|---|---|
+| Opens on | Hover, keyboard focus, and tap |
+| Stays open | While the pointer is on the card, so the link can be clicked |
+| Closes on | Esc, or leaving it. A tap elsewhere closes it too |
+| Link | Names one page. A click opens it in the system browser, and the course never loads it inside the app |
+
+**One table, as data: `app/src/specs.json`.** Each row holds `id`, `name`, `aliases`, `title`, `synopsis`, `url`, and `linkText`. A top-level `hosts` list names the hosts a link may use. Jared checks each synopsis and each link. A15 reads the synopses for reading grade, and A15a reads them for accuracy.
+
+**How it reaches tour text and lesson JSON: the app finds spec names when it renders, so the tour files do not change.**
+
+| Choice | Result |
+|---|---|
+| **Find names at render (chosen).** `specParts(text)` in `tour.ts` splits text on a pattern built from the table's names and aliases, as `splitText` splits `{{term:id}}` today | The 12 tour files stay as they are, so no A15a reader re-stamp. A new mention gets its card with no edit. Text the engine sends is covered too |
+| A `{{spec:id}}` mark in the tours | Each mention is an edit, the text hash changes, and the reader re-stamps each lesson. An unmarked mention gets no card, and Host messages have no marks |
+
+| Where a spec name can reach the screen | How it gets its card |
+|---|---|
+| Tour text, in `lesson-NN.json` `text`. Today: `X9.24-3` in lesson 6, `RFC 8996` and `RFC 7465` in lesson 7, `RFC 9449` in lesson 10 | `TermText.vue` runs `specParts` on the text between term marks |
+| `glossary.json`, `walk-gloss.json`, `wizard-copy.json` | The same component |
+| Text the engine or Host sends: `error.message`, `check.detail`, a refusal's detail. For example, the TLS 1.3 refusals name RFC 8446 sections | Each panel that prints it uses `TextWithSpecs.vue` |
+| Words written in a `.vue` template | They use `<SpecCard id="fips197" />` directly |
+| A claim's `source` in lesson JSON | Off screen, so no card. A source can name a spec with no row |
+
+**Section numbers stay as text.** "RFC 8446 section 4.2" gets a card on "RFC 8446", and the words "section 4.2" stay beside it. Names that are not specs, such as `TLS 1.3`, get no card unless the table lists them.
+
+**Links need new code in Electron.** `app/electron/main.cjs` has no window-open handler today. It gains `setWindowOpenHandler`, which always denies a new window, and it calls `shell.openExternal` only when the URL's host is in `hosts`. The renderer asks through `preload.cjs`. The app fetches nothing from these hosts, and a card works offline except for its link. Under `vite preview`, the link is a normal `target="_blank" rel="noopener"`.
+
+**Show keys:** a card holds no key, so it stays open in every state.
 
 ### 2.3 The S-box view
 
@@ -965,6 +1015,7 @@ Limits of the spike:
 | `app/src/components/AesWalkPanel.vue` | Chapter tabs. Holds the two views below |
 | `app/src/components/AesBlockWalk.vue` | Picker, grid, Back, Next, round chips |
 | `app/src/components/SboxView.vue` | The 16 by 16 table, row and column lights, for both tables |
+| `app/src/specs.json`, `components/SpecCard.vue`, `components/TextWithSpecs.vue` | The spec table, the card, and text with its names turned into cards (section 2.2h). `specParts` is pure, in `tour.ts`. `app/electron/main.cjs` and `preload.cjs` gain the link handler |
 | `app/src/components/KeySchedulePanel.vue` | The key as words, the expanded table of grids, one word's stage rows, the Rcon row |
 | `app/src/components/FieldPanel.vue` | The definition lines, and one multiply from the engine's terms |
 | `app/src/components/LongTextView.vue` | W2: the box, the side-by-side rows, the flip, and the picture beside it. It prints typed text as text, and never as HTML |
@@ -1046,6 +1097,7 @@ Sheet 5.9 lists them, and these three matter most:
 |---|---|---|---|
 | W0 | This doc and Jared's review. **After Jared passes the head,** Echo writes clauses from sections 2 to 4, red | Jared's pass on a named head. Clauses exist and fail with a named code | Richard, Jared, Echo |
 | **W1a** skeleton | `AesKey.Walk.cs` with word rows and MixColumns terms, `AesWalks.Block`, the tables route and the block route. No UI | FIPS, table, BCL, toggle, term, and golden clauses pass on both builds. `tools/gate.ps1` green | Richard |
+| **SC** spec cards | `specs.json`, `SpecCard.vue`, `TextWithSpecs.vue`, `specParts`, the Electron link handler, and the table's rows for every spec on screen. It lands with the new look, before W1b, because it binds every screen | Spec card clauses. A15 and A15a on `specs.json` | Nancy, Richard, Jared on the table |
 | **Hold on W1b** | Do not start the walk screens until the lead says the new look is set. Steve wants a major UX refresh. W1a is engine work, and it is not affected | | Lead |
 | **W1b** small section | `walk.ts`, `useWalkTimeline.ts`, `AesBlockWalk.vue`, `SboxView.vue`, `KeySchedulePanel.vue`, `FieldPanel.vue`, chapter 1 at 128 bits with animation, binary on hover, and typed text (`AesTypedBlocks`, `/typed-block`), encrypt and decrypt, the flip guard | e2e: a learner reaches `Pump four is ok.` by Next alone. A clicked cell's lookup equals the next state, both tables. Grid order clause. S-box scan. Measure the block reply time at AES-128 and AES-256, and record both in `docs/learnings.md`, because section 7 keeps one reply until this shows a visible delay | Nancy |
 | **Stop: show Steve** | Steve steps through chapter 1 in the app and reacts. CBC and modes work starts after this | His reaction goes in `docs/learnings.md`, and later slices read it | Lead |
@@ -1070,6 +1122,13 @@ If Steve does not follow it after 2 rounds of word changes, stop and re-plan the
 | Theme | What a clause checks |
 |---|---|
 | Round values | Every CIPHER and INVERSE CIPHER state for FIPS C.1, C.2, C.3, by position. The vector reader skips the appendix's EQUIVALENT INVERSE CIPHER lists, which hold a different order |
+| Start view | The right-hand grid equals round key 0, and it is gone with Show keys OFF. The first Next lands on AddRoundKey 0 |
+| ShiftRows roll | The roll ends on the engine state. A Back during a roll leaves no strip and no hidden cell. Row 0 does not move |
+| Key fill | Each lit source byte equals the bytes in that byte's equation. A RotWord step lights byte `(j + 1) mod 4` of the word before. The equation's three values equal the reply's. A Back mid-word leaves no mark and no flying byte |
+| Spec table | Every `url` has a host in `hosts`, and every row has a synopsis that passes reading grade |
+| Spec on screen | A scan of tour text, gloss, and copy finds each spec-shaped name in the table. At the end of each lesson walk, an e2e scan of the page finds no spec-shaped name outside a card trigger. A Host refusal naming RFC 8446 shows a card |
+| Spec card | It opens on hover, focus, and tap. It stays open with the pointer on it. Esc closes it. Tour files keep their hash |
+| Spec link | A new window is always denied. A link opens outside only for a listed host, and a test URL on another host does not open |
 | Expanded table | 11, 13, and 15 grids of 16 cells. The cell at byte position n shows byte n of the expanded key, and its word name is `w(n / 4)`. No cell shows a letter. The key band ends where section 2.2b says, and those cells start filled |
 | Word build | Next adds one word. The lit cells equal that row's `previous` and `keyBack`. A tap on a built word opens its stage rows, and a tap on an unbuilt word does nothing. Each `aes-walk-*` key schedule cell is gone with Show keys OFF |
 | Key words | FIPS appendix A rows, for all three sizes. The Rcon row equals `01 02 04 08 10 20 40 80 1b 36`, and the used counts are 10, 8, 7 |

@@ -292,3 +292,7 @@ Pattern: kebab-case. Lists use `-<n>` for index or `-<name>` for a stable key. T
 1. **Step granularity.** The tour steps the engine one trace event at a time. A TLS 1.3 handshake can emit dozens of events, and the learner may feel stuck on small ones. The alternative is to group events per step.
 2. **Attack as a forked session.** The attack reruns the lesson with the same seed in a new tab. This keeps the engine true to its trace, but it costs a rerun and breaks the feel of "flip a byte on the wire right now".
 3. **Eavesdropper view relies on `visibleToWire` from the engine.** The UI could guess from the record type, but that risks fake data. The engine must label each field, which adds work to S3 and S4.
+
+## Standing rule: spec cards
+
+Any mention of a named spec, on any screen and in any lesson, is a hover card with a short synopsis and a link to a page that explains it. Hover, keyboard focus, and tap open it. It stays open while the pointer is on the card. Esc closes it. The table is `app/src/specs.json`. Text finds its cards when it renders, so tour files carry no marks. `docs/walkthrough-design.md` section 2.2h has the detail. The new look keeps this rule.
