@@ -172,6 +172,9 @@ public sealed class SessionManager
     /// <summary>Sends a frame to every socket, ordered against trace lines by the fence. The flip frame goes out here.</summary>
     public void Broadcast(string frame) => _fence.Announce(() => Fanout(frame));
 
+    /// <summary>Sends one trace frame built for the toggle as it is now, ordered against Broadcast. A replay sends each line through here.</summary>
+    public void BroadcastPicked(Func<bool, string> frameFor) => _fence.Pick(show => Fanout(frameFor(show)));
+
     void Fanout(string frame)
     {
         Channel<string>[] clients;
