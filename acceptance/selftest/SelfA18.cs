@@ -48,7 +48,7 @@ namespace Acceptance
             string file = Path.Combine(c.AcceptanceDir, "checks", "engine_limits.json");
             Dictionary<string, object> limits = MiniJson.AsObject(MiniJson.Parse(File.ReadAllText(file, Encoding.UTF8)));
             string absent = MiniJson.Str(limits, "absent");
-            int cases = 0, lines = 0;
+            int cases = 0, lines = 0, correct = 0;
             foreach (object o in MiniJson.Arr(limits, "lines"))
             {
                 Dictionary<string, object> e = MiniJson.AsObject(o);
@@ -58,6 +58,13 @@ namespace Acceptance
                 string good = Status(c, root, e, Tour(lesson, new[] { example }, source, null));
                 Check.True(good.StartsWith("PASS"), id + " should PASS on its example line, gave " + good);
                 cases++; lines++;
+
+                foreach (object also in MiniJson.Arr(e, "alsoPasses") ?? new List<object>())
+                {
+                    string other = Status(c, root, e, Tour(lesson, new[] { (string)also }, source, null));
+                    Check.True(other.StartsWith("PASS"), id + " should PASS on the correct line '" + also + "', gave " + other);
+                    correct++;
+                }
 
                 foreach (object p in MiniJson.Arr(e, "require"))
                     MustFail(c, root, e, Tour(lesson, new[] { Regex.Replace(example, (string)p, "zz", RegexOptions.IgnoreCase) }, source, null), "the words of " + p + " are gone", ref cases);
@@ -75,7 +82,7 @@ namespace Acceptance
                     MustFail(c, root, e, Tour(lesson, new[] { example + " The standard requires these." }, source, null), "the line ranks the standard's list", ref cases);
             }
             Check.True(lines == 8, "engine_limits.json should hold 8 lines, holds " + lines);
-            return lines + " line clauses PASS on their example, and " + (cases - lines) + " one-change tours each FAIL";
+            return lines + " line clauses PASS on their example, " + correct + " more correct lines PASS, and " + (cases - lines) + " one-change tours each FAIL";
         }
     }
 }
