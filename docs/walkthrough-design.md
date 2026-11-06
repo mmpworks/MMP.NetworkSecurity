@@ -1,6 +1,6 @@
 # MMP.NetworkSecurity: walkthrough design
 
-Author: Richard. Date: 2026-11-06. Revision 3, with Steve's depth links, the S-box view, the modes walk, the first grid view, and the lesson 6 steps. Status: design only, for Jared's review and Echo's clauses. No product code. Branch `docs/walkthrough-design`, from main `7b569a1`.
+Author: Richard. Date: 2026-11-06. Revision 4, with Steve's depth links, the S-box view, the modes walk, the first grid view, the lesson 6 steps, and Jared's review of 480ce59. Status: design only, for Jared's review and Echo's clauses. No product code. Branch `docs/walkthrough-design`, from main `7b569a1`.
 
 Sources of facts: FIPS 197, the engine, and Jared's sheet `E:\dev\ns-lesson1-facts.md`. Steve's web pages set depth and teaching order only (section 2.1).
 
@@ -13,7 +13,7 @@ Sources of facts: FIPS 197, the engine, and Jared's sheet `E:\dev\ns-lesson1-fac
 
 1. The walk has a working spike. It matched all 372 FIPS 197 round values. ECB, CBC, and GCM each matched the wire on every block of a real lesson 1 run (section 3.6).
 2. `EncryptBlock` and `DecryptBlock` do not change. The split of SubBytes and ShiftRows lives only in the walk path.
-3. The S-box tables come from the engine by a public route, so the S-box view stays open with Show keys OFF. The round states close with Show keys OFF, because one state gives away the key (section 3.5).
+3. The S-box tables come from the engine by a public route. With Show keys OFF, the tables and the modes walk stay open, and the round states close (section 3.5).
 4. Lessons 3, 4, and 5 show key pairs in action. Lesson 7 shows the one RSA box (section 5).
 5. No slice adds an event to an engine stream. Echo re-records nothing (section 4).
 
@@ -81,7 +81,7 @@ Steve's Wikipedia page sets the order. It describes the older TDES form. **This 
 | 1 | Split the text into 16-byte blocks | Section 2.2, first view |
 | 2 | Put one block in the 4x4 grid, by columns | Section 2.2, first view |
 | 3 | KeyExpansion makes the round keys. The key size sets the rounds: 10, 12, or 14 in total | Section 2.2 |
-| 4 | AddRoundKey with round key 0 | Section 2.2 |
+| 4 | AddRoundKey with round key 0. This comes before round 1, and it is not a round | Section 2.2 |
 | 5 | SubBytes, with one byte traced through the S-box | Sections 2.2, 2.3 |
 | 6 | ShiftRows | Section 2.2 |
 | 7 | MixColumns | Section 2.2 |
@@ -93,7 +93,7 @@ Steve's Wikipedia page sets the order. It describes the older TDES form. **This 
 
 Round 1 shows each step in full. So step 5 opens the S-box view by itself on the first SubBytes, with the first cell selected. Later rounds keep it one click away.
 
-Jared's sheet sections 5.7, 5.9, 5.11, and 5.13 list the lines on these pages that a lesson must not copy.
+Jared's sheet sections 5.7, 5.9, 5.11, 5.13, and 5.14 list the lines on these pages that a lesson must not copy.
 
 ### 2.2 Chapter 1: inside the block
 
@@ -101,7 +101,7 @@ The learner runs lesson 1 and opens the **AES walk** tab.
 
 **The first view teaches the grid.** A reader learns the fill order here, so this view must get it right.
 
-1. The text shows split into 4 blocks of 16 bytes. The learner picks block 1 to 4.
+1. The text shows split into 4 blocks of 16 bytes. All four hold the same letters, and the panel says so. So chapter 1 walks block 1, and it offers no picker, because a picker would change nothing here. The learner picks a block in chapter 2, where each block goes a different way, by opening its AES box.
 2. The picked block drops into the grid one byte at a time, with Next. Each cell shows its position, 0 to 15.
 3. The grid fills **down the first column, then down the next**, and the panel says so.
 
@@ -162,7 +162,7 @@ What each step says:
 
 **Real data.** The tables come from `AesKey`'s own `Sbox` and `InverseSbox`, through `GET /api/walk/aes/tables`. The app stores no copy in source. The spike checked that a table lookup equals the walk's swap on 320 of 320 cells, over SubBytes and InvSubBytes.
 
-**Show keys OFF.** The tables are public, so the table and a free lookup stay open: the learner can type any byte. The grid and its real states stay closed (section 3.5).
+**Show keys OFF.** The tables are public, so the table and a free lookup stay open: the learner can type any byte. The block grid and its real states stay closed (section 3.5).
 
 **How the table was built** comes in W2: the field inverse, then XOR with four rotations and `63` (FIPS 197 section 5.1.1, sheet 5.8). It needs one more engine call, `AesKey.SboxBuild(byte)`, so that the numbers stay real.
 
@@ -202,8 +202,26 @@ What each tab states, from sheet 5.12:
 
 | Row field | Means |
 |---|---|
-| `wire: match` | The walk's cipher block equals the bytes in the run's `wire.sent` event |
-| `wire: differs` | A fork changed the bytes. CBC unlock runs on the wire bytes, so the learner sees the damage: the spike's `L1-flip-cbc` run changed 16, 1, 0, 0, 0 bytes per block. That block turns to junk, the next block has the same bit flipped, and then it recovers. CBC raises no error. GCM shows the failed tag and no unlock, as the engine returns no bytes |
+| `status: match` | The block the receiver got equals the block the sender locked |
+| `status: differs` | A tamper plan changed this block on the wire. Only a flip can cause this, because a walk bug throws instead (below) |
+
+**Two sets of wire bytes, so a bug and a tamper cannot share a word.** `wire.sent` holds the bytes after the tamper (`EnginePump.cs:342`). The sender's bytes come from the same event with the session's plan undone: a byte flip is its own inverse, so calling `TamperPlan.Apply` on the received bytes gives them back. With no plan, the two sets are equal.
+
+- **The lock column always uses the sender's bytes.** Every block must equal the walk's lock result, on every session, or the query throws `AES_WALK_DIVERGED`. The check covers all blocks of the message, including rows the reply caps.
+- **The unlock column always uses the received bytes**, as the receiver did.
+
+In lesson 1, a free flip on a non-wire event changes nothing. `Interpreter.ApplySend` skips the plain tamper point when the effect already holds its wire bytes, and `Lesson01Aes` sends that way. So the fork matches its parent, and every row reads `match`. No lesson 1 attack row uses `Replacement`. A plan that holds one gets 409 `WALK_MESSAGE_REPLACED`.
+
+**Every place a flip can land.** The reply's `damage` field names the frame field from the message's layout.
+
+| Flip lands in | Rows | Unlock | The learner sees |
+|---|---|---|---|
+| CBC or ECB cipher block | That row `differs` | Runs on the received bytes | CBC: that block turns to junk, the next block has the same bit flipped, then it recovers. The spike's `L1-flip-cbc` run changed 16, 1, 0, 0, 0 bytes per block. ECB: that block turns to junk. Neither raises an error |
+| CBC IV | All `match`, `damage: iv` | Runs on the received IV | Block 1 has the same bit flipped. No junk block and no error |
+| GCM cipher block | That row `differs`, `damage: cipher` | None. The tag failed, and the engine returns no bytes | The failed tag |
+| GCM nonce | All `match`, `damage: nonce` | None | The failed tag. The lock column still shows the nonce the sender used |
+| GCM tag | All `match`, `damage: tag` | None | The cipher blocks arrived intact, and the tag failed |
+| Frame header, type or length | All `match`, `damage: type` or `length` | None | The receiver could not read this frame as sent. The run's own events show what happened |
 
 **Out of scope, named on the tab.** The modes page also lists CFB, OFB, and CTR, and it names XTS. CFB, OFB, and XTS are not in this course (grep of `src/NetSec.Core`: 0 files). CTR alone runs in lesson 8's SSH suite, and the panel points there. Lesson 1 runs counter mode only inside GCM.
 
@@ -231,6 +249,8 @@ From Jared's sheet. Echo can scan for these in `walk-gloss.json` and the tour.
 | "A matrix with a special multiply" | "matrix multiplication", with no note |
 | "8 bits in, 8 bits out" | "each 4-bit chunk" |
 | "GHASH makes the tag. AES supplies the hash key and the mask" | "AES makes the tag" |
+| "XORs the round key" | "Adds the round key", with no XOR named |
+| "Decryption starts with AddRoundKey, using the last round key" | "The inverse round key" |
 | "The CBC IV must be unpredictable. The GCM nonce must be unique" | "Unique IV" for CBC, or one IV rule for all modes |
 | "One block turns to junk, and the next has the same bit flipped. Then it recovers" | "A corrupted block affects subsequent blocks" |
 | "This engine checks the tag first. No text comes out on a failure" | "GCM must check the tag first", as a rule of the standard |
@@ -253,7 +273,6 @@ From Jared's sheet. Echo can scan for these in `walk-gloss.json` and the tour.
 | Decision | Control |
 |---|---|
 | Which chapter | Two tabs |
-| Which block (chapter 1) | One picker, 1 to 4 |
 | Which key size (chapter 1) | One selector |
 | Which mode (chapter 2) | Three tabs |
 | Move through steps | Back, Next, and round chips to jump |
@@ -328,22 +347,30 @@ namespace NetSec.Labs {
     public byte[] Data;                       // The padded data block
     public byte[] Chain;                      // CBC: the IV or last cipher block. Else null
     public byte[] LockIn, LockOut;            // Into and out of forward AES
-    public byte[] Cipher, Wire; public AesWireStatus Status;
+    public byte[] Cipher, Received; public AesWireStatus Status;   // Cipher: what the sender locked
     public AesPass UnlockPass;                // Inverse for ECB and CBC, Forward for GCM
-    public byte[] UnlockIn, UnlockOut, Result;   // Null when a GCM tag failed
+    public byte[] UnlockIn, UnlockOut, Result;   // Null when the receiver gave no bytes
   }
+  public enum AesTagState { NotAGcmMessage, NotRun, Passed, Failed }
   public sealed class AesFeedWalk {
-    public AesFeedMode Mode; public string Message; public byte[] Starter;   // CBC IV or GCM nonce. Else null
+    public AesFeedMode Mode; public string Message;
+    public byte[] Starter, ReceivedStarter;   // CBC IV or GCM nonce, as sent and as received. Else null
+    public string Damage;                     // The frame field a flip hit: iv, nonce, cipher, tag, type, length. Else null
+    public AesTagState Tag;
     public int TotalBlocks, ForwardCalls, InverseCalls; public AesFeedRow[] Rows;
   }
   public static class AesWalks {              // Pure. Same input, same output. No session, no socket
     public static AesBlockPair Block(byte[] key, byte[] forwardInput, byte[] inverseInputOrNull);
-    public static AesFeedWalk Feed(byte[] key, AesFeedMode mode, string message, byte[] plain, byte[] wireBody, bool tagPassed, int maxRows);
+    // senderFrame and receivedFrame are whole frames. They are equal when no plan touched this message.
+    // Throws AES_WALK_DIVERGED if any lock result differs from senderFrame.
+    public static AesFeedWalk Feed(byte[] key, AesFeedMode mode, string message, byte[] plain, byte[] senderFrame, byte[] receivedFrame, AesTagState tag, int maxRows);
   }
 }
 ```
 
-`Gcm.CounterBlock` is new and pure. `CounterCrypt` stays as it is. The wire match catches a drift between the two. `Lesson01Aes.Pad` changes from private to internal, so the feed uses the lesson's own padding. Its bytes and the lab's trace stay as they are. `ErrorCodes` gains `AesWalkDiverged`, `WalkNotBuilt`, `WalkWaitingForWire`, `WalkKeySizeNotInRun`, and `WalkBadArgument`.
+`Gcm.CounterBlock` is new and pure. `CounterCrypt` stays as it is. The lock guard catches a drift between the two. `Lesson01Aes.Pad` changes from private to internal, so the feed uses the lesson's own padding. Its bytes and the lab's trace stay as they are. `ErrorCodes` gains `AesWalkDiverged`, `WalkNotBuilt`, `WalkWaitingForWire`, `WalkMessageNotSent`, `WalkMessageReplaced`, `WalkKeySizeNotInRun`, and `WalkBadArgument`.
+
+**`AesWalks.Feed` is a third copy of the mode logic,** after `Modes.cs` and `Gcm.cs`. The lock guard is its run-time pin. A row cannot read `differs` for a Feed bug, because a Feed bug fails the guard first.
 
 Language limits, checked by the spike: no optional parameters, no records, no expression bodies, no target-typed `new`. Types use only `byte[]`, `Buffer`, and `List<T>`.
 
@@ -353,20 +380,26 @@ Language limits, checked by the spike: no optional parameters, no records, no ex
 
 ```
 GET /api/walk/aes/tables
-GET /api/sessions/{id}/walk/aes/block?source=text|ecb|cbc|gcm&block=0..3&keyBits=128|192|256
+GET /api/sessions/{id}/walk/aes/block?source=text&keyBits=128|192|256
+GET /api/sessions/{id}/walk/aes/block?source=ecb|cbc|gcm&block=0..rows-1
 GET /api/sessions/{id}/walk/aes/modes?mode=ecb|cbc|gcm
 ```
 
-`source=text` is chapter 1. The other sources open a box in chapter 2, on the row's real input. Only `source=text` takes a `keyBits` other than the run's.
+`source=text` is chapter 1, on block 1 of the text. The other sources open a box in chapter 2. `rows` is the row count that mode's `/modes` reply gives: 5 for `TextCbc` and `TextEcb` with the padding block, 4 for `TextGcm1` and for a capped picture. Only `source=text` takes a `keyBits` other than the run's.
 
 Call path for the two session routes:
 
-1. The route reads `security.ShowKeys`. OFF returns 409 `KEYS_HIDDEN`, as the key log route does.
+1. `/block` reads `security.ShowKeys` first. OFF returns 409 `KEYS_HIDDEN`, as the key log route does. `/modes` skips this step (section 3.5).
 2. `sessions.Find(id)`. Null returns 404 `SESSION_NOT_FOUND`.
 3. `session.Lesson != 1` returns 409 `WALK_NOT_BUILT`.
-4. `AesWalkFacts.Read(session.After(0))` filters on `StoredEvent.Type` and `Message`, and parses only those shown lines. It takes `aes.key`, the `plain` of each `aes.message.sent`, the `wire` of the client's `wire.sent`, and the server's `GCM tag` check. `LabSession` holds no new state.
+4. `AesWalkFacts.Read(session.After(0), session.TamperPlan)` reads the facts. It filters on `StoredEvent.Type`, `Message`, and `StreamId`, and parses only those shown lines:
+   - `aes.key`, and the `plain` of each `aes.message.sent`.
+   - The `wire` of the client's `wire.sent`, which is the received frame. Calling `TamperPlan.Apply` with the message's `StreamId` and `StreamSeq` gives the sender's frame.
+   - The tag result. All three GCM checks have the message `GCM tag`, so the filter also reads `step`: `aes.s.text-gcm-1` belongs to `TextGcm1`. No such event gives `NotRun`.
 5. `AesWalks.Block` or `AesWalks.Feed` runs. For a practice key, the Host draws it first.
-6. `AesWalkJson.Write` writes the reply. English stays out of Core.
+6. `AesWalkJson.Write` writes the reply, with `Cache-Control: no-store`. English stays out of Core.
+
+`LabSession` gains one read-only field, `TamperPlan`, from `attack?.Plan` at `SessionManager.Start`. It holds no other new state.
 
 `/api/walk/aes/tables` skips steps 1 to 5. The tables are public, so it stays open with Show keys OFF. It still passes `HostGuard`.
 
@@ -378,9 +411,9 @@ Replies, trimmed. Every error carries `code`, `message`, `retryable`, and `reque
 // /api/walk/aes/tables
 { "sbox": "637c777b...", "inverseSbox": "52096ad5..." }
 
-// /block?source=text&block=0
+// /block?source=text
 {
-  "source": "text", "block": 0, "blockCount": 4, "keyBits": 128, "rounds": 10, "keySource": "run",
+  "source": "text", "keyBits": 128, "rounds": 10, "keySource": "run",
   "inputHex": "50756d7020666f7572206973206f6b2e",
   "keyWords": [ { "i": 4, "previous": "...", "rotated": "...", "substituted": "...", "rcon": "...", "afterRcon": "...", "keyBack": "...", "word": "..." } ],
   "forward": { "input": "...", "output": "...", "steps": [ { "kind": "AddRoundKey", "round": 0, "state": "...", "roundKey": "..." } ] },
@@ -390,35 +423,57 @@ Replies, trimmed. Every error carries `code`, `message`, `retryable`, and `reque
 
 // /modes?mode=gcm
 {
-  "mode": "gcm", "message": "TextGcm1", "starter": "e4f00aae0569f1494f973a46", "totalBlocks": 4,
-  "forwardCalls": 6, "inverseCalls": 0,
+  "mode": "gcm", "message": "TextGcm1", "starter": "e4f00aae0569f1494f973a46", "receivedStarter": "e4f00aae0569f1494f973a46",
+  "damage": null, "tag": "passed", "totalBlocks": 4, "forwardCalls": 6, "inverseCalls": 0,
   "rows": [ { "block": 0, "data": "...", "chain": null, "lockIn": "...00000002", "lockOut": "...", "cipher": "...",
-              "wire": "...", "status": "match", "unlockPass": "forward", "unlockIn": "...00000002", "unlockOut": "...", "result": "..." } ]
+              "received": "...", "status": "match", "unlockPass": "forward", "unlockIn": "...00000002", "unlockOut": "...", "result": "..." } ]
 }
 ```
 
 | Case | Status and code |
 |---|---|
-| Show keys OFF, session routes | 409 `KEYS_HIDDEN` |
+| Show keys OFF, `/block` | 409 `KEYS_HIDDEN` |
 | Lesson other than 1, in the pilot | 409 `WALK_NOT_BUILT` |
 | `keyBits` other than the run's, with a source other than `text` | 400 `WALK_KEY_SIZE_NOT_IN_RUN` |
-| A step-mode run has not sent the message yet | 409 `WALK_WAITING_FOR_WIRE`, `retryable: true` |
+| A running session has not sent the message yet | 409 `WALK_WAITING_FOR_WIRE`, `retryable: true` |
+| A finished session never sent the message | 409 `WALK_MESSAGE_NOT_SENT` |
+| The plan holds a `Replacement` | 409 `WALK_MESSAGE_REPLACED` |
 | A bad mode, source, block, or key size | 400 `WALK_BAD_ARGUMENT` |
 | A guard fired | 500 `AES_WALK_DIVERGED` |
 
 ### 3.5 Show keys OFF
 
-**Decision: OFF closes the round states and keeps the public tables open.** Round 0's AddRoundKey gives `state = input xor key`, and the input is public here, so one state gives the whole key. Any later round key also gives the key, because the key schedule runs backward. A fingerprint per cell would teach nothing.
+**Decision: OFF closes the round states. The public tables and the modes walk stay open.**
 
-The walk's states lose their teaching with the toggle OFF. `modes-design.md` section 6.5 says each lesson keeps its comparison. That stays true for the lesson, because the panels of section 6.5 still run. The tab shows: "Show keys is off. Every step here gives away the key, so these steps stay closed. Turn Show keys on to walk them. The S-box table is public, and it stays open."
+| Route | OFF | Why |
+|---|---|---|
+| `/api/walk/aes/tables` | Open | The tables are public |
+| `/modes` | Open | A row holds no key and no round state. Each field comes from values the trace shows with the toggle OFF: `plain` and `wire`. For example, GCM's key stream equals text XOR cipher |
+| `/block` | **Closed**, 409 `KEYS_HIDDEN` | It holds the key and the round keys. The first AddRoundKey also gives `state = input xor key`, so input and state give the key. A fingerprint per cell would teach nothing |
 
-**The flip race.** This is the same class as PRs #140, #141, and #143. A reply can be in flight when the toggle flips, and it does not pass through `ShowKeysFence`. The fix sits in the app:
+So with the toggle OFF, chapter 1's steps close, and chapter 2's rows stay. A chapter 2 AES box stays shut. The block tab shows: "Show keys is off. These steps show the key and the round keys, so they stay closed. Turn Show keys on to walk them. The S-box table and the modes walk stay open."
 
-1. `walk.ts` holds a generation counter. The `security.show-keys` frame raises it, and the store clears the walk.
-2. A reply whose generation is old is dropped.
-3. A walk reply never enters a session file, `/events`, or a save.
+`modes-design.md` section 6.5 says each lesson keeps its comparison. That stays true, because the panels of section 6.5 still run.
 
-Echo gets a clause for each of the three.
+**The rule for every walk route that reads a key.** This covers W1 and the later lessons 2, 5, 6, 7, and 8, and the section 5 bench.
+
+1. The Host checks the toggle first, before it reads any key.
+2. Each reply carries `Cache-Control: no-store`.
+3. An error body holds no bytes.
+4. A clause lists these routes, so a new one must join the list.
+
+A route may answer with the toggle OFF only if its reply holds no key byte. Lesson 6's fingerprints (section 1.1) meet this rule. The route list names each route's OFF behaviour.
+
+**The limit, from `modes-design.md` section 6.2.** OFF is not a security boundary. It is a setting for a shared screen or a shared trace. The Host still holds the bytes, and each hidden line carries the seed (`SessionManager.cs:79`), and a lab key comes from that seed.
+
+**The flip race.** This is the same class as PRs #140, #141, and #143. A reply can be in flight when the toggle flips, and it does not pass through `ShowKeysFence`. Frames can also drop (`SessionManager.cs:160`, `DropOldest`), and sockets reconnect (`host.ts:91-99`), so the fix cannot rest on the `security.show-keys` frame alone. The fix sits in the app:
+
+1. `walk.ts` holds a generation counter. It rises, and the store clears the block walk, when `sec.showKeys` goes false by any route (`security.ts:141`, the frame handler, or a reload), and when the socket closes (`store.ts:133`).
+2. A reply whose generation is old is dropped. A reply that lands while `sec.showKeys` is false is dropped too.
+3. After a reconnect, the app reloads the toggle first, and fetches the walk again only if it is ON.
+4. A walk reply never enters a session file, `/events`, or a save.
+
+Echo gets a clause for each of the four, and one that drops the flip frame on purpose.
 
 ### 3.6 Spike output
 
@@ -455,7 +510,7 @@ The 186 encrypt values and 186 inverse values come from FIPS 197 (2001 edition),
 Limits of the spike:
 
 1. The walk file ran on the desktop CLR, on the copy of `AesKey`. It compiled for CF and did not run on it.
-2. The feed logic in the spike is throwaway code, and `AesWalks` does not exist yet. No route, no app panel, and no Show keys path ran.
+2. The feed logic in the spike is throwaway code, and `AesWalks` does not exist yet. No route, no app panel, no Show keys path, and no sender-frame undo ran.
 3. Same-seed runs give the same key, so the `TextEcb` check compares two runs.
 
 **Which FIPS edition.** FIPS 197-upd1 (2023) is the source of record for the algorithm: section 3.4 for the state, 5.1 for the cipher, 5.2 for key expansion, 5.3 for the inverse. Its appendix B gives the AES-128 cipher example, and its appendix A gives the key tables. Upd1 removed the appendix C round values and points to NIST's example site. Its appendix D says the technical specifications did not change. So the inverse round values come from the 2001 edition, the same source `acceptance/vectors/SOURCES.md` already names. Jared should confirm this choice.
@@ -524,8 +579,8 @@ Sheet 5.10 governs. The mailbox picture on Steve's asymmetric page fits two of t
 |---|---|---|---|
 | 1 | Walks encrypt, then decrypt, and sees the same round keys in reverse order. Then flips one key bit and decrypts | One key does both jobs. A wrong key gives junk, and AES on one block gives no error | `WalkDecrypt` under the flipped key, W2. `source=text` gains `flipKeyBit` |
 | 3 | Sees each side mix its own private part with the other's public share, and both reach one secret. Plays the eavesdropper: "mix" the two public shares, and sees a value that does not match. Opens the ML-KEM box step | Two strangers reach one secret. In X25519, that secret never crosses the wire | `X25519.Mult` on real bytes. Jared must approve the wording, because one failed try does not prove the hard problem |
-| 4 | Key-pair bench. Sign with the private key, and check with the public key. Change one byte, and the check fails. Sign with `attacker-ed25519`, and the check fails. The bench offers no "sign with the public key" button, and the text says why | One owner can sign, and anyone can check. A tag from lesson 1 could come from either side. Only a signature points at the sender | `Ed25519.Sign`, `Ed25519.Verify`. New route `POST /api/walk/signature` |
-| 5 | Sees which job each part did: hybrid exchange (asymmetric), certificate signature (asymmetric), AES-GCM records (symmetric). Then presses **Measure**: AES on 1 MB, and repeated Ed25519 signs and X25519 mixes | Pairs set up the key and the shared key carries the data. The speed gap is a number from this machine, labelled as such | `Modes.Ctr`, `Ed25519.Sign`, `X25519.Mult`. New route `POST /api/walk/speed` |
+| 4 | Key-pair bench, on a bench key made for the bench. It never signs with `ca-root` or a `Mine` key. Sign with the private key, and check with the public key. Change one byte, and the check fails. Sign with `attacker-ed25519`, and the check fails. The bench offers no "sign with the public key" button, and the text says why | One owner can sign, and anyone can check. A tag from lesson 1 could come from either side. Only a signature points at the sender | `Ed25519.Sign`, `Ed25519.Verify`. New route `POST /api/walk/signature` |
+| 5 | Sees which job each part did: hybrid exchange (asymmetric), certificate signature (asymmetric), AES-GCM records (symmetric). Then presses **Measure**: AES on 1 MB, and repeated Ed25519 signs and X25519 mixes | Pairs set up the key and the shared key carries the data. The speed gap is a number from this machine, on the course's own table AES and not hardware AES. The label says both | `Modes.Ctr`, `Ed25519.Sign`, `X25519.Mult`. New route `POST /api/walk/speed` |
 | 7 | L7-S05 points back to the bench: this is where a public key locks a secret, and it names RSA | Lock and sign are two different verbs | Tour text, W5 |
 
 ### 5.4 Lines that stay out
@@ -549,7 +604,7 @@ Sheet 5.9 lists them, and these three matter most:
 | **W1c** | `Gcm.CounterBlock`, `AesWalks.Feed`, the modes route, `AesFeedView.vue`, chapter 2 with ECB, CBC, GCM. Key sizes, two tour steps, gloss | Wire clauses per mode. e2e on wire match and on damage. A15, A15a by a reader who did not write it | Richard, Nancy |
 | W2 | `AesKey.SboxBuild(byte)` and "how the table was built". `flipKeyBit`. One-bit-flip spread count (4 bytes after round 1, 16 after round 2) | FIPS 5.1.1 worked example for `53`. Spread count against Jared's values | Richard, Nancy |
 | W3 | Lesson 3 try-it, lesson 4 bench | Clauses on each check result | Richard, Nancy, Jared on wording |
-| W4 | Lesson 5 record walk and speed bench | Record walk equals the wire. The number's label names the machine | Richard, Nancy |
+| W4 | Lesson 5 record walk and speed bench | Record walk equals the wire. The number's label names the machine and table AES | Richard, Nancy |
 | W5 | Lessons 2, 6 (section 1.1), 7, 8 queries, one PR each | A reference check per lesson, from Jared. Lesson 6: each replayed PIN key equals the run's | Richard, Jared |
 | W6 | Lessons 9, 10, 11 tour text | A15, A15a | Richard |
 
@@ -566,17 +621,22 @@ If Steve does not follow it after 2 rounds of word changes, stop and re-plan the
 
 | Theme | What a clause checks |
 |---|---|
-| Round values | Every encrypt and inverse state for FIPS C.1, C.2, C.3, by position |
+| Round values | Every CIPHER and INVERSE CIPHER state for FIPS C.1, C.2, C.3, by position. The vector reader skips the appendix's EQUIVALENT INVERSE CIPHER lists, which hold a different order |
 | Key words | FIPS appendix A rows, for all three sizes |
 | Step counts | 40, 48, 56 per direction. The last encrypt round has no MixColumns. The decrypt order is section 5.3's |
 | S-box | Both tables equal FIPS Tables 4 and 6 on all 256 entries. `53` gives `ed`, and row `e`, column `d` of the inverse gives `53`. The route answers with Show keys OFF |
 | S-box view | A clicked cell's row, column, and table value equal the next state's cell, on SubBytes and InvSubBytes |
 | Real run | Key and block from a live session's trace, with the BCL as referee on the walk's output |
 | Modes | `match` on every row: `TextGcm1` 4, `TextCbc` 5, `PictureEcb` capped rows, `TextEcb` 5 on the fork. `unlockPass` is inverse for ECB and CBC, forward for GCM. Call counts per section 2.4 |
-| Damage | `L1-flip-cbc` gives `differs` and the 16, 1, 0, 0, 0 pattern. `L1-flip-gcm` gives `differs`, a failed tag, and no unlock bytes |
+| Damage | `L1-flip-cbc` gives `differs` and the 16, 1, 0, 0, 0 pattern. `L1-flip-gcm` gives `differs`, a failed tag, and no unlock bytes. Free flips: CBC IV gives `damage: iv` with block 1's bit flipped. GCM nonce and tag give all `match`, the named `damage`, and a failed tag. A header flip gives no unlock. The lock column shows the sender's starter in each case |
+| Tag per message | A flip on `PictureGcm` leaves `TextGcm1`'s tag as `passed` |
+| Bug versus tamper | A session with no plan never reads `differs`. A unit test gives `Feed` a wrong sender frame, and it throws `AES_WALK_DIVERGED`. A free flip on a non-wire event reads all `match` |
+| Box rows | `/block` answers for every row of `/modes`, including the padding row, and gives 400 one past it |
 | Label | A control run's `source=text` reply says `notSent`, and the panel shows the teaching-example label |
 | Real path | `WalkEncrypt` equals `EncryptBlock` on 10,000 random inputs |
-| Toggle | OFF gives 409 `KEYS_HIDDEN` on both session routes. A flip drops an in-flight reply. No state reaches a session file |
+| Toggle | OFF gives 409 `KEYS_HIDDEN` on `/block`, with no bytes in the error. `/modes` and the tables answer OFF, and a `/modes` reply holds no key byte and no round state. Every field recomputes from `plain` and `wire` |
+| Key-bearing routes | A clause lists each walk route and its OFF behaviour, and each reply has `Cache-Control: no-store`. A new route must join the list |
+| Flip race | The block walk clears when `sec.showKeys` goes false and when the socket closes, with the flip frame dropped on purpose. A late reply is dropped. No state reaches a session file |
 | No app math | No S-box bytes under `app/src` |
 | Grid order | Row r, column c shows byte `r + 4c`, on every state. On the first view, the first column reads `Pump` and cells fill in position order 0 to 15 |
 | Step order | A walk by Next alone meets the section 2.1 steps in order |
