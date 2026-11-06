@@ -76,7 +76,8 @@ const canFlip = computed(() => ui.selectedByte != null && !!ev.value?.wire && !i
       <v-spacer />
       <v-btn size="x-small" color="error" :disabled="!canFlip" data-testid="flip-byte-button" @click="flipSelectedByte">Flip this byte</v-btn>
     </div>
-    <div v-if="!ev || !view || (!view.before && !view.after && !view.beforeHidden)" class="empty-note">{{ ev ? 'This event moves no bytes.' : 'Bytes appear here when the engine sends a message.' }}</div>
+    <div v-if="view?.neverOnWire" class="empty-note" data-testid="inspector-no-wire">This event never crossed the wire, so a listener sees nothing of it.</div>
+    <div v-else-if="!ev || !view || (!view.before && !view.after && !view.beforeHidden)" class="empty-note">{{ ev ? 'This event moves no bytes.' : 'Bytes appear here when the engine sends a message.' }}</div>
     <div v-else class="inspector-body">
       <div class="byte-grids">
         <section v-if="view.before" class="grid-sec" :class="{ shut: !beforeOpen }">
@@ -110,7 +111,7 @@ const canFlip = computed(() => ui.selectedByte != null && !!ev.value?.wire && !i
       </div>
       <div class="field-list" role="group" aria-label="Fields of this message">
         <div class="fl-hint muted">{{ fields.length ? 'Pick a field to light its bytes.' : 'This message lists no fields.' }}</div>
-        <div v-if="eve && unreadableBytes" class="field-note">unreadable without the key ({{ unreadableBytes }} bytes)</div>
+        <div v-if="eve && unreadableBytes" class="field-note">locked: the eavesdropper has no key ({{ unreadableBytes }} bytes)</div>
         <template v-for="f in fields" :key="fieldKey(f)">
           <button
             type="button" class="field-row" :class="[sealed(f) ? 'k-sealed' : `k-${f.kind}`, { on: isLit(f), unreadable: sealed(f), hl: isHighlighted('inspector', 'field', f.name) }]"
@@ -118,7 +119,7 @@ const canFlip = computed(() => ui.selectedByte != null && !!ev.value?.wire && !i
           >
             <span class="fname"><i class="swatch" :class="sealed(f) ? 'k-sealed' : `k-${f.kind}`" />{{ f.name }}</span>
             <span class="muted">{{ where(f) }}</span>
-            <span v-if="sealed(f)" class="fgloss">unreadable without the key</span>
+            <span v-if="sealed(f)" class="fgloss">locked: the eavesdropper has no key</span>
             <span v-else-if="f.gloss && f.gloss.toLowerCase() !== f.name.toLowerCase()" class="fgloss">{{ f.gloss }}</span>
             <span class="fval" :data-testid="`inspector-field-value-${f.name}`">{{ decoded(f) }}</span>
           </button>

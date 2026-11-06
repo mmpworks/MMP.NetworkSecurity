@@ -63,6 +63,7 @@ function expectOneGrid(m: Awaited<ReturnType<typeof measure>>, where: string) {
   expect(m.gridCut, `${where}: a hex row cut at the right`).toBe(0)
 }
 
+const LOCKED = 'locked: the eavesdropper has no key'
 const MESSAGES: [number, string[]][] = [[1, ['TextGcm1', 'TextCbc', 'PictureEcb']], [5, ['ClientHello', 'Finished']], [8, ['KEXINIT']]]
 for (const width of [1100, 1280, 1440]) {
   test(`at ${width} wide every byte column and the text column line up, and nothing overflows`, async ({ page }) => {
@@ -101,7 +102,7 @@ for (const theme of ['light', 'dark'] as const) {
     await shot(page, `eavesdropper-${theme}-at-rest`)
     const row = page.getByTestId('inspector-field-row-cipher')
     await expect(row).toContainText('bytes 16 to 79')
-    await expect(row).toContainText('unreadable without the key')
+    await expect(row).toContainText(LOCKED)
     await expect(page.getByTestId('inspector-field-value-cipher')).not.toHaveText('')
     await row.click()
     await expect(row).toHaveAttribute('aria-pressed', 'true')
@@ -117,3 +118,42 @@ for (const theme of ['light', 'dark'] as const) {
     expect(s.fails, JSON.stringify(s.fails.slice(0, 5))).toEqual([])
   })
 }
+
+// Ranges checked against the engine by decryption with each run's own keys. A wrong range in these lessons must fail here.
+const RANGES: [number, string, string, string, number][] = [
+  [6, 'Sale', 'pinBlock', 'bytes 16 to 31', 16],
+  [7, 'ApplicationData', 'cipher', 'bytes 21 to 68', 48],
+  [8, 'ServiceRequest', 'encryptedPacket', 'bytes 0 to 31', 32],
+]
+for (const [lesson, message, field, range, count] of RANGES) {
+  test(`lesson ${lesson}: the eavesdropper can pick ${field} of ${message}, ${range}`, async ({ page }) => {
+    await page.setViewportSize({ width: 1440, height: 800 })
+    await freePlay(page, lesson)
+    await pick(page, message)
+    await page.getByTestId('view-eavesdropper').click()
+    const row = page.getByTestId(`inspector-field-row-${field}`)
+    await expect(row).toContainText(range)
+    await expect(row).toContainText(LOCKED)
+    await row.click()
+    await expect(page.getByTestId('inspector-after').locator('.hb.lit.k-sealed')).toHaveCount(count)
+  })
+}
+
+test('an event with no wire bytes shows the eavesdropper no bytes and no rows', async ({ page }) => {
+  await page.setViewportSize({ width: 1440, height: 800 })
+  await freePlay(page, 7)
+  const id = await page.locator('.statusbar').innerText().then(t => /session (?<id>\S+)/.exec(t)?.groups?.id ?? '')
+  const r = await fetch(`http://127.0.0.1:${host.port}/api/sessions/${id}/events`, { headers: { Authorization: `Bearer ${host.token}` } })
+  const body = (await r.json()) as { events?: any[] } | any[]
+  const rows = (Array.isArray(body) ? body : body.events ?? []).map((f: any) => ({ seq: f.seq, ...(f.event ?? f) }))
+  const plainOnly = rows.find((e: any) => e.type === 'tls.record.received' && e.plain && !e.wire)
+  expect(plainOnly, 'a received record with readable bytes and no wire bytes').toBeTruthy()
+  const text = Buffer.from(plainOnly.plain, 'hex').toString('latin1')
+  await page.getByTestId(`event-row-${plainOnly.seq}`).click()
+  await page.getByTestId('inspector-tab-bytes').click()
+  await expect(page.getByTestId('inspector')).toContainText(text.slice(0, 8))
+  await page.getByTestId('view-eavesdropper').click()
+  await expect(page.getByTestId('inspector')).not.toContainText(text.slice(0, 8))
+  await expect(page.getByTestId('inspector').locator('.field-row')).toHaveCount(0)
+  await expect(page.getByTestId('inspector-no-wire')).toBeVisible()
+})

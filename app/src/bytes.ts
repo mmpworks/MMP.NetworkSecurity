@@ -16,6 +16,8 @@ export interface BytesView {
   after: { hex: string } | null
   /** True when the eavesdropper view hides readable bytes that the endpoints can see. */
   beforeHidden: boolean
+  /** True in the eavesdropper view for an event with readable bytes that never crossed the wire: a listener sees nothing of it. */
+  neverOnWire: boolean
   /** The buffer the fields describe. */
   fieldsOn: 'before' | 'after'
   /** The fields that fit their buffer. */
@@ -48,10 +50,13 @@ export function bytesView(e: TraceEvent, view: 'endpoints' | 'eavesdropper' | 'b
   const end = endOf(e.fields)
 
   // An engine event: only the readable bytes. Its fields often describe the wire it will become, so they show only when they fill it.
-  if (!wireLen) return { before: plainLen ? { hex: e.plain } : null, after: null, beforeHidden: false, fieldsOn: 'before', fields: end === plainLen ? [...e.fields] : [], source: null }
+  if (!wireLen) {
+    if (view === 'eavesdropper') return { before: null, after: null, beforeHidden: false, neverOnWire: plainLen > 0, fieldsOn: 'before', fields: [], source: null }
+    return { before: plainLen ? { hex: e.plain } : null, after: null, beforeHidden: false, neverOnWire: false, fieldsOn: 'before', fields: end === plainLen ? [...e.fields] : [], source: null }
+  }
 
   // In the clear and unchanged: one grid is enough.
-  if (!plainLen || e.plain === e.wire) return { before: null, after: { hex: e.wire }, beforeHidden: false, fieldsOn: 'after', fields: fits(e.fields, wireLen), source: null }
+  if (!plainLen || e.plain === e.wire) return { before: null, after: { hex: e.wire }, beforeHidden: false, neverOnWire: false, fieldsOn: 'after', fields: fits(e.fields, wireLen), source: null }
 
   // Fields that end where the readable bytes end, and not where the wire ends, describe the inner message (TLS 1.3 records).
   const fieldsOn = end === plainLen && end !== wireLen ? 'before' : 'after'
@@ -61,6 +66,7 @@ export function bytesView(e: TraceEvent, view: 'endpoints' | 'eavesdropper' | 'b
     before: hide ? null : { hex: e.plain },
     after: { hex: e.wire },
     beforeHidden: hide,
+    neverOnWire: false,
     fieldsOn,
     fields: hide && fieldsOn === 'before' ? [] : fields,
     source: fieldsOn === 'after' ? sourceOf(e, fields) : null,

@@ -61,6 +61,17 @@ test('an engine event with no wire bytes shows only the fields that fit its byte
   expect(v.fields).toEqual([])
 })
 
+test('an event that never crossed the wire shows the eavesdropper nothing', () => {
+  // Lesson 7, tls.record.received: the receiver's readable text, with no wire bytes.
+  const received = ev({ type: 'tls.record.received', plain: hexOf(19, 0x68), wire: '', fields: [f('application_data', 0, 19, 'data', false)] })
+  const v = bytesView(received, 'eavesdropper')
+  expect(v.before).toBeNull()
+  expect(v.after).toBeNull()
+  expect(v.fields).toEqual([])
+  expect(v.neverOnWire).toBe(true)
+  expect(bytesView(received, 'endpoints').before?.hex.length).toBe(38)
+})
+
 test('the window fits the screen work area of a 1080p screen at 100, 125 and 150 percent', () => {
   for (const area of [{ x: 0, y: 0, width: 1920, height: 1032 }, { x: 0, y: 0, width: 1536, height: 824 }, { x: 0, y: 0, width: 1280, height: 688 }]) {
     const w = fitWindow(area)
