@@ -68,3 +68,11 @@ After the fix: Host tests 101 of 101. `npm run build` (vue-tsc, then vite) passe
 The rebase was clean. One call changed: the OS session's empty credential set now passes the caller `host/os-lab-<n>`, as V1's `Credentials(types, caller)` asks. The set is empty, so no vault row is written.
 
 After the rebase: Host tests 150 of 150 (`main` 134, V2 16). `npm run build` passes. Acceptance A1 to A8 147 of 147, A9 to A12 31 of 31, A13 to A15a 21 of 22 (`NOT_A_FRESH_RUN`), A16 8 of 8, A17 21 of 53. Total 228 of 261. M is 261 because Echo added `A17.vault.audit-check-names-limits`.
+
+## Review round 2 (Jared, #129 comment 6672836960) and main b3d1483
+
+1. Jared's 10 cases all pass at `e223f5c`. His should-fix: a wrong root the server does not send also reads `PartialChain`, so the words must fit both causes. Red `e921089` adds that case (`other-root-not-sent`) and requires the words "another root" for every `PartialChain` refusal. Both `PartialChain` cases failed. The sentence now names both causes.
+2. `main` moved to b3d1483 (#130, #131, #132). The force-push gate cannot read the repo's visibility, so the branch merges `main` in rather than rebasing. The merged tree equals a rebase on the same `main`.
+3. Clean build from no `bin` or `obj`: `NetSec.Core`, `NetSec.Vault`, `NetSec.Host`, `NetSec.Host.Tests` and `NetSec.Core.NetCF` each give 0 warnings and 0 errors. `npm run build` passes.
+
+After: Host tests 152 of 152 (`main` 135, V2 17). A16 8 of 8, A17 21 of 53. A1 to A15a were not rerun on this merge. They gave 199 of 200 on `main` d2b8678, and `main` since then changed the `limits` words and one app line. Counting that run, the total is 228 of 261.
