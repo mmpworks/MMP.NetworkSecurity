@@ -49,6 +49,9 @@ public sealed class OsTransportTrustTests
         "eku-codesigning-only" => new(name, false, "NotValidForUsage", "root.pem", LeafFiles, (o, d) => { Root(o, d, "root"); Issue(o, d, "leaf", "localhost", "root", Leaf + "extendedKeyUsage=codeSigning\n"); }),
         "no-eku" => new(name, true, null, "root.pem", LeafFiles, (o, d) => { Root(o, d, "root"); Issue(o, d, "leaf", "localhost", "root", Leaf); }),
         "expired" => new(name, false, "NotTimeValid", "root.pem", LeafFiles, (o, d) => { Root(o, d, "root"); Issue(o, d, "leaf", "localhost", "root", Leaf + "extendedKeyUsage=serverAuth\n", "-not_before 20200101000000Z -not_after 20200201000000Z"); }),
+        // Jared's shape: the leaf is under a root the trust file does not hold, and the server sends no root. Windows reads PartialChain,
+        // the status a missing intermediate gives too, so the words must fit both causes.
+        "other-root-not-sent" => new(name, false, "PartialChain", "other.pem", LeafFiles, (o, d) => { Root(o, d, "root"); Root(o, d, "other"); Issue(o, d, "leaf", "localhost", "root", Leaf + "extendedKeyUsage=serverAuth\n"); }),
         "other-root" => new(name, false, "UntrustedRoot", "other.pem", LeafFiles + " -cert_chain root.pem", (o, d) => { Root(o, d, "root"); Root(o, d, "other"); Issue(o, d, "leaf", "localhost", "root", Leaf + "extendedKeyUsage=serverAuth\n"); }),
         "via-intermediate-sent" => new(name, true, null, "root.pem", LeafFiles + " -cert_chain inter.pem", (o, d) => { Root(o, d, "root"); Issue(o, d, "inter", "Test Intermediate", "root", Ca); Issue(o, d, "leaf", "localhost", "inter", Leaf + "extendedKeyUsage=serverAuth\n"); }),
         "via-intermediate-not-sent" => new(name, false, "PartialChain", "root.pem", LeafFiles, (o, d) => { Root(o, d, "root"); Issue(o, d, "inter", "Test Intermediate", "root", Ca); Issue(o, d, "leaf", "localhost", "inter", Leaf + "extendedKeyUsage=serverAuth\n"); }),
@@ -73,6 +76,7 @@ public sealed class OsTransportTrustTests
     [InlineData("via-intermediate-not-sent")]
     [InlineData("via-non-ca-issuer-sent")]
     [InlineData("self-signed-leaf-as-trust")]
+    [InlineData("other-root-not-sent")]
     public async Task Lesson_5_trusts_a_server_only_as_windows_would(string name)
     {
         Case c = Of(name);
@@ -94,6 +98,7 @@ public sealed class OsTransportTrustTests
         Assert.Equal("OS_TRANSPORT_FAILED", finished.GetProperty("code").GetString());
         Assert.Equal("os.tls.trust", finished.GetProperty("check").GetString());
         if (c.Status is not null) Assert.Contains("(" + c.Status, detail);
+        if (c.Status == "PartialChain") Assert.Contains("another root", detail);
     }
 
     [Fact]
