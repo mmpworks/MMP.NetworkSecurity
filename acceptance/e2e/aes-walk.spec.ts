@@ -195,12 +195,14 @@ test('[A19.ui.reduced-motion-has-no-transition] with reduced motion each step sh
     expect(await running(page), `running animations at step ${i + 2}`).toBe(0);
     expect(await grid(page), `the end frame at step ${i + 2}`).toBe(steps[i + 1].state.toLowerCase());
   }
-  // The control: with motion allowed, a step does move, a click during the motion jumps on, and the walk still lands on the engine's state.
+  // The control: with motion allowed, a step does move. Design 2.2a: a click during a motion jumps to that step's end frame, and does not start the next step.
   await page.emulateMedia({ reducedMotion: 'no-preference' });
   await page.getByTestId('aes-walk-next').click();
   await expect.poll(() => running(page), { message: 'something moves with motion allowed', timeout: 2_000, intervals: [20] }).toBeGreaterThan(0);
   await page.getByTestId('aes-walk-next').click();
-  await expect.poll(() => grid(page), { message: 'after a click during a motion, the walk lands on the engine state', timeout: 15_000 }).toBe(steps[14].state.toLowerCase());
+  await expect.poll(() => grid(page), { message: 'a click during a motion lands on that step\'s end frame', timeout: 5_000 }).toBe(steps[13].state.toLowerCase());
+  await expect.poll(() => running(page), { message: 'the motion has ended', timeout: 5_000 }).toBe(0);
+  expect(await grid(page), 'the click did not start the next step').toBe(steps[13].state.toLowerCase());
 });
 
 test('[A19.ui.play-stops-at-the-end-of-a-round] one Play and Pause button runs one round and stops, and pressing it again runs the next', async ({ page }) => {
@@ -240,6 +242,9 @@ const tableCell = (page: Page, n: number) => page.getByTestId(`aes-walk-table-ce
 /** The whole expanded key as hex, from the reply's word rows, by the layout of design section 2.2b. */
 const expandedHex = (rows: any[]) => rows.slice().sort((a, b) => a.i - b.i).map(r => r.word.toLowerCase()).join('');
 
+/** A cell's byte, from data-hex, which is empty or absent until the cell is built. Cell text also holds a position mark and a word name, so the clause does not read text. */
+async function hexOf(page: Page, n: number): Promise<string> { return ((await tableCell(page, n).getAttribute('data-hex')) ?? '').toLowerCase(); }
+
 async function toKeySchedule(page: Page): Promise<void> {
   for (let i = 0; i < 40 && !(await tableCell(page, 0).isVisible().catch(() => false)); i++) await page.getByTestId('aes-walk-next').click();
   await expect(tableCell(page, 0), 'the expanded table').toBeVisible();
@@ -256,8 +261,8 @@ test('[A19.ui.expanded-table-layout] 11 grids of 16 cells: the key cells start f
     const c = tableCell(page, n);
     await expect(c, `byte ${n}: its word name`).toHaveAttribute('data-word', `w${Math.floor(n / 4)}`);
     expect(await c.getAttribute('data-letter'), `byte ${n}: key bytes are not text`).toBeNull();
-    if (n < 16) await expect(c, `key byte ${n} starts filled`).toContainText(hex.slice(2 * n, 2 * n + 2), { ignoreCase: true });
-    else await expect(c, `byte ${n} starts empty`).not.toContainText(new RegExp(`\\b${hex.slice(2 * n, 2 * n + 2)}\\b`, 'i'));
+    if (n < 16) expect(await hexOf(page, n), `key byte ${n} starts filled`).toBe(hex.slice(2 * n, 2 * n + 2));
+    else expect(await hexOf(page, n), `byte ${n} starts empty`).toBe('');
   }
 });
 
@@ -272,11 +277,15 @@ test('[A19.ui.word-build-lights-its-two-words] Next adds one word, the lit cells
   const rows: any[] = reply.keyWords.slice().sort((a: any, b: any) => a.i - b.i);
   const nk = tables.body.sizes.find((s: any) => s.keyBits === reply.keyBits).keyWords;
   const hex = expandedHex(rows);
-  const litBytes = async () => {
+  /** Every lit cell, as word name to its bytes in position order. So lighting extra cells, or the wrong cells, fails. */
+  const litWords = async () => {
     const lit = page.locator('[data-testid^="aes-walk-table-cell-"][data-lit="true"]');
-    const out: string[] = [];
-    for (let k = 0; k < await lit.count(); k++) out.push(((await lit.nth(k).textContent()) ?? '').replace(/\s+/g, ''));
-    return out.join(' ').toLowerCase();
+    const words: Record<string, string> = {};
+    for (let k = 0; k < await lit.count(); k++) {
+      const name = (await lit.nth(k).getAttribute('data-word')) ?? '?';
+      words[name] = (words[name] ?? '') + ((await lit.nth(k).getAttribute('data-hex')) ?? '').toLowerCase();
+    }
+    return words;
   };
   // A tap on a word not yet built does nothing.
   await tableCell(page, 4 * 10).click();
@@ -287,11 +296,9 @@ test('[A19.ui.word-build-lights-its-two-words] Next adds one word, the lit cells
   for (const i of [nk, nk + 1, nk + 2, nk + 3, nk + 4]) {
     const row = rows.find(r => r.i === i);
     await page.getByTestId('aes-walk-next').click();
-    for (let b = 0; b < 4; b++) await expect(tableCell(page, 4 * i + b), `w${i} byte ${b} is built`).toContainText(hex.slice(2 * (4 * i + b), 2 * (4 * i + b) + 2), { ignoreCase: true });
-    const lit = await litBytes();
-    for (const [name, value] of [['the word before', row.previous], ['the word Nk back', row.keyBack]]) {
-      for (let b = 0; b < 4; b++) expect(lit, `w${i}: ${name} is lit`).toContain(value.slice(2 * b, 2 * b + 2).toLowerCase());
-    }
+    for (let b = 0; b < 4; b++) expect(await hexOf(page, 4 * i + b), `w${i} byte ${b} is built`).toBe(hex.slice(2 * (4 * i + b), 2 * (4 * i + b) + 2));
+    expect(await hexOf(page, 4 * (i + 1)), `w${i + 1} is not built yet`).toBe('');
+    expect(await litWords(), `w${i}: only its two source words are lit`).toEqual({ [`w${i - 1}`]: row.previous.toLowerCase(), [`w${i - nk}`]: row.keyBack.toLowerCase() });
   }
   await tableCell(page, 4 * nk).click();
   const row = rows.find(r => r.i === nk);
@@ -311,7 +318,7 @@ test('[A19.ui.key-band-on-192-and-256] at 192 and 256 bits the key runs past rou
     await expect(page.locator('[data-testid^="aes-walk-table-cell-"]'), `${bits} bits: cells`).toHaveCount(cells);
     const hex = expandedHex(reply.keyWords);
     for (let n = 0; n < 4 * nk; n++) {
-      await expect(tableCell(page, n), `${bits} bits: key byte ${n} starts filled`).toContainText(hex.slice(2 * n, 2 * n + 2), { ignoreCase: true });
+      expect(await hexOf(page, n), `${bits} bits: key byte ${n} starts filled`).toBe(hex.slice(2 * n, 2 * n + 2));
       await expect(tableCell(page, n), `${bits} bits: key byte ${n} is in the band`).toHaveAttribute('data-key', 'true');
     }
     await expect(tableCell(page, 4 * nk), `${bits} bits: the first built word is past the band`).not.toHaveAttribute('data-key', 'true');

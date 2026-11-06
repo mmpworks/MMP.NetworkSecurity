@@ -189,7 +189,7 @@ UI test ids, all ASSUMED under the design's `aes-walk-` prefix:
 | `aes-walk-play`, `aes-walk-speed` | One Play and Pause button. One speed control holding `slow`, `normal`, `fast`. No `aes-walk-play-round` exists |
 | `aes-walk-key-size-{bits}` | Picks 128, 192 or 256. It arrives in W1c. Until then `A19.ui.end-frames-on-all-key-sizes` reads NOT RUN |
 | `aes-walk-table-grid-{n}` | One grid per round key: 11, 13 or 15. Design 2.2b at #156 |
-| `aes-walk-table-cell-{p}` | Byte position p of the expanded key, 0 to 175 at AES-128. The text holds its hex once built, `data-word` holds `w(p / 4)`, `data-lit` is `true` on the source words of the word being built, `data-key` is `true` on the key's own bytes. It carries no `data-letter`. Next adds one word |
+| `aes-walk-table-cell-{p}` | Byte position p of the expanded key, 0 to 175 at AES-128. `data-hex` holds its 2 hex digits once built, and is empty or absent before that. `data-word` holds `w(p / 4)`, `data-lit` is `true` on the source words of the word being built, `data-key` is `true` on the key's own bytes. It carries no `data-letter`. Next adds one word |
 | `aes-walk-build-{previous,rotated,substituted,rcon,after-rcon,key-back,word}` | The stage rows of a tapped built word. A tap on an unbuilt word shows none |
 | `aes-walk-build-key-note` | After a tap on a key word: "This word is part of the key" |
 | `aes-walk-key-band-note` | At 192 and 256 bits: "The first 6 words are the key", or 8. It arrives in W1c. Until then `A19.ui.key-band-on-192-and-256` reads NOT RUN |
