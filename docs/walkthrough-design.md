@@ -1,6 +1,6 @@
 # MMP.NetworkSecurity: walkthrough design
 
-Author: Richard. Date: 2026-11-06. Revision 5, with Steve's depth links, the S-box view, the modes walk, the first grid view, the lesson 6 steps, Jared's review, and the block animation, key schedule part, and finite field. Status: design only, for Jared's check and Echo's clauses. No product code.
+Author: Richard. Date: 2026-11-06. Revision 6, adding Steve's rulings: jump to a round, tap a byte, the GHASH walk, and the forgery demo. Status: design only, for Jared's check and Echo's clauses. No product code.
 
 Sources of facts: FIPS 197, the engine, and Jared's sheet `E:\dev\ns-lesson1-facts.md`. Steve's web pages set depth and teaching order only (section 2.1).
 
@@ -95,7 +95,7 @@ Steve's Wikipedia page sets the order. It describes the older TDES form. **This 
 |---|---|---|
 | 1 | Split the text into 16-byte blocks | Section 2.2, first view |
 | 2 | Put one block in the 4x4 grid, by columns | Section 2.2, first view |
-| 3 | The key schedule: the word wall, then one word built step by step. The key size sets the rounds: 10, 12, or 14 in total | Section 2.2b |
+| 3 | The key schedule: the key as words, then the expanded table, built one word at a time. The key size sets the rounds: 10, 12, or 14 in total | Section 2.2b |
 | 4 | AddRoundKey with round key 0. This comes before round 1, and it is not a round | Section 2.2 |
 | 5 | SubBytes, with one byte traced through the S-box | Sections 2.2, 2.3 |
 | 6 | ShiftRows | Section 2.2 |
@@ -136,7 +136,7 @@ So the first column reads `Pump`, and the top row reads `P`, space, `r`, space. 
 | Part | On screen | Words that carry the truth |
 |---|---|---|
 | Label | The panel names the input | "A teaching example. AES runs on this text block alone, the way ECB uses it. This run did not send this block in ECB." The label changes to `match` on the `L1-use-ecb` fork |
-| Key schedule | The word wall, then one word built step by step (section 2.2b) | The key makes 11 round keys for AES-128 (13 for 192, 15 for 256) |
+| Key schedule | The key as words, then the expanded table, built one word at a time (section 2.2b) | The key makes 11 round keys for AES-128 (13 for 192, 15 for 256) |
 | Encrypt | AddRoundKey 0. Rounds 1 to 9: SubBytes, ShiftRows, MixColumns, AddRoundKey. Round 10: SubBytes, ShiftRows, AddRoundKey | The first SubBytes sees letters XOR round key 0. It never sees bare letters |
 | Decrypt | AddRoundKey 10. Rounds 9 to 1: InvShiftRows, InvSubBytes, AddRoundKey, InvMixColumns. Last: InvShiftRows, InvSubBytes, AddRoundKey 0. The grid reads `Pump four is ok.` | The same key, with the round keys from last to first. This is FIPS 197 section 5.3 order, and the only order that works with these round keys (sheet 5.1) |
 
@@ -186,15 +186,30 @@ For tests: a clause reads end frames under reduced motion, so no test waits on a
 
 Steve's ask: how the key schedule is created. FIPS 197 section 5.2 is the source of record. None of Steve's five videos walks it, by the lead's reading. This part comes before the first AddRoundKey.
 
-**View 1, the word wall.** A row of words, grouped in fours. Each group of 4 words is one round key. The learner sees which group each AddRoundKey uses.
+**View 1, the key and the expanded table.**
 
-| Key | Nk (key words) | Rounds | Round keys | Words | Round constants used |
-|---|---|---|---|---|---|
-| AES-128 | 4 | 10 | 11 | 44 | 10 |
-| AES-192 | 6 | 12 | 13 | 52 | 8 |
-| AES-256 | 8 | 14 | 15 | 60 | 7 |
+1. The original key shows as its words: `w0` to `w3` at AES-128.
+2. The whole expanded table shows as one grid of 16 cells per round key: 11 grids at AES-128. Each column of a grid is one word, so the columns fill in the same order as the block (section 2.2).
+3. Each cell looks like a block cell: its byte position at top left, hex in the centre, its word name at lower left, and no letter at lower right, because key bytes are not text.
 
-**View 2, build one word.** The first Nk words are the key itself. Each later word comes from two earlier words: the one before it, and the one Nk back. Every Nk words, the word before it first passes through three steps. Next walks each word of round key 1. After that, Next moves one round key at a time, and the learner can click any word to open its build.
+The byte position runs through the whole table, 0 to 175 at AES-128. `w4` is positions 16 to 19, in round key 1's first column.
+
+| Key | Nk (key words) | Rounds | Round keys, so grids | Words | Byte positions | Round constants used | Where the key ends |
+|---|---|---|---|---|---|---|---|
+| AES-128 | 4 | 10 | 11 | 44 | 0 to 175 | 10 | The end of round key 0 |
+| AES-192 | 6 | 12 | 13 | 52 | 0 to 207 | 8 | The second column of round key 1 |
+| AES-256 | 8 | 14 | 15 | 60 | 0 to 239 | 7 | The end of round key 1 |
+
+**At AES-192 and AES-256, the key runs past round key 0.** The grids stay one per round key, because each grid is what one AddRoundKey uses. A band marks the key's words across the grids: `w0` to `w5` at AES-192, and `w0` to `w7` at AES-256. Those cells start filled, and the panel says: "The first 6 words are the key, so round key 1 starts with key bytes." At AES-256 it says the first 8 words. The build starts at the next column: `w6` at AES-192, and `w8` at AES-256.
+
+**View 2, build one word.** The first Nk words are the key itself. Each later word comes from two earlier words: the one before it, and the one Nk back. Every Nk words, the word before it first passes through three steps. Next and Play build one word at a time.
+
+| Moment | On screen |
+|---|---|
+| A word builds | The word before it and the word Nk back light up in the table. Each one matches its stage row by colour, and the stage row also names it, such as `w3` and `w0`, so colour is never the only sign |
+| Play | Stops when a grid fills, by the rule of section 2.8. Press it again for the next grid. A round chip jumps to a grid |
+| Tap a built word | Its stage rows open, and the two words behind it light up. A word not yet built does nothing |
+| A key word | It has no stage rows, so a tap says "This word is part of the key" |
 
 Worked example, the FIPS 197 appendix A key `2b7e1516 28aed2a6 abf71588 09cf4f3c`. The app shows the run's own key, with the same steps.
 
@@ -207,6 +222,8 @@ Worked example, the FIPS 197 appendix A key `2b7e1516 28aed2a6 abf71588 09cf4f3c
 | XOR w0 (`2b7e1516`) | `a0fafe17`, which is w4 | `keyBack`, `word` |
 
 **AES-256 only:** at `i mod 8 = 4`, the word before passes through SubWord alone. The panel says so when the learner picks 256.
+
+**The reply needs no new field.** `keyWords[]` already has every row by `i`, and each row holds `word`, `previous`, `rotated`, `substituted`, `rcon`, `afterRcon`, and `keyBack`. Grid, column, cell, and byte position come from `i` by layout: `i / 4`, `i % 4`, and `4i + r`. The two words to light are `i - 1` and `i - Nk`, with Nk from the tables route's size table. That is position arithmetic, and the app reads no byte value to do it. A clause holds it: the bytes in the lit cells must equal `previous` and `keyBack`.
 
 **Rcon row.** `01 02 04 08 10 20 40 80 1b 36`. Each value is the one before it, doubled in the field. Ordinary doubling of `80` gives `100`, which does not fit in a byte. Field doubling gives `1b`. This row is the first place the learner meets the field in real use. The row comes from the tables route, because the app holds no crypto values.
 
@@ -271,6 +288,33 @@ One measured line sits apart from the definitions, because a one-bit test is not
 
 **What stays out.** No robots, no 3D, and no video style copy: our own 2D grid and our own colours. No frames, captions, or drawings from the videos, which are leads for order and teaching ideas. No claim that AES hardware instructions are "impervious", which is wider than we can source.
 
+### 2.2e Tap a byte, and jump to a round
+
+These two ideas come from CrypTool's "AES (step-by-step)" page. We take the ideas and no code.
+
+**Jump to a round.** The round chips of section 2.8 already do this, in encrypt and decrypt. Play continues from the round the learner jumps to.
+
+**Tap a byte (W2).** The learner taps a byte in any state. Earlier states light up the bytes it depends on, back to the input block. It ends at each round key byte too, and it stops there, because a walk back through the key schedule belongs to section 2.2b.
+
+| Step | A byte in this cell depends on |
+|---|---|
+| AddRoundKey | The same cell, and the same cell of the round key |
+| SubBytes, InvSubBytes | The same cell |
+| ShiftRows, InvShiftRows | The cell the shift map names |
+| MixColumns, InvMixColumns | All 4 cells of its column |
+
+**No math in the app.** The engine sends this rule in the tables route as `dependsOn`, one list per step kind and cell. The app follows those lists backward. That is a graph walk, and it reads no byte value. The rule holds no key, so it stays open with Show keys OFF. The grids it lights stay closed.
+
+**A clause checks the rule against the real cipher.** Change one input byte: a state byte outside its set must never change, and a byte inside its set must change for some value. The spike ran this on 10,240 cases, with 0 faults of either kind. A cell after round 1's ShiftRows depends on 1 input byte. Cell 0 after round 1's MixColumns depends on 4, and after round 2's on all 16.
+
+**Why W2, and not W1b.**
+
+1. W2 already holds the one-bit-flip count, and tap-a-byte is the same lesson: diffusion. They share the clause's flip test.
+2. W1b ends in Steve's first look at the block walk. A tap there would mean two things on a SubBytes cell (the S-box lookup, and the dependency). I would rather settle that gesture once with Steve's reaction in hand.
+3. Nothing in W1a or W1b depends on it, and the rule adds one call to `AesKey`.
+
+**What would change my mind:** Steve asks for it during his W1b look, or the new look gives each gesture its own place.
+
 ### 2.3 The S-box view
 
 **What the learner sees, on a SubBytes step:**
@@ -328,7 +372,7 @@ What each tab states, from sheet 5.12:
 | CBC, 5 blocks with padding | Sender 5 | Receiver 5 |
 | GCM, 4 blocks and no padding | Each side 6: 4 counters, 1 hash key, 1 tag mask | 0 |
 
-`Gcm.cs` never calls `DecryptBlock` (sheet 5.2). The panel walks the 4 counters, and it names the other 2 calls. GHASH makes the tag, and it is out of scope for the walk, pending Steve's ruling. The GCM panel says: "The G in GCM means Galois. GHASH makes the tag in a much larger Galois field, GF(2^128)." The panel shows the `GCM tag` result from the run's own `check.result` event.
+`Gcm.cs` never calls `DecryptBlock` (sheet 5.2). The panel walks the 4 counters, and it names the other 2 calls. The GCM panel says: "The G in GCM means Galois. GHASH makes the tag in a much larger Galois field, GF(2^128)." The panel shows the `GCM tag` result from the run's own `check.result` event. Section 2.4a walks GHASH.
 
 **Live checks from the run.**
 
@@ -361,11 +405,75 @@ In lesson 1, a free flip on a non-wire event changes nothing. `Interpreter.Apply
 |---|---|---|
 | ECB, the default in some tools | `L1-use-ecb` | Equal blocks give equal cipher blocks |
 | CBC with no tag. A strong key does not fix this | `L1-flip-cbc` | In this lab, a flipped bit passes with no error. A library that checks padding can raise an error on a flip near the end, and it still passes a flip in the earlier blocks |
-| A repeated GCM nonce | `L1-reuse-nonce` | Two messages share a key stream. Only the lab's detector calls it out |
+| A repeated GCM nonce | `L1-reuse-nonce`, then `L1-forge-last-block` | Two messages share a key stream, and only the lab's detector calls it out. The forgery demo shows what that costs (section 2.4b) |
 
 Off-screen sources for these words. MySQL 8.4 Reference Manual, `block_encryption_mode`: default value `aes-128-ecb`. .NET 10.0.14 `Aes.Create()`, run by Jared: CBC and PKCS7 by default, and a flip in an earlier block raised no error on 384 of 384, while the second-last block raised a padding error on 128 of 128 for a 64-byte text and on 56 of 128 for a 41-byte text, and the last byte of the 64-byte text raised one on all 8 bits. MySQL stays off the screen.
 
 **Out of scope, named on the tab.** The modes page also lists CFB, OFB, and CTR, and it names XTS. CFB, OFB, and XTS are not in this course (grep of `src/NetSec.Core`: 0 files). CTR alone runs in lesson 8's SSH suite, and the panel points there. Lesson 1 runs counter mode only inside GCM.
+
+### 2.4a GHASH: how the GCM tag is made (W1c)
+
+Steve moved this into the modes chapter. Facts come from SP 800-38D and Jared's sheet section 5.18. It opens from the GCM tab, and it uses the run's `TextGcm1`.
+
+| Step | On screen | Value from the engine |
+|---|---|---|
+| 1. H | AES locks a block of 16 zero bytes. The result is the hash key H | `Hash` |
+| 2. Each cipher block | Y starts at zero. XOR the cipher block into Y, then multiply Y by H in GF(2^128) | One row per block: `Before`, `Block`, `AfterXor`, `AfterMultiply` |
+| 3. Lengths | XOR a last block that holds both lengths in bits, then multiply by H | The same row shape, with `IsLengths` |
+| 4. Mask | AES locks the nonce with count 1. The result is the mask | `CounterBlock`, `Mask` |
+| 5. Tag | Y XOR the mask | `Tag`, which must equal the frame's tag |
+
+**Words the panel must get right, from sheet 5.18:**
+
+1. "The nonce is not in GHASH. A changed nonce still fails, because the mask changes."
+2. "GCM needs no padding, because XOR uses only the key stream bytes it needs." GHASH zero-fills a short block for its own use, and that changes no sent byte.
+3. "AAD is empty in this lesson, so GHASH starts at the cipher blocks."
+4. The tag check comes first in this engine, and no text comes out on a failure.
+
+The multiply stays one step on screen. Its 128 shifts teach nothing beyond section 2.2c, so the panel shows only input and result.
+
+The bit order inside GF(2^128) is reversed from section 2.2c's: the field's 1 is `80 00 ... 00`. The panel does not teach this. A clause pins it through the values.
+
+### 2.4b The forgery demo: what a repeated nonce gives away (W1c)
+
+Steve's ruling: show what the repeated-nonce mistake costs. An eavesdropper with two frames and no key forges a message that the real check accepts.
+
+**What runs.** A new attack row, `L1-forge-last-block`. The client sends `TextGcm2` under the first nonce, with its last block changed to `Pump four failed`, and with the same length. `L1-reuse-nonce` cannot do this: it sends the same text twice, so the two frames differ nowhere.
+
+**The maths, on 4 blocks with empty AAD** (`+` is XOR, and multiply is in GF(2^128)):
+
+| Step | Formula |
+|---|---|
+| 1. The tag | `T = C1 H^5 + C2 H^4 + C3 H^3 + C4 H^2 + L H + M`, where `M` is the mask |
+| 2. Two frames, one nonce, only C4 differs | `T + T' = (C4 + C4') H^2`. M, L, and the other terms cancel |
+| 3. Solve | `H^2 = (T + T') / (C4 + C4')`, then a square root. Squaring is one-to-one here, so there is one answer |
+| 4. The mask | `M = T + GHASH(H, C)` |
+| 5. Forge | `C4'' = P'' + (C4 + P4)`, which needs the known text only. The new tag is `GHASH(H, C1 C2 C3 C4'') + M`, under the same nonce |
+
+**On screen, in order:** the two frames from the wire, the blocks that differ, H with the line "Recovered with no key", the forged last block `Pump four closed`, and the real check's answer.
+
+**Three truths the panel states:**
+
+1. The lab's detector stops this run at the repeat. So the forged message goes to `Gcm.TryOpen` in the query, not through the lab. "The detector is a lab feature. Real GCM has no such alarm" (`L1-C04`).
+2. This demo covers two messages that differ only in the last block. The general case needs root finding, and SP 800-38D Appendix A says only that an attacker can "likely" find H.
+3. The fault is the repeated nonce. AES and GCM are fine when each nonce is used once.
+
+**Closed with Show keys OFF, on Jared's recommendation, because H is key material.** Steve approved the demo and can overrule this. The recovery needs no key, and the forged tag rests on H.
+
+**Control run and goldens stay unchanged.** The row reads a new lab option, and with the option absent, `Lesson01Aes` takes the same path and draws the same random bytes. No result enters a trace or a session file.
+
+**A checked test case, off screen.** Key `000102...0f`, nonce `a0a1a2a3a4a5a6a7a8a9aaab`, text `Pump four is ok.` 4 times, then the last block `Pump four failed`, then forged `Pump four closed`. T1, C4, T2, and C4' came from the real `Gcm.Seal`. H and the forged values came from the spike, from the frames alone, and the real `Gcm.TryOpen` accepted the result. M is from Jared's Python, and the forged tag depends on it.
+
+| Value | Bytes |
+|---|---|
+| T1 | `ced9be742e604bd3c021c4aca8730192` |
+| C4 | `ec21213913e7f998f016e7b9c50a6f53` |
+| T2 | `04cd111a6c8a0ba9a02a0e083f48a21b` |
+| C4' | `ec21213913e7f998f016e8ab8c096119` |
+| H | `c6a13b37878f5b826f4f8162a1c8d879` |
+| M | `fcee691d22c779b3a1a6d8a277507065` |
+| Forged last block | `ec21213913e7f998f016eda68a166119` |
+| Forged tag | `4207b367ff74886a6fec40259d3939e0` |
 
 ### 2.5 Decision: ECB carries chapter 1
 
@@ -420,7 +528,7 @@ From Jared's sheet. Echo can scan for these in `walk-gloss.json` and the tour.
 | Move through steps | Back, Next, and round chips to jump |
 | Watch steps move | One Play and Pause button, which stops at the end of the round. Press it again for the next round. Steve can overrule this after he steps through W1b |
 | How fast | One speed control: slow, normal, fast |
-| See one word's build | Click a word on the word wall |
+| See one word's build | Tap a built word in the table |
 | See one byte's lookup | Click a cell |
 | Open an AES box (chapter 2) | Click the box |
 
@@ -466,6 +574,11 @@ namespace NetSec.Crypto {
     public readonly AesColumnByte[] Terms;    // MixColumns and InvMixColumns only. Else null
   }
   public sealed class AesBlockWalk { public readonly int Rounds; public readonly byte[] Input, Output; public readonly AesStep[] Steps; }
+  public sealed class GhashRow {              // One XOR and multiply. IsLengths marks the last row
+    public readonly byte[] Before, Block, AfterXor, AfterMultiply;
+    public readonly bool IsLengths;
+  }
+  public sealed class GhashWalk { public readonly byte[] Hash, CounterBlock, Mask, Tag; public readonly GhashRow[] Rows; }
   public sealed class AesKeyWord {            // One row of the FIPS 197 appendix A tables. An unused cell is null
     public readonly int Index;
     public readonly byte[] Previous, Rotated, Substituted, Rcon, AfterRcon, KeyBack, Word;
@@ -485,11 +598,13 @@ namespace NetSec.Crypto {
     public static byte[] SubstitutionTable();        // A copy of Sbox, 256 bytes
     public static byte[] InverseSubstitutionTable(); // A copy of InverseSbox, 256 bytes
     public static int[] ShiftMap(bool inverse);      // A copy of ShiftRowsMap or InverseShiftRowsMap
+    public static int[] DependsOn(AesStepKind kind, int cell);   // W2. The earlier cells this cell depends on (section 2.2e)
     public static byte[] RoundConstants(int count);  // Each value is the one before it, doubled in the field
     public static AesColumnByte[] MixTerms(byte[] before, bool inverse);   // One entry per state byte, in r + 4c order
   }
   public static class Gcm {                   // Added to Gcm.cs
     public static byte[] CounterBlock(byte[] nonce, int blockIndex);   // nonce, then 32-bit blockIndex + 2
+    public static GhashWalk WalkTag(AesKey k, byte[] nonce, byte[] aad, byte[] cipher);   // Throws AES_WALK_DIVERGED if Tag differs from ComputeTag
   }
 }
 namespace NetSec.Labs {
@@ -518,6 +633,12 @@ namespace NetSec.Labs {
     public AesTagState Tag;
     public int TotalBlocks, ForwardCalls, InverseCalls; public AesFeedRow[] Rows;
   }
+  public sealed class GcmForgery {            // Every value comes from the two frames and the known text
+    public byte[] Hash, Mask, ForgedBlock, ForgedTag, ForgedBody;
+  }
+  public static class GcmForgeries {          // Pure. No AesKey parameter, so it cannot read a key. Throws NetSecException with the codes below
+    public static GcmForgery Recover(byte[] nonce1, byte[] sealed1, byte[] nonce2, byte[] sealed2, byte[] knownLast, byte[] forgedLast);
+  }
   public static class AesWalks {              // Pure. Same input, same output. No session, no socket
     public static AesBlockPair Block(byte[] key, byte[] forwardInput, byte[] inverseInputOrNull);
     // senderFrame and receivedFrame are whole frames. They are equal when no plan touched this message.
@@ -529,7 +650,9 @@ namespace NetSec.Labs {
 
 `WalkEncrypt` and `WalkDecrypt` fill `Terms` from `MixTerms`, on the state before the step, and throw `AES_WALK_DIVERGED` if any `Result` differs from the state after it. The doublings use the existing `Xtime`, so the real path's `Times` tables stay untouched.
 
-`Gcm.CounterBlock` is new and pure. `CounterCrypt` stays as it is. The lock guard catches a drift between the two. `Lesson01Aes.Pad` changes from private to internal, so the feed uses the lesson's own padding. Its bytes and the lab's trace stay as they are. `ErrorCodes` gains `AesWalkDiverged`, `WalkNotBuilt`, `WalkWaitingForWire`, `WalkMessageNotSent`, `WalkMessageReplaced`, `WalkKeySizeNotInRun`, and `WalkBadArgument`.
+`Gf128` gains `Inverse` and `SquareRoot`, built from repeated `Multiply`. The field's 1 is `80 00 ... 00` in GCM's bit order, which is the trap in the power loop. `Gcm.WalkTag` runs beside `ComputeTag`, and the real path does not change. `Lesson01Aes` gains `OptionForgeLastBlock`, and `AttackCatalog` gains the row.
+
+`Gcm.CounterBlock` is new and pure. `CounterCrypt` stays as it is. The lock guard catches a drift between the two. `Lesson01Aes.Pad` changes from private to internal, so the feed uses the lesson's own padding. Its bytes and the lab's trace stay as they are. `ErrorCodes` gains `AesWalkDiverged`, `WalkNotBuilt`, `WalkWaitingForWire`, `WalkMessageNotSent`, `WalkMessageReplaced`, `WalkKeySizeNotInRun`, `WalkBadArgument`, `WalkForgeSameText`, `WalkForgeNonceDiffers`, and `WalkForgeTooManyBlocks`.
 
 **`AesWalks.Feed` is a third copy of the mode logic,** after `Modes.cs` and `Gcm.cs`. The lock guard is its run-time pin. A row cannot read `differs` for a Feed bug, because a Feed bug fails the guard first.
 
@@ -544,7 +667,11 @@ GET /api/walk/aes/tables
 GET /api/sessions/{id}/walk/aes/block?source=text&keyBits=128|192|256
 GET /api/sessions/{id}/walk/aes/block?source=ecb|cbc|gcm&block=0..rows-1
 GET /api/sessions/{id}/walk/aes/modes?mode=ecb|cbc|gcm
+GET /api/sessions/{id}/walk/aes/ghash
+GET /api/sessions/{id}/walk/aes/forge
 ```
+
+`/ghash` and `/forge` arrive in W1c. `/forge` gives a forgery only on a session that ran `L1-forge-last-block`, and any other session gets a named refusal below. The route reads the two frames from `wire.sent`, calls `GcmForgeries.Recover`, and then, as a guard, reads the run's key: the recovered H must equal AES of the zero block, or `AES_WALK_DIVERGED`. It passes the forged body to the real `Gcm.TryOpen` and returns its answer and text.
 
 `source=text` is chapter 1, on block 1 of the text. The other sources open a box in chapter 2. `rows` is the row count that mode's `/modes` reply gives: 5 for `TextCbc` and `TextEcb` with the padding block, 4 for `TextGcm1` and for a capped picture. Only `source=text` takes a `keyBits` other than the run's.
 
@@ -602,6 +729,9 @@ Replies, trimmed. Every error carries `code`, `message`, `retryable`, and `reque
 | A finished session never sent the message | 409 `WALK_MESSAGE_NOT_SENT` |
 | The plan holds a `Replacement` | 409 `WALK_MESSAGE_REPLACED` |
 | A bad mode, source, block, or key size | 400 `WALK_BAD_ARGUMENT` |
+| Forge: the two frames are the same text, as on `L1-reuse-nonce` | 409 `WALK_FORGE_SAME_TEXT` |
+| Forge: the two frames have different nonces, as on a control run | 409 `WALK_FORGE_NONCE_DIFFERS`, with no H shown |
+| Forge: anything other than one changed last block | 409 `WALK_FORGE_TOO_MANY_BLOCKS`. This covers more than the last block differing (which needs root finding, and the pilot does not build it), only an earlier block differing (the divisor would be zero), and different lengths (H would come out wrong). No lab row reaches the last two, and `Recover` is public, so it refuses them |
 | A guard fired | 500 `AES_WALK_DIVERGED` |
 
 ### 3.5 Show keys OFF
@@ -610,8 +740,10 @@ Replies, trimmed. Every error carries `code`, `message`, `retryable`, and `reque
 
 | Route | OFF | Why |
 |---|---|---|
-| `/api/walk/aes/tables` | Open | The S-box tables, shift maps, round constants, and size table are public |
+| `/api/walk/aes/tables` | Open | The S-box tables, shift maps, round constants, size table, and dependency rule are public |
 | `/modes` | Open | A row holds no key and no round state. Each field comes from values the trace shows with the toggle OFF: `plain` and `wire`. For example, GCM's key stream equals text XOR cipher |
+| `/ghash` | **Closed**, 409 `KEYS_HIDDEN` | It holds H, and each Y value is built from H |
+| `/forge` | **Closed**, 409 `KEYS_HIDDEN` | On Jared's recommendation, because H is key material. Steve approved the demo and can overrule this. The recovery needs no key |
 | `/block` | **Closed**, 409 `KEYS_HIDDEN` | It holds the key, the round keys, the word rows, and the MixColumns terms, whose inputs are round states. The first AddRoundKey also gives `state = input xor key`, so input and state give the key. A fingerprint per cell would teach nothing |
 
 So with the toggle OFF, chapter 1's steps close, and chapter 2's rows stay. A chapter 2 AES box stays shut. The block tab shows: "Show keys is off. These steps show the key and the round keys, so they stay closed. Turn Show keys on to walk them. The S-box table, the key size table, the round constants, the field definition, and the modes walk stay open."
@@ -673,6 +805,14 @@ Rcon: 01020408102040801b36
 AES-128 uses 10 round constants
 AES-192 uses 8 round constants
 AES-256 uses 7 round constants
+real Gcm.Seal: T1 ced9be742e604bd3c021c4aca8730192 C4 ec21213913e7f998f016e7b9c50a6f53
+real Gcm.Seal: T2 04cd111a6c8a0ba9a02a0e083f48a21b C4' ec21213913e7f998f016e8ab8c096119
+H from two frames, no key: c6a13b37878f5b826f4f8162a1c8d879, equals AES of the zero block: True
+forged last block ec21213913e7f998f016eda68a166119, tag 4207b367ff74886a6fec40259d3939e0
+real Gcm.TryOpen accepts the forgery: True, text ends: Pump four closed
+one tag bit changed: TryOpen says False
+tap-a-byte rule: 10240 cases, a byte outside the set changed the cell in 0, a byte inside the set never did in 0
+input bytes behind cell 0: after AddRoundKey 0: 1, after round 1 SubBytes: 1, ShiftRows: 1, MixColumns: 4, after round 2 MixColumns: 16
 ```
 
 The 186 encrypt values and 186 inverse values come from FIPS 197 (2001 edition), appendix C. The comparison is strict, by position. "Jared 5.3" compares with his independent Python AES, which shares no code with the course. The walk file and the `AesKey` copy also compiled against the CF 3.5 references in `E:\dev\tools\netcf35-ref`, with 0 errors and 0 warnings.
@@ -694,8 +834,9 @@ Limits of the spike:
 | `app/src/components/AesWalkPanel.vue` | Chapter tabs. Holds the two views below |
 | `app/src/components/AesBlockWalk.vue` | Picker, grid, Back, Next, round chips |
 | `app/src/components/SboxView.vue` | The 16 by 16 table, row and column lights, for both tables |
-| `app/src/components/KeySchedulePanel.vue` | The word wall, one word's build, the Rcon row |
+| `app/src/components/KeySchedulePanel.vue` | The key as words, the expanded table of grids, one word's stage rows, the Rcon row |
 | `app/src/components/FieldPanel.vue` | The definition lines, and one multiply from the engine's terms |
+| `app/src/components/GhashView.vue`, `ForgeryView.vue` | W1c: the rows of section 2.4a, and the steps of section 2.4b. Values come from the engine |
 | `app/src/useWalkTimeline.ts` | Play, Pause, speed, stop at the end of a round, reduced motion. It holds states and never makes a byte |
 | `app/src/components/AesFeedView.vue` | One mode's rows, lock and unlock, the box link, wire status |
 | `app/src/App.vue` | One more entry in the panel tab list, shown when the run holds `aes.key` |
@@ -772,10 +913,11 @@ Sheet 5.9 lists them, and these three matter most:
 |---|---|---|---|
 | W0 | This doc and Jared's review. **After Jared passes the head,** Echo writes clauses from sections 2 to 4, red | Jared's pass on a named head. Clauses exist and fail with a named code | Richard, Jared, Echo |
 | **W1a** skeleton | `AesKey.Walk.cs` with word rows and MixColumns terms, `AesWalks.Block`, the tables route and the block route. No UI | FIPS, table, BCL, toggle, term, and golden clauses pass on both builds. `tools/gate.ps1` green | Richard |
+| **Hold on W1b** | Do not start the walk screens until the lead says the new look is set. Steve wants a major UX refresh. W1a is engine work, and it is not affected | | Lead |
 | **W1b** small section | `walk.ts`, `useWalkTimeline.ts`, `AesBlockWalk.vue`, `SboxView.vue`, `KeySchedulePanel.vue`, `FieldPanel.vue`, chapter 1 at 128 bits with animation, encrypt and decrypt, the flip guard | e2e: a learner reaches `Pump four is ok.` by Next alone. A clicked cell's lookup equals the next state, both tables. Grid order clause. S-box scan. Measure the block reply time at AES-128 and AES-256, and record both in `docs/learnings.md`, because section 7 keeps one reply until this shows a visible delay | Nancy |
 | **Stop: show Steve** | Steve steps through chapter 1 in the app and reacts. CBC and modes work starts after this | His reaction goes in `docs/learnings.md`, and later slices read it | Lead |
-| **W1c** | `Gcm.CounterBlock`, `AesWalks.Feed`, the modes route, `AesFeedView.vue`, chapter 2 with ECB, CBC, GCM, and "Mistakes people make". Key sizes, two tour steps, gloss | Wire clauses per mode. e2e on wire match and on damage. A15, A15a by a reader who did not write it | Richard, Nancy |
-| W2 | `AesKey.SboxBuild(byte)` and "how the table was built". `flipKeyBit`. One-bit-flip spread count (4 bytes after round 1, 16 after round 2) | FIPS 5.1.1 worked example for `53`. Spread count against Jared's values | Richard, Nancy |
+| **W1c** | `Gcm.CounterBlock`, `AesWalks.Feed`, the modes route, `AesFeedView.vue`, chapter 2 with ECB, CBC, GCM, and "Mistakes people make". `Gcm.WalkTag`, `Gf128.Inverse` and `SquareRoot`, `GcmForgeries`, `OptionForgeLastBlock`, the attack row, `/ghash`, `/forge`, `GhashView.vue`, `ForgeryView.vue`. Key sizes, two tour steps, gloss | Wire clauses per mode. e2e on wire match and on damage. A15, A15a by a reader who did not write it | Richard, Nancy |
+| W2 | `AesKey.SboxBuild(byte)` and "how the table was built". `flipKeyBit`. `AesKey.DependsOn` and tap-a-byte. One-bit-flip spread count (4 bytes after round 1, 16 after round 2) | FIPS 5.1.1 worked example for `53`. Spread count against Jared's values | Richard, Nancy |
 | W3 | Lesson 3 try-it, lesson 4 bench | Clauses on each check result | Richard, Nancy, Jared on wording |
 | W4 | Lesson 5 record walk and speed bench | Record walk equals the wire. The number's label names the machine and table AES | Richard, Nancy |
 | W5 | Lessons 2, 6 (section 1.1), 7, 8 queries, one PR each | A reference check per lesson, from Jared. Lesson 6: each replayed PIN key equals the run's | Richard, Jared |
@@ -795,6 +937,8 @@ If Steve does not follow it after 2 rounds of word changes, stop and re-plan the
 | Theme | What a clause checks |
 |---|---|
 | Round values | Every CIPHER and INVERSE CIPHER state for FIPS C.1, C.2, C.3, by position. The vector reader skips the appendix's EQUIVALENT INVERSE CIPHER lists, which hold a different order |
+| Expanded table | 11, 13, and 15 grids of 16 cells. The cell at byte position n shows byte n of the expanded key, and its word name is `w(n / 4)`. No cell shows a letter. The key band ends where section 2.2b says, and those cells start filled |
+| Word build | Next adds one word. The lit cells equal that row's `previous` and `keyBack`. A tap on a built word opens its stage rows, and a tap on an unbuilt word does nothing. Each `aes-walk-*` key schedule cell is gone with Show keys OFF |
 | Key words | FIPS appendix A rows, for all three sizes. The Rcon row equals `01 02 04 08 10 20 40 80 1b 36`, and the used counts are 10, 8, 7 |
 | End frames | Every animated step lands on the engine state for that step, for all three key sizes |
 | Reduced motion | Each step shows its end frame with no transition |
@@ -808,6 +952,13 @@ If Steve does not follow it after 2 rounds of word changes, stop and re-plan the
 | Modes | `match` on every row: `TextGcm1` 4, `TextCbc` 5, `PictureEcb` capped rows, `TextEcb` 5 on the fork. `unlockPass` is inverse for ECB and CBC, forward for GCM. Call counts per section 2.4 |
 | Damage | `L1-flip-cbc` gives `differs` and the 16, 1, 0, 0, 0 pattern. `L1-flip-gcm` gives `differs`, a failed tag, and no unlock bytes. Free flips: CBC IV gives `damage: iv` with block 1's bit flipped. GCM nonce and tag give all `match`, the named `damage`, and a failed tag. A header flip gives no unlock. A `TextCbc` type flip with xor 10 gives `damage: type`, and the run completes with no failed check. The lock column shows the sender's starter in each case. A free wire flip, addressed by stream, recovers the sender's frame. A failed run can cut the client's burst short, so a clause on a later message in a flip fork allows a row result or `WALK_MESSAGE_NOT_SENT` |
 | Tag per message | A flip on `PictureGcm` leaves `TextGcm1`'s tag as `passed` |
+| GHASH | Each row is XOR then multiply. `Tag` equals the frame's tag on `TextGcm1`, and on a message with the BCL as referee. H equals AES of the zero block. The nonce is not an input to a row |
+| Forgery recovery | Recovered H equals AES of the zero block under the run's key, on 2 seeds. Section 2.4b's table holds |
+| Forgery accepted | `Gcm.TryOpen` accepts the forged message and returns the forged text. A one-bit change to the forged tag fails it |
+| Forgery refusals | Same text twice gives `WALK_FORGE_SAME_TEXT`, never a divide by zero or a wrong H. Two nonces give `WALK_FORGE_NONCE_DIFFERS`, with no H. More than the last block differing, only an earlier block differing, and different lengths each give `WALK_FORGE_TOO_MANY_BLOCKS` |
+| Forgery reads no key | `GcmForgeries.Recover` takes frames and known text only. A test calls it with no key in scope |
+| Control unchanged | The control's golden is unchanged with the new option in the code. No forgery value enters a trace or session file |
+| Tap a byte (W2) | The flip test of section 2.2e, on every step and cell |
 | Bug versus tamper | A session with no plan never reads `differs`. A unit test gives `Feed` a wrong sender frame, and it throws `AES_WALK_DIVERGED`. A free flip on a non-wire event reads all `match` |
 | Box rows | `/block` answers for every row of `/modes`, including the padding row, and gives 400 one past it |
 | Label | A control run's `source=text` reply says `notSent`, and the panel shows the teaching-example label |
@@ -852,12 +1003,14 @@ If Steve does not follow it after 2 rounds of word changes, stop and re-plan the
 | `server-replaces-never-merges` | Applies. The app replaces the whole walk on each reply and clears it on a flip. Mark `walk.ts` |
 | A new gem? | No gem covers "an instrumented twin of a hot path, checked against the real path on every call". One use site so far. I record it as a candidate at W5, with Jared as SME, if the second walk type uses it too |
 
+**CrypTool, "AES (step-by-step)" on CrypTool-Online,** https://www.cryptool.org/en/cto/aes-step-by-step , which redirects to https://legacy.cryptool.org/en/cto/aes-step-by-step . Read 2026-11-06. It offers "Tap on each byte to see the bytes it depends on", and it shows encode and decode rounds. Took: the tap idea. We took no code, and the page states a copyright notice with no licence. Where we differ: our rule comes from the engine and a clause flips real bytes to check it. Its page does not mention a jump to a round, so that control is ours.
+
 **CUPID, under pressure.** Predictable is the property most at risk, because a twin path can drift. The run-time guard answers that. Composable holds: `AesWalks` is pure, and lessons 5 and 7 reuse it. Domain-based holds: the types use the FIPS step names. Complexity hotspots: `describeStep` wants a lookup by step kind, and each Vue file stays thin because `walk.ts` holds the logic. SOLID adds nothing here.
 
 ## 8. Non-goals
 
-1. No walk of GHASH, SHA-256 rounds, or the X25519 ladder in the pilot.
-2. No CFB, OFB, or XTS. No CTR tab in lesson 1.
+1. No walk of SHA-256 rounds or the X25519 ladder in the pilot. GHASH shows each multiply as one step, and its 128 shifts stay out.
+2. No CFB, OFB, or XTS. No CTR tab in lesson 1. No root finding: the forgery covers a change in the last block only.
 3. No walk on a loaded replay or an OS transport session.
 4. No change to `EncryptBlock`, `DecryptBlock`, or `CounterCrypt`.
 5. No claim that this AES is production AES. `AesKey.cs:8` already says that table lookups can leak through a CPU cache, and the panel says so too.
