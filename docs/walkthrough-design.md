@@ -1,6 +1,6 @@
 # MMP.NetworkSecurity: walkthrough design
 
-Author: Richard. Date: 2026-11-06. Revision 14, adding the GCM stream view for W1c. Status: design only, for Jared's check and Echo's clauses. No product code.
+Author: Richard. Date: 2026-11-06. Revision 15, adding the open list. Status: design only, for Jared's check and Echo's clauses. No product code.
 
 Sources of facts: FIPS 197, the engine, and Jared's sheet `E:\dev\ns-lesson1-facts.md`. Steve's web pages set depth and teaching order only (section 2.1).
 
@@ -1421,6 +1421,17 @@ If Steve does not follow it after 2 rounds of word changes, stop and re-plan the
 4. No change to `EncryptBlock`, `DecryptBlock`, or `CounterCrypt`.
 5. No claim that this AES is production AES. `AesKey.cs:8` already says that table lookups can leak through a CPU cache, and the panel says so too.
 
+## 9. Open list
+
+Each row is a later slice with no design yet. The mock holds the three views. Their designs wait until W1b and W1c are done. The lead then asks for them, and Steve sets the order. A row that needs a new field stays out of W1a's frozen shape.
+
+| Item | What it is | When |
+|---|---|---|
+| HMAC tab | Plain SHA-256, the HMAC steps, the chain, and the daily seal. This is lesson 2 ground | After W1b and W1c |
+| Feistel tab | A Feistel network, beside AES | After W1b and W1c |
+| Diffie-Hellman tab | A modular walk with small numbers, beside lesson 3's X25519 try-it | W3 |
+| A route to an ECB flip | `wire.status: differs` has no route today, because a free fork drops the ECB option. W1c owes the route and a clause. This came from Jared's review of #178 | W1c |
+
 ## Disposition
 
-Ready for Jared's review on the crypto wording and sections 1.1, 2.4, 2.5, 3.5, 3.6, and 5. Echo writes clauses after Jared passes the head. Do not start W1a until both are done.
+W1a is in #178. W1b waits for #178 to merge, for Nancy's shell, and for the lead's word. Slice SC goes first.
