@@ -1,6 +1,7 @@
 using System;
 using System.Threading;
 using MMP.AsyncProxy;
+using NetSec.Errors;
 using NetSec.Io;
 using NetSec.Machine;
 using NetSec.Trace;
@@ -180,6 +181,118 @@ namespace NetSec.Tests
             pump.Enqueue(EngineCommand.Close);
             links[1].Close();
             run.Wait(20000);
+        }
+
+        /// <summary>The engine has failed, and its last output is the alert.</summary>
+        sealed class AlertEngine : IProtocolEngine
+        {
+            readonly TraceStream _stream = Make.Stream("client");
+            public EngineStatus Status { get; private set; } = EngineStatus.Open;
+            public TraceStream Stream => _stream;
+            public string Peer => "server";
+            public EngineOutput Feed(byte[] b, int off, int n) => new EngineOutput(new OutputItem[0], new DeliveredChunk[0], Status, null);
+            public EngineOutput Command(EngineCommand c) => new EngineOutput(new OutputItem[0], new DeliveredChunk[0], Status, null);
+
+            public EngineOutput Start()
+            {
+                Status = EngineStatus.Failed;
+                TraceEventDraft draft = new TraceEventDraft();
+                draft.Type = "tls.alert.sent";
+                draft.Message = "Alert";
+                return new EngineOutput(new[] { new OutputItem(_stream.Stamp(draft), new byte[] { 2, 40 }) }, new DeliveredChunk[0], Status, null);
+            }
+        }
+
+        sealed class FixedWriteLink : IByteLink
+        {
+            readonly IFuture _write;
+            readonly Promise<int> _read = new Promise<int>();
+            public FixedWriteLink(IFuture write) { _write = write; }
+            public IFuture<int> Read(byte[] b, int off, int n) => _read.Future;
+            public IFuture Write(byte[] b, int off, int n) => _write;
+            public void Close() { _read.TrySetResult(0); }
+        }
+
+        static TraceEvent OneEvent(ListSink sink, string type)
+        {
+            TraceEvent found = null;
+            foreach (TraceEvent e in sink.Events)
+            {
+                if (e.Type != type) continue;
+                Assert.Null(found);
+                found = e;
+            }
+            Assert.NotNull(found);
+            return found;
+        }
+
+        static void AssertSaysNotLeft(ListSink sink, string code)
+        {
+            TraceEvent sent = OneEvent(sink, "wire.sent"), lost = OneEvent(sink, "wire.write.failed");
+            Assert.Equal(sent.Message, lost.Message);
+            Assert.Equal(sent.From, lost.From);
+            Assert.Equal(sent.To, lost.To);
+            Assert.StartsWith(code + ":", lost.Detail);
+            Assert.Contains(sent.EventId, lost.Detail);
+            Assert.True(lost.Wire == null || lost.Wire.Length == 0, "only bytes that left carry Wire");
+        }
+
+        /// <summary>The engine's own failure is the run's error, so a lost alert leaves the result silent. The trace must say that the alert did not leave.</summary>
+        [Fact]
+        public void A_lost_alert_write_says_so_in_the_trace()
+        {
+            ListSink sink = new ListSink();
+            FixedWriteLink link = new FixedWriteLink(Futures.FromException(new InvalidOperationException("the peer is gone")));
+            IFuture<PumpResult> run = new EnginePump(new AlertEngine(), link, sink, new FreeRunGate(), null, 0).Run();
+
+            Assert.True(run.Wait(20000));
+            Assert.Null(run.Result.Error);
+            Assert.Equal(0, run.Result.BytesSent);
+            AssertSaysNotLeft(sink, ErrorCodes.LinkLost);
+        }
+
+        [Fact]
+        public void A_lost_write_on_an_open_engine_says_so_in_the_trace_and_the_result()
+        {
+            ListSink sink = new ListSink();
+            FixedWriteLink link = new FixedWriteLink(Futures.FromException(new InvalidOperationException("the peer is gone")));
+            EnginePump pump = new EnginePump(new CountingEngine(), link, sink, new FreeRunGate(), null, 0);
+            IFuture<PumpResult> run = pump.Run();
+
+            pump.Enqueue(new EngineCommand(EngineCommandKind.Send, 0, new byte[1], null));
+            Assert.True(run.Wait(20000));
+            Assert.Equal(ErrorCodes.LinkLost, run.Result.Error.Code);
+            AssertSaysNotLeft(sink, ErrorCodes.LinkLost);
+        }
+
+        [Fact]
+        public void A_write_past_its_deadline_says_so_in_the_trace()
+        {
+            ListSink sink = new ListSink();
+            FixedWriteLink link = new FixedWriteLink(new Promise<int>().Future);
+            EnginePump pump = new EnginePump(new CountingEngine(), link, sink, new FreeRunGate(), null, 300);
+            IFuture<PumpResult> run = pump.Run();
+
+            pump.Enqueue(new EngineCommand(EngineCommandKind.Send, 0, new byte[1], null));
+            Assert.True(run.Wait(20000));
+            Assert.Equal(ErrorCodes.LinkDeadline, run.Result.Error.Code);
+            AssertSaysNotLeft(sink, ErrorCodes.LinkDeadline);
+        }
+
+        [Fact]
+        public void A_write_that_completes_logs_no_failure()
+        {
+            MemoryLink[] links = MemoryLink.Pair();
+            ListSink sink = new ListSink();
+            EnginePump pump = new EnginePump(new CountingEngine(), links[0], sink, new FreeRunGate(), null, 0);
+            IFuture<PumpResult> run = pump.Run();
+
+            pump.Enqueue(new EngineCommand(EngineCommandKind.Send, 0, new byte[1], null));
+            Assert.Equal(1, ReadCount(links[1]));
+            pump.Enqueue(EngineCommand.Close);
+            Assert.True(run.Wait(20000));
+            Assert.Null(run.Result.Error);
+            Assert.DoesNotContain(sink.Events, e => e.Type == "wire.write.failed");
         }
     }
 }
