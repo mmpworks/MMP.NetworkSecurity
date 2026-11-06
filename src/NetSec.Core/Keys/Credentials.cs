@@ -34,6 +34,25 @@ namespace NetSec.Keys
 
         public static string[] All { get { return (string[])Everything.Clone(); } }
 
+        /// <summary>The built-in training key a type runs on when its mode is BuiltIn. Null for a type with no long-term key (a trust list, a lab's per-run key).
+        /// The inverse of OfKey; the DUKPT type runs on the 128-bit base key.</summary>
+        public static string BuiltInKeyOf(string typeId)
+        {
+            switch (typeId)
+            {
+                case RootCa: return KeyIds.CaRoot;
+                case Tls13Server: return KeyIds.ServerTlsEd25519;
+                case Tls13Client: return KeyIds.ClientTlsEd25519;
+                case Tls11Server: return KeyIds.ServerTls11Rsa;
+                case SshHostEd25519: return KeyIds.SshHostEd25519;
+                case SshHostRsa: return KeyIds.SshHostRsa;
+                case SshClient: return KeyIds.SshClient;
+                case DukptBdk: return KeyIds.DukptBdk128;
+                case TokenIssuer: return KeyIds.TokenIssuer;
+                default: return null;
+            }
+        }
+
         /// <summary>The type that holds a KeyIds key. Null for a key with no type: the attacker's key has no owner to replace it.</summary>
         public static string OfKey(string keyId)
         {

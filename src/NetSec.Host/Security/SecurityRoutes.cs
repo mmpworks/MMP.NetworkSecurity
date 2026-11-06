@@ -14,7 +14,8 @@ public static class SecurityRoutes
     /// <summary>The caller name on the vault audit row each read of this route writes.</summary>
     public const string KeyRouteCaller = "host/key-route";
 
-    public static void Map(WebApplication app, SecurityStore store, FlowRuns runs)
+    /// <summary>showKeysChanged tells every socket of a flip, so the UI replaces each open session from /events.</summary>
+    public static void Map(WebApplication app, SecurityStore store, FlowRuns runs, Action<bool> showKeysChanged)
     {
         app.MapGet("/api/security", () => Results.Json(new
         {
@@ -41,6 +42,7 @@ public static class SecurityRoutes
         app.MapPut("/api/security/show-keys", (ShowKeysBody body) =>
         {
             store.SetShowKeys(body.On);
+            showKeysChanged(store.ShowKeys);
             return Results.Json(new { on = store.ShowKeys });
         });
         app.MapPost("/api/security/flows/{flowId}/runs", (string flowId) =>
@@ -99,24 +101,8 @@ public static class SecurityRoutes
         }, new JsonSerializerOptions(JsonSerializerOptions.Web) { DefaultIgnoreCondition = System.Text.Json.Serialization.JsonIgnoreCondition.WhenWritingNull });
     }
 
-    static ITrainingKey? BuiltInKey(string typeId)
-    {
-        const string NoKey = "";
-        string keyId = typeId switch
-        {
-            SecurityTypes.RootCa => KeyIds.CaRoot,
-            SecurityTypes.Tls13Server => KeyIds.ServerTlsEd25519,
-            SecurityTypes.Tls13Client => KeyIds.ClientTlsEd25519,
-            SecurityTypes.Tls11Server => KeyIds.ServerTls11Rsa,
-            SecurityTypes.SshHostEd25519 => KeyIds.SshHostEd25519,
-            SecurityTypes.SshHostRsa => KeyIds.SshHostRsa,
-            SecurityTypes.SshClient => KeyIds.SshClient,
-            SecurityTypes.DukptBdk => KeyIds.DukptBdk128,
-            SecurityTypes.TokenIssuer => KeyIds.TokenIssuer,
-            _ => NoKey,
-        };
-        return keyId == NoKey ? null : new TrainingKeySource().Find(keyId);
-    }
+    static ITrainingKey? BuiltInKey(string typeId) =>
+        SecurityTypes.BuiltInKeyOf(typeId) is { } keyId ? new TrainingKeySource().Find(keyId) : null;
 
     static object StepOf(FlowRuns runs, RunReply reply)
     {
