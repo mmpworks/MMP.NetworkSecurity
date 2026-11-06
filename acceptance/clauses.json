@@ -22,6 +22,7 @@
   "A16": "A real IKeyHandle given to the glass-box factory fails by type; the OS transport runs SslStream and its output holds no secret bytes; the UI labels the glass-box engine TRAINING ONLY; the CE wording is used",
   "A17": "Per-type Mock or My test key modes: the readiness rule refuses by name, the five wizards are driven by a machine that owns the moves, the vault keeps keys and an audit chain, Show keys hides values, and every claim of proof names an outside referee or says known-answer",
   "A19": "The AES walk shows every state of one block, encrypt and decrypt, from the real engine: states, key rows and tables equal FIPS 197, a live run equals an independent AES and the BCL, Show keys OFF closes the states, and the app holds no table",
+  "A18": "Each lesson says on screen what its engine leaves out, by the gaps of docs/conformance-matrix.md; a real peer shows each named refusal beside a control that connects",
   "SELF": "Harness self-check: the suite bites"
  },
  "groups": {
@@ -2035,6 +2036,94 @@
    "counts": true
   },
   {
+   "id": "A18.screen.l10-dpop-subset",
+   "base": "A18.screen.l10-dpop-subset",
+   "assertion": "A18",
+   "group": "docs",
+   "build": "host",
+   "slice": "Each",
+   "referee": "script over the tour files; OpenSSL 3.5.7 and Go referees for refusals",
+   "roles": [],
+   "counts": true
+  },
+  {
+   "id": "A18.screen.l4-pki-leaves-out",
+   "base": "A18.screen.l4-pki-leaves-out",
+   "assertion": "A18",
+   "group": "docs",
+   "build": "host",
+   "slice": "Each",
+   "referee": "script over the tour files; OpenSSL 3.5.7 and Go referees for refusals",
+   "roles": [],
+   "counts": true
+  },
+  {
+   "id": "A18.screen.l5-tls13-leaves-out",
+   "base": "A18.screen.l5-tls13-leaves-out",
+   "assertion": "A18",
+   "group": "docs",
+   "build": "host",
+   "slice": "Each",
+   "referee": "script over the tour files; OpenSSL 3.5.7 and Go referees for refusals",
+   "roles": [],
+   "counts": true
+  },
+  {
+   "id": "A18.screen.l6-c01-corrected",
+   "base": "A18.screen.l6-c01-corrected",
+   "assertion": "A18",
+   "group": "docs",
+   "build": "host",
+   "slice": "Each",
+   "referee": "script over the tour files; OpenSSL 3.5.7 and Go referees for refusals",
+   "roles": [],
+   "counts": true
+  },
+  {
+   "id": "A18.screen.l6-names-variant",
+   "base": "A18.screen.l6-names-variant",
+   "assertion": "A18",
+   "group": "docs",
+   "build": "host",
+   "slice": "Each",
+   "referee": "script over the tour files; OpenSSL 3.5.7 and Go referees for refusals",
+   "roles": [],
+   "counts": true
+  },
+  {
+   "id": "A18.screen.l7-rsa-padding",
+   "base": "A18.screen.l7-rsa-padding",
+   "assertion": "A18",
+   "group": "docs",
+   "build": "host",
+   "slice": "Each",
+   "referee": "script over the tour files; OpenSSL 3.5.7 and Go referees for refusals",
+   "roles": [],
+   "counts": true
+  },
+  {
+   "id": "A18.screen.l7-tls11-leaves-out",
+   "base": "A18.screen.l7-tls11-leaves-out",
+   "assertion": "A18",
+   "group": "docs",
+   "build": "host",
+   "slice": "Each",
+   "referee": "script over the tour files; OpenSSL 3.5.7 and Go referees for refusals",
+   "roles": [],
+   "counts": true
+  },
+  {
+   "id": "A18.screen.l8-ssh-leaves-out",
+   "base": "A18.screen.l8-ssh-leaves-out",
+   "assertion": "A18",
+   "group": "docs",
+   "build": "host",
+   "slice": "Each",
+   "referee": "script over the tour files; OpenSSL 3.5.7 and Go referees for refusals",
+   "roles": [],
+   "counts": true
+  },
+  {
    "id": "A19.app.field-definition-lines",
    "base": "A19.app.field-definition-lines",
    "assertion": "A19",
@@ -4037,6 +4126,17 @@
   {
    "id": "SELF.a17-text-checks-bite",
    "base": "SELF.a17-text-checks-bite",
+   "assertion": "SELF",
+   "group": "selftest",
+   "build": "host",
+   "slice": "S0",
+   "referee": "stand-ins built on the BCL, python cryptography and real OpenSSL runs",
+   "roles": [],
+   "counts": false
+  },
+  {
+   "id": "SELF.a18-lines-bite",
+   "base": "SELF.a18-lines-bite",
    "assertion": "SELF",
    "group": "selftest",
    "build": "host",

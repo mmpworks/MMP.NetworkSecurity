@@ -510,6 +510,45 @@ def a19_gcm_line(root):
     return "the GCM panel names the Galois field"
 
 
+def engine_limits():
+    path = os.path.join(os.path.dirname(os.path.abspath(__file__)), "engine_limits.json")
+    return json.load(open(path, encoding="utf-8"))
+
+
+def a18_line(root, limits, entry):
+    """One lesson says on screen what its engine leaves out (docs/conformance-matrix.md). One step holds the whole line, and that step's claim cites the standard."""
+    tours = load_tours(root)
+    lesson = entry["lesson"]
+    if lesson not in tours:
+        raise NotRun("LESSON_NOT_BUILT", "lesson %d has no tour yet" % lesson)
+    tour = tours[lesson]
+    claims = list(tour["claims"])
+    for s in tour["steps"]:
+        claims += s.get("claims", [])
+    whole = lesson_text(tour) + "\n" + "\n".join(plain(c.get("text", "")) for c in claims)
+    for p in entry.get("banAnywhere", []):
+        m = re.search(p, whole, re.I)
+        if m:
+            raise Fail("lesson %d still says '%s'" % (lesson, m.group(0)))
+    patterns = list(entry["require"])
+    if entry.get("needsAbsent", True):
+        patterns.append(limits["absent"])
+    for s in tour["steps"]:
+        text = " ".join(step_texts(s))
+        if entry.get("readClaims"):
+            text += " " + " ".join(plain(c.get("text", "")) for c in s.get("claims", []))
+        if not all(re.search(p, text, re.I) for p in patterns):
+            continue
+        for p in entry.get("banInLine", []):
+            m = re.search(p, text, re.I)
+            if m:
+                raise Fail("step %s says '%s'. The line names what the engine leaves out, and does not rank the standard's list" % (s.get("id", "?"), m.group(0)))
+        if not any(re.search(entry["source"], c.get("source", ""), re.I) for c in s.get("claims", [])):
+            raise Fail("step %s holds the line, and carries no claim whose source names %s" % (s.get("id", "?"), entry["source"]))
+        return "stated in step %s, matrix row %d" % (s.get("id", "?"), entry["row"])
+    raise Fail("lesson %d has no single step with all of: %s" % (lesson, " and ".join(patterns)))
+
+
 NON_GOAL_HEADING = re.compile(r"(?i)^#{1,6}\s.*\b(non-?goals?|out of scope|not in scope|will not do)\b")
 
 
@@ -718,6 +757,9 @@ def main():
         "A19.app.field-definition-lines": lambda: a19_definition(root, a.max_grade),
         "A19.app.gcm-panel-names-the-field": lambda: a19_gcm_line(root),
     }
+    limits = engine_limits()
+    for entry in limits["lines"]:
+        clauses[entry["id"]] = (lambda e: lambda: a18_line(root, limits, e))(entry)
     if a.list:
         print("\n".join(sorted(clauses)))
         return 0
