@@ -307,9 +307,7 @@ namespace NetSec.Host
         {
             LabSession? session = Text(m, "sessionId") is { } id ? sessions.Find(id) : _current;
             if (session is null) { Fail(requestId, "SESSION_NOT_FOUND", "No session to save."); return; }
-            // While Show keys is OFF, a saved trace holds no key bytes: a file written while ON gets a hidden copy, and the original stays.
-            string file = !security.ShowKeys && session.FileHoldsShownKeys ? TraceLines.WriteHiddenCopy(session.SessionFile) : session.SessionFile;
-            Send(new { type = "session.saved", requestId, sessionId = session.SessionId, sessionFile = file });
+            sessions.Save(session, file => JsonSerializer.Serialize(new { type = "session.saved", requestId, sessionId = session.SessionId, sessionFile = file }));
         }
 
         void Load(JsonElement m, string? requestId)
