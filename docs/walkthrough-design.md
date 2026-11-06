@@ -1,6 +1,6 @@
 # MMP.NetworkSecurity: walkthrough design
 
-Author: Richard. Date: 2026-11-06. Revision 11, adding the round constant doubling. Revision 10 added the phantom column. Status: design only, for Jared's check and Echo's clauses. No product code.
+Author: Richard. Date: 2026-11-06. Revision 12, adding the order of the AddRoundKey motion. Status: design only, for Jared's check and Echo's clauses. No product code.
 
 Sources of facts: FIPS 197, the engine, and Jared's sheet `E:\dev\ns-lesson1-facts.md`. Steve's web pages set depth and teaching order only (section 2.1).
 
@@ -165,7 +165,7 @@ Steve's ask: see the 16 bytes change at each stage.
 
 | Step | What moves | End frame |
 |---|---|---|
-| AddRoundKey | The round key grid slides over the state. Each cell shows its new byte | Engine state after AddRoundKey |
+| AddRoundKey | In order: the round key grid fills on the right, column by column, and holds with the block unchanged. It then slides over the block, each byte changes one at a time, and the key returns. The first AddRoundKey of a walk skips the fill, because the Start view already shows its key: round 0 on encrypt, and round Nr on decrypt. Decrypt's AddRoundKey 0 fills, as every other one does | Step's `roundKey`, then the engine state after AddRoundKey |
 | SubBytes | Each cell flips to its new byte, one cell at a time on the first pass, then all cells at once | Engine state after SubBytes |
 | ShiftRows | A smooth roll, one row at a time, like a ticker tape. Row 0 stays. Rows 1, 2, 3 rotate left by 1, 2, 3: bytes leave the left edge and enter at the right edge. No fade and no lift | Engine state after ShiftRows |
 | MixColumns | One column at a time lifts, its 4 bytes join, and 4 new bytes come out | Engine state after MixColumns |
@@ -274,7 +274,7 @@ Worked example, the FIPS 197 appendix A key `2b7e1516 28aed2a6 abf71588 09cf4f3c
 
 The stage row for RotWord reads "RotWord: rotate one byte, up this column". With reduced motion, each word lands whole, and Back mid-word leaves no marks.
 
-**The phantom column (Steve's item, W1b).** A word that transforms the word before gets a phantom: a copy of that column, lifted above the base. RotWord words have one, and so do AES-256's SubWord-only words. Plain words, such as w5, show none. The base column never changes, and the learner can see that.
+**The phantom column (Steve's item, W1b).** A word that transforms a copy of the word before gets a phantom: a copy of that column, lifted above the base. RotWord words have one, and so do AES-256's SubWord-only words. Plain words, such as w5, show none. The base column never changes, and the learner can see that.
 
 | Moment | The phantom shows | Value from the reply |
 |---|---|---|
@@ -1265,6 +1265,7 @@ If Steve does not follow it after 2 rounds of word changes, stop and re-plan the
 | Expanded table | 11, 13, and 15 grids of 16 cells. The cell at byte position n shows byte n of the expanded key, and its word name is `w(n / 4)`. No cell shows a letter. The key band ends where section 2.2b says, and those cells start filled |
 | Word build | Next adds one word. The lit cells equal that row's `previous` and `keyBack`. A tap on a built word opens its stage rows, and a tap on an unbuilt word does nothing. Each `aes-walk-*` key schedule cell is gone with Show keys OFF |
 | Key words | FIPS appendix A rows, for all three sizes. The Rcon row equals `01 02 04 08 10 20 40 80 1b 36`, and the used counts are 10, 8, 7 |
+| AddRoundKey order | With motion on, the key grid equals the step's `roundKey` while the block still equals the state before the step, then the block changes. The first AddRoundKey of a walk shows no fill, on encrypt and on decrypt. Each later one fills first, including decrypt's AddRoundKey 0. Pause holds the fill and the slide, by the Pause holds clause |
 | End frames | Every animated step lands on the engine state for that step, for all three key sizes |
 | Reduced motion | Each step shows its end frame with no transition |
 | Pause holds | With motion on at the `slow` speed, Pause during a flying byte, a key fill, a phantom column, and a matrix multiply. The clause waits for each animation's `ready`, then samples. Each moving element's position stays the same for 2 seconds, within 1 pixel. At least one paused animation has a `currentTime` below its end. If nothing runs when the click lands, the clause repeats from the step before, and it reads NOT RUN after 3 tries |
