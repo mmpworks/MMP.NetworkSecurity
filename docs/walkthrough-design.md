@@ -212,7 +212,7 @@ Worked example, the FIPS 197 appendix A key `2b7e1516 28aed2a6 abf71588 09cf4f3c
 
 **Words on screen:**
 
-1. "Each round gets a different key, so the rounds do not repeat one key."
+1. "Each round gets its own key."
 2. At AES-128 only: "Round keys are key material. Anyone who learns one round key can run this table backward and get the key." The lead's script ran this from round key 10 and got the key back. This line stays at 128, because AES-192 needs 6 words and AES-256 needs 8.
 3. "Decryption uses the same round keys, from last to first."
 
@@ -222,13 +222,13 @@ Steve's ask: define a finite field. The panel states the definition and shows on
 
 **Definition on screen, in this order:**
 
-1. "A field is a set of values with add, subtract, multiply and divide, where every answer stays in the set. Only divide by zero is not allowed."
+1. "A field is a set of values with add, subtract, multiply and divide, where every answer stays in the set. Only divide by zero is not allowed. They follow the usual rules of arithmetic."
 2. "A finite field has a fixed number of values. The field that AES uses has 256 values, one for each byte. Its name is GF(2^8)."
 3. "Add is XOR."
 4. "Multiply treats each byte as a polynomial, multiplies without carries, and reduces the result by `x^8 + x^4 + x^3 + x + 1` (`11b` in hex). So the answer always fits in a byte."
-5. "Every value except zero has an inverse. So each multiply step can be undone."
+5. "Every value except zero has an inverse. So multiplying by any nonzero value can be undone."
 
-A fixed number of values alone does not make a field, so the panel states both rules.
+A fixed number of values alone does not make a field, so the panel states both rules. FIPS 197 does not define a field (section 4, footnote 1) and sends the reader to textbooks. These lines are our wording, and Jared read them against the FIPS arithmetic.
 
 | Place | What the learner sees |
 |---|---|
@@ -253,12 +253,12 @@ The full column comes out `04 66 81 e5`. The inverse takes it back: `14 x 04` is
 
 ### 2.2d Why each step exists
 
-Each step's panel adds one "why" line. **Confusion and diffusion are common teaching labels.** FIPS 197 does not use them, and nobody read Shannon's paper this session, so the panel says "often called" and cites no source for the mapping.
+Each step's panel adds one "why" line. FIPS 197 does not use the words confusion and diffusion. The meanings below follow Shannon 1949, section 23, which Jared read. Tying each step to one word is common teaching and not Shannon's, so the panel says "often called" and states no source for that mapping.
 
 | Term | Meaning on screen |
 |---|---|
-| Confusion | Hides how the output depends on the key |
-| Diffusion | Spreads each input bit across the output. After round 1, a one-bit change reaches 4 bytes. After round 2, it reaches all 16 |
+| Confusion | The link between the key and the locked bytes is made very hard to follow |
+| Diffusion | The patterns in the message spread out across the locked bytes |
 
 | Step | Why line |
 |---|---|
@@ -267,7 +267,7 @@ Each step's panel adds one "why" line. **Confusion and diffusion are common teac
 | ShiftRows | Diffusion between columns. Without it, each column would stay on its own |
 | MixColumns | Diffusion inside a column. Each output byte depends on all 4 input bytes |
 
-W2's one-bit-flip count shows the diffusion numbers from the engine. W1 states them in words only.
+One measured line sits apart from the definitions, because a one-bit test is not what either word means: "In one test, one changed input bit changed 4 bytes after round 1, all 16 bytes after round 2, and 54 of the 128 output bits at the end." W2's one-bit-flip count shows these numbers from the engine on the run's own block. W1 states the test as a test.
 
 **What stays out.** No robots, no 3D, and no video style copy: our own 2D grid and our own colours. No frames, captions, or drawings from the videos, which are leads for order and teaching ideas. No claim that AES hardware instructions are "impervious", which is wider than we can source.
 
@@ -418,7 +418,7 @@ From Jared's sheet. Echo can scan for these in `walk-gloss.json` and the tour.
 | Which key size (chapter 1) | One selector |
 | Which mode (chapter 2) | Three tabs |
 | Move through steps | Back, Next, and round chips to jump |
-| Watch steps move | One Play and Pause button, which stops at the end of the round. Press it again for the next round |
+| Watch steps move | One Play and Pause button, which stops at the end of the round. Press it again for the next round. Steve can overrule this after he steps through W1b |
 | How fast | One speed control: slow, normal, fast |
 | See one word's build | Click a word on the word wall |
 | See one byte's lookup | Click a cell |
@@ -772,7 +772,7 @@ Sheet 5.9 lists them, and these three matter most:
 |---|---|---|---|
 | W0 | This doc and Jared's review. **After Jared passes the head,** Echo writes clauses from sections 2 to 4, red | Jared's pass on a named head. Clauses exist and fail with a named code | Richard, Jared, Echo |
 | **W1a** skeleton | `AesKey.Walk.cs` with word rows and MixColumns terms, `AesWalks.Block`, the tables route and the block route. No UI | FIPS, table, BCL, toggle, term, and golden clauses pass on both builds. `tools/gate.ps1` green | Richard |
-| **W1b** small section | `walk.ts`, `useWalkTimeline.ts`, `AesBlockWalk.vue`, `SboxView.vue`, `KeySchedulePanel.vue`, `FieldPanel.vue`, chapter 1 at 128 bits with animation, encrypt and decrypt, the flip guard | e2e: a learner reaches `Pump four is ok.` by Next alone. A clicked cell's lookup equals the next state, both tables. Grid order clause. S-box scan | Nancy |
+| **W1b** small section | `walk.ts`, `useWalkTimeline.ts`, `AesBlockWalk.vue`, `SboxView.vue`, `KeySchedulePanel.vue`, `FieldPanel.vue`, chapter 1 at 128 bits with animation, encrypt and decrypt, the flip guard | e2e: a learner reaches `Pump four is ok.` by Next alone. A clicked cell's lookup equals the next state, both tables. Grid order clause. S-box scan. Measure the block reply time at AES-128 and AES-256, and record both in `docs/learnings.md`, because section 7 keeps one reply until this shows a visible delay | Nancy |
 | **Stop: show Steve** | Steve steps through chapter 1 in the app and reacts. CBC and modes work starts after this | His reaction goes in `docs/learnings.md`, and later slices read it | Lead |
 | **W1c** | `Gcm.CounterBlock`, `AesWalks.Feed`, the modes route, `AesFeedView.vue`, chapter 2 with ECB, CBC, GCM, and "Mistakes people make". Key sizes, two tour steps, gloss | Wire clauses per mode. e2e on wire match and on damage. A15, A15a by a reader who did not write it | Richard, Nancy |
 | W2 | `AesKey.SboxBuild(byte)` and "how the table was built". `flipKeyBit`. One-bit-flip spread count (4 bytes after round 1, 16 after round 2) | FIPS 5.1.1 worked example for `53`. Spread count against Jared's values | Richard, Nancy |
