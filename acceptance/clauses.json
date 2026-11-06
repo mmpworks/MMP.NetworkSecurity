@@ -1837,6 +1837,17 @@
    "counts": true
   },
   {
+   "id": "A17.security.fallback-finds-the-repo-folder",
+   "base": "A17.security.fallback-finds-the-repo-folder",
+   "assertion": "A17",
+   "group": "a17",
+   "build": "host",
+   "slice": "V0",
+   "referee": "test over HTTP and WebSocket, OpenSSL, ssh.exe, Go referees; known-answer where no outside referee exists",
+   "roles": [],
+   "counts": true
+  },
+  {
    "id": "A17.show-keys.default-on",
    "base": "A17.show-keys.default-on",
    "assertion": "A17",
@@ -3971,6 +3982,17 @@
   {
    "id": "SELF.a17-repo-guard-bites",
    "base": "SELF.a17-repo-guard-bites",
+   "assertion": "SELF",
+   "group": "selftest",
+   "build": "host",
+   "slice": "S0",
+   "referee": "stand-ins built on the BCL, python cryptography and real OpenSSL runs",
+   "roles": [],
+   "counts": false
+  },
+  {
+   "id": "SELF.a17-security-folder-bites",
+   "base": "SELF.a17-security-folder-bites",
    "assertion": "SELF",
    "group": "selftest",
    "build": "host",
