@@ -192,9 +192,40 @@ namespace NetSec.Trace
     /// <summary>The Show keys boundary (modes-design.md section 6.4). Pure: same input, same output. Rules, engines and labs never call it.</summary>
     public static class TraceRedaction
     {
-        public static string Fingerprint(byte[] secret) { return null; }
+        public const string HiddenByToggle = "toggle";
 
-        public static TraceEvent Hide(TraceEvent e) { return e; }
+        /// <summary>"fp:" and the first 8 bytes of SHA-256, as 16 lowercase hex. Same key, same fingerprint; that is its one job.</summary>
+        public static string Fingerprint(byte[] secret)
+        {
+            NetSec.Crypto.IHash hash = NetSec.Crypto.Hashes.Sha256();
+            hash.Update(secret, 0, secret.Length);
+            byte[] digest = hash.Finish();
+            byte[] head = new byte[8];
+            Array.Copy(digest, head, head.Length);
+            return "fp:" + Hex.Encode(head);
+        }
+
+        /// <summary>A new event in which each secret that holds bytes holds a fingerprint, its length and "toggle" instead. All else stays. The input is not changed.</summary>
+        public static TraceEvent Hide(TraceEvent e)
+        {
+            if (e.Secrets == null) return e;
+            TraceSecret[] hidden = new TraceSecret[e.Secrets.Length];
+            for (int i = 0; i < hidden.Length; i++) hidden[i] = Hide(e.Secrets[i]);
+            return e.WithSecrets(hidden);
+        }
+
+        static TraceSecret Hide(TraceSecret s)
+        {
+            if (s.Bytes == null) return s;
+            TraceSecret h = new TraceSecret();
+            h.Holder = s.Holder;
+            h.Name = s.Name;
+            h.DerivedFrom = s.DerivedFrom;
+            h.Fingerprint = Fingerprint(s.Bytes);
+            h.Length = s.Bytes.Length;
+            h.Hidden = HiddenByToggle;
+            return h;
+        }
     }
 
     public static class TraceJson
@@ -221,6 +252,12 @@ namespace NetSec.Trace
             w.Raw("fields", FieldsJson(e.Fields));
             w.Raw("secrets", SecretsJson(e.Secrets));
             w.Raw("check", CheckJson(e.Check));
+            if (e.KeyUse != null)
+            {
+                w.Text("typeId", e.KeyUse.TypeId);
+                w.Number("version", e.KeyUse.Version);
+                w.Text("provider", e.KeyUse.Provider);
+            }
             if (e.WaitingFor != null) w.Raw("waiting", "{\"actor\":" + MiniJson.Quote(e.WaitingFor) + "}");
             w.Number("atMicros", e.AtMicros);
             return w.Finish();
@@ -255,6 +292,12 @@ namespace NetSec.Trace
                 w.Text("name", secrets[i].Name);
                 w.Bytes("hex", secrets[i].Bytes);
                 w.Raw("derivedFrom", QuotedList(secrets[i].DerivedFrom));
+                if (secrets[i].Hidden != null)
+                {
+                    w.Text("fingerprint", secrets[i].Fingerprint);
+                    w.Number("length", secrets[i].Length);
+                    w.Text("hidden", secrets[i].Hidden);
+                }
                 items[i] = w.Finish();
             }
             return "[" + string.Join(",", items) + "]";
