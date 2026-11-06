@@ -2145,6 +2145,17 @@
    "counts": true
   },
   {
+   "id": "A19.host.rcon-steps",
+   "base": "A19.host.rcon-steps",
+   "assertion": "A19",
+   "group": "a17",
+   "build": "host",
+   "slice": "W1",
+   "referee": "FIPS 197 (2001) data, the suite's RefAes, and the .NET library",
+   "roles": [],
+   "counts": true
+  },
+  {
    "id": "A19.host.replies-carry-no-store",
    "base": "A19.host.replies-carry-no-store",
    "assertion": "A19",
@@ -2796,6 +2807,28 @@
   {
    "id": "A19.walk.terms-worked-example.net10",
    "base": "A19.walk.terms-worked-example",
+   "assertion": "A19",
+   "group": "walk",
+   "build": "net10",
+   "slice": "W1",
+   "referee": "FIPS 197 (2001) data, the suite's RefAes, and the .NET library",
+   "roles": [],
+   "counts": true
+  },
+  {
+   "id": "A19.walk.word-test.cf",
+   "base": "A19.walk.word-test",
+   "assertion": "A19",
+   "group": "walk",
+   "build": "cf",
+   "slice": "W1",
+   "referee": "FIPS 197 (2001) data, the suite's RefAes, and the .NET library",
+   "roles": [],
+   "counts": true
+  },
+  {
+   "id": "A19.walk.word-test.net10",
+   "base": "A19.walk.word-test",
    "assertion": "A19",
    "group": "walk",
    "build": "net10",

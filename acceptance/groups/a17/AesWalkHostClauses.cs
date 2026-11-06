@@ -49,6 +49,7 @@ namespace Acceptance
             {
                 Dictionary<string, object> m = MiniJson.AsObject(o);
                 KeyRow k = new KeyRow();
+                k.Divisor = (int)MiniJson.Num(m, "divisor", -2); k.Quotient = (int)MiniJson.Num(m, "quotient", -2); k.Remainder = (int)MiniJson.Num(m, "remainder", -2);
                 k.Index = (int)MiniJson.Num(m, "i", -1); k.Previous = MiniJson.Str(m, "previous"); k.Rotated = MiniJson.Str(m, "rotated"); k.Substituted = MiniJson.Str(m, "substituted");
                 k.Rcon = MiniJson.Str(m, "rcon"); k.AfterRcon = MiniJson.Str(m, "afterRcon"); k.KeyBack = MiniJson.Str(m, "keyBack"); k.Word = MiniJson.Str(m, "word");
                 r.Add(k);
@@ -232,9 +233,20 @@ namespace Acceptance
                     Dictionary<string, object> m = MiniJson.AsObject(q);
                     TermPart p = new TermPart();
                     p.Factor = (int)MiniJson.Num(m, "factor", -1); p.Input = MiniJson.Str(m, "input"); p.Reduced = MiniJson.Bool(m, "reduced", false); p.Result = MiniJson.Str(m, "result");
-                    foreach (object d in MiniJson.Arr(m, "doublings") ?? new List<object>()) p.Doublings.Add((string)d);
+                    foreach (object d in MiniJson.Arr(m, "doublings") ?? new List<object>())
+                    {
+                        Dictionary<string, object> o2 = MiniJson.AsObject(d);
+                        Check.True(o2 != null, "a doubling is not an object with from, shifted, reduced and to");
+                        Doubling y = new Doubling();
+                        y.From = MiniJson.Str(o2, "from"); y.To = MiniJson.Str(o2, "to"); y.Reduced = MiniJson.Bool(o2, "reduced", false);
+                        y.Shifted = Convert.ToInt32(MiniJson.Str(o2, "shifted") ?? "-1", 16);
+                        p.Doublings.Add(y);
+                    }
+                    foreach (object q2 in MiniJson.Arr(m, "picks") ?? new List<object>()) p.Picks.Add((string)q2);
+                    foreach (object q2 in MiniJson.Arr(m, "sums") ?? new List<object>()) p.Sums.Add((string)q2);
                     x.Parts.Add(p);
                 }
+                foreach (object q3 in MiniJson.Arr(b, "running") ?? new List<object>()) x.Running.Add((string)q3);
                 all.Add(x);
             }
             return all;
@@ -271,6 +283,40 @@ namespace Acceptance
             List<object> got = MiniJson.Arr(d, name);
             Check.True(got != null && got.Count == 16, state + ": " + name + " should hold 16 entries");
             for (int i = 0; i < 16; i++) Check.True(Convert.ToInt32(got[i]) == want[i], state + ": " + name + "[" + i + "] is " + got[i] + ", expected " + want[i]);
+        }
+
+        /// <summary>Design section 2.2b: the Host sends each doubling of the round constants. The values are the FIPS 197 row, and the rules are the field's, so no step's numbers come from the Host alone.</summary>
+        [Clause("A19.host.rcon-steps")]
+        public static string RconSteps(Ctx c)
+        {
+            byte[] rcon = Hex.Decode("01020408102040801b36");
+            using (HostProc h = A17.Host(c, "walk-rcon"))
+            {
+                foreach (bool on in new bool[] { true, false })
+                {
+                    SetShowKeys(h, on);
+                    string state = on ? "Show keys ON" : "Show keys OFF";
+                    Reply r = HostHttp.Get(h, Tables);
+                    Check.True(r.Ok && r.Json != null, state + ": GET tables got " + r);
+                    List<object> steps = MiniJson.Arr(r.Json, "rconSteps");
+                    Check.True(steps != null && steps.Count == 9, state + ": rconSteps should hold 9 steps, holds " + (steps == null ? 0 : steps.Count));
+                    for (int i = 0; i < 9; i++)
+                    {
+                        Dictionary<string, object> s = MiniJson.AsObject(steps[i]);
+                        string at = state + ", step " + i;
+                        Check.True(s != null, at + ": not an object");
+                        int from = Convert.ToInt32(MiniJson.Str(s, "from") ?? "-1", 16), to = Convert.ToInt32(MiniJson.Str(s, "to") ?? "-1", 16), shifted = Convert.ToInt32(MiniJson.Str(s, "shifted") ?? "-1", 16);
+                        bool reduced = MiniJson.Bool(s, "reduced", false);
+                        Check.True(from == rcon[i], at + ": from " + from.ToString("x2") + ", expected " + rcon[i].ToString("x2"));
+                        Check.True(to == rcon[i + 1], at + ": to " + to.ToString("x2") + ", expected " + rcon[i + 1].ToString("x2"));
+                        Check.True(shifted == from << 1, at + ": shifted " + shifted.ToString("x") + " is not " + from.ToString("x2") + " moved left by one bit");
+                        Check.True(reduced == (shifted > 0xff), at + ": reduced " + reduced + " with shifted " + shifted.ToString("x"));
+                        Check.True(to == (reduced ? shifted ^ 0x11b : shifted), at + ": to " + to.ToString("x2") + " does not follow from shifted " + shifted.ToString("x"));
+                        Check.True(reduced == (from == 0x80), at + ": only 80 to 1b is reduced, and this step from " + from.ToString("x2") + " reads " + reduced);
+                    }
+                }
+            }
+            return "9 steps follow the round constants and the field's rules, and only 80 to 1b is reduced, with Show keys ON and OFF";
         }
 
         [Clause("A19.host.block-terms-real-run")]
@@ -344,7 +390,7 @@ namespace Acceptance
                 Check.True(block.Status == 409 && block.Code == "KEYS_HIDDEN", "OFF: GET block got " + block + ", expected 409 KEYS_HIDDEN");
                 Check.True(tables.Ok, "OFF: GET tables got " + tables);
                 // A term is one byte, so no byte search can find it. The field names of the word rows and the terms mark them instead, in either reply.
-                foreach (string field in new string[] { "keyWords", "terms", "parts", "doublings", "afterRcon" })
+                foreach (string field in new string[] { "keyWords", "terms", "parts", "doublings", "picks", "sums", "running", "afterRcon" })
                 {
                     Check.True(!HasField(block.Json, field), "OFF: the block error holds the field " + field);
                     Check.True(!HasField(tables.Json, field), "OFF: the tables reply holds the field " + field);

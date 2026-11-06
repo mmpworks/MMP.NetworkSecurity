@@ -2,7 +2,7 @@
 
 Author: Echo. Date: 2026-11-05. Branch: `test/acceptance-suite`. Rule: D11. Builders never write under `acceptance/`.
 
-Conclusion: the suite has **M = 332 product clauses** (`clauses.json`): the 208 of the first release, 54 for A17 (sections 8 and 12) and 70 for the AES walk, A19 (sections 10 and 11). With no product built it reports **0 of 332 PASS, 0 FAIL, 332 NOT RUN**.
+Conclusion: the suite has **M = 335 product clauses** (`clauses.json`): the 208 of the first release, 54 for A17 (sections 8 and 12) and 73 for the AES walk, A19 (sections 10 and 11). With no product built it reports **0 of 335 PASS, 0 FAIL, 335 NOT RUN**.
 Its 31 checks on itself all PASS. The suite is written against `docs/program-design.md` section 11, `docs/modes-design.md`, and the merged referees in `acceptance/referees`. Every group compiles against the contract stub on net10.0 and on net48 with the CF build of MMP.AsyncProxy.
 Disposition: merge this branch. Send the open items in section 7 and in `CONTRACT.md` section 5.7 to Richard and Jared.
 
@@ -232,3 +232,9 @@ Conclusion: `A17.security.fallback-finds-the-repo-folder` adds **1 clause**, so 
 Limit: the last branch of `SecurityStore.ResolveRoot`, with no `.git` above the Host, is not run. A temp folder may have a `.git` above it on some machines, so the result would depend on the machine.
 
 Disposition: merge after sections 10 and 11.
+
+## 13. A19: the round constant steps and the word test (added 2026-11-06)
+
+Conclusion: `A19.host.rcon-steps` adds 1 clause, and `A19.walk.word-test` adds 2 (one per build), so M is **335**. Source: `docs/walkthrough-design.md` section 2.2b, from #169 and #172. The on-screen themes of that section arrive in the W1b set.
+
+Disposition: merge before W1a.

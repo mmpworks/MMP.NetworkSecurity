@@ -147,6 +147,11 @@ namespace Acceptance
             {
                 KeyRow e = expected[i], a = actual[i];
                 Check.True(a.Index == e.Index, where + ": row " + i + " has index " + a.Index + ", expected " + e.Index);
+                if (e.Divisor >= 0)
+                {
+                    Check.True(a.Divisor == e.Divisor && a.Quotient == e.Quotient && a.Remainder == e.Remainder, where + ": w[" + e.Index + "] test is " + a.Divisor + ", " + a.Quotient + ", " + a.Remainder + ", expected " + e.Divisor + ", " + e.Quotient + ", " + e.Remainder);
+                    values += 3;
+                }
                 values += Cell(where, e.Index, "previous", e.Previous, a.Previous);
                 values += Cell(where, e.Index, "rotated", e.Rotated, a.Rotated);
                 values += Cell(where, e.Index, "substituted", e.Substituted, a.Substituted);
