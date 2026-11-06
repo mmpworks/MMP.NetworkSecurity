@@ -29,7 +29,7 @@ import VaultPage from './components/VaultPage.vue'
 import { closeVault, vault } from './vault'
 import ShowKeysSwitch from './components/ShowKeysSwitch.vue'
 import WizardSheet from './components/WizardSheet.vue'
-import { badgeCount, closeSecurity, keysChip, loadSecurity, openSecurity, sec } from './security'
+import { badgeCount, closeSecurity, keysChip, loadSecurity, openSecurity, sec, words } from './security'
 
 const lightbox = ref(false)
 const mineCountColor = computed(() => (keysChip.value === 'Keys: built-in' ? undefined : 'primary'))
@@ -84,8 +84,8 @@ const raceUpTo = computed(() => selectedEvent.value?.seq ?? Infinity)
 const race = computed(() => ({ left: raceStats(shownEvents.value, raceUpTo.value, 'tls11'), right: raceStats(shownEvents.value, raceUpTo.value, 'tls13') }))
 
 function setView(v: ViewMode) { ui.view = v }
-// The Message bytes pane keeps at least 345 px, the height of a short message with every row and field in view. The diagram scrolls, so it gives up the height.
-const bytesPanePercent = Math.min(70, Math.max(46, Math.ceil(345 / Math.max(1, window.innerHeight - 90) * 100)))
+// The Message bytes pane keeps at least 360 px: a short message with every row and field in view, also under the 50 px Show keys banner. The diagram scrolls, so it gives up the height.
+const bytesPanePercent = Math.min(70, Math.max(46, Math.ceil(360 / Math.max(1, window.innerHeight - 90) * 100)))
 function toggleTransport() { ui.transport = ui.transport === 'os' ? 'glass' : 'os' }
 
 function moveSelection(d: number) {
@@ -182,6 +182,7 @@ const shortcuts: [string, string][] = [
         </v-alert>
 
         <NeedsBanner />
+        <v-alert v-if="!sec.showKeys" type="info" class="banner" data-testid="show-keys-off-banner">{{ words('wizard.keys.off-banner') }}</v-alert>
         <SecurityPage v-if="sec.open && !vault.open" />
         <VaultPage v-if="sec.open && vault.open" />
         <WizardSheet v-if="sec.run" />

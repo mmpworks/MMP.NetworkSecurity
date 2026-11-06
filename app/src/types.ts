@@ -11,7 +11,8 @@ export interface TraceField {
   gloss: string
 }
 
-export interface TraceSecret { holder: string; name: string; hex: string; derivedFrom: string[] }
+// With Show keys OFF the Host sends no hex. A secret then carries fingerprint ("fp:" and 8 bytes as hex), length in bytes, and hidden ("toggle" or "non-exportable").
+export interface TraceSecret { holder: string; name: string; hex: string; derivedFrom: string[]; fingerprint: string; length: number; hidden: string }
 
 export interface TraceCheck { id: string; name: string; result: 'pass' | 'fail'; code: string; detail: string }
 
@@ -35,6 +36,10 @@ export interface TraceEvent {
   secrets: TraceSecret[]
   check: TraceCheck | null
   waiting: string
+  /** On key.in-use events: the type id, its key version (0 for a built-in key), and the provider (builtin, file or vault). */
+  typeId: string
+  version: number
+  provider: string
   /** `name=value;name=value` on measure.result events. */
   detail: string
 }

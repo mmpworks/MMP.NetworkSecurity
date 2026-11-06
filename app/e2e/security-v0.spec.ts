@@ -30,13 +30,13 @@ test('the top bar shows the keys chip, the security button, the Show keys switch
   await shot(page, '01-top-bar')
 })
 
-test('the Show keys switch is on and locked in V0, because the Host hides nothing yet', async ({ page }) => {
+test('the Show keys switch is on by default and can be used', async ({ page }) => {
   await open(page, host)
   await expect(page.getByTestId('show-keys-switch')).toBeChecked()
-  await expect(page.getByTestId('show-keys-switch')).toBeDisabled()
+  await expect(page.getByTestId('show-keys-switch')).toBeEnabled()
   await page.getByTestId('security-setup-button').click()
   await expect(page.getByTestId('sec-test-keys-line')).toHaveText('Use test keys only. This course shows your keys on screen and in saved files.')
-  await expect(page.getByTestId('sec-show-keys-switch')).toBeDisabled()
+  await expect(page.getByTestId('sec-show-keys-switch')).toBeEnabled()
 })
 
 test('the Security setup screen lists 15 types with the two-button mode switch and the states', async ({ page }) => {

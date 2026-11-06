@@ -45,10 +45,13 @@ export function normalizeEvent(frame: any): TraceEvent {
       name: str(f.name), offset: Number(f.offset ?? 0), length: Number(f.length ?? 0),
       kind: (f.kind ?? 'data') as TraceField['kind'], visibleToWire: f.visibleToWire !== false, gloss: str(f.gloss),
     })),
-    secrets: arr(e.secrets).map((s): TraceSecret => ({ holder: str(s.holder), name: str(s.name), hex: str(s.hex).toLowerCase(), derivedFrom: arr(s.derivedFrom).map(str) })),
+    secrets: arr(e.secrets).map((s): TraceSecret => ({ holder: str(s.holder), name: str(s.name), hex: str(s.hex).toLowerCase(), derivedFrom: arr(s.derivedFrom).map(str), fingerprint: str(s.fingerprint).toLowerCase(), length: Number(s.length ?? str(s.hex).length / 2), hidden: str(s.hidden) })),
     check,
     waiting,
     detail: str(e.detail),
+    typeId: str(e.typeId),
+    version: Number(e.version ?? 0),
+    provider: str(e.provider),
   }
 }
 

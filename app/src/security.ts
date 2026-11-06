@@ -1,5 +1,5 @@
 import { computed, reactive, watch } from 'vue'
-import { addr, lessons, startSession, ui } from './store'
+import { addr, lessons, onShowKeys, replaceOpenSessions, showKeysFrameCount, startSession, ui } from './store'
 import { hostGet, hostSend } from './host'
 import copy from './wizard-copy.json'
 
@@ -137,9 +137,12 @@ export async function openSecurity() { sec.open = true; await loadSecurity() }
 export function closeSecurity() { sec.open = false; sec.run = null; sec.returnLesson = null }
 
 export async function setShowKeys(on: boolean) {
+  const frames = showKeysFrameCount()
   const r = await hostSend(addr, 'PUT', '/api/security/show-keys', { on })
-  if (r.status < 300) sec.showKeys = on
-  else fault(str(r.body?.code) || 'SHOW_KEYS_FAILED', str(r.body?.message))
+  if (r.status < 300) {
+    // The reply acts only when no frame came in the meantime, which keeps the case where the socket is down.
+    if (frames === showKeysFrameCount()) { sec.showKeys = on; await replaceOpenSessions(on) }
+  } else fault(str(r.body?.code) || 'SHOW_KEYS_FAILED', str(r.body?.message))
 }
 
 export async function setMode(typeId: string, mode: KeyMode): Promise<boolean> {
@@ -231,3 +234,6 @@ watch(() => ui.error, e => {
 })
 
 export const lessonsBuilt = computed(() => lessons.value.filter(l => l.built))
+
+// The Host broadcasts security.show-keys when any client flips the switch. The store replaces each open session, and this keeps the switch in step.
+onShowKeys(on => { sec.showKeys = on })

@@ -29,6 +29,8 @@ export interface SessionRec {
   events: TraceEvent[]
   finished: { outcome: string; code: string; check: string } | null
   replay: boolean
+  /** A replayed file that holds hidden secrets: its bytes are gone, whatever the switch says. */
+  fileHidesKeys: boolean
 }
 
 export const addr = resolveHostAddress()
@@ -164,10 +166,45 @@ async function resync() {
     const last = s.events.length ? s.events[s.events.length - 1].seq : 0
     const body = await hostGet(addr, `/api/sessions/${s.id}/events?after=${last}`)
     const rows: any[] = Array.isArray(body) ? body : body?.events ?? []
-    s.events = [...s.events, ...rows.map(normalizeEvent).filter(e => e.seq > last)]
+    const read = rows.map(normalizeEvent).filter(e => e.seq > last)
+    s.events = [...s.events, ...(keysHidden ? read.map(withoutBytes) : read)]
   } catch { /* the live feed keeps going */ }
 }
 
+
+let flipGeneration = 0
+let keysHidden = false
+/** The app's copy of an event with its key bytes gone. A secret keeps its length and says why it has no hex. */
+const withoutBytes = (e: TraceEvent): TraceEvent => (e.secrets.some(x => x.hex)
+  ? { ...e, secrets: e.secrets.map(x => (x.hex ? { ...x, hex: '', length: x.length || x.hex.length >> 1, hidden: x.hidden || 'toggle' } : x)) }
+  : e)
+/**
+ * The Host redacts at its boundary, so after a flip of Show keys every open session is read again.
+ * OFF takes the bytes out of the app's copy first, so a slow or failed read can never leave them on screen.
+ * A reply from an older flip is dropped. Events newer than the reply came after the read, so the Host already sent them under this flip.
+ * A replay has no session on the Host to read: OFF takes its bytes, and only opening the file again brings them back.
+ */
+export async function replaceOpenSessions(on: boolean) {
+  const generation = ++flipGeneration
+  keysHidden = !on
+  if (!on) for (const s of ui.sessions) s.events = s.events.map(withoutBytes)
+  for (const s of ui.sessions.filter(x => !x.replay)) {
+    try {
+      const body = await hostGet(addr, `/api/sessions/${s.id}/events`)
+      if (generation !== flipGeneration) return
+      const rows: any[] = Array.isArray(body) ? body : body?.events ?? []
+      const read = rows.map(normalizeEvent).sort((a, b) => a.seq - b.seq)
+      const last = read.length ? read[read.length - 1].seq : 0
+      s.events = [...(keysHidden ? read.map(withoutBytes) : read), ...s.events.filter(e => e.seq > last)]
+    } catch { /* The live feed keeps going. On OFF the bytes are already gone. */ }
+  }
+}
+
+// The Host's frame is the truth for Show keys. A PUT reply that lands after a frame is the same flip or an older one, so it must not act.
+let showKeysFrames = 0
+export const showKeysFrameCount = () => showKeysFrames
+let showKeysHandler: ((on: boolean) => void) | null = null
+export function onShowKeys(h: (on: boolean) => void) { showKeysHandler = h }
 // The Host sends every frame to every open socket. This client owns only the sessions it asked for: a session.started whose
 // requestId it sent. A trace or finished frame can arrive ahead of its session.started, so frames of unknown sessions wait by id.
 const myRequests = new Set<string>()
@@ -195,6 +232,11 @@ function onFrame(f: any) {
       if (!mySessions.has(String(f.sessionId))) return hold(f)
       return f.type === 'trace' ? onTrace(f) : onFinished(f)
     case 'session.forked': return mySessions.has(String(f.sessionId)) || mySessions.has(String(f.parentId)) ? onForked(f) : undefined
+    case 'security.show-keys':
+      showKeysFrames++
+      showKeysHandler?.(f.on !== false)
+      void replaceOpenSessions(f.on !== false)
+      return
     case 'error':
       if (f.requestId && !myRequests.has(String(f.requestId))) return
       ui.error = normalizeError(f)
@@ -206,7 +248,8 @@ function onStarted(f: any) {
   const lesson = ui.lesson ?? 0
   const rec: SessionRec = {
     id: String(f.sessionId), parentId: '', label: `lesson ${lesson}`, lesson, seed: Number(f.seed ?? 0),
-    trainingOnly: !!f.trainingOnly, transportKind: String(f.transportKind ?? (f.trainingOnly ? 'glass' : 'os')), events: [], finished: null, replay: false,
+    // The Host names no transport for a replay. It reads a saved file and opens no OS socket, so its rows show as a training run's rows do.
+    trainingOnly: !!f.trainingOnly || !!f.replay, transportKind: String(f.transportKind ?? (f.trainingOnly || f.replay ? 'glass' : 'os')), events: [], finished: null, replay: !!f.replay, fileHidesKeys: !!f.fileHidesKeys,
   }
   ui.sessions = [...ui.sessions.filter(s => s.id !== rec.id), rec]
   ui.activeId = rec.id
@@ -221,7 +264,7 @@ function onTrace(f: any) {
   const ev = normalizeEvent(f)
   const s = ui.sessions.find(x => x.id === ev.sessionId)
   if (!s) return
-  if (!s.events.some(e => e.seq === ev.seq)) s.events = [...s.events, ev]
+  if (!s.events.some(e => e.seq === ev.seq)) s.events = [...s.events, keysHidden ? withoutBytes(ev) : ev]
   if (ev.waiting) ui.engine = 'waiting'
   wake()
 }
@@ -297,7 +340,7 @@ export function runEngine() { sock?.send({ type: 'session.run', sessionId: ui.ac
 export function pauseEngine() { sock?.send({ type: 'session.pause', sessionId: ui.activeId }); ui.engine = 'stepping' }
 export function restartSession() { if (ui.lesson != null) startSession(ui.mode) }
 export function saveSession() { if (ui.activeId) sock?.send({ type: 'session.save', sessionId: ui.activeId }) }
-export function loadTrace(file: string) { if (file) sock?.send({ type: 'session.load', file }) }
+export function loadTrace(file: string) { if (file) sock?.send({ type: 'session.load', requestId: nextReq(), file }) }
 
 // ---- tour driver ----
 
