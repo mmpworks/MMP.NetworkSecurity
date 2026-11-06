@@ -15,6 +15,7 @@
     <Compile Include="..\groups\walk\AesStepClauses.cs" Link="walk\AesStepClauses.cs" />
     <Compile Include="..\groups\walk\AesFieldClauses.cs" Link="walk\AesFieldClauses.cs" />
     <Compile Include="..\groups\a17\AesWalkHostClauses.cs" Link="a17\AesWalkHostClauses.cs" />
+    <Compile Include="..\groups\a17\SecurityFolderClauses.cs" Link="a17\SecurityFolderClauses.cs" />
     <Compile Include="..\groups\a17\A17Kit.cs" Link="a17\A17Kit.cs" />
     <Compile Include="..\groups\a17\V0Clauses.cs" Link="a17\V0Clauses.cs" />
     <Compile Include="..\groups\a17\V3Clauses.cs" Link="a17\V3Clauses.cs" />
