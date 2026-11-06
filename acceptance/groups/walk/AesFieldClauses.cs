@@ -61,6 +61,7 @@ namespace Acceptance
             }
             Check.True(mix[0].Parts[0].Reduced && mix[0].Parts[1].Reduced, "2 x d4 and 3 x bf both need the reduction by 11b");
             Check.True(!mix[0].Parts[2].Reduced && mix[0].Parts[2].Doublings.Count == 0, "1 x 5d needs no doubling");
+            Check.True(mix[0].Parts[0].Doublings.Count == 1, "2 x d4 needs one doubling, and has " + mix[0].Parts[0].Doublings.Count);
             Doubling first = mix[0].Parts[0].Doublings[0];
             Check.True(first.From == "d4" && first.Shifted == 0x1a8 && first.Reduced && first.To == "b3", "2 x d4: from " + first.From + ", shifted " + first.Shifted.ToString("x") + ", to " + first.To + ", expected d4, 1a8, b3");
             Check.True(string.Join(" ", mix[0].Running.ToArray()) == "b3 69 34 04", "running is " + string.Join(" ", mix[0].Running.ToArray()) + ", expected b3 69 34 04");
