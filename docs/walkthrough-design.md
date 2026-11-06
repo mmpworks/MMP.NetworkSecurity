@@ -1,6 +1,6 @@
 # MMP.NetworkSecurity: walkthrough design
 
-Author: Richard. Date: 2026-11-06. Revision 13, adding the test that decides each word, with its numbers from the engine. Status: design only, for Jared's check and Echo's clauses. No product code.
+Author: Richard. Date: 2026-11-06. Revision 14, adding the GCM stream view for W1c. Status: design only, for Jared's check and Echo's clauses. No product code.
 
 Sources of facts: FIPS 197, the engine, and Jared's sheet `E:\dev\ns-lesson1-facts.md`. Steve's web pages set depth and teaching order only (section 2.1).
 
@@ -721,6 +721,47 @@ Steve's ruling: show what the repeated-nonce mistake costs. An eavesdropper with
 | Forged last block | `ec21213913e7f998f016eda68a166119` |
 | Forged tag | `4207b367ff74886a6fec40259d3939e0` |
 
+### 2.4d The GCM stream view (W1c)
+
+Steve's item. It opens from the GCM tab, on the run's `TextGcm1`. It shows that AES locks counters and never sees the text. The text then XORs with the key stream, one byte at a time. The build waits until W1a is done.
+
+| Part | On screen | Value from the engine |
+|---|---|---|
+| A block | A counter, then 3 rows: Text, Key stream, and Sent | `/modes` row: `count`, `lockIn`, `data`, `lockOut`, `cipher` |
+| One byte | "p (70) XOR a3 = d3", with the bits below it, and the sent byte lands | Byte j of `data`, `lockOut`, and `cipher`. The app prints them and computes no XOR |
+| The end | "64 bytes in, 64 bytes out. No padding." | The byte counts of `data` and `cipher` |
+| The tag | H, the mask, and the GHASH table | `/ghash`, as section 2.4a sets out |
+| A flip | The tags differ, and the words in the list below show | `/ghash` `flip` |
+
+Controls: Play the stream, Pause, Resume, Next, and Show all. Pause and Resume follow section 2.2a. Flip one bit is one button, and pressing it again puts the bit back.
+
+**The flip's words:** "The tags differ, so the receiver rejects the message and returns no text. Without the tag, it would read:" and then the text. With no flip: "The tags match, so the receiver accepts the text."
+
+**The flip runs in the walk and changes nothing in the run.** The panel says so. The trace gets no event, and the lesson's own attack stays the way to flip a byte on the wire. The engine returns no text on a failed tag, so "would read" comes from the walk and never from `Gcm`'s open path.
+
+**What the routes already hold, and what is missing:**
+
+| Need | Status |
+|---|---|
+| Counter block, key stream, text, sent bytes | Held: `lockIn`, `lockOut`, `data`, `cipher`. GCM's `data` has no padding, so its length gives the bytes used |
+| H, mask, table, tag | Held: `/ghash` `hash`, `mask`, `rows`, `tag` |
+| The counter's number | **New:** `count` on a GCM row. The app would otherwise read it out of `lockIn` |
+| The flip | **New:** `flip` on `/ghash`: `byte`, `bit`, `cipher`, `computedTag`, `textWithoutTag`. The engine picks one bit and works these out |
+
+Neither field touches W1a, because `/modes` and `/ghash` arrive in W1c.
+
+**Show keys OFF.** The stream rows stay open, as `/modes` does today, because each key stream byte equals text XOR cipher. The tag section closes, because `/ghash` holds H. `flip` must close with it even with H removed: `tag` XOR `computedTag` is the changed block times a power of H, so a client that held both could recover H.
+
+**Unused key stream bytes need care.** A short last block leaves key stream bytes no XOR used. Text XOR cipher cannot give those bytes, so they are new AES output, and the reason `/modes` stays open does not cover them. Two rules follow:
+
+1. `TextGcm1` is 64 bytes, so it fills its 4 blocks and has no unused bytes. **So the strike-through never shows on the run's own message.**
+2. The struck-through bytes and their words arrive with typed text, under the practice key, in a separate slice after W1c: "No padding. The last block used 9 key stream bytes and dropped the other 7." On a run's key, `lockOut` holds only the bytes the text used.
+
+**Two things in the mock that the build changes:**
+
+1. It says "Made-up values, for the walk only". This view uses the run's real message, so those words go.
+2. It lists other data the tag protects. AAD is empty in this lesson, and section 2.4a's words already say so, so that line goes.
+
 ### 2.4c A longer text, and the picture (W2)
 
 Steve's ask, after CrypTool 2's "Block Modes" template: a view with many blocks, where the mode's effect shows. We take the idea and no code or image.
@@ -866,7 +907,8 @@ namespace NetSec.Crypto {
     public readonly byte[] Before, Block, AfterXor, AfterMultiply;
     public readonly bool IsLengths;
   }
-  public sealed class GhashWalk { public readonly byte[] Hash, CounterBlock, Mask, Tag; public readonly GhashRow[] Rows; }
+  public sealed class GhashFlip { public readonly int Byte, Bit; public readonly byte[] Cipher, ComputedTag, TextWithoutTag; }   // One bit flipped in the walk. The run does not change
+  public sealed class GhashWalk { public readonly byte[] Hash, CounterBlock, Mask, Tag; public readonly GhashRow[] Rows; public readonly GhashFlip Flip; }
   public sealed class AesKeyWord {            // One row of the FIPS 197 appendix A tables. An unused cell is null
     public readonly int Index;
     public readonly int Divisor, Quotient, Remainder;   // Index / Nk, the test FIPS 197 section 5.2 applies to this word
@@ -915,7 +957,8 @@ namespace NetSec.Labs {
     public int Block;
     public byte[] Data;                       // The padded data block
     public byte[] Chain;                      // CBC: the IV or last cipher block. Else null
-    public byte[] LockIn, LockOut;            // Into and out of forward AES
+    public int Count;                         // GCM: the counter's number, from 2. Else 0
+    public byte[] LockIn, LockOut;            // Into and out of forward AES. On a run's key, a short GCM block holds only the bytes the text used
     public byte[] Cipher, Received; public AesWireStatus Status;   // Cipher: what the sender locked
     public AesPass UnlockPass;                // Inverse for ECB and CBC, Forward for GCM
     public byte[] UnlockIn, UnlockOut, Result;   // Null when the receiver gave no bytes
@@ -1247,7 +1290,7 @@ Sheet 5.9 lists them, and these three matter most:
 | **Hold on W1b** | Do not start the walk screens until the lead says the new look is set. Steve wants a major UX refresh. W1a is engine work, and it is not affected | | Lead |
 | **W1b** small section | `walk.ts`, `useWalkTimeline.ts`, `AesBlockWalk.vue`, `SboxView.vue`, `KeySchedulePanel.vue`, `FieldPanel.vue`, `MixMatrixView.vue`, chapter 1 at 128 bits with animation, binary on hover, and typed text (`AesTypedBlocks`, `/typed-block`), encrypt and decrypt, the flip guard | e2e: a learner reaches `Pump four is ok.` by Next alone. A clicked cell's lookup equals the next state, both tables. Grid order clause. S-box scan. Measure the block reply time at AES-128 and AES-256, and record both in `docs/learnings.md`, because section 7 keeps one reply until this shows a visible delay | Nancy |
 | **Stop: show Steve** | Steve steps through chapter 1 in the app and reacts. CBC and modes work starts after this | His reaction goes in `docs/learnings.md`, and later slices read it | Lead |
-| **W1c** | `Gcm.CounterBlock`, `AesWalks.Feed`, the modes route, `AesFeedView.vue`, chapter 2 with ECB, CBC, GCM, and "Mistakes people make". `Gcm.WalkTag`, `Gf128.Inverse` and `SquareRoot`, `GcmForgeries`, `OptionForgeLastBlock`, the attack row, `/ghash`, `/forge`, `GhashView.vue`, `ForgeryView.vue`. Key sizes, two tour steps, gloss | Wire clauses per mode. e2e on wire match and on damage. A15, A15a by a reader who did not write it | Richard, Nancy |
+| **W1c** | `Gcm.CounterBlock`, `AesWalks.Feed`, the modes route, `AesFeedView.vue`, chapter 2 with ECB, CBC, GCM, and "Mistakes people make". `Gcm.WalkTag`, `Gf128.Inverse` and `SquareRoot`, `GcmForgeries`, `OptionForgeLastBlock`, the attack row, `/ghash`, `/forge`, `GhashView.vue`, `ForgeryView.vue`, `GcmStreamView.vue` (section 2.4d). Key sizes, two tour steps, gloss | Wire clauses per mode. e2e on wire match and on damage. A15, A15a by a reader who did not write it | Richard, Nancy |
 | W2 | `AesKey.SboxBuild(byte)` and "how the table was built". `flipKeyBit`. `AesKey.DependsOn` and tap-a-byte. `AesLongText`, `/long-text`, `LongTextView.vue`, and the picture side by side. One-bit-flip spread count (4 bytes after round 1, 16 after round 2) | FIPS 5.1.1 worked example for `53`. Spread count against Jared's values | Richard, Nancy |
 | W3 | Lesson 3 try-it, lesson 4 bench | Clauses on each check result | Richard, Nancy, Jared on wording |
 | W4 | Lesson 5 record walk and speed bench | Record walk equals the wire. The number's label names the machine and table AES | Richard, Nancy |
@@ -1306,6 +1349,8 @@ If Steve does not follow it after 2 rounds of word changes, stop and re-plan the
 | Modes | `match` on every row: `TextGcm1` 4, `TextCbc` 5, `PictureEcb` capped rows, `TextEcb` 5 on the fork. `unlockPass` is inverse for ECB and CBC, forward for GCM. Call counts per section 2.4 |
 | Damage | `L1-flip-cbc` gives `differs` and the 16, 1, 0, 0, 0 pattern. `L1-flip-gcm` gives `differs`, a failed tag, and no unlock bytes. Free flips: CBC IV gives `damage: iv` with block 1's bit flipped. GCM nonce and tag give all `match`, the named `damage`, and a failed tag. A header flip gives no unlock. A `TextCbc` type flip with xor 10 gives `damage: type`, and the run completes with no failed check. The lock column shows the sender's starter in each case. A free wire flip, addressed by stream, recovers the sender's frame. A failed run can cut the client's burst short, so a clause on a later message in a flip fork allows a row result or `WALK_MESSAGE_NOT_SENT` |
 | Tag per message | A flip on `PictureGcm` leaves `TextGcm1`'s tag as `passed` |
+| GCM stream | On `TextGcm1`, each `count` runs from 2, and each `lockIn` ends in that count. Byte j of `cipher` equals byte j of `data` XOR byte j of `lockOut`, checked by the clause and never by the app. The panel prints those bytes. Next moves one byte, and Show all shows the engine's rows. Pause holds the motion. With Show keys OFF, the stream stays and the tag section closes. Every GCM message in lesson 1 fills its blocks, so a pure test on `AesWalks.Feed` holds the unused-byte rule: on a run's key, a 25-byte text's last `lockOut` holds 9 bytes |
+| GCM flip | `flip.computedTag` differs from `tag`, and it equals the BCL's tag on `flip.cipher`. `flip.textWithoutTag` differs from the text at one bit, the bit `flip` names. The trace gets no event from it. Off with Show keys OFF, with `/ghash` |
 | GHASH | Each row is XOR then multiply. `Tag` equals the frame's tag on `TextGcm1`, and on a message with the BCL as referee. H equals AES of the zero block. The nonce is not an input to a row |
 | Forgery recovery | Recovered H equals AES of the zero block under the run's key, on 2 seeds. Section 2.4b's table holds |
 | Forgery accepted | `Gcm.TryOpen` accepts the forged message and returns the forged text. A one-bit change to the forged tag fails it |
