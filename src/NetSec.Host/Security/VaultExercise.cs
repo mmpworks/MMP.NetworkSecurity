@@ -24,7 +24,7 @@ public sealed class VaultExercise
     const string SignatureRefused = "Signature Verification Failure";
 
     /// <summary>The course text under every chain result, pass or fail. AuditChain names the same three limits.</summary>
-    public const string ChainLimits = "This check has no secret, so it misses three changes: an edit to the newest row, rows cut from the end, and a full rewrite of every row.";
+    public const string ChainLimits = "This check has no secret. It misses three changes: an edit to the newest row, rows cut from the end, and a full rewrite of every row.";
 
     static readonly VaultKeyPolicy SigningPolicy = new(VaultAlgorithms.Ed25519, false, [VaultOps.Sign]);
     static readonly VaultKeyPolicy DerivePolicy = new(VaultAlgorithms.HkdfSecret, false, [VaultOps.Derive]);

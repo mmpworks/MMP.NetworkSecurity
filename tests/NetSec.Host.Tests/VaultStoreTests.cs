@@ -106,4 +106,14 @@ public sealed class VaultStoreTests : IDisposable
         Assert.Contains("cut from the end", limits);
         Assert.Contains("rewrite of every row", limits);
     }
+
+    /// <summary>The app's copy file holds the words the screen shows. The Host's field must hold the same words, so the two cannot drift.</summary>
+    [Fact]
+    public void The_limits_field_holds_the_words_of_the_app_copy_file()
+    {
+        DirectoryInfo dir = new(AppContext.BaseDirectory);
+        while (dir.Parent is not null && !File.Exists(Path.Combine(dir.FullName, "app", "src", "wizard-copy.json"))) dir = dir.Parent;
+        string copy = JsonDocument.Parse(File.ReadAllText(Path.Combine(dir.FullName, "app", "src", "wizard-copy.json"))).RootElement.GetProperty("wizard.vault.audit.limits").GetString()!;
+        Assert.Equal(VaultExercise.ChainLimits, copy);
+    }
 }
