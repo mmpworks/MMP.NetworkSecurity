@@ -29,6 +29,8 @@ export interface SessionRec {
   events: TraceEvent[]
   finished: { outcome: string; code: string; check: string } | null
   replay: boolean
+  /** A replayed file that holds hidden secrets: its bytes are gone, whatever the switch says. */
+  fileHidesKeys: boolean
 }
 
 export const addr = resolveHostAddress()
@@ -224,7 +226,7 @@ function onStarted(f: any) {
   const lesson = ui.lesson ?? 0
   const rec: SessionRec = {
     id: String(f.sessionId), parentId: '', label: `lesson ${lesson}`, lesson, seed: Number(f.seed ?? 0),
-    trainingOnly: !!f.trainingOnly, transportKind: String(f.transportKind ?? (f.trainingOnly ? 'glass' : 'os')), events: [], finished: null, replay: false,
+    trainingOnly: !!f.trainingOnly, transportKind: String(f.transportKind ?? (f.trainingOnly ? 'glass' : 'os')), events: [], finished: null, replay: false, fileHidesKeys: !!f.fileHidesKeys,
   }
   ui.sessions = [...ui.sessions.filter(s => s.id !== rec.id), rec]
   ui.activeId = rec.id

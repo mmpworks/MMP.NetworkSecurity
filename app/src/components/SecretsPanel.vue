@@ -1,6 +1,7 @@
 <script setup lang="ts">
 import { computed, reactive } from 'vue'
 import { isHighlighted, isOsTransport, selectedEvent, shownEvents, ui, upToSeq } from '../store'
+import KeysInUse from './KeysInUse.vue'
 
 // With Show keys OFF a row holds no hex. It shows its fingerprint and its length, and two rows are the same key when their fingerprints match.
 interface Row { holder: string; name: string; hex: string; fingerprint: string; length: number; hidden: string; derivedFrom: string[]; fresh: boolean }
@@ -50,6 +51,7 @@ const copy = (hex: string) => { try { void navigator.clipboard?.writeText(hex) }
 <template>
   <div class="secrets" data-testid="secrets-panel">
     <div class="inspector-tools"><span class="side-title">WHAT EACH SIDE KNOWS</span></div>
+    <KeysInUse v-if="!isOsTransport" />
     <div v-if="isOsTransport" class="empty-note">Values are held by the OS. This course shows none of them with the OS transport.</div>
     <template v-else-if="eve">
       <div class="secret-cols">

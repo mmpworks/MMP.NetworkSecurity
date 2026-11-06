@@ -36,6 +36,10 @@ export interface TraceEvent {
   secrets: TraceSecret[]
   check: TraceCheck | null
   waiting: string
+  /** On key.in-use events: the type id, its key version (0 for a built-in key), and the provider (builtin, file or vault). */
+  typeId: string
+  version: number
+  provider: string
   /** `name=value;name=value` on measure.result events. */
   detail: string
 }

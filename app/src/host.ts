@@ -49,6 +49,9 @@ export function normalizeEvent(frame: any): TraceEvent {
     check,
     waiting,
     detail: str(e.detail),
+    typeId: str(e.typeId),
+    version: Number(e.version ?? 0),
+    provider: str(e.provider),
   }
 }
 

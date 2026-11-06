@@ -258,3 +258,9 @@ body { background: var(--bg); color: var(--text); overflow: hidden; }
 .vault-audit-table th, .vault-audit-table td { text-align: left; padding: 4px 8px; border-bottom: 1px solid var(--line); overflow-wrap: anywhere; }
 .vault-screen .vault-chain { display: flex; align-items: center; gap: 8px; width: 100%; margin: 0; }
 .vault-screen .wiz-parts li { display: flex; flex-wrap: wrap; align-items: baseline; gap: 2px 10px; }
+
+/* Keys in use (V3) */
+.keys-in-use { padding: 6px 10px; border-bottom: 1px solid var(--line); display: flex; flex-direction: column; gap: 4px; }
+.kiu-chips { display: flex; flex-wrap: wrap; gap: 6px; }
+.kiu-chip { display: inline-flex; flex-wrap: wrap; align-items: baseline; gap: 2px 8px; padding: 3px 8px; border: 1px solid var(--line); border-radius: 8px; font-size: 12px; }
+.kiu-chip code { font: 11px ui-monospace, Consolas, monospace; overflow-wrap: anywhere; }
