@@ -398,6 +398,8 @@ if ($e2eMine.Count -gt 0) {
         $previewPort = @(4180, 5173) | Where-Object { $listening -notcontains $_ } | Select-Object -First 1
         $hostPort = 5180; while ($listening -contains $hostPort) { $hostPort++ }
         $env:ACC_HOST_PORT = [string]$hostPort
+        # Run only the selected clauses. Before this, every spec ran, and a failure outside the selection never reached the report.
+        $env:ACC_E2E_GREP = if ($Clauses -contains 'All') { '' } else { (@($e2eMine | ForEach-Object { '\[' + [regex]::Escape($_.id) + '\]' }) -join '|') }
         if ($previewPort) { $env:ACC_PREVIEW_PORT = [string]$previewPort }
         else { Set-All $e2eMine 'NOT RUN' 'PORT_BUSY' 'ports 4180 and 5173 are both in use by another process. The Host allows only these two origins, so the UI cannot be served here without testing against a stranger.' }
         $r = if ($previewPort) { Invoke-Tool 'npx' @('playwright', 'test') $e2e -TimeoutSec 1800 } else { [pscustomobject]@{ ExitCode = -997; Output = '' } }

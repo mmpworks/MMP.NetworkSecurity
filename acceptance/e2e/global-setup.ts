@@ -27,13 +27,13 @@ function answers(port: number, host: string): Promise<boolean> {
   });
 }
 
-/** Waits for the child's own words: vite prints the address it bound. A port that answers proves nothing, since another tree can hold it. */
-async function previewOwnsPort(log: string, port: number, exited: () => boolean, ms: number): Promise<boolean> {
+/** Waits for the child's own words: vite prints the address it bound, and the Host prints HOST-READY. A port that answers proves nothing, since another tree can hold it. */
+async function childSaid(log: string, words: string, exited: () => boolean, ms: number): Promise<boolean> {
   const end = Date.now() + ms;
   while (Date.now() < end) {
     if (exited()) return false;
     const text = (fs.existsSync(log) ? fs.readFileSync(log, 'utf8') : '').replace(/\x1b\[[0-9;]*m/g, '');   // vite colours the port number
-    if (text.includes(`localhost:${port}`)) return true;
+    if (text.includes(words)) return true;
     await new Promise(r => setTimeout(r, 250));
   }
   return false;
@@ -70,14 +70,18 @@ export default async function globalSetup(): Promise<void> {
   fs.mkdirSync(securityDir, { recursive: true });
   // Design section 11 gives --port and --token. Design section 5 gives NETSEC_PORT and NETSEC_TOKEN. The suite passes both. A .dll path runs under dotnet.
   const hostArgs = ['--port', String(HOST_PORT), '--token', TOKEN];
+  const hostLogPath = path.join(OUT, 'host.log');
+  fs.rmSync(hostLogPath, { force: true });
+  const hostLog = fs.openSync(hostLogPath, 'a');
   const host = hostDll.toLowerCase().endsWith('.dll')
-    ? spawn('dotnet', [hostDll, ...hostArgs], { cwd: path.dirname(hostDll), detached: false, stdio: 'ignore', env: { ...process.env, NETSEC_PORT: String(HOST_PORT), NETSEC_TOKEN: TOKEN, LOCALAPPDATA: localAppData, NETSEC_SECURITY_DIR: securityDir } })
-    : spawn(hostDll, hostArgs, { cwd: path.dirname(hostDll), detached: false, stdio: 'ignore', env: { ...process.env, NETSEC_PORT: String(HOST_PORT), NETSEC_TOKEN: TOKEN, LOCALAPPDATA: localAppData, NETSEC_SECURITY_DIR: securityDir } });
+    ? spawn('dotnet', [hostDll, ...hostArgs], { cwd: path.dirname(hostDll), detached: false, stdio: ['ignore', hostLog, hostLog], env: { ...process.env, NETSEC_PORT: String(HOST_PORT), NETSEC_TOKEN: TOKEN, LOCALAPPDATA: localAppData, NETSEC_SECURITY_DIR: securityDir } })
+    : spawn(hostDll, hostArgs, { cwd: path.dirname(hostDll), detached: false, stdio: ['ignore', hostLog, hostLog], env: { ...process.env, NETSEC_PORT: String(HOST_PORT), NETSEC_TOKEN: TOKEN, LOCALAPPDATA: localAppData, NETSEC_SECURITY_DIR: securityDir } });
   let hostGone = false;
   host.on('exit', () => { hostGone = true; });
   host.on('error', () => { /* a start failure shows as hostUp false */ });
   if (host.pid) state.pids.push(host.pid);
-  state.hostUp = await waitPort(HOST_PORT, 60_000) && !hostGone;
+  state.hostUp = await childSaid(hostLogPath, `HOST-READY port=${HOST_PORT}`, () => hostGone, 60_000);
+  if (!state.hostUp && hostGone) { state.reason = 'PORT_BUSY'; state.note = `this run's Host exited before it bound port ${HOST_PORT}. See host.log`; }
 
   const previewLogPath = path.join(OUT, 'preview.log');
   fs.rmSync(previewLogPath, { force: true });
@@ -87,7 +91,7 @@ export default async function globalSetup(): Promise<void> {
   preview.on('exit', (code, sig) => { previewGone = true; try { fs.appendFileSync(path.join(OUT, 'preview.log'), `\n[preview exited code=${code} signal=${sig} at ${new Date().toISOString()}]\n`); } catch { /* ignore */ } });
   preview.on('error', () => { /* a start failure shows as previewUp false */ });
   if (preview.pid) state.pids.push(preview.pid);
-  state.previewUp = await previewOwnsPort(previewLogPath, PREVIEW_PORT, () => previewGone, 60_000) && await waitPort(PREVIEW_PORT, 60_000, 'localhost');   // vite preview listens on localhost, which can be ::1 only
+  state.previewUp = await childSaid(previewLogPath, `localhost:${PREVIEW_PORT}`, () => previewGone, 60_000) && await waitPort(PREVIEW_PORT, 60_000, 'localhost');   // vite preview listens on localhost, which can be ::1 only
   if (!state.previewUp && previewGone) { state.reason = 'PORT_BUSY'; state.note = `this run's preview exited before it bound port ${PREVIEW_PORT}. See preview.log`; }
   if (!state.note) state.note = state.hostUp && state.previewUp ? 'live' : `host up: ${state.hostUp}, preview up: ${state.previewUp}`;
   fs.writeFileSync(stateFile(), JSON.stringify(state));

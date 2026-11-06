@@ -1,5 +1,5 @@
 import { expect, test, type Page } from '@playwright/test';
-import { HOST_PORT, NotRun, TOKEN, hostGet, openApp, requireLive } from './support';
+import { HOST_PORT, NotRun, TOKEN, hostGet, openApp, readState, requireLive } from './support';
 
 /**
  * A19, chapter 1 of the AES walk in the app (docs/walkthrough-design.md sections 2.2, 2.3, 3.5, slice W1b). Test ids: CONTRACT.md section 6.
@@ -25,6 +25,9 @@ function kindOrder(rounds: number, encrypt: boolean): string[] {
 }
 
 async function setShowKeys(on: boolean): Promise<void> {
+  // With no live Host of this run's own, a finally block must not hide the NOT RUN, and must not change another run's Host.
+  const live = readState();
+  if (!live.hostUp || !live.previewUp) return;
   const r = await fetch(`http://127.0.0.1:${HOST_PORT}/api/security/show-keys`, {
     method: 'PUT', headers: { 'Content-Type': 'application/json', Authorization: `Bearer ${TOKEN}`, Origin: 'http://localhost:5173' }, body: JSON.stringify({ on }),
   });
