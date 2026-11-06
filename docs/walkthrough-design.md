@@ -550,7 +550,7 @@ Steve's ask, after CrypTool 2's "Block Modes" template: a view with many blocks,
 | Question | Answer |
 |---|---|
 | Which key? | The practice key, as section 2.2g sets out. The panel says: "This key differs from the run's" |
-| Which IV? | One fixed IV, so a flip compares like with like, and a clause can recompute every value with the BCL. The panel says: "This view uses one fixed IV so that a flip compares fairly. A real system uses a new unpredictable IV for each message. With one fixed IV, two texts with the same start give the same cipher blocks." The learner can see that by typing twice |
+| Which IV? | One fixed IV, so a flip compares like with like, and a clause can recompute every value with the BCL. The panel says: "This view uses one fixed IV so that a flip compares fairly. A real system uses a new unpredictable IV for each message. With one fixed IV, two texts with the same first block give the same first cipher block." The learner can see that by typing twice |
 | The flip | One query returns both the base rows and the flipped rows. The flip must land on a text byte, because a padding bit is not a text bit, and `WALK_BAD_ARGUMENT` refuses the rest. So at 16, 32, ... bytes, the last block offers no flip. A flipped bit can make invalid UTF-8, so the view shows flipped data as hex |
 | Show keys OFF | **Open**, as section 2.2g sets out |
 | Session needed? | No. The route takes the text and reads no run |
