@@ -146,9 +146,11 @@ body { background: var(--bg); color: var(--text); overflow: hidden; }
 }
 
 /* Secrets */
-.secret-cols { display: flex; gap: 8px; padding: 8px; overflow: auto; flex: 1 1 auto; min-height: 0; align-items: flex-start; }
+.secrets { overflow: auto; }
+.secrets > * { flex: 0 0 auto; }
+.secret-cols { display: flex; gap: 8px; padding: 4px 8px; align-items: flex-start; }
 .secret-col { flex: 1 1 0; min-width: 160px; }
-.col-head { font-weight: 700; text-transform: capitalize; margin-bottom: 4px; }
+.col-head { font-weight: 700; text-transform: capitalize; margin-bottom: 2px; }
 .secret-row { display: flex; flex-wrap: wrap; align-items: center; gap: 4px 8px; padding: 4px 6px; border-radius: 6px; border-left: 3px solid var(--secret); background: var(--surface2); margin-bottom: 4px; font-size: 12px; }
 .secret-row.fresh { animation: flash 1.2s ease-out 1; }
 .secret-row.hl { outline: 2px solid var(--focus); }
@@ -156,12 +158,12 @@ body { background: var(--bg); color: var(--text); overflow: hidden; }
 .sname { font-weight: 700; color: var(--secret); }
 .secret-row code { font: 11px ui-monospace, Consolas, monospace; overflow-wrap: anywhere; }
 .chip-from { font-size: 10px; border: 1px solid var(--line); border-radius: 8px; padding: 0 5px; color: var(--muted); }
-.converge { margin: 0 8px 8px; padding: 6px; border: 1px solid var(--line); border-radius: 8px; }
+.converge { margin: 0 8px 6px; padding: 4px 6px; border: 1px solid var(--line); border-radius: 8px; }
 .converge.match { border-color: var(--pass); box-shadow: 0 0 8px color-mix(in srgb, var(--pass) 40%, transparent); }
-.grids { display: flex; gap: 10px; flex-wrap: wrap; }
+.grids { display: flex; gap: 4px 10px; flex-wrap: wrap; }
 .grid32 { display: grid; grid-template-columns: repeat(16, 1fr); gap: 2px; font: 9px ui-monospace, Consolas, monospace; }
 .cell { background: var(--surface2); border-radius: 2px; padding: 1px; text-align: center; color: var(--secret); }
-.match-tag { color: var(--pass); font-weight: 700; margin-top: 4px; }
+.match-tag { color: var(--pass); font-weight: 700; margin-top: 2px; }
 
 /* Tour */
 .tour { overflow: auto; }
@@ -274,7 +276,7 @@ body { background: var(--bg); color: var(--text); overflow: hidden; }
 .vault-screen .wiz-parts li { display: flex; flex-wrap: wrap; align-items: baseline; gap: 2px 10px; }
 
 /* Keys in use (V3) */
-.keys-in-use { padding: 6px 10px; border-bottom: 1px solid var(--line); display: flex; flex-direction: column; gap: 4px; }
+.keys-in-use { padding: 4px 10px; border-bottom: 1px solid var(--line); display: flex; flex-direction: column; gap: 2px; }
 .kiu-chips { display: flex; flex-wrap: wrap; gap: 6px; }
 .kiu-chip { display: inline-flex; flex-wrap: wrap; align-items: baseline; gap: 2px 8px; padding: 3px 8px; border: 1px solid var(--line); border-radius: 8px; font-size: 12px; }
 .kiu-chip code { font: 11px ui-monospace, Consolas, monospace; overflow-wrap: anywhere; }

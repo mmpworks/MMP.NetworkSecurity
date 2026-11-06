@@ -157,3 +157,33 @@ test('an event with no wire bytes shows the eavesdropper no bytes and no rows', 
   await expect(page.getByTestId('inspector').locator('.field-row')).toHaveCount(0)
   await expect(page.getByTestId('inspector-no-wire')).toBeVisible()
 })
+
+// What each side knows: a row never sits under the box below it, and the panel has one scroll. A short lesson fits with no scroll at 1440 wide.
+const secretsLayout = (page: Page) => page.evaluate(() => {
+  const panel = document.querySelector('[data-testid=secrets-panel]')!
+  const box = (e: Element) => e.getBoundingClientRect()
+  const rows = [...panel.querySelectorAll('.secret-row')].map(box)
+  const below = [...panel.querySelectorAll('.converge')].map(box)
+  const clips = [...panel.querySelectorAll('.secret-cols')].filter(e => e.scrollHeight > e.clientHeight + 1).length
+  return {
+    rows: rows.length,
+    rowsUnderBox: rows.filter(r => below.some(b => r.bottom > b.top + 1 && r.top < b.bottom - 1)).length,
+    innerScrollers: clips,
+    shown: panel.clientHeight, whole: panel.scrollHeight,
+    rowTexts: [...panel.querySelectorAll('.secret-row')].filter(e => e.scrollWidth > e.clientWidth + 1).length,
+  }
+})
+
+for (const size of [{ width: 1440, height: 760 }, { width: 1536, height: 760 }, { width: 1440, height: 900 }, { width: 1280, height: 800 }, { width: 1100, height: 800 }]) {
+  test(`at ${size.width} x ${size.height} no key row sits under the match box`, async ({ page }) => {
+    await page.setViewportSize(size)
+    await freePlay(page, 1)
+    await pick(page, 'TextGcm1')
+    const m = await secretsLayout(page)
+    expect(m.rows, 'key rows on screen').toBeGreaterThan(1)
+    expect(m.rowsUnderBox, 'key rows under the match box').toBe(0)
+    expect(m.innerScrollers, 'a second scroll inside the panel').toBe(0)
+    expect(m.rowTexts, 'cut row text').toBe(0)
+    if (size.width >= 1440) expect(m.whole, 'the panel scrolls on a short lesson').toBeLessThanOrEqual(m.shown + 1)
+  })
+}
