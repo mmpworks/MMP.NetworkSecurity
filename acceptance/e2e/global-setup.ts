@@ -31,11 +31,15 @@ export default async function globalSetup(): Promise<void> {
 
   const localAppData = path.join(OUT, 'localappdata');
   fs.mkdirSync(localAppData, { recursive: true });
+  // A fresh folder each run. Without it the Host uses the repository's .security/, so a run that stops with Show keys OFF starts the next run OFF.
+  const securityDir = path.join(OUT, 'security');
+  fs.rmSync(securityDir, { recursive: true, force: true });
+  fs.mkdirSync(securityDir, { recursive: true });
   // Design section 11 gives --port and --token. Design section 5 gives NETSEC_PORT and NETSEC_TOKEN. The suite passes both. A .dll path runs under dotnet.
   const hostArgs = ['--port', String(HOST_PORT), '--token', TOKEN];
   const host = hostDll.toLowerCase().endsWith('.dll')
-    ? spawn('dotnet', [hostDll, ...hostArgs], { cwd: path.dirname(hostDll), detached: false, stdio: 'ignore', env: { ...process.env, NETSEC_PORT: String(HOST_PORT), NETSEC_TOKEN: TOKEN, LOCALAPPDATA: localAppData } })
-    : spawn(hostDll, hostArgs, { cwd: path.dirname(hostDll), detached: false, stdio: 'ignore', env: { ...process.env, NETSEC_PORT: String(HOST_PORT), NETSEC_TOKEN: TOKEN, LOCALAPPDATA: localAppData } });
+    ? spawn('dotnet', [hostDll, ...hostArgs], { cwd: path.dirname(hostDll), detached: false, stdio: 'ignore', env: { ...process.env, NETSEC_PORT: String(HOST_PORT), NETSEC_TOKEN: TOKEN, LOCALAPPDATA: localAppData, NETSEC_SECURITY_DIR: securityDir } })
+    : spawn(hostDll, hostArgs, { cwd: path.dirname(hostDll), detached: false, stdio: 'ignore', env: { ...process.env, NETSEC_PORT: String(HOST_PORT), NETSEC_TOKEN: TOKEN, LOCALAPPDATA: localAppData, NETSEC_SECURITY_DIR: securityDir } });
   host.on('error', () => { /* a start failure shows as hostUp false */ });
   if (host.pid) state.pids.push(host.pid);
   state.hostUp = await waitPort(HOST_PORT, 60_000);

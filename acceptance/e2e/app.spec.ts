@@ -145,7 +145,16 @@ test('[A17.ui.show-keys-switch] on by default; off replaces key bytes with finge
   const start = page.getByRole('button', { name: /start tour/i });
   if (await start.isVisible().catch(() => false)) await start.click();
   const secretRows = page.locator('[data-testid^="secret-row-"]');
-  await expect.poll(async () => await secretRows.count(), { timeout: 45_000, message: 'secret rows while Show keys is ON' }).toBeGreaterThan(0);
+  // Lesson 1 starts on concept steps, and its key reaches the secrets panel when the tour reaches the step that binds keys.installed.
+  // On the V3 Host key.in-use carries secrets: [] on purpose. So the clause walks the tour with Next, one step at a time, until a row shows.
+  // The clause names no step number, so a tour that adds a step does not move it. The cap only stops a tour that never shows a row.
+  const nextBtn = page.getByTestId('tour-next');
+  for (let hop = 0; hop < 30 && (await secretRows.count()) === 0; hop++) {
+    await expect(nextBtn, 'Next is available while no secret row shows').toBeEnabled({ timeout: 45_000 });
+    await nextBtn.click();
+    await page.waitForTimeout(2_000);
+  }
+  await expect.poll(async () => await secretRows.count(), { timeout: 45_000, message: 'secret rows while Show keys is ON, after walking the tour' }).toBeGreaterThan(0);
   const textOf = async () => (await secretRows.allInnerTexts()).join('\n');
   expect(await textOf(), 'ON: a row shows key bytes').toMatch(/[0-9a-f]{16,}/i);
 
