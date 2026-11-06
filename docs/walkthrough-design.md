@@ -1,6 +1,6 @@
 # MMP.NetworkSecurity: walkthrough design
 
-Author: Richard. Date: 2026-11-06. Revision 4, with Steve's depth links, the S-box view, the modes walk, the first grid view, the lesson 6 steps, and Jared's review of 480ce59. Status: design only, for Jared's review and Echo's clauses. No product code. Branch `docs/walkthrough-design`, from main `7b569a1`.
+Author: Richard. Date: 2026-11-06. Revision 5, with Steve's depth links, the S-box view, the modes walk, the first grid view, the lesson 6 steps, Jared's review, and the block animation, key schedule part, and finite field. Status: design only, for Jared's check and Echo's clauses. No product code.
 
 Sources of facts: FIPS 197, the engine, and Jared's sheet `E:\dev\ns-lesson1-facts.md`. Steve's web pages set depth and teaching order only (section 2.1).
 
@@ -95,16 +95,18 @@ Steve's Wikipedia page sets the order. It describes the older TDES form. **This 
 |---|---|---|
 | 1 | Split the text into 16-byte blocks | Section 2.2, first view |
 | 2 | Put one block in the 4x4 grid, by columns | Section 2.2, first view |
-| 3 | KeyExpansion makes the round keys. The key size sets the rounds: 10, 12, or 14 in total | Section 2.2 |
+| 3 | The key schedule: the word wall, then one word built step by step. The key size sets the rounds: 10, 12, or 14 in total | Section 2.2b |
 | 4 | AddRoundKey with round key 0. This comes before round 1, and it is not a round | Section 2.2 |
 | 5 | SubBytes, with one byte traced through the S-box | Sections 2.2, 2.3 |
 | 6 | ShiftRows | Section 2.2 |
-| 7 | MixColumns | Section 2.2 |
+| 7 | MixColumns, with one real multiply and the field definition | Sections 2.2, 2.2c |
 | 8 | AddRoundKey | Section 2.2 |
 | 9 | Repeat for the other rounds | Round chips |
 | 10 | The last round, with no MixColumns | Section 2.2 |
 | 11 | Decryption, step by step, with the inverse table | Sections 2.2, 2.3 |
 | 12 | Modes: ECB, CBC, GCM, with lock and unlock for each | Section 2.4 |
+
+Each step in chapter 1 also moves, as section 2.2a sets out, and carries one "why" line, as section 2.2d sets out.
 
 Round 1 shows each step in full. So step 5 opens the S-box view by itself on the first SubBytes, with the first cell selected. Later rounds keep it one click away.
 
@@ -134,7 +136,7 @@ So the first column reads `Pump`, and the top row reads `P`, space, `r`, space. 
 | Part | On screen | Words that carry the truth |
 |---|---|---|
 | Label | The panel names the input | "A teaching example. AES runs on this text block alone, the way ECB uses it. This run did not send this block in ECB." The label changes to `match` on the `L1-use-ecb` fork |
-| KeyExpansion | The round keys, built word by word | The key makes 11 round keys for AES-128 (13 for 192, 15 for 256) |
+| Key schedule | The word wall, then one word built step by step (section 2.2b) | The key makes 11 round keys for AES-128 (13 for 192, 15 for 256) |
 | Encrypt | AddRoundKey 0. Rounds 1 to 9: SubBytes, ShiftRows, MixColumns, AddRoundKey. Round 10: SubBytes, ShiftRows, AddRoundKey | The first SubBytes sees letters XOR round key 0. It never sees bare letters |
 | Decrypt | AddRoundKey 10. Rounds 9 to 1: InvShiftRows, InvSubBytes, AddRoundKey, InvMixColumns. Last: InvShiftRows, InvSubBytes, AddRoundKey 0. The grid reads `Pump four is ok.` | The same key, with the round keys from last to first. This is FIPS 197 section 5.3 order, and the only order that works with these round keys (sheet 5.1) |
 
@@ -155,6 +157,120 @@ What each step says:
 | InvMixColumns | Each column is unmixed, by the matrix 14, 11, 13, 9 | The selected column before and after |
 | KeyExpansion | Each word comes from the word before it and the word one key back. Every Nk words, it also rotates, swaps by S-box, and takes a round constant. AES-256 adds one more S-box swap | One row of the FIPS 197 appendix A table |
 
+### 2.2a The block animation
+
+Steve's ask: see the 16 bytes change at each stage.
+
+**Rule: the animation only moves between states the engine already returned. The app computes no byte.** Motion is decoration between two engine states, and each step lands on its engine end frame.
+
+| Step | What moves | End frame |
+|---|---|---|
+| AddRoundKey | The round key grid slides over the state. Each cell shows its new byte | Engine state after AddRoundKey |
+| SubBytes | Each cell flips to its new byte, one cell at a time on the first pass, then all cells at once | Engine state after SubBytes |
+| ShiftRows | Row 0 stays. Rows 1, 2, 3 slide left by 1, 2, 3 and wrap around | Engine state after ShiftRows |
+| MixColumns | One column at a time lifts, its 4 bytes join, and 4 new bytes come out | Engine state after MixColumns |
+| Inverse steps | The same motion, in the inverse direction | Engine state after the inverse step |
+
+| Detail | Rule |
+|---|---|
+| Where a byte came from | Each cell shows a small mark with its position before this step, 0 to 15. The marks reset at each step, because a byte has no single source after MixColumns |
+| Which way ShiftRows moves | The engine's `ShiftRowsMap` and `InverseShiftRowsMap` come from the tables route (section 3.4), so a motion cannot disagree with the real map |
+| Next and Back | They land on the same states as without animation. A click during a motion jumps to the end frame |
+| `prefers-reduced-motion` | Each step jumps to its end frame |
+| Show keys flips OFF during a motion | The timeline stops, and the walk clears (section 3.5) |
+| Library | None. CSS transforms and one small composable, `useWalkTimeline`. I would add a library only if a transform cannot do the MixColumns join |
+
+For tests: a clause reads end frames under reduced motion, so no test waits on a timer.
+
+### 2.2b The key schedule part
+
+Steve's ask: how the key schedule is created. FIPS 197 section 5.2 is the source of record. None of Steve's five videos walks it, by the lead's reading. This part comes before the first AddRoundKey.
+
+**View 1, the word wall.** A row of words, grouped in fours. Each group of 4 words is one round key. The learner sees which group each AddRoundKey uses.
+
+| Key | Nk (key words) | Rounds | Round keys | Words | Round constants used |
+|---|---|---|---|---|---|
+| AES-128 | 4 | 10 | 11 | 44 | 10 |
+| AES-192 | 6 | 12 | 13 | 52 | 8 |
+| AES-256 | 8 | 14 | 15 | 60 | 7 |
+
+**View 2, build one word.** The first Nk words are the key itself. Each later word comes from two earlier words: the one before it, and the one Nk back. Every Nk words, the word before it first passes through three steps. Next walks each word of round key 1. After that, Next moves one round key at a time, and the learner can click any word to open its build.
+
+Worked example, the FIPS 197 appendix A key `2b7e1516 28aed2a6 abf71588 09cf4f3c`. The app shows the run's own key, with the same steps.
+
+| Stage | Bytes | Field in the reply |
+|---|---|---|
+| w3 | `09cf4f3c` | `previous` |
+| RotWord | `cf4f3c09` | `rotated` |
+| SubWord (same S-box) | `8a84eb01` | `substituted` |
+| XOR Rcon 1 (`01000000`) | `8b84eb01` | `rcon`, `afterRcon` |
+| XOR w0 (`2b7e1516`) | `a0fafe17`, which is w4 | `keyBack`, `word` |
+
+**AES-256 only:** at `i mod 8 = 4`, the word before passes through SubWord alone. The panel says so when the learner picks 256.
+
+**Rcon row.** `01 02 04 08 10 20 40 80 1b 36`. Each value is the one before it, doubled in the field. Ordinary doubling of `80` gives `100`, which does not fit in a byte. Field doubling gives `1b`. This row is the first place the learner meets the field in real use. The row comes from the tables route, because the app holds no crypto values.
+
+**Words on screen:**
+
+1. "Each round gets a different key, so the rounds do not repeat one key."
+2. At AES-128 only: "Round keys are key material. Anyone who learns one round key can run this table backward and get the key." The lead's script ran this from round key 10 and got the key back. This line stays at 128, because AES-192 needs 6 words and AES-256 needs 8.
+3. "Decryption uses the same round keys, from last to first."
+
+### 2.2c The finite field
+
+Steve's ask: define a finite field. The panel states the definition and shows one real multiply.
+
+**Definition on screen, in this order:**
+
+1. "A field is a set of values with add, subtract, multiply and divide, where every answer stays in the set. Only divide by zero is not allowed."
+2. "A finite field has a fixed number of values. The field that AES uses has 256 values, one for each byte. Its name is GF(2^8)."
+3. "Add is XOR."
+4. "Multiply treats each byte as a polynomial, multiplies without carries, and reduces the result by `x^8 + x^4 + x^3 + x + 1` (`11b` in hex). So the answer always fits in a byte."
+5. "Every value except zero has an inverse. So each multiply step can be undone."
+
+A fixed number of values alone does not make a field, so the panel states both rules.
+
+| Place | What the learner sees |
+|---|---|
+| Rcon row | `80` doubled gives `1b` |
+| MixColumns | One real multiply from the run's selected column, with its reduction shown |
+| InvMixColumns | The same, with factors 14, 11, 13, 9. Each needs 3 doublings |
+| S-box, "How the table was built" | Starts from the byte's inverse in this field. It stays in W2 and links back to the definition |
+
+Worked example for the words and the clause. Column `d4 bf 5d 30`, from FIPS 197 appendix B round 1.
+
+| Term | Field result | Ordinary result |
+|---|---|---|
+| `2 x d4` | `b3` | `1a8`, too big for a byte |
+| `3 x bf` | `da` | `23d`, too big for a byte |
+| `1 x 5d` | `5d` | |
+| `1 x 30` | `30` | |
+| XOR of the 4 terms | `04` | |
+
+The full column comes out `04 66 81 e5`. The inverse takes it back: `14 x 04` is `38`, `11 x 66` is `b7`, `13 x 81` is `d7`, `9 x e5` is `8c`, and their XOR is `d4`.
+
+**"The app runs no math" stays.** The engine returns the terms, and the app only prints them (section 3.3).
+
+### 2.2d Why each step exists
+
+Each step's panel adds one "why" line. **Confusion and diffusion are common teaching labels.** FIPS 197 does not use them, and nobody read Shannon's paper this session, so the panel says "often called" and cites no source for the mapping.
+
+| Term | Meaning on screen |
+|---|---|
+| Confusion | Hides how the output depends on the key |
+| Diffusion | Spreads each input bit across the output. After round 1, a one-bit change reaches 4 bytes. After round 2, it reaches all 16 |
+
+| Step | Why line |
+|---|---|
+| AddRoundKey | The key enters here and nowhere else |
+| SubBytes | It breaks straight-line math, and confusion rests on that. The table is public and holds no key, so it needs the key steps around it |
+| ShiftRows | Diffusion between columns. Without it, each column would stay on its own |
+| MixColumns | Diffusion inside a column. Each output byte depends on all 4 input bytes |
+
+W2's one-bit-flip count shows the diffusion numbers from the engine. W1 states them in words only.
+
+**What stays out.** No robots, no 3D, and no video style copy: our own 2D grid and our own colours. No frames, captions, or drawings from the videos, which are leads for order and teaching ideas. No claim that AES hardware instructions are "impervious", which is wider than we can source.
+
 ### 2.3 The S-box view
 
 **What the learner sees, on a SubBytes step:**
@@ -174,6 +290,7 @@ What each step says:
 | The S-box holds no secret. The key enters only through AddRoundKey | Sheet 5.8 |
 | One changed byte stays one byte here. ShiftRows and MixColumns do the spreading | Sheet 5.8, 5.9 |
 | KeyExpansion uses this same table | `AesKey.cs` `SubWord` |
+| No byte maps to itself, and no byte maps to its opposite: 0 of 256 each | Sheet 5.8, and the lead's script |
 
 **Real data.** The tables come from `AesKey`'s own `Sbox` and `InverseSbox`, through `GET /api/walk/aes/tables`. The app stores no copy in source. The spike checked that a table lookup equals the walk's swap on 320 of 320 cells, over SubBytes and InvSubBytes.
 
@@ -301,10 +418,13 @@ From Jared's sheet. Echo can scan for these in `walk-gloss.json` and the tour.
 | Which key size (chapter 1) | One selector |
 | Which mode (chapter 2) | Three tabs |
 | Move through steps | Back, Next, and round chips to jump |
+| Watch steps move | One Play and Pause button, which stops at the end of the round. Press it again for the next round |
+| How fast | One speed control: slow, normal, fast |
+| See one word's build | Click a word on the word wall |
 | See one byte's lookup | Click a cell |
 | Open an AES box (chapter 2) | Click the box |
 
-Cut: a play button, a speed slider, a separate encrypt/decrypt switch (decrypt follows encrypt in one step list), and a stand-alone S-box page.
+Cut: a separate "Play this round" button, because Play already stops there, a separate encrypt/decrypt switch (decrypt follows encrypt in one step list), and a stand-alone S-box page.
 
 ## 3. Real data rule
 
@@ -343,18 +463,30 @@ namespace NetSec.Crypto {
     public readonly int Round;                // Encrypt: 0 to Nr. Decrypt: Nr down to 0
     public readonly byte[] State;             // 16 bytes after this step, in r + 4c order
     public readonly byte[] RoundKey;          // AddRoundKey only. Else null
+    public readonly AesColumnByte[] Terms;    // MixColumns and InvMixColumns only. Else null
   }
   public sealed class AesBlockWalk { public readonly int Rounds; public readonly byte[] Input, Output; public readonly AesStep[] Steps; }
   public sealed class AesKeyWord {            // One row of the FIPS 197 appendix A tables. An unused cell is null
     public readonly int Index;
     public readonly byte[] Previous, Rotated, Substituted, Rcon, AfterRcon, KeyBack, Word;
   }
+  public sealed class AesTerm {               // One factor x input term of a mixed byte
+    public readonly int Factor;               // 2, 3, 1 or 14, 11, 13, 9
+    public readonly byte Input;
+    public readonly byte[] Doublings;         // Input x2, x4, x8, as far as the factor needs. The inverse factors need 3
+    public readonly bool Reduced;             // Any doubling needed the reduction by 11b
+    public readonly byte Result;
+  }
+  public sealed class AesColumnByte { public readonly AesTerm[] Terms; public readonly byte Result; }   // Result is the XOR of the terms
   public sealed partial class AesKey {
     public AesBlockWalk WalkEncrypt(byte[] block);   // Throws AES_WALK_DIVERGED if it differs from EncryptBlock
     public AesBlockWalk WalkDecrypt(byte[] block);   // Throws AES_WALK_DIVERGED if it differs from DecryptBlock
     public AesKeyWord[] WalkKeyExpansion();          // Nb * (Nr + 1) rows
     public static byte[] SubstitutionTable();        // A copy of Sbox, 256 bytes
     public static byte[] InverseSubstitutionTable(); // A copy of InverseSbox, 256 bytes
+    public static int[] ShiftMap(bool inverse);      // A copy of ShiftRowsMap or InverseShiftRowsMap
+    public static byte[] RoundConstants(int count);  // Each value is the one before it, doubled in the field
+    public static AesColumnByte[] MixTerms(byte[] before, bool inverse);   // One entry per state byte, in r + 4c order
   }
   public static class Gcm {                   // Added to Gcm.cs
     public static byte[] CounterBlock(byte[] nonce, int blockIndex);   // nonce, then 32-bit blockIndex + 2
@@ -394,6 +526,8 @@ namespace NetSec.Labs {
   }
 }
 ```
+
+`WalkEncrypt` and `WalkDecrypt` fill `Terms` from `MixTerms`, on the state before the step, and throw `AES_WALK_DIVERGED` if any `Result` differs from the state after it. The doublings use the existing `Xtime`, so the real path's `Times` tables stay untouched.
 
 `Gcm.CounterBlock` is new and pure. `CounterCrypt` stays as it is. The lock guard catches a drift between the two. `Lesson01Aes.Pad` changes from private to internal, so the feed uses the lesson's own padding. Its bytes and the lab's trace stay as they are. `ErrorCodes` gains `AesWalkDiverged`, `WalkNotBuilt`, `WalkWaitingForWire`, `WalkMessageNotSent`, `WalkMessageReplaced`, `WalkKeySizeNotInRun`, and `WalkBadArgument`.
 
@@ -436,14 +570,16 @@ Replies, trimmed. Every error carries `code`, `message`, `retryable`, and `reque
 
 ```json
 // /api/walk/aes/tables
-{ "sbox": "637c777b...", "inverseSbox": "52096ad5..." }
+{ "sbox": "637c777b...", "inverseSbox": "52096ad5...", "shiftRows": [0, 5, 10, 15, "..."], "inverseShiftRows": [0, 13, 10, 7, "..."], "rcon": "01020408102040801b36",
+  "sizes": [ { "keyBits": 128, "keyWords": 4, "rounds": 10, "roundKeys": 11, "words": 44, "rconUsed": 10 } ] }
 
 // /block?source=text
 {
   "source": "text", "keyBits": 128, "rounds": 10, "keySource": "run",
   "inputHex": "50756d7020666f7572206973206f6b2e",
   "keyWords": [ { "i": 4, "previous": "...", "rotated": "...", "substituted": "...", "rcon": "...", "afterRcon": "...", "keyBack": "...", "word": "..." } ],
-  "forward": { "input": "...", "output": "...", "steps": [ { "kind": "AddRoundKey", "round": 0, "state": "...", "roundKey": "..." } ] },
+  "forward": { "input": "...", "output": "...", "steps": [ { "kind": "AddRoundKey", "round": 0, "state": "...", "roundKey": "..." },
+                                                 { "kind": "MixColumns", "round": 1, "state": "...", "terms": [ { "result": "04", "parts": [ { "factor": 2, "input": "d4", "doublings": ["b3"], "reduced": true, "result": "b3" } ] } ] } ] },
   "inverse": { "input": "...", "output": "...", "steps": [] },
   "wire": { "status": "notSent", "message": "TextEcb" }
 }
@@ -474,11 +610,11 @@ Replies, trimmed. Every error carries `code`, `message`, `retryable`, and `reque
 
 | Route | OFF | Why |
 |---|---|---|
-| `/api/walk/aes/tables` | Open | The tables are public |
+| `/api/walk/aes/tables` | Open | The S-box tables, shift maps, round constants, and size table are public |
 | `/modes` | Open | A row holds no key and no round state. Each field comes from values the trace shows with the toggle OFF: `plain` and `wire`. For example, GCM's key stream equals text XOR cipher |
-| `/block` | **Closed**, 409 `KEYS_HIDDEN` | It holds the key and the round keys. The first AddRoundKey also gives `state = input xor key`, so input and state give the key. A fingerprint per cell would teach nothing |
+| `/block` | **Closed**, 409 `KEYS_HIDDEN` | It holds the key, the round keys, the word rows, and the MixColumns terms, whose inputs are round states. The first AddRoundKey also gives `state = input xor key`, so input and state give the key. A fingerprint per cell would teach nothing |
 
-So with the toggle OFF, chapter 1's steps close, and chapter 2's rows stay. A chapter 2 AES box stays shut. The block tab shows: "Show keys is off. These steps show the key and the round keys, so they stay closed. Turn Show keys on to walk them. The S-box table and the modes walk stay open."
+So with the toggle OFF, chapter 1's steps close, and chapter 2's rows stay. A chapter 2 AES box stays shut. The block tab shows: "Show keys is off. These steps show the key and the round keys, so they stay closed. Turn Show keys on to walk them. The S-box table, the key size table, the round constants, the field definition, and the modes walk stay open."
 
 `modes-design.md` section 6.5 says each lesson keeps its comparison. That stays true, because the panels of section 6.5 still run.
 
@@ -495,7 +631,7 @@ A route may answer with the toggle OFF only if its reply holds no key byte. Less
 
 **The flip race.** This is the same class as PRs #140, #141, and #143. A reply can be in flight when the toggle flips, and it does not pass through `ShowKeysFence`. Frames can also drop (`SessionManager.cs:160`, `DropOldest`), and sockets reconnect (`host.ts:91-99`), so the fix cannot rest on the `security.show-keys` frame alone. The fix sits in the app:
 
-1. `walk.ts` holds a generation counter. It rises, and the store clears the block walk, when `sec.showKeys` goes false by any route (`security.ts:141`, the frame handler, or a reload), and when the socket closes (`store.ts:133`).
+1. `walk.ts` holds a generation counter. It rises, the store clears the block walk, and `useWalkTimeline` stops, when `sec.showKeys` goes false by any route (`security.ts:141`, the frame handler, or a reload), and when the socket closes (`store.ts:133`).
 2. A reply whose generation is old is dropped. A reply that lands while `sec.showKeys` is false is dropped too.
 3. After a reconnect, the app reloads the toggle first, and fetches the walk again only if it is ON.
 4. A walk reply never enters a session file, `/events`, or a save.
@@ -530,6 +666,13 @@ PictureEcb (ECB): forward AES equals the wire on 257 of 257 blocks, inverse AES 
 TextCbc (CBC): forward AES of (data xor previous) equals the wire on 5 of 5 blocks, inverse AES then xor gives the data back on 5 of 5
 TextEcb (ECB): forward AES equals the wire on 5 of 5 blocks, inverse AES gives the data back on 5 of 5, distinct cipher blocks 2
 L1-flip-cbc: unlock from the wire bytes, changed bytes per block: 16,1,0,0,0
+MixColumns and InvMixColumns: terms XOR to the state byte on 1056 of 1056 bytes, all three key sizes, 4224 terms
+column d4 bf 5d 30, byte 0: 2xd4=b3 (reduced); 3xbf=da (reduced); 1x5d=5d; 1x30=30; out 04 66 81 e5
+inverse, byte 0: 14x04: doublings 08 10 20 -> 38; 11x66: doublings cc 83 1d -> b7; 13x81: doublings 19 32 64 -> d7; 9xe5: doublings d1 b9 69 -> 8c; out d4
+Rcon: 01020408102040801b36
+AES-128 uses 10 round constants
+AES-192 uses 8 round constants
+AES-256 uses 7 round constants
 ```
 
 The 186 encrypt values and 186 inverse values come from FIPS 197 (2001 edition), appendix C. The comparison is strict, by position. "Jared 5.3" compares with his independent Python AES, which shares no code with the course. The walk file and the `AesKey` copy also compiled against the CF 3.5 references in `E:\dev\tools\netcf35-ref`, with 0 errors and 0 warnings.
@@ -551,6 +694,9 @@ Limits of the spike:
 | `app/src/components/AesWalkPanel.vue` | Chapter tabs. Holds the two views below |
 | `app/src/components/AesBlockWalk.vue` | Picker, grid, Back, Next, round chips |
 | `app/src/components/SboxView.vue` | The 16 by 16 table, row and column lights, for both tables |
+| `app/src/components/KeySchedulePanel.vue` | The word wall, one word's build, the Rcon row |
+| `app/src/components/FieldPanel.vue` | The definition lines, and one multiply from the engine's terms |
+| `app/src/useWalkTimeline.ts` | Play, Pause, speed, stop at the end of a round, reduced motion. It holds states and never makes a byte |
 | `app/src/components/AesFeedView.vue` | One mode's rows, lock and unlock, the box link, wire status |
 | `app/src/App.vue` | One more entry in the panel tab list, shown when the run holds `aes.key` |
 | `app/src/tours/lesson-01.json` | Two new steps. One follows "ECB locks each block alone" and opens chapter 1. One follows "CBC and GCM hide the shape" and opens chapter 2. They land after #145 |
@@ -625,8 +771,8 @@ Sheet 5.9 lists them, and these three matter most:
 | Slice | Builds | Closing check | Owner |
 |---|---|---|---|
 | W0 | This doc and Jared's review. **After Jared passes the head,** Echo writes clauses from sections 2 to 4, red | Jared's pass on a named head. Clauses exist and fail with a named code | Richard, Jared, Echo |
-| **W1a** skeleton | `AesKey.Walk.cs`, `AesWalks.Block`, the tables route and the block route. No UI | FIPS, table, BCL, toggle, and golden clauses pass on both builds. `tools/gate.ps1` green | Richard |
-| **W1b** small section | `walk.ts`, `AesBlockWalk.vue`, `SboxView.vue`, chapter 1 at 128 bits, encrypt and decrypt, the flip guard | e2e: a learner reaches `Pump four is ok.` by Next alone. A clicked cell's lookup equals the next state, both tables. Grid order clause. S-box scan | Nancy |
+| **W1a** skeleton | `AesKey.Walk.cs` with word rows and MixColumns terms, `AesWalks.Block`, the tables route and the block route. No UI | FIPS, table, BCL, toggle, term, and golden clauses pass on both builds. `tools/gate.ps1` green | Richard |
+| **W1b** small section | `walk.ts`, `useWalkTimeline.ts`, `AesBlockWalk.vue`, `SboxView.vue`, `KeySchedulePanel.vue`, `FieldPanel.vue`, chapter 1 at 128 bits with animation, encrypt and decrypt, the flip guard | e2e: a learner reaches `Pump four is ok.` by Next alone. A clicked cell's lookup equals the next state, both tables. Grid order clause. S-box scan | Nancy |
 | **Stop: show Steve** | Steve steps through chapter 1 in the app and reacts. CBC and modes work starts after this | His reaction goes in `docs/learnings.md`, and later slices read it | Lead |
 | **W1c** | `Gcm.CounterBlock`, `AesWalks.Feed`, the modes route, `AesFeedView.vue`, chapter 2 with ECB, CBC, GCM, and "Mistakes people make". Key sizes, two tour steps, gloss | Wire clauses per mode. e2e on wire match and on damage. A15, A15a by a reader who did not write it | Richard, Nancy |
 | W2 | `AesKey.SboxBuild(byte)` and "how the table was built". `flipKeyBit`. One-bit-flip spread count (4 bytes after round 1, 16 after round 2) | FIPS 5.1.1 worked example for `53`. Spread count against Jared's values | Richard, Nancy |
@@ -649,7 +795,12 @@ If Steve does not follow it after 2 rounds of word changes, stop and re-plan the
 | Theme | What a clause checks |
 |---|---|
 | Round values | Every CIPHER and INVERSE CIPHER state for FIPS C.1, C.2, C.3, by position. The vector reader skips the appendix's EQUIVALENT INVERSE CIPHER lists, which hold a different order |
-| Key words | FIPS appendix A rows, for all three sizes |
+| Key words | FIPS appendix A rows, for all three sizes. The Rcon row equals `01 02 04 08 10 20 40 80 1b 36`, and the used counts are 10, 8, 7 |
+| End frames | Every animated step lands on the engine state for that step, for all three key sizes |
+| Reduced motion | Each step shows its end frame with no transition |
+| Shift map | `state[i]` after ShiftRows equals `state[map[i]]` before it, using the map the tables route sends |
+| Field terms | The XOR of the terms equals the state byte, in every round, both directions. `d4 bf 5d 30` gives `04 66 81 e5` |
+| Definition | Lines 1 to 5 of section 2.2c appear, and pass the reading-grade clause |
 | Step counts | 40, 48, 56 per direction. The last encrypt round has no MixColumns. The decrypt order is section 5.3's |
 | S-box | Both tables equal FIPS Tables 4 and 6 on all 256 entries. `53` gives `ed`, and row `e`, column `d` of the inverse gives `53`. The route answers with Show keys OFF |
 | S-box view | A clicked cell's row, column, and table value equal the next state's cell, on SubBytes and InvSubBytes |
@@ -661,7 +812,7 @@ If Steve does not follow it after 2 rounds of word changes, stop and re-plan the
 | Box rows | `/block` answers for every row of `/modes`, including the padding row, and gives 400 one past it |
 | Label | A control run's `source=text` reply says `notSent`, and the panel shows the teaching-example label |
 | Real path | `WalkEncrypt` equals `EncryptBlock` on 10,000 random inputs |
-| Toggle | OFF gives 409 `KEYS_HIDDEN` on `/block`, with no bytes in the error. `/modes` and the tables answer OFF, and a `/modes` reply holds no key byte and no round state. Every field recomputes from `plain` and `wire` |
+| Toggle | OFF gives 409 `KEYS_HIDDEN` on `/block`, with no bytes in the error, so no word row or term leaves. A flip during Play stops the timeline. `/modes` and the tables answer OFF, and a `/modes` reply holds no key byte and no round state. Every field recomputes from `plain` and `wire` |
 | Key-bearing routes | A clause lists each walk route and its OFF behaviour, and each reply has `Cache-Control: no-store`. A new route must join the list |
 | Flip race | The block walk clears when `sec.showKeys` goes false and when the socket closes, with the flip frame dropped on purpose. A late reply is dropped. No state reaches a session file |
 | No app math | No S-box bytes under `app/src` |
@@ -691,7 +842,7 @@ If Steve does not follow it after 2 rounds of word changes, stop and re-plan the
 | Rejected | Asynchronous projection and a stored view. No staleness exists here, because the walk computes at the query |
 | Where we differ | One learner on one machine. No scale pressure. The read side recomputes with the real engine, and that is the teaching |
 
-**The arithmetic.** One learner, at most about 1 walk query per second while picking blocks. A block reply is about 5 to 7 KiB, and a feed reply holds at most 5 rows. The tables reply is 1,024 hex characters, fetched once. A walk costs about 6 microseconds in this test environment, against about 0.5 microseconds for `EncryptBlock`. Storage over three years is zero, since nothing is stored. So the design uses no cache, no streaming, and no per-step request. One reply holds the whole walk, and Next is a local move.
+**The arithmetic.** One learner, at most about 1 walk query per second while picking blocks. A block reply is about 5 to 7 KiB of states and key words. The MixColumns terms add 1,152 terms at AES-128 and 1,664 at AES-256, at about 40 bytes each by estimate, so about 46 to 67 KiB more. That is a large reply for one click, and it is still small for a local socket, so the design sends it whole and keeps no second query. A feed reply holds at most 5 rows. The tables reply is about 1.1 KiB, fetched once. A walk costs about 6 microseconds in this test environment, against about 0.5 microseconds for `EncryptBlock`. Storage over three years is zero, since nothing is stored. So the design uses no cache, no streaming, and no per-step request. One reply holds the whole walk, and Next is a local move.
 
 **Gem catalog.** I read `E:\dev\MMP.ProgrammingGems\INDEX.md`.
 
