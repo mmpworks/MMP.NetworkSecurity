@@ -12,9 +12,11 @@ export function tourIds(lesson: number): string[] {
   return (Array.isArray(j) ? j : j.steps).map((s: { id: string }) => s.id)
 }
 
-export async function open(page: Page) {
-  await page.addInitScript(({ port, token }) => { (window as any).netsec = { host: { port, token } } }, { port: PORT, token: TOKEN })
-  await page.goto(`/?port=${PORT}&token=${TOKEN}`)
+export interface HostAddress { port: number; token: string }
+
+export async function open(page: Page, host: HostAddress = { port: PORT, token: TOKEN }) {
+  await page.addInitScript(({ port, token }) => { (window as any).netsec = { host: { port, token } } }, host)
+  await page.goto(`/?port=${host.port}&token=${host.token}`)
   await expect(page.getByTestId('host-chip')).toContainText(/connected/i)
 }
 
