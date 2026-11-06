@@ -117,3 +117,13 @@ OF THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
 4. OpenSSL and the Go toolchain. The referee tests run them from the machine. They are not copied here.
 
 Licences not read: the installed tools themselves (.NET, Node, PowerShell, Visual Studio) are not redistributed by this repository, and their licences were not read.
+
+## Fonts in the app
+
+These fonts ship inside the Electron app, Latin subset only. Each is under the SIL Open Font License 1.1. The full license text is in each package's `LICENSE` file under `app/node_modules/@fontsource/`.
+
+| Font | Package | Copyright |
+|---|---|---|
+| Atkinson Hyperlegible, 400 and 700 | `@fontsource/atkinson-hyperlegible` 5.3.0 | Copyright 2020 Braille Institute of America, Inc. |
+| Familjen Grotesk, 500 and 700 | `@fontsource/familjen-grotesk` 5.3.0 | Copyright 2021 The Familjen Grotesk Project Authors |
+| JetBrains Mono, 400 and 600 | `@fontsource/jetbrains-mono` 5.3.0 | Copyright 2020 The JetBrains Mono Project Authors |
