@@ -56,14 +56,24 @@ namespace NetSec.Bridge
 
         public IFuture Send(byte[] frame)
         {
+            return AsyncProxy.Run(SendBody(frame));
+        }
+
+        IEnumerable<IFuture> SendBody(byte[] frame)
+        {
             TraceEventDraft draft = new TraceEventDraft();
             draft.Type = "wire.sent";
             draft.From = "ce";
             draft.To = "gateway";
             draft.Message = "PinEnvelope";
             draft.Wire = frame;
-            _sink.Write(_stream.Stamp(draft));
-            return FrameIo.WriteFrame(_link, frame);
+            TraceEvent sent = _stream.Stamp(draft);
+            _sink.Write(sent);
+            IFuture write = FrameIo.WriteFrame(_link, frame);
+            yield return Futures.Observe(write);
+            if (write.IsFaulted || write.IsCanceled) _sink.Write(_stream.Stamp(TraceEventDraft.LostWrite(sent, ErrorCodes.LinkLost)));
+            // The caller still sees the write's fault.
+            yield return write;
         }
 
         public IFuture<byte[]> Receive()
@@ -82,6 +92,9 @@ namespace NetSec.Bridge
     {
         public IPEndPoint PinPad, Gateway;
         public string LinkKind;
+
+        /// <summary>Null means LinkKind picks the link.</summary>
+        public IDeviceLink Link;
         public SshSuite Suite;
         public IRandomSource Random;
         public ITrainingKeySource Keys;
@@ -162,6 +175,13 @@ namespace NetSec.Bridge
             }
             IFuture sent = link.Send(envelope.Bytes);
             yield return Futures.Observe(sent);
+            if (sent.IsFaulted || sent.IsCanceled)
+            {
+                result.Code = CodeOf(sent);
+                yield return Futures.Observe(link.Close());
+                pad.Close();
+                yield break;
+            }
             IFuture<byte[]> replyRead = link.Receive();
             yield return Futures.Observe(replyRead);
             if (replyRead.IsFaulted || replyRead.IsCanceled)
@@ -205,6 +225,7 @@ namespace NetSec.Bridge
 
         static IDeviceLink LinkFor(CeRunOptions o, string traceId)
         {
+            if (o.Link != null) return o.Link;
             if (o.LinkKind == LinkExternalForward)
                 return new ExternalForwardLink(o.Gateway, o.Sink, traceId + "/ce/forward", traceId, o.Clock);
             if (o.LinkKind == GlassSshLink.KindName)

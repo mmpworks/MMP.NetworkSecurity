@@ -365,13 +365,9 @@ namespace NetSec.Io
             _bytesSent += wire.Length;
         }
 
-        /// <summary>Names the wire.sent event whose bytes may not have left. It carries no Wire, because only bytes that left carry Wire.</summary>
         void LogLostWrite(TraceEvent sent, string code)
         {
-            TraceEventDraft draft = new TraceEventDraft();
-            draft.Type = "wire.write.failed"; draft.From = sent.From; draft.To = sent.To; draft.Message = sent.Message;
-            draft.Detail = code + ": the write for event " + sent.EventId + " failed, so its bytes may not have left";
-            _sink.Write(_wireStream.Stamp(draft));
+            _sink.Write(_wireStream.Stamp(TraceEventDraft.LostWrite(sent, code)));
         }
 
         void Deliver(EngineOutput output)
