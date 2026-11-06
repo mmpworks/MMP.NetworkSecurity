@@ -138,6 +138,67 @@ namespace Acceptance
             }
         }
 
+        /// <summary>A18, matrix row 29: RSA PKCS#1 v1.5 had no BCL comparison. Signatures and encryption run both ways against the .NET library, on keys the library made. A clause on key format alone would not show this.</summary>
+        [Clause("A2.rsa.pkcs1", PerBuild = true)]
+        public static string RsaPkcs1(Ctx c)
+        {
+            const int Keys = 3, RoundsPerKey = 30;
+            using (BclOracle o = BclOracle.Start(c))
+            {
+                Rng rng = new Rng(0xA2A5A);
+                Tally t = new Tally();
+                for (int k = 0; k < Keys; k++)
+                {
+                    RsaKeyParts key = RsaKeyParts.Generate(o);
+                    byte[] n = key.N;
+                    for (int i = 0; i < RoundsPerKey; i++)
+                    {
+                        string where = "key " + k + " round " + i;
+                        byte[] msg = rng.Bytes(1 + i % 64);
+                        byte[] bad = (byte[])msg.Clone();
+                        bad[0] ^= 0x01;
+                        foreach (string hash in new string[] { "sha1", "sha256" })
+                        {
+                            byte[] sig = key.Call(o, "rsa-sign", "alg", hash, "data", msg);
+                            t.Expect(where + " " + hash + " verify a BCL signature", Subject.RsaVerify(hash, n, key.E, msg, sig), "refused a BCL signature");
+                            t.Expect(where + " " + hash + " altered message", !Subject.RsaVerify(hash, n, key.E, bad, sig), "accepted a BCL signature on another message");
+                        }
+                        byte[] ours = Subject.RsaSignSha1(n, key.D, msg);
+                        t.Expect(where + " BCL verifies our signature", key.Call(o, "rsa-verify", "alg", "sha1", "data", msg, "signature", ours)[0] == 1, "the BCL refused our SHA-1 signature");
+                        byte[] plain = rng.Bytes(1 + i % 100), back;
+                        byte[] cipher = key.Call(o, "rsa-encrypt", "data", plain);
+                        t.Expect(where + " decrypt BCL ciphertext", Subject.RsaDecrypt(n, key.D, cipher, out back), "refused a BCL ciphertext");
+                        t.Compare(where + " BCL ciphertext gives the text", plain, back);
+                        t.Compare(where + " BCL decrypts our ciphertext", plain, key.Call(o, "rsa-decrypt", "data", Subject.RsaEncrypt(n, key.E, plain, rng.Bytes(512))));
+                    }
+                }
+                return t.Done();
+            }
+        }
+
+        /// <summary>One RSA key from the oracle. It keeps every field, because each oracle call imports the whole key.</summary>
+        sealed class RsaKeyParts
+        {
+            public byte[] N, E, D;
+            System.Collections.Generic.Dictionary<string, object> _fields;
+
+            public static RsaKeyParts Generate(BclOracle o)
+            {
+                System.Collections.Generic.Dictionary<string, object> f = o.Request("rsa-keygen", "bits", 2048);
+                RsaKeyParts k = new RsaKeyParts();
+                k._fields = f;
+                k.N = Hex.Decode(MiniJson.Str(f, "n")); k.E = Hex.Decode(MiniJson.Str(f, "e")); k.D = Hex.Decode(MiniJson.Str(f, "d"));
+                return k;
+            }
+
+            public byte[] Call(BclOracle o, string op, params object[] args)
+            {
+                System.Collections.Generic.List<object> all = new System.Collections.Generic.List<object>(args);
+                foreach (string name in new string[] { "n", "e", "d", "p", "q", "dp", "dq", "qi" }) { all.Add(name); all.Add(Hex.Decode(MiniJson.Str(_fields, name))); }
+                return o.Bytes("output", op, all.ToArray());
+            }
+        }
+
         [Clause("A2.mlkem768.ours-encaps-bcl-decaps", PerBuild = true)]
         public static string KemOursEncaps(Ctx c)
         {
