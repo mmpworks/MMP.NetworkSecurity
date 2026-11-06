@@ -49,7 +49,7 @@ export interface LessonRow {
 
 export interface AttackRow { attackId: string; label: string; expectCheck?: string; expectCode?: string }
 
-export type Transport = 'glass' | 'real'
+export type Transport = 'glass' | 'os'
 export type ViewMode = 'endpoints' | 'eavesdropper' | 'both'
 export type AppMode = 'tour' | 'free'
 

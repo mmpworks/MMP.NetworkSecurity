@@ -75,7 +75,11 @@ namespace NetSec.Errors
         public const string TransportNotBuilt = "TRANSPORT_NOT_BUILT";
         public const string ChannelBufferFull = "CHANNEL_BUFFER_FULL";
         public const string LessonNotBuilt = "LESSON_NOT_BUILT";
-        public const string RealModeNotBuilt = "REAL_MODE_NOT_BUILT";
+        public const string OsTransportNotBuilt = "OS_TRANSPORT_NOT_BUILT";
+        public const string OsTransportNoPeer = "OS_TRANSPORT_NO_PEER";
+        public const string OsTransportFailed = "OS_TRANSPORT_FAILED";
+        public const string KeylogNotKept = "KEYLOG_NOT_KEPT";
+        public const string TransportUnknown = "TRANSPORT_UNKNOWN";
         public const string DhPeerOutOfRange = "DH_PEER_OUT_OF_RANGE";
         public const string HkdfPrkTooShort = "HKDF_PRK_TOO_SHORT";
         public const string RsaValueOutOfRange = "RSA_VALUE_OUT_OF_RANGE";

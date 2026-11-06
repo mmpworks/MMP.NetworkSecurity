@@ -19,7 +19,7 @@ namespace NetSec.Host.Tests;
 /// <summary>A real Host with its own security folder. A bad key must stop only the lessons that read it, and always by name.</summary>
 public class SecurityLiveTests
 {
-    sealed class Host : IDisposable
+    internal sealed class Host : IDisposable
     {
         readonly Process _process;
         readonly HttpClient _http = new();
@@ -28,7 +28,7 @@ public class SecurityLiveTests
         public readonly int Port;
         public string SecurityDir => Path.Combine(Root, "security");
 
-        public Host()
+        public Host(Dictionary<string, string>? env = null)
         {
             Directory.CreateDirectory(Root);
             TcpListener free = new(IPAddress.Loopback, 0);
@@ -40,6 +40,7 @@ public class SecurityLiveTests
             info.Environment["NETSEC_TOKEN"] = Token;
             info.Environment["LOCALAPPDATA"] = Root;
             info.Environment["NETSEC_SECURITY_DIR"] = SecurityDir;
+            foreach (KeyValuePair<string, string> pair in env ?? []) info.Environment[pair.Key] = pair.Value;
             TaskCompletionSource<bool> ready = new(TaskCreationOptions.RunContinuationsAsynchronously);
             _process = new Process { StartInfo = info };
             _process.OutputDataReceived += (_, e) => { if (e.Data != null && e.Data.StartsWith("HOST-READY")) ready.TrySetResult(true); };
@@ -75,12 +76,12 @@ public class SecurityLiveTests
         }
 
         /// <summary>session.start, then every frame up to the session's end or its error. Returns the frames.</summary>
-        public async Task<List<JsonElement>> Session(int lesson)
+        public async Task<List<JsonElement>> Session(int lesson, string transport = "glass")
         {
             using ClientWebSocket ws = new();
             using CancellationTokenSource limit = new(TimeSpan.FromSeconds(30));
             await ws.ConnectAsync(new Uri($"ws://127.0.0.1:{Port}/ws?token={Token}"), limit.Token);
-            await ws.SendAsync(Encoding.UTF8.GetBytes("{\"type\":\"session.start\",\"requestId\":\"r\",\"lesson\":" + lesson + ",\"seed\":3,\"mode\":\"run\"}"), WebSocketMessageType.Text, true, limit.Token);
+            await ws.SendAsync(Encoding.UTF8.GetBytes("{\"type\":\"session.start\",\"requestId\":\"r\",\"lesson\":" + lesson + ",\"seed\":3,\"mode\":\"run\",\"transport\":\"" + transport + "\"}"), WebSocketMessageType.Text, true, limit.Token);
             List<JsonElement> frames = [];
             while (true)
             {

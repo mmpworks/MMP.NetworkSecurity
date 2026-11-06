@@ -78,7 +78,7 @@ test('the eavesdropper view hides what the wire hides, and the attack names its 
   await expect(page.getByTestId('check-fail-badge').first()).toBeVisible()
 })
 
-test('real mode relabels the chip and hides secret rows', async ({ page }) => {
+test('the OS transport relabels the chip and hides secret rows', async ({ page }) => {
   await open(page)
   await page.getByTestId('transport-switch').click()
   await expect(page.getByTestId('training-only-label')).toContainText('OS TRANSPORT')

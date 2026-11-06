@@ -276,8 +276,14 @@ namespace NetSec.Host.Tests
                 await s.Send("{\"type\":\"session.start\",\"requestId\":\"r3\",\"lesson\":" + row.GetProperty("lesson").GetInt32() + ",\"mode\":\"run\"}");
                 Assert.Equal("LESSON_NOT_BUILT", (await s.Until("error")).GetProperty("code").GetString());
             }
-            await s.Send("{\"type\":\"session.start\",\"requestId\":\"r2\",\"lesson\":0,\"mode\":\"run\",\"transport\":\"real\"}");
-            Assert.Equal("REAL_MODE_NOT_BUILT", (await s.Until("error")).GetProperty("code").GetString());
+            // Lesson 0 has no OS path.
+            await s.Send("{\"type\":\"session.start\",\"requestId\":\"r2\",\"lesson\":0,\"mode\":\"run\",\"transport\":\"os\"}");
+            Assert.Equal("OS_TRANSPORT_NOT_BUILT", (await s.Until("error")).GetProperty("code").GetString());
+            // "real" was the old name. It is refused by name, so an old caller never runs a glass session in silence.
+            await s.Send("{\"type\":\"session.start\",\"requestId\":\"r4\",\"lesson\":5,\"mode\":\"run\",\"transport\":\"real\"}");
+            JsonElement unknown = await s.Until("error");
+            Assert.Equal("TRANSPORT_UNKNOWN", unknown.GetProperty("code").GetString());
+            Assert.Contains("os", unknown.GetProperty("message").GetString());
         }
 
         /// <summary>A lab can do slow work before its first event. A step sent right after session.started must still release that event, with no resend.</summary>
