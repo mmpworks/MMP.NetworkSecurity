@@ -60,11 +60,15 @@ type clientOptions struct {
 	knownHost  string
 	exec       string
 	tunnel     string
+	password   string
+	rekeyBytes uint64
 }
 
 func (c *clientOptions) register(fs *flag.FlagSet, shared *sshconf.Algorithms) {
 	c.algorithms = shared
 	fs.StringVar(&c.connect, "connect", "", "client: host:port to dial")
+	fs.StringVar(&c.password, "password-only", "", "client: offer this password as the only login method")
+	fs.Uint64Var(&c.rekeyBytes, "rekey-bytes", 0, "client: ask for a key re-exchange after this many bytes (0: library default)")
 	fs.StringVar(&c.user, "user", "training", "client: user name")
 	fs.StringVar(&c.identity, "identity", "", "client: private key file")
 	fs.StringVar(&c.knownHost, "known-host", "", "client: known_hosts file")

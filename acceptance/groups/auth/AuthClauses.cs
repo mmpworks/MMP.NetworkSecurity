@@ -153,6 +153,31 @@ namespace Acceptance
 
         // ---------------------------------------------------------------- the product's token under the Go verifier
 
+        /// <summary>A18, matrix row 13: the token check takes EdDSA only. An unsigned token and a token that names another algorithm are each refused, beside a good token.</summary>
+        [Clause("A18.refuse.token.only-eddsa")]
+        public static string OnlyEdDsa(Ctx c)
+        {
+            TrainingKeySource keys = new TrainingKeySource();
+            ITrainingKey issuer = keys.Find(KeyIds.TokenIssuer);
+            long now = DateTimeOffset.UtcNow.ToUnixTimeSeconds();
+            string claims = "{\"iss\":\"https://pump.training/issuer\",\"aud\":\"https://pump.training/api\",\"sub\":\"learner\",\"iat\":" + now + ",\"exp\":" + (now + 300) + "}";
+            string token = NetSec.Auth.Token.Issue(issuer, claims);
+            AuthDecision good = NetSec.Auth.Token.Verify(issuer.CopyPublic(), token, DateTime.UtcNow);
+            Check.True(good.Allowed, "control: the product refused its own EdDSA token: " + good.Code);
+            string[] parts = token.Split('.');
+            Func<string, string> head = delegate (string alg) { return Convert.ToBase64String(Encoding.ASCII.GetBytes("{\"alg\":\"" + alg + "\",\"typ\":\"JWT\"}")).TrimEnd('=').Replace('+', '-').Replace('/', '_'); };
+            string[,] cases = { { "none", head("none") + "." + parts[1] + "." }, { "ES256", head("ES256") + "." + parts[1] + "." + parts[2] }, { "HS256", head("HS256") + "." + parts[1] + "." + parts[2] } };
+            string codes = "";
+            for (int i = 0; i < cases.GetLength(0); i++)
+            {
+                AuthDecision d = NetSec.Auth.Token.Verify(issuer.CopyPublic(), cases[i, 1], DateTime.UtcNow);
+                Check.True(!d.Allowed, "the product accepted a token with alg " + cases[i, 0] + ". The on-screen line A18.screen.l10-dpop-subset needs a change");
+                Check.Equal("refusal code for alg " + cases[i, 0], "TOKEN_BAD_ALG", d.Code);
+                codes += " " + cases[i, 0] + "=" + d.Code;
+            }
+            return "the product's own EdDSA token passes; tokens naming other algorithms are refused:" + codes;
+        }
+
         [Clause("A11.token.verifies-under-go-tokenverify")]
         public static string TokenUnderGo(Ctx c)
         {
