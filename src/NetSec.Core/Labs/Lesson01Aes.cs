@@ -213,7 +213,7 @@ namespace NetSec.Labs
             return plain;
         }
 
-        static byte[] Pad(byte[] plain)
+        internal static byte[] Pad(byte[] plain)
         {
             int pad = BlockSize - plain.Length % BlockSize;
             byte[] padded = new byte[plain.Length + pad];

@@ -21,6 +21,38 @@ public static class AesWalkRoutes
         app.MapGet("/api/walk/aes/tables", (HttpContext http) => NoStore(http, Guarded(() => Results.Json(AesWalkJson.Tables()))));
         app.MapGet("/api/sessions/{id}/walk/aes/block", (HttpContext http, string id, string? source, string? keyBits) =>
             NoStore(http, Block(security.ShowKeys, sessions.Find(id), id, source, keyBits)));
+        // Section 2.2g: the learner's own text. It runs under the public practice key and reads no run, so it stays open with Show keys off.
+        app.MapPost("/api/walk/aes/typed-block", (HttpContext http, TypedText body) => NoStore(http, Typed(() => TypedBlock(body.Text))));
+        app.MapPost("/api/walk/aes/long-text", (HttpContext http, LongTextAsk body) => NoStore(http, Typed(() => LongText(body))));
+    }
+
+    public sealed record TypedText(string? Text);
+
+    public sealed record LongTextAsk(string? Text, int? FlipBlock, int? FlipBit);
+
+    static IResult TypedBlock(string? text)
+    {
+        AesTypedBlock typed = AesTypedBlocks.Cut(text ?? "");
+        byte[] key = AesPractice.Key(128), cipher = new byte[BlockSize];
+        new AesKey(key).EncryptBlock(typed.Block, 0, cipher, 0);
+        return Results.Json(AesWalkJson.TypedBlock(typed, AesWalks.Block(key, typed.Block, cipher)));
+    }
+
+    static IResult LongText(LongTextAsk ask)
+    {
+        byte[] text = AesTypedText.Bytes(ask.Text ?? "");
+        int flipBlock = ask.FlipBlock ?? -1;
+        return Results.Json(AesWalkJson.LongText(AesLongText.Build(AesPractice.Key(128), AesPractice.Iv(), text, flipBlock, ask.FlipBit ?? 0)));
+    }
+
+    /// <summary>A refusal from the text rules is a 400 with its code. The walk's own guard still applies.</summary>
+    static IResult Typed(Func<IResult> walk)
+    {
+        try { return Guarded(walk); }
+        catch (NetSecException e) when (e.Error.Code is ErrorCodes.WalkTextEmpty or ErrorCodes.WalkTextTooLong or ErrorCodes.WalkTextInvalid or ErrorCodes.WalkBadArgument)
+        {
+            return Refuse(400, e.Error.Code, e.Error.Message);
+        }
     }
 
     static IResult NoStore(HttpContext http, IResult result)

@@ -65,6 +65,48 @@ public static class AesWalkJson
         wire = new { status = wireStatus, message = wireMessage },
     };
 
+    /// <summary>Chapter 1 on a typed block: the walk under the public practice key, and how the text was cut into the block.</summary>
+    public static object TypedBlock(AesTypedBlock typed, AesBlockPair pair) => new
+    {
+        walk = Block("typed", "typed-practice", pair, "notSent", "TextEcb"),
+        cut = new
+        {
+            block = Bytes(typed.Block),
+            usedBytes = typed.UsedBytes,
+            paddingBytes = typed.PaddingBytes,
+            notIncludedBytes = typed.NotIncludedBytes,
+            splitCharacterBytesIn = typed.SplitCharacterBytesIn,
+        },
+    };
+
+    static object LongRow(AesLongTextRow r) => new
+    {
+        block = r.Block,
+        data = Bytes(r.Data),
+        ecb = Bytes(r.Ecb),
+        cbc = Bytes(r.Cbc),
+        ecbRepeat = r.EcbRepeat,
+        cbcRepeat = r.CbcRepeat,
+        ecbBitsChanged = r.EcbBitsChanged,
+        cbcBitsChanged = r.CbcBitsChanged,
+    };
+
+    /// <summary>The longer text under the practice key and IV, ECB beside CBC. keySource names the key, so a reader never takes it for a run's key.</summary>
+    public static object LongText(AesLongTextView v) => new
+    {
+        keySource = "typed-practice",
+        blocks = v.Rows.Length,
+        ecbRepeats = v.EcbRepeats,
+        cbcRepeats = v.CbcRepeats,
+        rows = v.Rows.Select(LongRow).ToArray(),
+        flipped = v.FlippedRows is null ? null : new
+        {
+            ecbBlocksChanged = v.EcbBlocksChanged,
+            cbcBlocksChanged = v.CbcBlocksChanged,
+            rows = v.FlippedRows.Select(LongRow).ToArray(),
+        },
+    };
+
     /// <summary>The size table comes from a walk of an all-zero key at each size, so its numbers are the engine's own.</summary>
     static object Size(int keyBytes)
     {
