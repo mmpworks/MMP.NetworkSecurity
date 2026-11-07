@@ -9,6 +9,27 @@ export const HOST_PORT = 5190
 export const TOKEN = 'lesson0-token'
 const hostDll = process.env.NETSEC_HOST_DLL ?? path.resolve(__dirname, '..', 'src', 'NetSec.Host', 'bin', 'Release', 'net10.0', 'NetSec.Host.dll')
 
+// The suite runs the Release Host. A Debug build, a pull or a branch switch leaves that DLL older than the code, and the specs then test an old Host
+// with no warning. So a run refuses to start while any source file under src/ is newer than the DLL. A Host that the person names in NETSEC_HOST_DLL is theirs to keep current.
+function newestSource(dir: string): { file: string; ms: number } {
+  let best = { file: '', ms: 0 }
+  for (const entry of fs.readdirSync(dir, { withFileTypes: true })) {
+    if (entry.name === 'bin' || entry.name === 'obj') continue
+    const full = path.join(dir, entry.name)
+    if (entry.isDirectory()) { const inner = newestSource(full); if (inner.ms > best.ms) best = inner }
+    else if (entry.name.endsWith('.cs') || entry.name.endsWith('.csproj')) { const ms = fs.statSync(full).mtimeMs; if (ms > best.ms) best = { file: full, ms } }
+  }
+  return best
+}
+if (!process.env.NETSEC_HOST_DLL) {
+  const newest = newestSource(path.resolve(__dirname, '..', 'src'))
+  const built = fs.existsSync(hostDll) ? fs.statSync(hostDll).mtimeMs : 0
+  if (built < newest.ms) {
+    throw new Error(`HOST_DLL_STALE: ${built ? 'the Release Host is older than ' + path.relative(path.resolve(__dirname, '..'), newest.file) : 'no Release Host at ' + hostDll}. `
+      + 'Rebuild it from the repo root: dotnet build src/NetSec.Host -c Release')
+  }
+}
+
 // The Host reads its security folder once at start, and every spec on port 5190 shares that Host, so a run has one folder. Without this line the Host
 // falls back to the tree's .security folder, which holds keys from earlier runs. Workers inherit the value, so the config makes one folder per run.
 process.env.NETSEC_SECURITY_DIR ??= fs.mkdtempSync(path.join(os.tmpdir(), 'ns-e2e-security-'))
