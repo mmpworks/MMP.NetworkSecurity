@@ -502,6 +502,8 @@ $rows = foreach ($c in $sel) {
     $r = $results[$c.id]
     [pscustomobject][ordered]@{ id = $c.id; assertion = $c.assertion; slice = $c.slice; group = $c.group; build = $c.build; referee = $c.referee; status = $r.status; reason = $r.reason; detail = $r.detail; ms = $r.ms }
 }
+# One selected clause makes foreach return a single object. The report keeps results as an array, so a reader never has to guess the shape.
+$rows = @($rows)
 $prodRows = @($rows | Where-Object { $_.assertion -ne 'SELF' })
 $selfRows = @($rows | Where-Object { $_.assertion -eq 'SELF' })
 $nPass = @($prodRows | Where-Object { $_.status -eq 'PASS' }).Count
@@ -510,6 +512,13 @@ $nNot = @($prodRows | Where-Object { $_.status -eq 'NOT RUN' }).Count
 $mSel = $prodRows.Count
 $reasons = @($prodRows | Where-Object { $_.status -ne 'PASS' } | Group-Object -Property { "$($_.status) $($_.reason)" } | ForEach-Object { [pscustomobject]@{ key = $_.Name; count = $_.Count } })
 
+# Test settings that change what a run proves, so a reader sees them in the report itself.
+$activeEnv = [ordered]@{}
+foreach ($name in @('ACC_E2E_DEFECT', 'ACC_SELF_ONLY')) { $v = [Environment]::GetEnvironmentVariable($name); if ($v) { $activeEnv[$name] = $v } }
+# A clause near the runner's 900 s budget is a timeout waiting to happen. ACC_SLOW_WARN_SEC lowers the line, for a test of this warning.
+$slowSec = 600; if ($env:ACC_SLOW_WARN_SEC) { $slowSec = [int]$env:ACC_SLOW_WARN_SEC }
+$slow = @($sel | ForEach-Object { $r = $results[$_.id]; if ($r -and $r.ms -and ([double]$r.ms / 1000) -gt $slowSec) { [pscustomobject]@{ id = $_.id; seconds = [math]::Round([double]$r.ms / 1000) } } })
+
 $jsonPath = Join-Path $OutDir "acceptance-$stamp.json"
 $mdPath = Join-Path $OutDir "acceptance-$stamp.md"
 $summary = [ordered]@{
@@ -517,6 +526,7 @@ $summary = [ordered]@{
     productRoot = $ProductRoot; productCommit = (Git-Head $ProductRoot); acceptanceCommit = (git -C $ProductRoot log -1 --format=%h -- acceptance 2>$null)
     freshClone = [bool]$FreshChild; productPresent = $productExists
     M = $M; selected = $mSel; pass = $nPass; fail = $nFail; notRun = $nNot; reasons = $reasons
+    activeEnv = $activeEnv; slowWarnSeconds = $slowSec; slow = $slow
     selfChecks = [ordered]@{ selected = $selfRows.Count; pass = @($selfRows | Where-Object { $_.status -eq 'PASS' }).Count; fail = @($selfRows | Where-Object { $_.status -eq 'FAIL' }).Count; notRun = @($selfRows | Where-Object { $_.status -eq 'NOT RUN' }).Count }
 }
 ([ordered]@{ summary = $summary; results = $rows } | ConvertTo-Json -Depth 6) | Set-Content -Path $jsonPath -Encoding utf8
@@ -528,6 +538,14 @@ $null = $md.AppendLine(("**{0} of {1} clauses PASS** ({2} FAIL, {3} NOT RUN). M 
 $null = $md.AppendLine()
 $null = $md.AppendLine("Command: ``$($summary.command)``. Product commit: $($summary.productCommit). Acceptance commit: $($summary.acceptanceCommit). Fresh clone: $($summary.freshClone). Product present: $productExists.")
 $null = $md.AppendLine()
+if ($activeEnv.Count -gt 0) {
+    $null = $md.AppendLine("Active test settings: " + (($activeEnv.Keys | ForEach-Object { "``$_=$($activeEnv[$_])``" }) -join ', ') + ". They change what this run proves.")
+    $null = $md.AppendLine()
+}
+foreach ($s in $slow) {
+    $null = $md.AppendLine("Warning: ``$($s.id)`` took $($s.seconds) s, past the $slowSec s warning line. The runner stops a clause at 900 s.")
+}
+if ($slow.Count -gt 0) { $null = $md.AppendLine() }
 $null = $md.AppendLine('## N of M per assertion')
 $null = $md.AppendLine()
 $null = $md.AppendLine('| Assertion | M | PASS | FAIL | NOT RUN | Slice | Referee |')
