@@ -10,7 +10,8 @@ namespace NetSec.Pki
     /// <summary>
     /// Reads an unencrypted OpenSSH private key file, the form ssh-keygen writes (PROTOCOL.key in the OpenSSH source). The file comes from a learner,
     /// so every length is checked against the bytes left before it is used, each refusal names its fault, and the decoded bytes are cleared on every
-    /// path. A key the engines cannot use is refused here, so no part of a bad file reaches a lab.
+    /// path. The file's text and its base64 body are .NET strings, which cannot be cleared, so they stay in memory until the collector takes them.
+    /// A key the engines cannot use is refused here, so no part of a bad file reaches a lab.
     /// </summary>
     public static class OpenSshKeyReader
     {
