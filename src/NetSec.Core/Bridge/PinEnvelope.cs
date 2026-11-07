@@ -82,6 +82,9 @@ namespace NetSec.Bridge
         public const string InjectedKeyId = "1234567890123456";
         public const string InjectedInitialKey = "0df82e94fec64fb6ba47e98887af157d";
 
+        /// <summary>The key a loader injects for a base key. On the built-in base key this is InjectedInitialKey, and a test pins that.</summary>
+        public static byte[] InitialKeyUnder(byte[] baseKey) { return DukptBank.DeriveInitialKey(baseKey, Hex.Decode(InjectedKeyId)); }
+
         /// <summary>Locks one PIN under the next counter's keys. The pad erases the derivation key inside NextTogether.</summary>
         public static PadSale Sell(DukptPinPad pad, string traceId, string pin, string pan, IRandomSource random)
         {

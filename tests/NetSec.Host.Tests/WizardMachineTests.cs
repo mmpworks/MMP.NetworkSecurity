@@ -426,4 +426,81 @@ public class WizardMachineTests
             Assert.DoesNotContain(hex, fact.Output + fact.ControlOutput, StringComparison.OrdinalIgnoreCase);
         }
     }
+
+    static JsonElement PaymentData(string path, string? checkValue = null) =>
+        JsonDocument.Parse(JsonSerializer.Serialize(new { paths = new Dictionary<string, string> { [SecurityTypes.DukptBdk] = path }, checkValue })).RootElement;
+
+    static RunReply PaymentFile(Rig rig, string text, string? checkValue = null)
+    {
+        Directory.CreateDirectory(rig.Root);
+        string path = Path.Combine(rig.Root, "bdk.txt");
+        File.WriteAllText(path, text);
+        FlowRun run = rig.Runs.Start("my-payment")!.Run;
+        run = Move(rig.Runs, run, "next", NoData).Run;
+        run = Move(rig.Runs, run, "use-files", NoData).Run;
+        return Move(rig.Runs, run, "files", PaymentData(path, checkValue));
+    }
+
+    const string PublishedBdk = "fedcba9876543210f1f1f1f1f1f1f1f1";
+
+    [Fact]
+    public void A_payment_key_made_for_the_learner_passes_with_no_outside_judge_and_shows_no_key()
+    {
+        using Rig rig = new();
+        FlowRun run = rig.Runs.Start("my-payment")!.Run;
+        run = Move(rig.Runs, run, "next", NoData).Run;
+        RunReply review = Move(rig.Runs, run, "make", NoData);
+        Assert.Equal(2, review.Facts.Count);
+        Assert.Equal("follows", rig.Store.Entry(SecurityTypes.DukptPad).Binding!.Provider);
+        RunReply check = Move(rig.Runs, Move(rig.Runs, review.Run, "next", NoData).Run, "check", NoData);
+        string hex = Convert.ToHexString(rig.Store.PlacedKey(SecurityTypes.DukptBdk)!.CopyMaterial()).ToLowerInvariant();
+        Assert.Equal(32, hex.Length);
+        Assert.Equal(2, check.Facts.Count);
+        foreach (CheckFact fact in check.Facts.Cast<CheckFact>())
+        {
+            Assert.True(fact.Passed, fact.Message);
+            Assert.Equal("none", fact.Judge);
+            Assert.Contains("2 of 2 values equal", fact.Output);
+            Assert.Contains("opens at the bank", fact.Output);
+            Assert.DoesNotContain(hex, fact.Output, StringComparison.OrdinalIgnoreCase);
+        }
+    }
+
+    [Fact]
+    public void A_base_key_file_places_those_bytes_and_a_matching_check_value_is_accepted()
+    {
+        foreach (string form in new[] { "ed6429", "ff0bd7", "FF0BD7C455" })
+        {
+            using Rig rig = new();
+            RunReply reply = PaymentFile(rig, PublishedBdk + "\n", form);
+            Assert.Empty(reply.Errors);
+            Assert.Equal(PublishedBdk, Convert.ToHexString(rig.Store.PlacedKey(SecurityTypes.DukptBdk)!.CopyMaterial()).ToLowerInvariant());
+            Assert.Equal("follows", rig.Store.Entry(SecurityTypes.DukptPad).Binding!.Provider);
+        }
+    }
+
+    [Theory]
+    [InlineData("fedcba9876543210f1f1f1f1f1f1f1", null, "DUKPT_KEY_SIZE")]
+    [InlineData("fedcba9876543210f1f1f1f1f1f1f1f1f1f1", null, "DUKPT_KEY_SIZE")]
+    [InlineData("not hex at all", null, "KEY_FILE_FORMAT")]
+    [InlineData(PublishedBdk, "000000", "DUKPT_KCV_MISMATCH")]
+    public void A_bad_base_key_file_is_refused_and_places_nothing(string text, string? checkValue, string code)
+    {
+        using Rig rig = new();
+        RunReply reply = PaymentFile(rig, text, checkValue);
+        Assert.Contains(reply.Errors, e => e.Code == code && e.TypeId == SecurityTypes.DukptBdk);
+        Assert.Null(rig.Store.Entry(SecurityTypes.DukptBdk).Binding);
+        Assert.Null(rig.Store.Entry(SecurityTypes.DukptPad).Binding);
+    }
+
+    [Fact]
+    public void A_missing_base_key_file_is_named_as_unreadable()
+    {
+        using Rig rig = new();
+        FlowRun run = rig.Runs.Start("my-payment")!.Run;
+        run = Move(rig.Runs, run, "next", NoData).Run;
+        run = Move(rig.Runs, run, "use-files", NoData).Run;
+        RunReply reply = Move(rig.Runs, run, "files", PaymentData(Path.Combine(rig.Root, "no-such-file.txt")));
+        Assert.Contains(reply.Errors, e => e.Code == "KEY_FILE_UNREADABLE");
+    }
 }

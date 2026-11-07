@@ -824,7 +824,7 @@ Each slice is vertical and merges to a running `main`. Builders never write `acc
 | V3 | `A17.show-keys.default-on`, `.off-holds-no-secret`, `.mine-shows-exportable`, `.non-exportable-hidden-when-on`, `.fingerprint-compare`, `A17.ui.show-keys-switch` | 6 |
 | V4 | `A17.flow.certificates.walk`, `A17.referee.tls13-server-openssl`, `.tls13-client-go-with-intermediate`, `.tls11-server-openssl`, `A17.proof.root-negative-control`, `A17.chain.alg-unsupported-named`, `A17.clock.new-certificate-not-expired`, `A17.attacks.hit-named-field`, `A17.attacks.unavailable-names-code` | 9 |
 | V5 | `A17.flow.ssh.walk`, `A17.referee.ssh-host-ssh-exe`, `.ssh-client-go` | 3 |
-| V6 | `A17.flow.payment.walk`, `A17.payment.vectors-through-flow-code` | 2 |
+| V6 | `A17.flow.payment.known-answer-walk`, `A17.payment.known-answer-vectors-through-flow-code` | 2 |
 | V7 | `A17.flow.lesson-keys.walk`, `A17.referee.lesson-keys-openssl-mac` | 2 |
 | V8 | `A17.lesson-N.my-keys` for lessons 1, 2, 4, 5, 6, 7, 8, 9, 10 (9), `A17.ui.no-word-real`, `A17.ui.test-keys-line`, `A17.ui.no-outside-judge-line`, `A17.copy.grade-and-tics`, `A17.cold.lesson-10-fresh-clone` | 14 |
 | **Total** | | **51** |

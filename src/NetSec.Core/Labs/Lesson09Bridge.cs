@@ -47,7 +47,7 @@ namespace NetSec.Labs
 
             LinkListener padListener = NewListener(), gatewayListener = NewListener(), serverListener = NewListener(), bankListener = NewListener();
 
-            PadSale sale = PinPadCore.Sell(new DukptPinPad(Hex.Decode(PinPadCore.InjectedInitialKey), Hex.Decode(PinPadCore.InjectedKeyId)), traceId, Pin, Pan, saleRandom);
+            PadSale sale = PinPadCore.Sell(new DukptPinPad(PinPadCore.InitialKeyUnder(keys.Find(KeyIds.DukptBdk128).CopyMaterial()), Hex.Decode(PinPadCore.InjectedKeyId)), traceId, Pin, Pan, saleRandom);
             TraceEventDraft locked = new TraceEventDraft();
             locked.Type = "pin.block.locked";
             locked.Message = "PinEnvelope";
