@@ -81,7 +81,8 @@ export const tour = reactive({
 })
 
 export type ThemeChoice = 'system' | 'light' | 'dark'
-function storedTheme(): ThemeChoice { const v = safeGet('mmpns.theme'); return v === 'light' || v === 'dark' ? v : 'system' }
+// Dark is the first theme. System stays a choice, and a saved choice wins.
+function storedTheme(): ThemeChoice { const v = safeGet('mmpns.theme'); return v === 'light' || v === 'system' ? v : 'dark' }
 function safeGet(k: string): string | null { try { return localStorage.getItem(k) } catch { return null } }
 function safeSet(k: string, v: string) { try { localStorage.setItem(k, v) } catch { /* storage may be blocked */ } }
 

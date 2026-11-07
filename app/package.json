@@ -12,6 +12,9 @@
     "e2e": "npm run build && playwright test"
   },
   "dependencies": {
+    "@fontsource/atkinson-hyperlegible": "5.3.0",
+    "@fontsource/familjen-grotesk": "5.3.0",
+    "@fontsource/jetbrains-mono": "5.3.0",
     "@mdi/font": "^7.4.47",
     "splitpanes": "^4.1.2",
     "vue": "3.5.13",

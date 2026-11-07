@@ -54,7 +54,7 @@ function waitForHost(timeoutMs = 60000) {
 
 async function createWindow() {
   const win = new BrowserWindow({
-    ...fitWindow(screen.getPrimaryDisplay().workArea), title: 'Network Security Lab', backgroundColor: '#0e1318',
+    ...fitWindow(screen.getPrimaryDisplay().workArea), title: 'Network Security Lab', backgroundColor: '#10141f',
     webPreferences: { preload: path.join(__dirname, 'preload.cjs'), contextIsolation: true, additionalArguments: [`--netsec-port=${PORT}`, `--netsec-token=${TOKEN}`] },
   })
   const devUrl = process.env.VITE_DEV_SERVER_URL
