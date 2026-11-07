@@ -1,5 +1,6 @@
 using System;
 using System.Collections.Generic;
+using System.IO;
 using System.Net;
 using System.Text;
 
@@ -103,6 +104,24 @@ namespace Acceptance
                 }
             }
             WalkWrite(ctx, 200, D("keySource", "typed-practice", "blocks", (double)rows.Count, "rows", rows), false);
+            return true;
+        }
+
+        /// <summary>The TLS 1.3 key schedule walk on RFC 8448's public inputs, open with Show keys OFF (sections-plan.md section 4). The fake serves each value from the suite's own vector file.</summary>
+        bool ScheduleRoute(HttpListenerContext ctx, string path)
+        {
+            if (path != Tls13WalkClauses.Path || M("walk-routes-missing")) return false;
+            if (!_showKeys && M("schedule-closed-off")) { WalkFail(ctx, 409, "KEYS_HIDDEN", "closed"); return true; }
+            string vectors = Path.Combine(Path.GetDirectoryName(Path.GetDirectoryName(Path.GetDirectoryName(_vaultScript))), "vectors");
+            VectorRecord rfc = Nsv.Load(vectors, "tls13-rfc8448.nsv", "tls13-rfc8448-1rtt")[0];
+            List<object> steps = new List<object>();
+            foreach (string name in new string[] { "early_secret", "derived_for_handshake", "ecdhe_shared", "handshake_secret", "c_hs_traffic", "s_hs_traffic", "derived_for_master", "master_secret", "s_finished_verify_data", "c_ap_traffic", "s_ap_traffic", "c_finished_verify_data" })
+            {
+                string output = rfc.Str(name);
+                if (name == "master_secret" && M("schedule-step-flip")) output = (output[0] == '0' ? "1" : "0") + output.Substring(1);
+                steps.Add(D("name", name, "kind", "Extract", "output", output));
+            }
+            WalkWrite(ctx, 200, D("source", "RFC 8448 section 3", "suite", "TLS_AES_128_GCM_SHA256", "keySource", M("schedule-other-keysource") ? "run" : "rfc8448", "steps", steps), false);
             return true;
         }
 
