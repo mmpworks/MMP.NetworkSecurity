@@ -11,7 +11,9 @@ function onOver(e: MouseEvent) {
   if (!cell || !HEX_BYTE.test(text)) { tip.value = null; return }
   const bits = parseInt(text, 16).toString(2).padStart(8, '0')
   const r = cell.getBoundingClientRect()
-  tip.value = { text: `${text.toLowerCase()} = ${bits.slice(0, 4)} ${bits.slice(4)}`, x: Math.max(8, Math.min(r.left, innerWidth - 150)), y: Math.max(8, r.top - 30) }
+  // Below the cell, so the tip never covers the label line above a grid. Above it when the window bottom is too close.
+  const below = r.bottom + 30 <= innerHeight
+  tip.value = { text: `${text.toLowerCase()} = ${bits.slice(0, 4)} ${bits.slice(4)}`, x: Math.max(8, Math.min(r.left, innerWidth - 150)), y: below ? r.bottom + 4 : Math.max(8, r.top - 30) }
 }
 const hide = () => { tip.value = null }
 onMounted(() => { document.addEventListener('mouseover', onOver); window.addEventListener('scroll', hide, true) })

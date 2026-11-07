@@ -1,13 +1,15 @@
 <script setup lang="ts">
 import { computed, ref } from 'vue'
-import { active, allEvents, attack, isHighlighted, lessonRow, loadTrace, pauseEngine, restartSession, runEngine, selectEvent, selectedEvent, startSession, stepEngine, ui } from '../store'
+import { active, allEvents, attack, isHighlighted, lessonRow, loadTrace, pauseEngine, restartSession, runEngine, selectedEvent, selectEvent, startSession, stepEngine, ui } from '../store'
+import { holderColumns } from '../lab'
 
 const actor = ref('')
 const type = ref('')
 const checksOnly = ref(false)
 const traceFile = ref('')
 import AttackResult from './AttackResult.vue'
-const actors = computed(() => [...new Set(allEvents.value.map(e => e.actor).filter(Boolean))])
+// The engine's 2 sides run on 2 threads, so arrival order changes between runs. The list follows the lesson's lanes, as the diagram does.
+const actors = computed(() => holderColumns(allEvents.value.map(e => e.actor).filter(Boolean), lessonRow.value?.lanes ?? []))
 // In the Eavesdropper view the log lists what a listener sees: the on-wire events, with no check names.
 const eve = computed(() => ui.view === 'eavesdropper')
 const rows = computed(() => allEvents.value.filter(e => (!eve.value || e.type === 'wire.sent') && (!actor.value || e.actor === actor.value) && (!type.value || e.type.includes(type.value)) && (!checksOnly.value || e.check)))
