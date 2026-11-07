@@ -47,11 +47,11 @@ const tried = computed(() => !!step.value?.tryIt && unlock.value.open)
         </p>
       </div>
       <p v-if="note" class="lesson-note" data-testid="lesson-note">{{ note }}</p>
-      <div v-if="step.tryIt" class="tryit" :class="{ done: tried }" data-testid="tour-try-it">
+      <AttackResult />
+      </div>
+      <div v-if="step.tryIt" class="tryit pinned" :class="{ done: tried }" data-testid="tour-try-it">
         <div class="side-title">{{ tried ? "DONE" : "TRY IT" }}</div>
         <v-btn color="primary" :variant="tried ? 'outlined' : 'flat'" data-testid="tour-try-it-action" @click="doTryIt">{{ step.tryIt.label }}</v-btn>
-      </div>
-      <AttackResult />
       </div>
       <div class="tour-foot">
         <v-btn :disabled="tour.stepIndex === 0" data-testid="tour-back" @click="tourBack">Back</v-btn>

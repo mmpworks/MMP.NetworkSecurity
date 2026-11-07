@@ -226,6 +226,8 @@ body { overflow: hidden; }
 .tryit .side-title { color: var(--text); }
 .tryit .v-btn { height: auto; min-height: 36px; white-space: normal; text-align: left; padding-block: 4px; }
 .tryit.done { border-color: var(--pass); background: transparent; }
+/* The try-it sits outside the scrolling words, so the one thing to do is always in view. */
+.tryit.pinned { flex: 0 0 auto; margin: 6px 12px; }
 .next-reason { flex: 1 1 auto; min-width: 0; text-align: right; color: var(--muted); font-size: 12px; }
 .lesson-note { border-left: 3px solid var(--warn); padding: 4px 8px; background: var(--surface2); font-size: 13px; }
 .term { border-bottom: 1px dotted var(--readable); cursor: help; }

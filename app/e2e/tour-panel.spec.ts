@@ -26,6 +26,8 @@ for (const size of [{ width: 1440, height: 770 }, { width: 1280, height: 640 }])
         const tryIt = page.getByTestId('tour-try-it-action')
         if (await tryIt.isVisible()) {
           await expect(page.getByTestId('next-reason')).not.toHaveText('')
+          const shown = await tryIt.evaluate(b => { const r = b.getBoundingClientRect(); const p = b.closest('[data-testid=tour-panel]')!.getBoundingClientRect(); return r.top >= p.top && r.bottom <= p.bottom && r.bottom <= innerHeight })
+          expect(shown, `${ids[i]}: the try-it is on screen without a scroll`).toBe(true)
           await tryIt.click()
         }
       }
