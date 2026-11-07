@@ -48,6 +48,13 @@ for (const theme of ['dark', 'light'] as const) {
     await visit(page, theme, 'keyboard shortcuts dialog')
     await page.keyboard.press('Escape')
 
+    // The glossary page, with one method row open.
+    await page.getByTestId('settings-button').click()
+    await page.getByTestId('glossary-open').click()
+    await page.locator('[data-testid^=glossary-method-]').first().click()
+    await visit(page, theme, 'glossary')
+    await page.getByTestId('glossary-back').click()
+
     // A tour step with glossary terms, and the term tooltip.
     await page.getByTestId('lesson-item-1').click()
     await page.getByRole('button', { name: /start tour/i }).click()
