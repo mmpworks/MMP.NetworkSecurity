@@ -16,7 +16,7 @@ ALLOW_LIST = {
     "acceptance/lib/Harness/OpenSshKey.cs",
 }
 FORBIDDEN_PATH = re.compile(
-    r"(^|/)\.security/|\.(pfx|p12|db|key|ndjson)$|(^|/)(master\.key|id_rsa|id_ed25519|known_hosts)$",
+    r"(^|/)\.security/|\.(pfx|p12|db|key|ndjson|bin)$|(^|/)(master\.key|id_rsa|id_ed25519|known_hosts)$",
     re.IGNORECASE,
 )
 # The words are joined here so this file holds no header of its own.

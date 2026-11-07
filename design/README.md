@@ -13,7 +13,7 @@ This folder saves the approved design mock and the script that builds it. The pu
 | `mock/patch_*.py` | The edits made to the template, in order. Kept as a record |
 | `mock/tests/mock_*.cjs` | Playwright checks used while building the mock |
 | `facts-sheet.md` | The fact sheet the reviewer kept while checking the course and the mock. It was checked against main 7b569a1. For the status of each method, `app/src/glossary.json` is the newer source |
-| `evidence/sealed-sample/` | The sealed-sample runs the fact sheet cites as `sealed-sample/...`: commands, cases and output. `ikm.bin` and the key files are throwaway test material, made for these runs only |
+| `evidence/sealed-sample/` | The sealed-sample runs the fact sheet cites as `sealed-sample/...`: commands, cases and output. `ikm.bin` and the key files are throwaway test material, made for these runs only. The 5 `.ndjson` ledger files and `ikm.bin` stay out of git, because `tools/secret_guard.py` refuses tracked ledger and key files. They live on disk at `E:/dev/ns-mock/design/evidence/sealed-sample/` |
 | `evidence/r182/decrypt.py` | The decrypt check the fact sheet cites as `r182/decrypt.py` |
 
 ## The rule the mock follows
