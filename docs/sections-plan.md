@@ -11,7 +11,7 @@ Owners: Richard (map, engine data, slices) and Nancy (screens). Decision owner: 
 
 1. Steve asked for 3 sections: **Handshake**, **Cryptographic techniques** and **Attacks**. This plan places all 12 lessons (0 to 11), every mock tab, the 5 key flows (the wizard) and all 52 attack runs. Section 1 is the map.
 2. 4 lessons have no clean place: lessons 6, 8, 9 and 10. Section 8 asks Steve 1 question about them, with my pick.
-3. The engine already holds every method the new walks need: AES, SHA-256, HMAC, DES, the Diffie-Hellman group, X25519, Ed25519 and the TLS 1.3 key schedule. Each new walk needs a new read-only walk type and a new route. No walk adds a field to W1a's frozen AES walk types (section 4).
+3. The engine already holds every method the new walks need, with one exception: AES, SHA-256, HMAC, DES, the Diffie-Hellman group, X25519, Ed25519 and the TLS 1.3 key schedule are there. ECDSA is not, and Steve wants it, so its slice adds new engine code. Each new walk needs a new read-only walk type and a new route. No walk adds a field to W1a's frozen AES walk types (section 4).
 4. The order is: the section shell, the AES walk with the long text (W1b), the Attacks index, the Handshake walk, then one technique walk per slice (section 5).
 5. Kill condition: by 2026-11-27, 3 sections live, 12 of 12 lessons placed, 52 of 52 attack runs reachable from Attacks, the AES walk in section 2 with the long text visible, and Steve has stepped through each section in the app (section 6).
 
@@ -21,7 +21,7 @@ Owners: Richard (map, engine data, slices) and Nancy (screens). Decision owner: 
 |---|---|---|
 | R1 | **The long text is always visible.** In section 2, the long cleartext stays on screen while the learner moves between the technique tabs. | Steve's routine sentence, as the lead relayed it |
 | R2 | The app has 3 sections: Handshake, Cryptographic techniques, Attacks. | Steve |
-| R3 | Section 2 holds AES as in the mock (block, key schedule, finite field, HMAC and the chain), Feistel and Diffie-Hellman each on its own, and the elliptic-curve methods. | Steve |
+| R3 | Section 2 holds AES as in the mock (block, key schedule, finite field, HMAC and the chain), Feistel and Diffie-Hellman each on its own, and the elliptic-curve methods: key agreement (ECDH, X25519) and signatures (ECDSA, Ed25519). | Steve, 2026-11-07, through the lead |
 | R4 | Section 3 shows how things break and how to guard against it, built from today's tour attack runs. | Steve |
 | R5 | Every walk draws real engine data. The app runs no math (the real data rule, `walkthrough-design.md` section 3). | Existing rule |
 | R6 | No walk adds a field to W1a's frozen walk types. A walk that needs more data gets its own type and route. | `walkthrough-design.md` section 9 |
@@ -57,7 +57,7 @@ Owners: Richard (map, engine data, slices) and Nancy (screens). Decision owner: 
 | HMAC tab: SHA-256, the HMAC steps, the chain, the daily seal | Techniques: HMAC and the chain | Open list, no design. The daily seal has no engine code (section 4) |
 | Feistel tab | Techniques: Feistel | Open list, no design |
 | Diffie-Hellman tab | Techniques: Diffie-Hellman | Open list (W3), no design |
-| Elliptic curves: ECDH or X25519, and a signature | Techniques: elliptic curves | New. **Question Q2** for the signature |
+| Elliptic curves: key agreement (ECDH, X25519) and signatures (ECDSA, Ed25519) | Techniques: elliptic curves | New. X25519 and Ed25519 run in the engine today. ECDSA does not (section 4) |
 
 ### 1.3 The wizard and Security setup
 
@@ -70,7 +70,7 @@ Owners: Richard (map, engine data, slices) and Nancy (screens). Decision owner: 
 
 ### 1.4 Attack runs
 
-All 52 runs stay in their tour steps. The Attacks section indexes them by kind and plays the same runs (Q3 sets this). The kinds below are mine. Nancy's screen lines may rename them.
+All 52 runs stay in their tour steps. The Attacks section indexes them by kind and plays the same runs (Q2 sets this). The kinds below are mine. Nancy's screen lines may rename them.
 
 | Kind | Runs | Count |
 |---|---|---|
@@ -108,7 +108,7 @@ Nancy writes this section. Her lines are pending. Until they arrive, these are m
 | HMAC and chain walk | New | Section 2 |
 | Feistel walk | New | Section 2, on the engine's DES |
 | Diffie-Hellman walk | New | Section 2 |
-| Elliptic-curve walks | New | Section 2: X25519, then a signature (Q2) |
+| Elliptic-curve walks | New | Section 2: X25519 (ECDH on Curve25519) and Ed25519 first, then ECDSA on P-256 with new engine code |
 | Handshake walk | New | Section 1: the TLS 1.3 messages, the key schedule, and the certificate chain |
 | Security setup, wizard, vault, glossary | Stay | Shared area |
 
@@ -126,7 +126,8 @@ Each walk gets its own immutable walk type in Core (C# 3, both builds) and its o
 | Feistel | `Des.cs` | `DesWalk` (initial permutation, 16 rounds of left and right halves, expansion, S-boxes, permutation, subkeys) | `/api/walk/des` | FIPS 46-3 or SP 800-17 known answers |
 | Diffie-Hellman | `DhGroup14`, `BigUInt.ModPow` | `DhWalk` (square and multiply rows; a small prime for reading, group 14 for the real run) | `/api/walk/dh` | Python `pow()`, as `dh-group14-rfc3526.nsv` does today |
 | X25519 | `X25519`, `Montgomery` | `X25519Walk` (the ladder: one row per bit, the swap, the 4 field values) | `/api/walk/x25519` | RFC 7748 section 5.2 vectors |
-| A signature (Q2) | `Ed25519` (if Q2 is A) | `Ed25519Walk` (r, R, k, S, then verify) | `/api/walk/ed25519` | RFC 8032 section 7.1 vectors |
+| Ed25519 signature | `Ed25519` | `Ed25519Walk` (r, R, k, S, then verify) | `/api/walk/ed25519` | RFC 8032 section 7.1 vectors |
+| ECDSA signature, and ECDH on P-256 | **No engine code exists.** The engine has no P-256 and no ECDSA | New Core code first: P-256 point arithmetic and ECDSA sign and verify, then `EcdsaWalk` | `/api/walk/ecdsa` | FIPS 186-5 and the NIST CAVP ECDSA vectors, plus OpenSSL as referee, with a spike before sign-off |
 | TLS 1.3 key schedule | `Tls13KeySchedule` | `Tls13ScheduleWalk` (each Extract and Derive-Secret, with its label and transcript hash) | `/api/walk/tls13/schedule` | RFC 8448 section 3 trace, as `tls13-rfc8448.nsv` does today |
 | TLS 1.3 messages and the chain | Trace events `tls.handshake.sent` and `.received`, lesson 4's certificate parse | None. The trace already holds them | Existing session routes | Lesson 5's and lesson 4's clauses |
 
@@ -145,7 +146,8 @@ The Attacks index needs no engine data: `run-attack` already plays each run, and
 | P5 W1c | Chapter 2 modes, unchanged | W1c's clauses | Unchanged, now inside section 2 |
 | P6 HMAC and chain | `Sha256Walk`, `HmacWalk`, `SealChainWalk` | FIPS 180-4 and RFC 4231 | Takes lesson 2 from **W5** |
 | P7 Diffie-Hellman | `DhWalk` | `pow()` references | Takes the lesson 3 half of **W3** |
-| P8 Elliptic curves | `X25519Walk`, then the signature walk from Q2 | RFC 7748, RFC 8032 | New |
+| P8 Elliptic curves, engine today | `X25519Walk` and `Ed25519Walk` | RFC 7748, RFC 8032 | New |
+| P8b ECDSA | New Core code: P-256, ECDSA sign and verify, then `EcdsaWalk`. Spike first | CAVP vectors and OpenSSL | New. The one slice that adds crypto to the engine |
 | P9 Feistel | `DesWalk` | DES known answers | New |
 
 The kill condition in section 6 covers P0 to P3. P4 onward is a second plan step, which Steve orders after his look.
@@ -165,7 +167,7 @@ A progress report states these 5 counts. It does not substitute the fact that bu
 ## 7. Non-goals
 
 1. No new lesson and no tour rewrite. Sections group what exists.
-2. No new crypto in the engine. Every walk reads code that already runs.
+2. No new crypto in the engine, except ECDSA on P-256 in slice P8b, which Steve asked for. Every other walk reads code that already runs.
 3. No change to W1a's frozen walk types.
 4. No change to the acceptance clause ids.
 
@@ -174,11 +176,14 @@ A progress report states these 5 counts. It does not substitute the fact that bu
 | Id | Question | Option A | Option B | My pick |
 |---|---|---|---|---|
 | Q1 | Lessons 6 (DUKPT), 8 (SSH), 9 (the bridge) and 10 (client proof) are neither the TLS chain nor a method you named. Where do they go? | Handshake holds every protocol (8, 9, 10), and DUKPT (6) goes to Techniques as a key scheme | A fourth section, "Protocols in the field", for 6, 8, 9 and 10 | **A.** It keeps your 3 sections, and each of the 4 lessons is a handshake or a key method |
-| Q2 | Elliptic curves: by "ECDSA too", do you mean a signature walk on the curve the course already runs, or ECDSA itself? | Ed25519 (EdDSA), which the course runs today in lessons 4, 5 and 10 | ECDSA on P-256, which needs new engine code | **A.** It walks code the lessons run. ECDSA can come later as its own slice |
-| Q3 | Attack runs: one place, or two? | Each run stays in its tour step, and Attacks is a second door to the same runs | Each run moves out of its tour into Attacks only | **A.** The tours keep teaching in order, and no tour or clause changes |
-| Q4 | Lesson numbers: keep them inside the sections? | Keep 0 to 11, so section 1 shows 0, 4, 5, 7, and so on | Renumber inside each section | **A.** Tests, clauses, tour ids and the docs all name lessons by number |
+| Q2 | Attack runs: one place, or two? | Each run stays in its tour step, and Attacks is a second door to the same runs | Each run moves out of its tour into Attacks only | **A.** The tours keep teaching in order, and no tour or clause changes |
+| Q3 | Lesson numbers: keep them inside the sections? | Keep 0 to 11, so section 1 shows 0, 4, 5, 7, and so on | Renumber inside each section | **A.** Tests, clauses, tour ids and the docs all name lessons by number |
 
-Nancy may add 1 screen question here, which makes 5.
+Nancy may add 1 screen question here.
+
+**Answered (2026-11-07, Steve, through the lead):**
+1. Elliptic-curve methods mean both key agreement (ECDH, X25519) and signatures (ECDSA, Ed25519). Both go in section 2.
+2. W1b becomes the AES walk inside section 2, and it goes before V4's certificate file path.
 
 ## 9. Prior art
 
