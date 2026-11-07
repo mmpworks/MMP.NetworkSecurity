@@ -15,28 +15,28 @@ const value = computed(() => (props.byte.length === 2 ? at(row.value, col.value)
 </script>
 
 <template>
-  <div class="sbox" data-testid="aes-walk-sbox">
-    <p v-if="byte.length === 2" class="sbox-lookup">
-      <span class="sbox-in">{{ byte }}</span>: row <b data-testid="aes-walk-sbox-row">{{ row }}</b>, column <b data-testid="aes-walk-sbox-col">{{ col }}</b>
-      gives <b class="sbox-out" data-testid="aes-walk-sbox-value">{{ value }}</b>
+  <div class="aw-sbox" data-testid="aes-walk-sbox">
+    <p v-if="byte.length === 2" class="aw-sbox-lookup">
+      <span class="aw-sbox-in">{{ byte }}</span>: row <b data-testid="aes-walk-sbox-row">{{ row }}</b>, column <b data-testid="aes-walk-sbox-col">{{ col }}</b>
+      gives <b class="aw-sbox-out" data-testid="aes-walk-sbox-value">{{ value }}</b>
     </p>
-    <table class="sbox-table" :aria-label="inverse ? 'The inverse S-box' : 'The S-box'">
+    <table class="aw-sbox-table" :aria-label="inverse ? 'The inverse S-box' : 'The S-box'">
       <thead>
         <tr><th />
-          <th v-for="y in DIGITS" :key="y" :class="{ 'sbox-hit': y === col }" scope="col">{{ y }}</th>
+          <th v-for="y in DIGITS" :key="y" :class="{ 'aw-sbox-hit': y === col }" scope="col">{{ y }}</th>
         </tr>
       </thead>
       <tbody>
         <tr v-for="x in DIGITS" :key="x">
-          <th :class="{ 'sbox-hit': x === row }" scope="row">{{ x }}</th>
+          <th :class="{ 'aw-sbox-hit': x === row }" scope="row">{{ x }}</th>
           <td
             v-for="y in DIGITS" :key="y" :data-testid="`aes-walk-sbox-cell-${x}-${y}`"
-            :class="{ 'sbox-line': x === row || y === col, 'sbox-cross': x === row && y === col }"
+            :class="{ 'aw-sbox-line': x === row || y === col, 'aw-sbox-cross': x === row && y === col }"
           >{{ at(x, y) }}</td>
         </tr>
       </tbody>
     </table>
-    <div class="sbox-words">
+    <div class="aw-sbox-words">
       <p class="muted">{{ gloss.sbox.pick }}</p>
       <p class="muted">{{ gloss.sbox.facts }}</p>
       <p v-if="inverse">{{ gloss.sbox.inverse }}</p>

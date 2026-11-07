@@ -9,20 +9,20 @@ defineProps<{ mixed: AesMixedByte | null; cell: number | null }>()
 </script>
 
 <template>
-  <div class="field" data-testid="aes-walk-field-panel">
-    <ol class="field-def">
+  <div class="aw-field" data-testid="aes-walk-field-panel">
+    <ol class="aw-field-def">
       <li v-for="(line, n) in gloss.definition" :key="n">{{ line }}</li>
     </ol>
-    <div v-if="mixed" class="field-mul">
+    <div v-if="mixed" class="aw-field-mul">
       <p class="muted">Byte {{ cell }} after this step is the XOR of 4 products:</p>
       <div
-        v-for="(t, j) in mixed.parts" :key="j" class="field-term" :data-testid="`aes-walk-term-${j}`"
+        v-for="(t, j) in mixed.parts" :key="j" class="aw-field-term" :data-testid="`aes-walk-term-${j}`"
         :data-reduced="String(t.reduced)"
       >
         <span>{{ t.factor }} × {{ t.input }} = <b>{{ t.result }}</b></span>
         <span v-if="t.reduced" class="muted">, {{ gloss.field.reduced }}</span>
       </div>
-      <p class="field-sum" data-testid="aes-walk-term-result">XOR of the 4 products: <b>{{ mixed.result }}</b></p>
+      <p class="aw-field-sum" data-testid="aes-walk-term-result">XOR of the 4 products: <b>{{ mixed.result }}</b></p>
     </div>
     <p v-else class="muted">{{ gloss.field.pick }}</p>
   </div>

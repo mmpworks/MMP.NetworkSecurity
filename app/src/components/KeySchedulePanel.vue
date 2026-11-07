@@ -59,20 +59,20 @@ const rconLit = computed(() => (shownRow.value?.rcon ? byteAt(shownRow.value.rco
 </script>
 
 <template>
-  <div class="ks" data-testid="aes-walk-key-schedule">
-    <div class="ks-words">
+  <div class="aw-ks" data-testid="aes-walk-key-schedule">
+    <div class="aw-ks-words">
       <p>{{ gloss.keys.start }}</p>
       <p>{{ [gloss.keys.eachRound, nk === 4 ? gloss.keys.only128 : '', gloss.keys.decrypt].filter(Boolean).join(' ') }}</p>
-      <p v-if="bandNote" class="ks-band-note" data-testid="aes-walk-key-band-note">{{ bandNote }}</p>
+      <p v-if="bandNote" class="aw-ks-band-note" data-testid="aes-walk-key-band-note">{{ bandNote }}</p>
     </div>
-    <div class="ks-table" role="list" aria-label="The expanded key, one grid per round key">
-      <div v-for="g in grids" :key="g" class="ks-grid-wrap" role="listitem">
-        <span class="ks-grid-name muted">Round key {{ g - 1 }}</span>
-        <div class="ks-grid" :data-testid="`aes-walk-table-grid-${g - 1}`">
+    <div class="aw-ks-table" role="list" aria-label="The expanded key, one grid per round key">
+      <div v-for="g in grids" :key="g" class="aw-ks-grid-wrap" role="listitem">
+        <span class="aw-ks-grid-name muted">Round key {{ g - 1 }}</span>
+        <div class="aw-ks-grid" :data-testid="`aes-walk-table-grid-${g - 1}`">
           <template v-for="r in ROWS" :key="r">
             <button
-              v-for="c in ROWS" :key="c" type="button" class="ks-cell"
-              :class="{ 'ks-key': isKey(4 * (g - 1) + c), 'ks-lit': lit.has(4 * (g - 1) + c), 'ks-shown': shown === 4 * (g - 1) + c }"
+              v-for="c in ROWS" :key="c" type="button" class="aw-ks-cell"
+              :class="{ 'aw-ks-key': isKey(4 * (g - 1) + c), 'aw-ks-lit': lit.has(4 * (g - 1) + c), 'aw-ks-shown': shown === 4 * (g - 1) + c }"
               :data-testid="`aes-walk-table-cell-${16 * (g - 1) + r + 4 * c}`"
               :data-word="`w${4 * (g - 1) + c}`"
               :data-hex="cellByte(16 * (g - 1) + r + 4 * c)"
@@ -81,29 +81,29 @@ const rconLit = computed(() => (shownRow.value?.rcon ? byteAt(shownRow.value.rco
               :aria-label="`byte ${16 * (g - 1) + r + 4 * c}, word w${4 * (g - 1) + c}`"
               @click="tap(4 * (g - 1) + c)"
             >
-              <span class="ks-pos">{{ 16 * (g - 1) + r + 4 * c }}</span>
-              <span class="ks-hex">{{ cellByte(16 * (g - 1) + r + 4 * c) }}</span>
-              <span class="ks-word">w{{ 4 * (g - 1) + c }}</span>
+              <span class="aw-ks-pos">{{ 16 * (g - 1) + r + 4 * c }}</span>
+              <span class="aw-ks-hex">{{ cellByte(16 * (g - 1) + r + 4 * c) }}</span>
+              <span class="aw-ks-word">w{{ 4 * (g - 1) + c }}</span>
             </button>
           </template>
         </div>
       </div>
     </div>
-    <div class="ks-side">
-      <p v-if="keyNote" class="ks-key-note" data-testid="aes-walk-build-key-note">w{{ shown }}: {{ gloss.keys.keyNote }}</p>
+    <div class="aw-ks-side">
+      <p v-if="keyNote" class="aw-ks-key-note" data-testid="aes-walk-build-key-note">w{{ shown }}: {{ gloss.keys.keyNote }}</p>
       <template v-else-if="shownRow">
-        <p class="ks-test">{{ wordTest(shownRow, nk) }}</p>
-        <dl class="ks-stages">
-          <div v-for="s in stages" :key="s.id" class="ks-stage" :class="`ks-stage-${s.id}`" :data-testid="`aes-walk-build-${s.id}`">
+        <p class="aw-ks-test">{{ wordTest(shownRow, nk) }}</p>
+        <dl class="aw-ks-stages">
+          <div v-for="s in stages" :key="s.id" class="aw-ks-stage" :class="`aw-ks-stage-${s.id}`" :data-testid="`aes-walk-build-${s.id}`">
             <dt>{{ s.label }}</dt>
             <dd>{{ s.value }}</dd>
           </div>
         </dl>
       </template>
-      <div class="ks-rcon-block">
+      <div class="aw-ks-rcon-block">
         <p class="muted">{{ gloss.keys.rcon }}</p>
-        <div class="ks-rcon" data-testid="aes-walk-rcon">
-          <span v-for="(v, n) in rcon" :key="n" :class="{ 'ks-rcon-unused': n >= used, 'ks-rcon-lit': v === rconLit }">{{ v }}</span>
+        <div class="aw-ks-rcon" data-testid="aes-walk-rcon">
+          <span v-for="(v, n) in rcon" :key="n" :class="{ 'aw-ks-rcon-unused': n >= used, 'aw-ks-rcon-lit': v === rconLit }">{{ v }}</span>
         </div>
         <p v-if="used < rcon.length" class="muted">{{ gloss.keys.rconUnused.replace('{bits}', String(block.keyBits)).replace('{used}', String(used)) }}</p>
       </div>
