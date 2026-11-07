@@ -115,7 +115,8 @@ async function scan(page: Page, values: ReturnType<typeof forbiddenValues>, wher
   }
 }
 
-// The rule (lead, 2026-11-06): lessons 0 to 6 in every suite. All 12 with NETSEC_SWEEP_ALL=1, in Echo's long run and on any PR that touches the Eavesdropper view.
+// The rule (Jared and the lead, 2026-11-06): lessons 0 to 6 in every suite. All 12 with NETSEC_SWEEP_ALL=1, in Echo's long run and on any PR that touches the Eavesdropper view.
+// One exception: a change that only narrows what that view shows, in a condition on named events, runs the lessons that emit those events, and the PR shows the git grep that finds them.
 // Lessons 7 to 10 take about 5 minutes each, because each view switch redraws a long diagram.
 const LESSONS = process.env.NETSEC_SWEEP_ALL === '1' ? [0, 1, 2, 3, 4, 5, 6, 7, 8, 9, 10, 11] : [0, 1, 2, 3, 4, 5, 6]
 for (const lesson of LESSONS) {
