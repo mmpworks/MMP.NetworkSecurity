@@ -13,7 +13,7 @@ Owners: Richard (map, engine data, slices) and Nancy (screens). Decision owner: 
 2. Every lesson has a place: section 3 holds all 12. Each lesson also links to the walk in section 1 or 2 that shows its method, where one exists.
 3. The engine registers 56 attack runs. The tours play 52 of them. 4 are in no tour (section 1.4).
 4. The engine already holds every method the new walks need, with one exception: AES, SHA-256, HMAC, DES, the Diffie-Hellman group, X25519, Ed25519 and the TLS 1.3 key schedule are there. ECDSA is not, and Steve wants it, so its slice adds new engine code. Each new walk needs a new read-only walk type and a new route. No walk adds a field to W1a's frozen AES walk types (section 4).
-5. A walk that runs on a session's own key gives that key away row by row. So each walk names its key, and the first slices run only on public practice keys and RFC vectors (section 4).
+5. A walk that runs on a session's own key gives that key away row by row. So each walk names its key. No new walk type in this plan runs on a session's own key: each runs on a public practice key or an RFC vector. W1a's block walk and the session trace keep their existing Show keys OFF rules (section 4).
 6. The order is: the section shell, the AES walk with the long text (W1b), the attack index inside Lessons, the Handshake walk, then one technique walk per slice (section 5).
 7. Kill condition: by 2026-11-27, 3 sections live, 12 of 12 lessons in Lessons, 52 of 52 tour attack runs reachable, the AES walk in section 2 with the long text visible, and Steve has stepped through each section in the app (section 6).
 
@@ -127,7 +127,7 @@ Each walk gets its own immutable walk type in Core (C# 3, both builds) and its o
 
 **The key decides what Show keys OFF closes.** W1a's typed-text walks are safe with Show keys OFF because they run on a public practice key (`walkthrough-design.md` section 3.5). The walks below are different: each shows values that give away the key it runs on. A Diffie-Hellman square-and-multiply row, or an X25519 ladder row with its swap bit, shows one bit of the private scalar. An ECDSA k gives the private key: d = (s·k − z)/r. The Ed25519 r and secret scalar do the same. HMAC's K xor ipad gives K. DES subkeys give the key.
 
-So this plan's walks run only on a public practice key or an RFC vector. A walk on a session's own key is a later choice, and it needs the "OFF closes" column below.
+So no new walk type in this plan runs on a session's own key: each runs on a public practice key or an RFC vector. W1a's block walk and the session trace keep their existing Show keys OFF rules, as the first and last rows show. A new walk on a session's own key is a later choice, and it needs the "OFF closes" column below.
 
 | Walk | Engine piece it reads | Key it runs on | If on a session's key, OFF closes | New type (name for the program design to fix) | New route | Reference check |
 |---|---|---|---|---|---|---|
@@ -135,7 +135,7 @@ So this plan's walks run only on a public practice key or an RFC vector. A walk 
 | The long text (R1) | `Lesson01Aes.Pad`, `Modes` | Public practice key and IV | Not applicable | `AesLongTextView` (built on `feat/w1b-aes-walk`) | `/api/walk/aes/long-text` | BCL AES on the same blocks |
 | SHA-256 | `Sha256Hash` | No key | Not applicable | `Sha256Walk` (padding, message schedule, 64 rounds per block) | `/api/walk/sha256` | FIPS 180-4 examples |
 | HMAC | `Hmac` | RFC 4231 vector keys | K, K xor ipad, K xor opad, the inner and outer states | `HmacWalk` (inner and outer pass) | `/api/walk/hmac` | RFC 4231 HMAC vectors |
-| The chain | `NetSec.Vault/AuditChain.cs`, the vault's hash-linked audit rows. Lesson 2 holds no chain code | The vault's own rows | The program design checks whether a row holds key material. If one does, OFF closes that field | `SealChainWalk`, in the Host, because the vault is not in Core and Core cannot reference it | `/api/walk/seal-chain` | Recompute each link with BCL SHA-256 |
+| The chain | `NetSec.Vault/AuditChain.cs`, the vault's hash-linked audit rows. Lesson 2 holds no chain code | A fixture chain built by `AuditChain` from a public seed. The learner's own audit log is a later choice | Not applicable to the fixture. `AuditChain.HashOf` covers prev_hash, seq, at, caller, op and name, so a real row holds no key bytes | `SealChainWalk`, in the Host, because the vault is not in Core and Core cannot reference it | `/api/walk/seal-chain` | Recompute each link with BCL SHA-256 |
 | The daily seal | **No engine code exists.** The mock shows it, and nothing in `src/` makes one | Not planned | Not planned | Not planned | Not planned | Out of this plan until Steve says what the daily seal shows. It would be new engine code, which section 7 rules out |
 | Feistel | `Des.cs`, which runs only inside `TdesKey`, and only tests call that. No lesson runs DES | FIPS 46-3 or SP 800-17 known-answer keys | Every subkey and the key | `DesWalk` (initial permutation, 16 rounds of left and right halves, expansion, S-boxes, permutation, subkeys) | `/api/walk/des` | FIPS 46-3 or SP 800-17 known answers |
 | Diffie-Hellman | `DhGroup14`, `BigUInt.ModPow`. Lesson 8's legacy exchange runs `DhGroup14` (`SshClientRules.cs`) | A public practice exponent, on a small prime and on group 14 | Every square-and-multiply row and the private exponent | `DhWalk` (square-and-multiply rows; a small prime for reading, group 14 for the real run). The engine computes the small-prime run too. The app computes nothing (R5) | `/api/walk/dh` | Python `pow()`, as `dh-group14-rfc3526.nsv` does today |
@@ -191,7 +191,7 @@ A progress report states these 5 counts. It does not substitute the fact that bu
 3. No change to W1a's frozen walk types.
 4. No change to the acceptance clause ids.
 5. No handshake offers P-256 or ECDSA. That code is walk-only.
-6. No walk in this plan runs on a session's own key (section 4).
+6. No new walk type in this plan runs on a session's own key. W1a's block walk and the session trace keep their existing Show keys OFF rules (section 4).
 
 ## 8. Questions for Steve
 
