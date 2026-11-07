@@ -111,5 +111,8 @@ namespace NetSec.Errors
         public const string WalkBadArgument = "WALK_BAD_ARGUMENT";
         public const string WalkWaitingForWire = "WALK_WAITING_FOR_WIRE";
         public const string WalkMessageNotSent = "WALK_MESSAGE_NOT_SENT";
+        public const string WalkTextEmpty = "WALK_TEXT_EMPTY";
+        public const string WalkTextTooLong = "WALK_TEXT_TOO_LONG";
+        public const string WalkTextInvalid = "WALK_TEXT_INVALID";
     }
 }
