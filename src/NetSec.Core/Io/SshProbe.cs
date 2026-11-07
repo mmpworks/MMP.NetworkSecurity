@@ -114,6 +114,9 @@ namespace NetSec.Io
     /// <summary>Probe's SSH half. It reads the known_hosts file, because the engine holds no file.</summary>
     internal static class SshProbe
     {
+        /// <summary>The learner's set when the request carries one. Its missing types fall back to the training keys inside CredentialSet itself.</summary>
+        static ITrainingKeySource KeysOf(ProbeRequest r) { return r.Credentials != null ? (ITrainingKeySource)r.Credentials : new TrainingKeySource(); }
+
         const int DeadlineMs = SshSetup.ReadDeadlineMs;
 
         public static IFuture<ProbeResult> Connect(ProbeRequest r)
@@ -147,8 +150,8 @@ namespace NetSec.Io
                 yield break;
             }
 
-            SshClientOptions options = SshSetup.Client(new TrainingKeySource(), r.SshSuite, RandomOf(r), r.PeerName ?? r.Host, r.Port, ReadText(r.KnownHostsFile), false);
-            if (r.ClientKeyId != null) options.UserKey = new TrainingKeySource().Find(r.ClientKeyId);
+            SshClientOptions options = SshSetup.Client(KeysOf(r), r.SshSuite, RandomOf(r), r.PeerName ?? r.Host, r.Port, ReadText(r.KnownHostsFile), false);
+            if (r.ClientKeyId != null) options.UserKey = KeysOf(r).Find(r.ClientKeyId);
             TraceStream stream = new TraceStream("probe/client/ssh", "probe", "probe", null, "client", new MonotonicClock());
             GlassSshSession session = new GlassSshSession(SshEngine.Client(options, stream, r.Tamper, "server"), connect.Result, sink, new FreeRunGate(), r.Tamper, DeadlineMs, null, null);
             session.Run();
@@ -182,7 +185,7 @@ namespace NetSec.Io
                 yield break;
             }
             string allowed = r.TunnelTo;
-            SshServerOptions options = SshSetup.Server(new TrainingKeySource(), r.SshSuite, RandomOf(r), delegate(string host, int port) { return allowed != null && allowed == host + ":" + port; });
+            SshServerOptions options = SshSetup.Server(KeysOf(r), r.SshSuite, RandomOf(r), delegate(string host, int port) { return allowed != null && allowed == host + ":" + port; });
             TraceStream stream = new TraceStream("probe/server/ssh", "probe", "probe", null, "server", new MonotonicClock());
             GlassSshSession session = new GlassSshSession(SshEngine.Server(options, stream, r.Tamper, "client"), accepted.Result, sink, new FreeRunGate(), r.Tamper, DeadlineMs, null, SshSetup.SocketTarget);
             session.Run();
