@@ -124,7 +124,8 @@ namespace NetSec.Keys
 
         /// <summary>
         /// The learner's keys from a folder named as modes-design.md section 3.3 names them, for a probe or a test. Labs never use this call. A missing
-        /// file leaves that one type built-in. user.pub, when present, must name the key in user.key, and known_hosts, when present, is the pin.
+        /// file leaves that one type built-in. user.pub, when present, must name the key in user.key. known_hosts, when present, is read
+        /// and not parsed: it marks the pin as the learner's, and the client reads its pin from the file the caller names.
         /// </summary>
         public static CredentialSet FromFiles(string directory)
         {

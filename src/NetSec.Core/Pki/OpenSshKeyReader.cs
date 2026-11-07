@@ -10,14 +10,15 @@ namespace NetSec.Pki
     /// <summary>
     /// Reads an unencrypted OpenSSH private key file, the form ssh-keygen writes (PROTOCOL.key in the OpenSSH source). The file comes from a learner,
     /// so every length is checked against the bytes left before it is used, each refusal names its fault, and the decoded bytes are cleared on every
-    /// path. A key the engines cannot use is refused here, so no part of a bad file reaches a lab.
+    /// path. The file's text and its base64 body are .NET strings, which cannot be cleared, so they stay in memory until the collector takes them.
+    /// A key the engines cannot use is refused here, so no part of a bad file reaches a lab.
     /// </summary>
     public static class OpenSshKeyReader
     {
         public const string Ed25519Type = "ssh-ed25519", RsaType = "ssh-rsa";
         const string Begin = "-----BEGIN OPENSSH PRIVATE KEY-----", End = "-----END OPENSSH PRIVATE KEY-----";
         const string Magic = "openssh-key-v1", NoCipher = "none";
-        const int BlockSize = 8, Ed25519Bytes = 32, RsaModulusBytes = 256;
+        const int BlockSize = 8, Ed25519Bytes = 32, RsaModulusBytes = 256, LargestExponentBytes = 4;
         const string RsaOid = "2a864886f70d010101";
 
         /// <summary>Reads the one key in text. expectedType is the key type the file's role takes, such as ssh-ed25519 for host.key.</summary>
@@ -117,8 +118,8 @@ namespace NetSec.Pki
             if (c.U32("check value") != c.U32("check value")) throw Refuse(ErrorCodes.KeyFileFormat, "The 2 check values differ. The file is damaged, or it is encrypted.");
             string type = c.Text("key type");
             string publicType = new Cursor(publicBlob, 0, publicBlob.Length).Text("public key type");
-            if (type != publicType) throw Refuse(ErrorCodes.KeyFileFormat, "The private key type " + type + " differs from the public key type " + publicType + ".");
-            if (type != expectedType) throw Refuse(ErrorCodes.KeyAlgorithmNotInEngine, "This file holds an " + type + " key, and this role takes " + expectedType + ".");
+            if (type != publicType) throw Refuse(ErrorCodes.KeyFileFormat, "The private key type " + Shown(type) + " differs from the public key type " + Shown(publicType) + ".");
+            if (type != expectedType) throw Refuse(ErrorCodes.KeyAlgorithmNotInEngine, "This file holds " + Shown(type) + ", and this role takes " + expectedType + ".");
             ITrainingKey key = type == Ed25519Type ? ReadEd25519(c, publicBlob, keyId) : ReadRsa(c, publicBlob, keyId);
             c.Bytes("comment");
             for (int pad = 1; !c.AtEnd; pad++)
@@ -155,11 +156,20 @@ namespace NetSec.Pki
             try
             {
                 if (n.Length != RsaModulusBytes) throw Refuse(ErrorCodes.KeySizeNot2048, "The lessons take an RSA key of 2048 bits. This one has " + (n.Length * 8) + ".");
+                // A huge public exponent would make every verify slow. Real keys use 65537, which is 3 bytes.
+                if (e.Length > LargestExponentBytes) throw Refuse(ErrorCodes.KeyFileFormat, "The RSA public exponent in this file is longer than " + LargestExponentBytes + " bytes.");
                 BigUInt bn = BigUInt.FromBytes(n), bd = BigUInt.FromBytes(d), bp = BigUInt.FromBytes(p), bq = BigUInt.FromBytes(q);
                 // p and q above 1 keep p - 1 and q - 1 nonzero for the 2 remainders below. A zero number has no DER form.
                 if (bp.CompareTo(BigUInt.One) <= 0 || bq.CompareTo(BigUInt.One) <= 0 || bp.Multiply(bq).CompareTo(bn) != 0
                     || bd.IsZero || bd.CompareTo(bn) >= 0 || BigUInt.FromBytes(e).IsZero)
                     throw Refuse(ErrorCodes.KeyFileFormat, "The RSA numbers in this file do not form one key.");
+                // q x iqmp mod p = 1 is what iqmp means. A wrong one would make bad signatures later, so it is refused here.
+                if (BigUInt.FromBytes(iqmp).Multiply(bq).Mod(bp).CompareTo(BigUInt.One) != 0)
+                    throw Refuse(ErrorCodes.KeyFileFormat, "The RSA number iqmp in this file is not the inverse of q mod p.");
+                // One block through the key: (m^e)^d mod n must give m back. p x q = n holds for a wrong d, and this does not.
+                BigUInt m = BigUInt.FromUInt32(2);
+                if (m.ModPow(BigUInt.FromBytes(e), bn).ModPow(bd, bn).CompareTo(m) != 0)
+                    throw Refuse(ErrorCodes.KeyFileFormat, "The RSA exponents in this file do not undo each other, so d does not match e.");
                 Cursor blob = new Cursor(publicBlob, 0, publicBlob.Length);
                 blob.Text("public key type");
                 if (!Equal(blob.Mpint("public e"), e) || !Equal(blob.Mpint("public n"), n) || !blob.AtEnd)
@@ -209,6 +219,15 @@ namespace NetSec.Pki
         }
 
         static bool Equal(byte[] a, byte[] b) { return a.Length == b.Length && Same(a, 0, b); }
+
+        /// <summary>A key type from the file, quoted, when it is short and printable ASCII. Else "an unknown type": the file chose those bytes.</summary>
+        static string Shown(string type)
+        {
+            const int Longest = 32;
+            if (type.Length == 0 || type.Length > Longest) return "an unknown type";
+            foreach (char ch in type) if (ch < 0x21 || ch > 0x7E) return "an unknown type";
+            return "an " + type + " key";
+        }
 
         static NetSecException Encrypted() { return Refuse(ErrorCodes.KeyFileEncrypted, "This key has a passphrase. A test key needs none."); }
 

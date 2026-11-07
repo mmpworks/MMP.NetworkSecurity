@@ -313,5 +313,50 @@ namespace NetSec.Tests
             System.IO.File.WriteAllBytes(Path.Combine(big, "host.key"), new byte[65 * 1024]);
             Assert.Equal(ErrorCodes.KeyFileFormat, Assert.Throws<NetSecException>(() => CredentialSet.FromFiles(big)).Error.Code);
         }
+
+        /// <summary>The key type comes from the file. A long or unprintable one must not reach the message, so the message says an unknown type.</summary>
+        [Fact]
+        public void A_long_or_unprintable_key_type_is_not_printed()
+        {
+            string bad = "ssh-x" + new string('A', 200) + "\u001b[2J";
+            byte[] pub = Ed25519.PublicFrom(Seed());
+            byte[] blob = new Raw().Text(bad).Bytes(pub).ToArray();
+            byte[] section = new Raw().U32(7).U32(7).Text(bad).Bytes(pub).Text("c").Pad(8).ToArray();
+            NetSecException e = Assert.Throws<NetSecException>(() => OpenSshKeyReader.Parse(Armor(File(blob, section)), KeyIds.SshClient, Ed));
+            // Ordinal: a culture compare ignores a control character and finds it everywhere.
+            Assert.DoesNotContain("\u001b", e.Error.Message, StringComparison.Ordinal);
+            Assert.DoesNotContain(new string('A', 40), e.Error.Message);
+            Assert.Contains("an unknown type", e.Error.Message);
+            byte[] otherBlob = new Raw().Text(Ed).Bytes(pub).ToArray();
+            NetSecException mismatch = Assert.Throws<NetSecException>(() => OpenSshKeyReader.Parse(Armor(File(otherBlob, section)), KeyIds.SshClient, Ed));
+            Assert.DoesNotContain("\u001b", mismatch.Error.Message, StringComparison.Ordinal);
+            Assert.Contains("an unknown type", mismatch.Error.Message);
+        }
+
+        /// <summary>Numbers that pass p x q = n can still be a broken key. A one-block round trip finds a wrong d, and q x iqmp mod p = 1 finds a wrong iqmp.</summary>
+        [Fact]
+        public void Rsa_numbers_with_a_wrong_d_or_iqmp_are_refused()
+        {
+            byte[][] k = RsaNumbers(TrainingRsaHost.CopyMaterial());
+            byte[] n = k[0], e = k[1], d = k[2], p = k[3], q = k[4], iqmp = k[7];
+            Assert.Equal(KeyAlgorithm.Rsa2048, OpenSshKeyReader.Parse(RsaFile(n, e, d, iqmp, p, q), KeyIds.SshHostRsa, Rsa).Algorithm);
+            byte[] wrongD = (byte[])d.Clone();
+            wrongD[wrongD.Length - 1] ^= 2;
+            Assert.Equal(ErrorCodes.KeyFileFormat, Refusal(RsaFile(n, e, wrongD, iqmp, p, q), Rsa));
+            byte[] wrongIqmp = (byte[])iqmp.Clone();
+            wrongIqmp[wrongIqmp.Length - 1] ^= 1;
+            Assert.Equal(ErrorCodes.KeyFileFormat, Refusal(RsaFile(n, e, d, wrongIqmp, p, q), Rsa));
+        }
+
+        /// <summary>A huge public exponent would make every verify slow. e above 4 bytes is refused, and the message names the exponent.</summary>
+        [Fact]
+        public void An_rsa_exponent_above_4_bytes_is_refused()
+        {
+            byte[][] k = RsaNumbers(TrainingRsaHost.CopyMaterial());
+            byte[] huge = new byte[] { 1, 0, 0, 0, 1 };
+            NetSecException ex = Assert.Throws<NetSecException>(() => OpenSshKeyReader.Parse(RsaFile(k[0], huge, k[2], k[7], k[3], k[4]), KeyIds.SshHostRsa, Rsa));
+            Assert.Equal(ErrorCodes.KeyFileFormat, ex.Error.Code);
+            Assert.Contains("exponent", ex.Error.Message);
+        }
     }
 }
