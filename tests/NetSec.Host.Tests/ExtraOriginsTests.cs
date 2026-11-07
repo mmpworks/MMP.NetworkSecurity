@@ -78,6 +78,7 @@ namespace NetSec.Host.Tests
         }) { }
     }
 
+    [Collection("ExtraOriginsHosts")]   // one collection: these three live Hosts start one after another, not beside the rest of the suite's burst
     public class ExtraOriginsLiveTests(OriginsHostFixture host) : IClassFixture<OriginsHostFixture>
     {
         async Task<(int Status, string Body, string Allow)> Get(string origin, bool withToken = true)
@@ -148,6 +149,7 @@ namespace NetSec.Host.Tests
         }
     }
 
+    [Collection("ExtraOriginsHosts")]
     public class ExtraOriginsUnsetLiveTests(HostFixture host) : IClassFixture<HostFixture>
     {
         [Fact]
@@ -169,6 +171,7 @@ namespace NetSec.Host.Tests
     }
 
     /// <summary>Electron sets NETSEC_ORIGINS to an empty string for the Host it spawns. The Host must read that as unset.</summary>
+    [Collection("ExtraOriginsHosts")]
     public class ExtraOriginsBlankLiveTests(BlankOriginsHostFixture host) : IClassFixture<BlankOriginsHostFixture>
     {
         [Fact]
