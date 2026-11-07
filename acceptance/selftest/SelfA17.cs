@@ -123,6 +123,36 @@ namespace Acceptance
         static bool HostWalkRow(string id) { return id.StartsWith("A19.host.", StringComparison.Ordinal); }
         static bool VaultKeysRow(string id) { return id.StartsWith("A17.vault", StringComparison.Ordinal) || id.StartsWith("A17.show-keys", StringComparison.Ordinal); }
 
+        static bool RestRow(string id) { return !LessonRow(id) && !HostWalkRow(id) && !VaultKeysRow(id); }
+
+        static readonly KeyValuePair<string, Predicate<string>>[] Rows = new KeyValuePair<string, Predicate<string>>[]
+        {
+            new KeyValuePair<string, Predicate<string>>("lessons", LessonRow),
+            new KeyValuePair<string, Predicate<string>>("walk-host", HostWalkRow),
+            new KeyValuePair<string, Predicate<string>>("vault-keys", VaultKeysRow),
+            new KeyValuePair<string, Predicate<string>>("rest", RestRow),
+        };
+
+        /// <summary>Each case runs in exactly one of the 4 rows, and no row is empty. A case in no row would never be proven, and a case in 2 rows would cost its time twice.</summary>
+        [Clause("SELF.a17-rows-hold-each-case-once")]
+        public static string RowsHoldEachCaseOnce(Ctx c)
+        {
+            Dictionary<string, int> perRow = new Dictionary<string, int>();
+            foreach (KeyValuePair<string, Predicate<string>> r in Rows) perRow[r.Key] = 0;
+            List<string> wrong = new List<string>();
+            foreach (Case k in Cases)
+            {
+                List<string> holders = new List<string>();
+                foreach (KeyValuePair<string, Predicate<string>> r in Rows) if (r.Value(k.Id)) { holders.Add(r.Key); perRow[r.Key]++; }
+                if (holders.Count != 1) wrong.Add(k.Id + " sits in " + holders.Count + " rows [" + string.Join(", ", holders.ToArray()) + "]");
+            }
+            Check.True(wrong.Count == 0, wrong.Count + " cases are not in exactly one row: " + string.Join("; ", wrong.ToArray()));
+            foreach (KeyValuePair<string, int> kv in perRow) Check.True(kv.Value > 0, "the row " + kv.Key + " holds no case");
+            List<string> counts = new List<string>();
+            foreach (KeyValuePair<string, int> kv in perRow) counts.Add(kv.Key + " " + kv.Value);
+            return Cases.Length + " cases, each in exactly one row: " + string.Join(", ", counts.ToArray());
+        }
+
         [Clause("SELF.a17-clauses-pass-and-bite-lessons")]
         public static string PassAndBiteLessons(Ctx c) { return ClausesPassAndBite(c, LessonRow); }
 
@@ -133,7 +163,7 @@ namespace Acceptance
         public static string PassAndBiteVaultKeys(Ctx c) { return ClausesPassAndBite(c, VaultKeysRow); }
 
         [Clause("SELF.a17-clauses-pass-and-bite-rest")]
-        public static string PassAndBiteRest(Ctx c) { return ClausesPassAndBite(c, delegate (string id) { return !LessonRow(id) && !HostWalkRow(id) && !VaultKeysRow(id); }); }
+        public static string PassAndBiteRest(Ctx c) { return ClausesPassAndBite(c, RestRow); }
 
         static string ClausesPassAndBite(Ctx c, Predicate<string> inRow)
         {

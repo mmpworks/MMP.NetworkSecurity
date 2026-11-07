@@ -4564,6 +4564,17 @@
    "counts": false
   },
   {
+   "id": "SELF.a17-rows-hold-each-case-once",
+   "base": "SELF.a17-rows-hold-each-case-once",
+   "assertion": "SELF",
+   "group": "selftest",
+   "build": "host",
+   "slice": "S0",
+   "referee": "stand-ins built on the BCL, python cryptography and real OpenSSL runs",
+   "roles": [],
+   "counts": false
+  },
+  {
    "id": "SELF.a17-security-folder-bites",
    "base": "SELF.a17-security-folder-bites",
    "assertion": "SELF",
