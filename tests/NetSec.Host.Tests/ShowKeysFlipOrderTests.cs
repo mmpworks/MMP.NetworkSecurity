@@ -18,6 +18,18 @@ public class ShowKeysFlipOrderTests
 {
     const string OffFrame = "{\"type\":\"security.show-keys\",\"on\":false}";
 
+    /// <summary>
+    /// Runs the flip on its own thread, never a pool thread. The toggle read that starts it holds the fence's read lock and waits up to 500 ms
+    /// for it, so a flip queued to a busy pool could start late and fail "the flip did not finish" for no fault of the Host (ProcessWaits).
+    /// </summary>
+    static Task StartFlip(Action flipNow)
+    {
+        TaskCompletionSource done = new(TaskCreationOptions.RunContinuationsAsynchronously);
+        Thread thread = new(() => { flipNow(); done.SetResult(); }) { IsBackground = true, Name = "show-keys-flip" };
+        thread.Start();
+        return done.Task;
+    }
+
     [Fact]
     public async Task A_line_picked_before_a_flip_to_off_reaches_the_socket_ahead_of_the_flip_frame()
     {
@@ -33,7 +45,7 @@ public class ShowKeysFlipOrderTests
             bool now = Volatile.Read(ref on) == 1;
             if (flip == null && now)
             {
-                flip = Task.Run(() => { Volatile.Write(ref on, 0); manager.Broadcast(OffFrame); });
+                flip = StartFlip(() => { Volatile.Write(ref on, 0); manager.Broadcast(OffFrame); });
                 flip.Wait(500);
             }
             return now;
@@ -82,7 +94,7 @@ public class ShowKeysFlipOrderTests
             bool now = Volatile.Read(ref on) == 1;
             if (Volatile.Read(ref armed) == 1 && flip == null && now)
             {
-                flip = Task.Run(() => { Volatile.Write(ref on, 0); manager.Broadcast(OffFrame); });
+                flip = StartFlip(() => { Volatile.Write(ref on, 0); manager.Broadcast(OffFrame); });
                 flip.Wait(500);
             }
             return now;

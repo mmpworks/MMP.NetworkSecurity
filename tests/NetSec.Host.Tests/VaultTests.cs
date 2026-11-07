@@ -11,6 +11,7 @@ using Xunit;
 namespace NetSec.Host.Tests;
 
 /// <summary>The practice vault on its own file, with the edits a person holding the file could make (the same edits acceptance/checks/vaultdb.py makes).</summary>
+[Collection(BlockingProductCalls.Name)]
 public sealed class VaultTests : IDisposable
 {
     readonly string _dir = Path.Combine(Path.GetTempPath(), "netsec-vault-" + Guid.NewGuid().ToString("N"));

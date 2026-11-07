@@ -29,8 +29,9 @@ public sealed class OsTransportLiveTests
     internal static void Run(string exe, string args, string dir)
     {
         using Process p = Process.Start(new ProcessStartInfo(exe, args) { WorkingDirectory = dir, UseShellExecute = false, RedirectStandardOutput = true, RedirectStandardError = true })!;
-        string output = p.StandardOutput.ReadToEnd() + p.StandardError.ReadToEnd();
-        Assert.True(p.WaitForExit(60_000) && p.ExitCode == 0, "openssl " + args + ": " + output);
+        // A make action is synchronous, so this helper stays synchronous. ReadAll reads both pipes at once.
+        (bool exited, int code, string output, string errors) = ProcessWaits.ReadAll(p, TimeSpan.FromSeconds(60));
+        Assert.True(exited && code == 0, "openssl " + args + ": " + output + errors);
     }
 
     static void SelfSignedRsa(string openssl, string dir)
@@ -46,33 +47,67 @@ public sealed class OsTransportLiveTests
         public readonly string Dir = Path.Combine(Path.GetTempPath(), "netsec-os-" + Guid.NewGuid().ToString("N"));
         public string Cert => Path.Combine(Dir, "cert.pem");
         public string KeyLog => Path.Combine(Dir, "peer.keylog");
-        public readonly int Port;
+        public int Port { get; private set; }
 
         /// <summary>make writes the server's files into Dir; serverFiles are the s_server arguments that name them. With no make, one self-signed RSA cert.pem.</summary>
-        public Peer(Action<string, string>? make = null, string serverFiles = "-cert cert.pem -key key.pem")
+        readonly TaskCompletionSource<int> _port = new(TaskCreationOptions.RunContinuationsAsynchronously);
+
+        // What s_server printed, with the time since it started, so a missed ACCEPT line says what the server did instead.
+        readonly List<string> _lines = new();
+        readonly Stopwatch _since = Stopwatch.StartNew();
+
+        void Note(string stream, string? line)
+        {
+            if (line == null) return;
+            lock (_lines) _lines.Add($"{_since.ElapsedMilliseconds} ms {stream}: {line}");
+        }
+
+        string Printed() { lock (_lines) return _lines.Count == 0 ? "nothing" : string.Join(" | ", _lines); }
+
+        /// <summary>Starts the server and awaits its ACCEPT line without holding a pool thread (ProcessWaits).</summary>
+        public static async Task<Peer> StartAsync(Action<string, string>? make = null, string serverFiles = "-cert cert.pem -key key.pem")
+        {
+            await ProcessWaits.StartSlots.WaitAsync();
+            try
+            {
+                // The make step runs openssl synchronously, so it runs on its own thread and holds no pool thread.
+                Peer peer = await ProcessWaits.OnOwnThread(() => new Peer(make, serverFiles));
+                try { peer.Port = await peer._port.Task.WaitAsync(TimeSpan.FromSeconds(20)); }
+                catch (TimeoutException)
+                {
+                    string printed = peer.Printed();
+                    bool exited = peer._server.HasExited;
+                    peer.Dispose();
+                    Assert.Fail($"openssl s_server gave no ACCEPT line in 20 s. Exited: {exited}. It printed: {printed}");
+                }
+                return peer;
+            }
+            finally { ProcessWaits.StartSlots.Release(); }
+        }
+
+        Peer(Action<string, string>? make, string serverFiles)
         {
             Directory.CreateDirectory(Dir);
             string openssl = OpenSsl();
             (make ?? SelfSignedRsa)(openssl, Dir);
             _server = new Process { StartInfo = new ProcessStartInfo(openssl, "s_server -accept 0 -tls1_3 -rev " + serverFiles + " -keylogfile peer.keylog")
             { WorkingDirectory = Dir, UseShellExecute = false, RedirectStandardOutput = true, RedirectStandardError = true, RedirectStandardInput = true } };
-            TaskCompletionSource<int> port = new(TaskCreationOptions.RunContinuationsAsynchronously);
             _server.OutputDataReceived += (_, e) =>
             {
+                Note("out", e.Data);
                 Match m = Regex.Match(e.Data ?? "", @"^ACCEPT.*?(?<port>\d+)\s*$");
-                if (m.Success) port.TrySetResult(int.Parse(m.Groups["port"].Value));
+                if (m.Success) _port.TrySetResult(int.Parse(m.Groups["port"].Value));
             };
+            _server.ErrorDataReceived += (_, e) => Note("err", e.Data);
             _server.Start();
             _server.BeginOutputReadLine();
             _server.BeginErrorReadLine();
-            Assert.True(port.Task.Wait(TimeSpan.FromSeconds(20)), "openssl s_server gave no ACCEPT line in 20 s");
-            Port = port.Task.Result;
         }
 
         /// <summary>The hex secrets of every line the server logged, as NSS key log lines hold them.</summary>
-        public List<string> Secrets()
+        public async Task<List<string>> SecretsAsync()
         {
-            Thread.Sleep(500);
+            await Task.Delay(500);
             using FileStream f = new(KeyLog, FileMode.Open, FileAccess.Read, FileShare.ReadWrite);
             return new StreamReader(f).ReadToEnd().Split('\n')
                 .Select(l => Regex.Match(l.Trim(), @"^[A-Z0-9_]+ [0-9a-f]{64} (?<secret>[0-9a-f]{32,})$"))
@@ -109,8 +144,8 @@ public sealed class OsTransportLiveTests
     [Fact]
     public async Task Lesson_5_on_the_os_transport_talks_tls_13_and_shows_no_secret()
     {
-        using Peer peer = new();
-        using SecurityLiveTests.Host host = new(new() { ["NETSEC_OS_PEER"] = "127.0.0.1:" + peer.Port, ["SSL_CERT_FILE"] = peer.Cert });
+        using Peer peer = await Peer.StartAsync();
+        using SecurityLiveTests.Host host = await SecurityLiveTests.Host.StartAsync(new() { ["NETSEC_OS_PEER"] = "127.0.0.1:" + peer.Port, ["SSL_CERT_FILE"] = peer.Cert });
         List<JsonElement> frames = await host.Session(5, "os");
 
         JsonElement started = frames.First(f => TypeOf(f) == "session.started");
@@ -126,7 +161,7 @@ public sealed class OsTransportLiveTests
         Assert.All(events, e => Assert.False(e.TryGetProperty("secrets", out JsonElement s) && s.ValueKind == JsonValueKind.Array && s.GetArrayLength() > 0));
 
         string said = string.Join("\n", frames.Select(f => f.GetRawText())).ToLowerInvariant() + File.ReadAllText(started.GetProperty("sessionFile").GetString()!).ToLowerInvariant();
-        List<string> secrets = peer.Secrets();
+        List<string> secrets = await peer.SecretsAsync();
         Assert.True(secrets.Count >= 5, "the peer logged " + secrets.Count + " secrets, so the handshake did not reach it");
         Assert.All(secrets, s => Assert.DoesNotContain(s, said));
 
@@ -138,8 +173,8 @@ public sealed class OsTransportLiveTests
     [Fact]
     public async Task A_lesson_with_no_os_path_is_refused_by_name()
     {
-        using Peer peer = new();
-        using SecurityLiveTests.Host host = new(new() { ["NETSEC_OS_PEER"] = "127.0.0.1:" + peer.Port, ["SSL_CERT_FILE"] = peer.Cert });
+        using Peer peer = await Peer.StartAsync();
+        using SecurityLiveTests.Host host = await SecurityLiveTests.Host.StartAsync(new() { ["NETSEC_OS_PEER"] = "127.0.0.1:" + peer.Port, ["SSL_CERT_FILE"] = peer.Cert });
         JsonElement last = (await host.Session(0, "os"))[^1];
         Assert.Equal("OS_TRANSPORT_NOT_BUILT", last.GetProperty("code").GetString());
         Assert.Contains("lesson 0", last.GetProperty("message").GetString(), StringComparison.OrdinalIgnoreCase);
@@ -148,7 +183,7 @@ public sealed class OsTransportLiveTests
     [Fact]
     public async Task The_os_transport_with_no_peer_set_is_refused_by_name()
     {
-        using SecurityLiveTests.Host host = new();
+        using SecurityLiveTests.Host host = await SecurityLiveTests.Host.StartAsync();
         JsonElement last = (await host.Session(5, "os"))[^1];
         Assert.Equal("OS_TRANSPORT_NO_PEER", last.GetProperty("code").GetString());
         Assert.Contains("NETSEC_OS_PEER", last.GetProperty("message").GetString());
@@ -157,8 +192,8 @@ public sealed class OsTransportLiveTests
     [Fact]
     public async Task A_peer_the_trust_file_does_not_name_is_refused_and_no_data_moves()
     {
-        using Peer peer = new(), other = new();
-        using SecurityLiveTests.Host host = new(new() { ["NETSEC_OS_PEER"] = "127.0.0.1:" + peer.Port, ["SSL_CERT_FILE"] = other.Cert });
+        using Peer peer = await Peer.StartAsync(), other = await Peer.StartAsync();
+        using SecurityLiveTests.Host host = await SecurityLiveTests.Host.StartAsync(new() { ["NETSEC_OS_PEER"] = "127.0.0.1:" + peer.Port, ["SSL_CERT_FILE"] = other.Cert });
         List<JsonElement> frames = await host.Session(5, "os");
         JsonElement finished = frames[^1];
         Assert.Equal("session.finished", TypeOf(finished));

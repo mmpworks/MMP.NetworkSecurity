@@ -70,7 +70,7 @@ public sealed class ShowKeysLiveTests
     [Fact]
     public async Task An_off_session_holds_no_hex_in_frames_events_or_its_file()
     {
-        using SecurityLiveTests.Host host = new();
+        using SecurityLiveTests.Host host = await SecurityLiveTests.Host.StartAsync();
         await SetShowKeys(host, false);
         List<JsonElement> frames = await host.Session(1);
         List<JsonElement> secrets = frames.SelectMany(SecretsIn).ToList();
@@ -89,7 +89,7 @@ public sealed class ShowKeysLiveTests
     [Fact]
     public async Task A_flip_redacts_an_open_session_and_the_flip_back_restores_it()
     {
-        using SecurityLiveTests.Host host = new();
+        using SecurityLiveTests.Host host = await SecurityLiveTests.Host.StartAsync();
         List<JsonElement> frames = await host.Session(1);
         string events = "/api/sessions/" + StartedId(frames) + "/events";
         int shown = WithHex(SecretsOfText((await host.Get(events)).Body));
@@ -103,7 +103,7 @@ public sealed class ShowKeysLiveTests
     [Fact]
     public async Task The_flip_is_broadcast_to_the_socket()
     {
-        using SecurityLiveTests.Host host = new();
+        using SecurityLiveTests.Host host = await SecurityLiveTests.Host.StartAsync();
         using Ws ws = new(host);
         await ws.Open();
         Task<JsonElement> seen = ws.Until("security.show-keys");
@@ -115,7 +115,7 @@ public sealed class ShowKeysLiveTests
     [Fact]
     public async Task The_key_log_is_refused_while_off()
     {
-        using SecurityLiveTests.Host host = new();
+        using SecurityLiveTests.Host host = await SecurityLiveTests.Host.StartAsync();
         string id = StartedId(await host.Session(1));
         Assert.Equal(200, (await host.Get("/api/sessions/" + id + "/keylog")).Status);
         await SetShowKeys(host, false);
@@ -127,7 +127,7 @@ public sealed class ShowKeysLiveTests
     [Fact]
     public async Task Key_in_use_names_the_type_version_and_provider_on_the_keys_stream()
     {
-        using SecurityLiveTests.Host host = new();
+        using SecurityLiveTests.Host host = await SecurityLiveTests.Host.StartAsync();
         await host.MakeFlow("my-login");
         string keyHex = JsonDocument.Parse((await host.Get("/api/security/types/token.issuer/key")).Body).RootElement.GetProperty("hex").GetString()!;
         List<JsonElement> frames = await host.Session(10);
@@ -153,7 +153,7 @@ public sealed class ShowKeysLiveTests
     [Fact]
     public async Task Save_while_off_returns_a_redacted_copy_and_replay_names_it()
     {
-        using SecurityLiveTests.Host host = new();
+        using SecurityLiveTests.Host host = await SecurityLiveTests.Host.StartAsync();
         List<JsonElement> frames = await host.Session(1);
         string id = StartedId(frames), file = StartedFile(frames);
         Assert.True(WithHex(SecretsOfText(File.ReadAllText(file))) > 0, "control: the ON file holds no hex");
@@ -190,7 +190,7 @@ public sealed class ShowKeysLiveTests
     [Fact]
     public async Task A_replay_sends_no_hex_after_a_flip_to_off_that_lands_while_it_runs()
     {
-        using SecurityLiveTests.Host host = new();
+        using SecurityLiveTests.Host host = await SecurityLiveTests.Host.StartAsync();
         string source = StartedFile(await host.Session(1));
         string[] lines = File.ReadAllLines(source).Where(l => l.Length > 0).ToArray();
         Assert.True(WithHex(SecretsOfText(string.Join("\n", lines))) > 0, "control: the ON file holds no hex");

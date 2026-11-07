@@ -22,7 +22,7 @@ public class AesTypedRoutesLiveTests
     [Fact]
     public async Task Both_text_routes_answer_with_Show_keys_off_and_name_the_practice_key()
     {
-        using SecurityLiveTests.Host host = new();
+        using SecurityLiveTests.Host host = await SecurityLiveTests.Host.StartAsync();
         (int off, _) = await host.Put("/api/security/show-keys", "{\"on\":false}");
         Assert.Equal(200, off);
 
@@ -46,7 +46,7 @@ public class AesTypedRoutesLiveTests
     [Fact]
     public async Task Both_text_routes_follow_the_key_size_and_default_to_128_bits()
     {
-        using SecurityLiveTests.Host host = new();
+        using SecurityLiveTests.Host host = await SecurityLiveTests.Host.StartAsync();
         (int status, JsonElement typed, _) = await Post(host, "/api/walk/aes/typed-block", "{\"text\":\"Pump\",\"keyBits\":256}");
         Assert.Equal(200, status);
         Assert.Equal(256, typed.GetProperty("walk").GetProperty("keyBits").GetInt32());
@@ -71,7 +71,7 @@ public class AesTypedRoutesLiveTests
     [InlineData("/api/walk/aes/long-text", "{\"text\":\"Pump\",\"flipBlock\":134217729,\"flipBit\":0}", "WALK_BAD_ARGUMENT")]   // Wrapped negative before the fix: a 500
     public async Task A_text_the_routes_cannot_walk_is_a_400_with_its_code(string path, string json, string code)
     {
-        using SecurityLiveTests.Host host = new();
+        using SecurityLiveTests.Host host = await SecurityLiveTests.Host.StartAsync();
         (int status, JsonElement body, string cache) = await Post(host, path, json);
         Assert.Equal(400, status);
         Assert.Equal(code, body.GetProperty("code").GetString());

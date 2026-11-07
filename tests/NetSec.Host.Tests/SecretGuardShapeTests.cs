@@ -76,34 +76,34 @@ public class SecretGuardShapeTests
 
     [Theory]
     [MemberData(nameof(Shapes))]
-    public void Each_key_shape_is_caught(string shape)
+    public async Task Each_key_shape_is_caught(string shape)
     {
         (string name, byte[] bytes) = Shape(shape);
-        (int code, string output) = Guard(name, bytes);
+        (int code, string output) = await Guard(name, bytes);
         Assert.True(code == 1, shape + ": the guard passed " + name + " (exit " + code + "): " + output);
     }
 
     [Theory]
     [MemberData(nameof(Controls))]
-    public void Each_harmless_control_passes(string control)
+    public async Task Each_harmless_control_passes(string control)
     {
         (string name, byte[] bytes) = Control(control);
-        (int code, string output) = Guard(name, bytes);
+        (int code, string output) = await Guard(name, bytes);
         Assert.True(code == 0, control + ": the guard refused " + name + " (exit " + code + "): " + output);
     }
 
-    static (int, string) Guard(string name, byte[] bytes)
+    static async Task<(int, string)> Guard(string name, byte[] bytes)
     {
         string dir = Path.Combine(Path.GetTempPath(), "netsec-shape-" + Guid.NewGuid().ToString("N"));
         Directory.CreateDirectory(dir);
         try
         {
-            Run(dir, "git", "init -q");
-            Run(dir, "git", "config core.quotepath true");
+            await Run(dir, "git", "init -q");
+            await Run(dir, "git", "config core.quotepath true");
             File.WriteAllText(Path.Combine(dir, ".gitignore"), ".security/\n");
             File.WriteAllBytes(Path.Combine(dir, name), bytes);
-            Run(dir, "git", "add -- .gitignore \"" + name + "\"");
-            return Run(dir, "python", "-I \"" + GuardPath() + "\"");
+            await Run(dir, "git", "add -- .gitignore \"" + name + "\"");
+            return await Run(dir, "python", "-I \"" + GuardPath() + "\"");
         }
         finally
         {
@@ -112,14 +112,13 @@ public class SecretGuardShapeTests
         }
     }
 
-    static (int, string) Run(string dir, string exe, string args)
+    static async Task<(int, string)> Run(string dir, string exe, string args)
     {
         ProcessStartInfo info = new(exe, args) { WorkingDirectory = dir, UseShellExecute = false, RedirectStandardOutput = true, RedirectStandardError = true, StandardOutputEncoding = Encoding.UTF8 };
         using Process p = Process.Start(info)!;
-        Task<string> errors = p.StandardError.ReadToEndAsync();
-        string output = p.StandardOutput.ReadToEnd();
-        p.WaitForExit(60_000);
-        return (p.ExitCode, output + errors.Result);
+        (bool exited, int code, string output, string errors) = await ProcessWaits.Collect(p, TimeSpan.FromSeconds(60));
+        Assert.True(exited, exe + " did not finish in 60 s");
+        return (code, output + errors);
     }
 
     static string GuardPath()

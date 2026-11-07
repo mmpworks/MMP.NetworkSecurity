@@ -11,6 +11,7 @@ namespace NetSec.Host.Tests;
 /// SshExeCheck end to end with a fake ssh.exe, so each branch runs without OpenSSH: a pass, the 2 refusals, a control that is not refused, a control
 /// refused for another reason, and a run that hits the time limit. WizardMachineTests runs the same check with the real ssh.exe.
 /// </summary>
+[Collection(BlockingProductCalls.Name)]
 public class SshExeCheckTests : IDisposable
 {
     // xUnit makes one instance per test, so this list holds what one test made, and Dispose takes it away after that test.
@@ -107,7 +108,9 @@ public class SshExeCheckTests : IDisposable
         File.Copy(Path.Combine(Environment.SystemDirectory, "PING.EXE"), child);
         _made.Add(child);
         Run($"@echo off\r\n\"{child}\" -n 30 127.0.0.1 >nul\r\n", SecurityTypes.SshHostEd25519);
-        System.Threading.Thread.Sleep(500);
+        // A killed tree can take a moment to leave the process table, longer on a busy machine, so poll up to 10 s.
+        DateTime end = DateTime.UtcNow.AddSeconds(10);
+        while (System.Diagnostics.Process.GetProcessesByName(name).Length > 0 && DateTime.UtcNow < end) System.Threading.Thread.Sleep(100);
         Assert.Empty(System.Diagnostics.Process.GetProcessesByName(name));
     }
 }
