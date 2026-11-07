@@ -86,7 +86,7 @@ const copy = (hex: string) => { try { void navigator.clipboard?.writeText(hex) }
         <div class="muted">{{ p.name }}: {{ !p.known ? 'no fingerprint to compare yet' : p.match ? 'both sides hold the same value' : 'the values differ' }}</div>
         <div class="grids">
           <div v-for="r in p.rows" :key="r.holder" class="grid32" :data-testid="`convergence-grid-${r.holder}`">
-            <span v-for="(c, i) in cells(cellText(r))" :key="i" class="cell">{{ c }}</span>
+            <span v-for="(c, i) in cells(cellText(r))" :key="i" class="cell" data-hex-byte>{{ c }}</span>
           </div>
         </div>
         <div v-if="p.match" class="match-tag" data-testid="convergence-match">✓ match</div>

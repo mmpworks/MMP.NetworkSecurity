@@ -45,7 +45,7 @@ const offsetsOf = (r: number) => Array.from({ length: Math.min(PER_ROW, bytes.va
             <i v-if="marks?.has(o)" class="span-mark" :data-testid="`inspector-span-${marks.get(o)}`" />
             <span
               class="hb" :class="[litClass(o) ? ['lit', litClass(o)] : '', { sel: selected === o, enc: encrypted?.(o) }]"
-              :data-testid="`${idPrefix}-${o}`" @click="emit('pick', o)"
+              :data-testid="`${idPrefix}-${o}`" data-hex-byte @click="emit('pick', o)"
             >{{ text(o) }}</span>
           </template>
         </span>

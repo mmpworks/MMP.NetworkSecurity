@@ -204,3 +204,22 @@ for (const [size, resized] of [[{ width: 1440, height: 770 }, false], [{ width: 
     expect(hits, 'hex grids that reach into the line').toBe(0)
   })
 }
+
+// Binary hover: every hex byte cell, in the bytes panel and in the match grids, shows its byte in binary.
+test('a hex byte in the bytes panel and in a match grid shows its binary on hover', async ({ page }) => {
+  await freePlay(page, 1)
+  await pick(page, 'TextGcm1')
+  const tip = page.getByTestId('binary-tip')
+  const first = page.locator('[data-testid^=inspector-byte-]').first()
+  const text = (await first.textContent())!.trim()
+  await first.hover()
+  await expect(tip).toHaveText(`${text} = ${parseInt(text, 16).toString(2).padStart(8, '0').replace(/^(?<hi>.{4})/, '$<hi> ')}`)
+  const cell = page.locator('[data-testid^=convergence-grid-] .cell').first()
+  const c = (await cell.textContent())!.trim()
+  await cell.hover()
+  await expect(tip).toContainText(`${c} = `)
+  await page.mouse.move(5, 300)
+  await expect(tip).toHaveCount(0)
+  const unmarked = await page.evaluate(() => [...document.querySelectorAll('.inspector .hb, .grid32 .cell')].filter(e => !e.hasAttribute('data-hex-byte')).length)
+  expect(unmarked, 'hex cells with no binary hover').toBe(0)
+})
