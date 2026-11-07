@@ -11,8 +11,25 @@ namespace NetSec.Host.Tests;
 /// SshExeCheck end to end with a fake ssh.exe, so each branch runs without OpenSSH: a pass, the 2 refusals, a control that is not refused, a control
 /// refused for another reason, and a run that hits the time limit. WizardMachineTests runs the same check with the real ssh.exe.
 /// </summary>
-public class SshExeCheckTests
+public class SshExeCheckTests : IDisposable
 {
+    // xUnit makes one instance per test, so this list holds what one test made, and Dispose takes it away after that test.
+    readonly System.Collections.Generic.List<string> _made = [];
+
+    public void Dispose()
+    {
+        foreach (string path in _made)
+        {
+            try
+            {
+                if (Directory.Exists(path)) Directory.Delete(path, true);
+                else if (File.Exists(path)) File.Delete(path);
+            }
+            catch (IOException) { }
+            catch (UnauthorizedAccessException) { }
+        }
+    }
+
     const string Script = "@echo off\r\n"
         + "echo %* | findstr /c:\"other-pin\" >nul && goto pin\r\n"
         + "echo %* | findstr /c:\"other-user\" >nul && goto user\r\n"
@@ -27,9 +44,10 @@ public class SshExeCheckTests
 
     const int ShortWaitMs = 1500;
 
-    static (CheckFact Fact, string Dir) Run(string script, string typeId)
+    (CheckFact Fact, string Dir) Run(string script, string typeId)
     {
         string root = Path.Combine(Path.GetTempPath(), "netsec-fakessh-" + Guid.NewGuid().ToString("N"));
+        _made.Add(root);
         string dir = Path.Combine(root, "proof");
         Directory.CreateDirectory(dir);
         string fake = Path.Combine(root, "ssh.cmd");
@@ -87,6 +105,7 @@ public class SshExeCheckTests
         string name = "netsec-child-" + Guid.NewGuid().ToString("N")[..12];
         string child = Path.Combine(Path.GetTempPath(), name + ".exe");
         File.Copy(Path.Combine(Environment.SystemDirectory, "PING.EXE"), child);
+        _made.Add(child);
         Run($"@echo off\r\n\"{child}\" -n 30 127.0.0.1 >nul\r\n", SecurityTypes.SshHostEd25519);
         System.Threading.Thread.Sleep(500);
         Assert.Empty(System.Diagnostics.Process.GetProcessesByName(name));
