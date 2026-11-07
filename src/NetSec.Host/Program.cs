@@ -34,7 +34,13 @@ builder.Logging.SetMinimumLevel(LogLevel.Warning);
 
 WebApplication app = builder.Build();
 CeProcess ce = new();
-HostGuard guard = new(token);
+// NETSEC_ORIGINS adds browser origins for test runs (ExtraOrigins). Print what was accepted and what was dropped, so a typo is visible.
+ExtraOrigins.Result extraOrigins = ExtraOrigins.Parse(Environment.GetEnvironmentVariable(ExtraOrigins.Variable));
+if (extraOrigins.Accepted.Count + extraOrigins.Dropped.Count > 0)
+{
+    Console.WriteLine($"HOST-ORIGINS accepted=[{string.Join(", ", extraOrigins.Accepted)}] dropped=[{string.Join("; ", extraOrigins.Dropped)}]");
+}
+HostGuard guard = new(token, extraOrigins.Accepted);
 LessonRows lessons = new();
 OsTransportFactory osTransport = new(Environment.GetEnvironmentVariable);
 WizardTable wizardTable = WizardTable.Load(Path.Combine(AppContext.BaseDirectory, "wizard-flows.json"));

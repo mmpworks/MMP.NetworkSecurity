@@ -8,18 +8,23 @@ namespace NetSec.Host;
 /// D14. A browser page can open a loopback socket, and this API returns keys. So every request passes two checks: an allowed
 /// Origin when the request has one, and the session token. A preflight carries no token, so it passes on the Origin alone.
 /// </summary>
-public sealed class HostGuard(string token)
+public sealed class HostGuard
 {
     public const string OriginRefused = "HOST_ORIGIN_REFUSED";
     public const string TokenRefused = "HOST_TOKEN_REFUSED";
 
     // A file:// page sends "file://" on a WebSocket and "null" on a fetch. The token still guards a sandboxed "null" page.
-    static readonly HashSet<string> AllowedOrigins = new(StringComparer.OrdinalIgnoreCase)
-    {
-        "file://", "null", "http://localhost:4180", "http://localhost:5173",
-    };
+    static readonly string[] DefaultOrigins = ["file://", "null", "http://localhost:4180", "http://localhost:5173"];
 
-    readonly byte[] _token = Encoding.UTF8.GetBytes(token);
+    readonly HashSet<string> AllowedOrigins;
+    readonly byte[] _token;
+
+    /// <param name="extraOrigins">Already-validated origins from <see cref="ExtraOrigins.Parse"/>; they add to the defaults.</param>
+    public HostGuard(string token, IEnumerable<string>? extraOrigins = null)
+    {
+        _token = Encoding.UTF8.GetBytes(token);
+        AllowedOrigins = new HashSet<string>(DefaultOrigins.Concat(extraOrigins ?? []), StringComparer.OrdinalIgnoreCase);
+    }
 
     public async Task Invoke(HttpContext ctx, RequestDelegate next)
     {
