@@ -98,6 +98,18 @@ namespace NetSec.Tests
             }
         }
 
+        [Theory]
+        [InlineData(192)]
+        [InlineData(256)]
+        public void The_longer_text_matches_the_BCL_at_192_and_256_bits(int keyBits)
+        {
+            byte[] key = AesPractice.Key(keyBits), iv = AesPractice.Iv();
+            byte[] text = Encoding.UTF8.GetBytes("Pump four is ok. Pump four is ok. Pump five is not.");
+            AesLongTextView v = AesLongText.Build(key, iv, text, -1, 0);
+            Assert.Equal(Bcl(key, null, text), v.Rows.SelectMany(r => r.Ecb).ToArray());
+            Assert.Equal(Bcl(key, iv, text), v.Rows.SelectMany(r => r.Cbc).ToArray());
+        }
+
         [Fact]
         public void Repeated_blocks_repeat_under_ECB_and_not_under_CBC()
         {

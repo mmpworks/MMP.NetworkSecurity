@@ -92,9 +92,10 @@ public static class AesWalkJson
     };
 
     /// <summary>The longer text under the practice key and IV, ECB beside CBC. keySource names the key, so a reader never takes it for a run's key.</summary>
-    public static object LongText(AesLongTextView v) => new
+    public static object LongText(AesLongTextView v, int keyBits) => new
     {
         keySource = "typed-practice",
+        keyBits,
         blocks = v.Rows.Length,
         ecbRepeats = v.EcbRepeats,
         cbcRepeats = v.CbcRepeats,

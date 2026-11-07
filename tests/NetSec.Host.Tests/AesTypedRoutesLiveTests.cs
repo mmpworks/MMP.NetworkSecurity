@@ -43,7 +43,28 @@ public class AesTypedRoutesLiveTests
         Assert.Equal(3, longText.GetProperty("flipped").GetProperty("cbcBlocksChanged").GetInt32());
     }
 
+    [Fact]
+    public async Task Both_text_routes_follow_the_key_size_and_default_to_128_bits()
+    {
+        using SecurityLiveTests.Host host = new();
+        (int status, JsonElement typed, _) = await Post(host, "/api/walk/aes/typed-block", "{\"text\":\"Pump\",\"keyBits\":256}");
+        Assert.Equal(200, status);
+        Assert.Equal(256, typed.GetProperty("walk").GetProperty("keyBits").GetInt32());
+        Assert.Equal(14, typed.GetProperty("walk").GetProperty("rounds").GetInt32());
+        Assert.Equal(60, typed.GetProperty("walk").GetProperty("keyWords").GetArrayLength());   // AES-256 expands to 4 x (14 + 1) words
+
+        (status, typed, _) = await Post(host, "/api/walk/aes/typed-block", "{\"text\":\"Pump\"}");
+        Assert.Equal(200, status);
+        Assert.Equal(128, typed.GetProperty("walk").GetProperty("keyBits").GetInt32());
+
+        (status, JsonElement longText, _) = await Post(host, "/api/walk/aes/long-text", "{\"text\":\"Pump four is ok.\",\"keyBits\":192}");
+        Assert.Equal(200, status);
+        Assert.Equal(192, longText.GetProperty("keyBits").GetInt32());
+    }
+
     [Theory]
+    [InlineData("/api/walk/aes/typed-block", "{\"text\":\"Pump\",\"keyBits\":100}", "WALK_BAD_ARGUMENT")]
+    [InlineData("/api/walk/aes/long-text", "{\"text\":\"Pump\",\"keyBits\":512}", "WALK_BAD_ARGUMENT")]
     [InlineData("/api/walk/aes/typed-block", "{\"text\":\"\"}", "WALK_TEXT_EMPTY")]
     [InlineData("/api/walk/aes/typed-block", "{}", "WALK_TEXT_EMPTY")]
     [InlineData("/api/walk/aes/long-text", "{\"text\":\"Pump\",\"flipBlock\":0,\"flipBit\":40}", "WALK_BAD_ARGUMENT")]
