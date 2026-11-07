@@ -272,6 +272,9 @@ namespace Acceptance
 
         static bool Active(TypeState t) { return t.Mode == "Mine" && t.Bound; }
 
+        /// <summary>The types with no built-in key: each run of lesson 1 or 2 draws one from its seed.</summary>
+        static bool DrawnPerRun(string typeId) { return typeId == "lab.aes-key" || typeId == "lab.seal-key"; }
+
         void KeyReply(HttpListenerContext ctx, TypeState t)
         {
             try { CourseRead(t, "host/key-route"); }
@@ -281,7 +284,7 @@ namespace Acceptance
             bool showHex = _showKeys && (!nonExportable || M("nonexportable-leaks"));
             if (M("mine-key-route-no-hex") && Active(t)) showHex = false;
             // As the real Host: lessons 1 and 2 draw a built-in key per run, so the route has no built-in bytes to show.
-            if (!Active(t) && (t.TypeId == "lab.aes-key" || t.TypeId == "lab.seal-key")) showHex = false;
+            if (!Active(t) && DrawnPerRun(t.TypeId)) showHex = false;
             if (M("nonexportable-hides-all") && Active(t)) showHex = false;
             Dictionary<string, object> r = D("typeId", t.TypeId, "version", (double)t.Version, "provider", t.Provider, "fingerprint", Fingerprint(key));
             if (t.TypeId == "token.issuer")
