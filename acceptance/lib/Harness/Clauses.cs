@@ -27,7 +27,7 @@ namespace Acceptance
     /// <summary>The stable code a product exception carries, read by reflection, so a group needs no product type to read it.</summary>
     public static class ProductCodes
     {
-        /// <summary>NetSecException.Error.Code, or null when the exception carries no such field.</summary>
+        /// <summary>NetSecException.Error.Code, or null when the exception carries no such field. Both are fields in Core (Errors.cs). If either becomes a property, this returns null and the caller's FAIL shows it, so a refactor goes red and does not go dark.</summary>
         public static string Of(Exception e)
         {
             if (e == null) return null;

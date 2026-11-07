@@ -90,6 +90,8 @@ namespace Acceptance
                 Keygen(c, k.Dir, "-q -t ed25519 -N \"\" -f \"" + k.HostKey + "\"");
                 Keygen(c, k.Dir, "-q -t ed25519 -N \"\" -f \"" + k.UserKey + "\"");
                 File.Copy(k.UserKey + ".pub", k.UserPub, true);
+                // FromFiles reads host.key, rsa-host.key, user.key, user.pub and known_hosts, and refuses any other row file. ssh-keygen also writes these 2, so they go.
+                File.Delete(k.HostKey + ".pub"); File.Delete(k.UserKey + ".pub");
             }
             // A second host key and a second user key, for the controls.
             string other = LivePki.Dir(c, "a17probe-" + stem + "-other");
