@@ -33,8 +33,9 @@ test('Techniques lists its 7 items and Handshake its 3 walks, as placeholders, a
   await page.getByTestId('section-techniques').click()
   await expect(page.getByTestId('lesson-rail')).toBeHidden()
   await expect(page.getByTestId('section-rail').locator('[data-testid^=walk-item-] .rail-title')).toHaveText(TECHNIQUES)
-  await page.getByTestId('section-rail').locator('[data-testid^=walk-item-]').first().click()
-  await expect(page.getByTestId('section-placeholder')).toContainText('AES')
+  await expect(page.getByTestId('section-rail')).not.toContainText('slice')
+  await page.getByTestId('walk-item-hmac').click()
+  await expect(page.getByTestId('section-placeholder')).toContainText('HMAC and chain')
   await page.getByTestId('section-handshake').click()
   await expect(page.getByTestId('section-rail').locator('[data-testid^=walk-item-] .rail-title')).toHaveText(HANDSHAKE)
   await expect(page.getByTestId('section-placeholder')).toBeVisible()
@@ -65,3 +66,20 @@ for (const size of [{ width: 1280, height: 640 }, { width: 1366, height: 768 }, 
     }
   })
 }
+
+// The AES walk lives in Techniques. A switch to another section never leaves it on screen (Jared, #226).
+test('the AES walk shows only in Techniques, and another section never shows it on top', async ({ page }) => {
+  await runFreePlay(page, 1)
+  await page.getByTestId('aes-walk-tab').click()
+  await expect(page.getByTestId('section-techniques')).toHaveAttribute('aria-pressed', 'true')
+  await expect(page.getByTestId('aes-walk-panel')).toBeVisible()
+  await expect(page.getByTestId('section-placeholder')).toHaveCount(0)
+  for (const s of ['handshake', 'lessons'] as const) {
+    await page.getByTestId(`section-${s}`).click()
+    await expect(page.getByTestId('walk-root'), `in ${s}`).toHaveCount(0)
+    await expect(page.getByTestId('aes-walk-panel'), `in ${s}`).toHaveCount(0)
+  }
+  await expect(page.getByTestId('lesson-item-1')).toHaveAttribute('aria-current', 'true')
+  await page.getByTestId('section-techniques').click()
+  await expect(page.getByTestId('aes-walk-panel'), 'the walk comes back in Techniques').toBeVisible()
+})

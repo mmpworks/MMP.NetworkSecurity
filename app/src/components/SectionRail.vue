@@ -1,9 +1,9 @@
 <script setup lang="ts">
 import { computed } from 'vue'
-import { sectionOf } from '../sections'
+import { sectionOf, walkStatus } from '../sections'
 import { ui } from '../store'
 
-// The rail of Handshake or Techniques: one item per walk. A walk whose slice has not landed shows when it arrives.
+// The rail of Handshake or Techniques: one item per walk. A walk that is not built yet says it comes later.
 const section = computed(() => sectionOf(ui.section))
 const picked = computed(() => ui.walkItem[ui.section] ?? null)
 function pick(id: string) { ui.walkItem = { ...ui.walkItem, [ui.section]: id } }
@@ -17,7 +17,7 @@ function pick(id: string) { ui.walkItem = { ...ui.walkItem, [ui.section]: id } }
     >
       <span class="rail-body">
         <span class="rail-title" :title="w.label">{{ w.label }}</span>
-        <span class="rail-status">arrives in slice {{ w.slice }}</span>
+        <span class="rail-status">{{ walkStatus(w) }}</span>
       </span>
     </button>
   </nav>

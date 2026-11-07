@@ -1,4 +1,5 @@
 import { computed, reactive, ref, watchEffect } from 'vue'
+import type { SectionId } from './sections'
 import { hostGet, normalizeError, normalizeEvent, openSocket, resolveHostAddress, type HostSocket } from './host'
 import { evaluateUnlock, findBound, parseHighlight, TOURS, type Unlock } from './tour'
 import type { AppMode, HostError, LessonRow, TourStep, TraceEvent, Transport, ViewMode } from './types'
@@ -64,10 +65,9 @@ export const ui = reactive({
   error: null as HostError | null,
   engine: 'idle' as 'idle' | 'running' | 'stepping' | 'waiting' | 'finished',
   shortcuts: false,
-  walkOpen: false,
   // The section the app shows, and the walk picked in each walk section. Lessons is first on open, so every lesson, tour and spec starts where it did.
-  section: 'lessons' as 'handshake' | 'techniques' | 'lessons',
-  walkItem: {} as Partial<Record<'handshake' | 'techniques' | 'lessons', string>>,
+  section: 'lessons' as SectionId,
+  walkItem: {} as Partial<Record<SectionId, string>>,
   glossaryOpen: false,
   glossaryFocus: null as string | null,
   follow: true,

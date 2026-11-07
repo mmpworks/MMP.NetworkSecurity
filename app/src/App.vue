@@ -14,7 +14,7 @@ import ByteInspector from './components/ByteInspector.vue'
 import EventLog from './components/EventLog.vue'
 import LessonRail from './components/LessonRail.vue'
 import SectionRail from './components/SectionRail.vue'
-import { sectionOf } from './sections'
+import { sectionOf, walkStatus } from './sections'
 import SecretsPanel from './components/SecretsPanel.vue'
 import SequenceDiagram from './components/SequenceDiagram.vue'
 import TourPanel from './components/TourPanel.vue'
@@ -168,14 +168,14 @@ const shortcuts: [string, string][] = [
           <Pane :size="100 - shares.rail" :min-size="60">
             <div class="workspace" data-testid="workspace">
             <!-- The AES walk mounts here and replaces the panels. Its tips and spec cards go to overlay-layer, outside this clip. -->
-            <section v-if="ui.walkOpen || aesWalkOpen" data-testid="walk-root" class="walk-root"><AesWalkPanel v-if="aesWalkOpen" /></section>
+            <section v-if="aesWalkOpen" data-testid="walk-root" class="walk-root"><AesWalkPanel /></section>
             <!-- Handshake and Techniques: the walk screens arrive in their slices. Until then the workspace says which slice brings the picked walk. -->
             <section v-if="ui.section !== 'lessons' && !aesWalkOpen" class="section-placeholder" data-testid="section-placeholder">
               <h2>{{ sectionOf(ui.section).label }}</h2>
-              <p v-if="placeholderItem">{{ placeholderItem.label }} arrives in slice {{ placeholderItem.slice }}.</p>
-              <p v-else>Pick a walk on the left. Each walk arrives in its own slice.</p>
+              <p v-if="placeholderItem">{{ placeholderItem.label }}: {{ walkStatus(placeholderItem) }}.</p>
+              <p v-else>Pick a walk on the left.</p>
             </section>
-            <Splitpanes v-show="!ui.walkOpen && ui.section === 'lessons'">
+            <Splitpanes v-show="ui.section === 'lessons'">
           <Pane :size="100 - shares.side" :min-size="36">
             <Splitpanes horizontal>
               <Pane :size="100 - bytesPanePercent" :min-size="25">
