@@ -135,12 +135,16 @@ export function clearError() { ui.error = null }
 
 // ---- connection ----
 
+// Modules that hold state bound to the open socket register here, and clear when it closes (the AES walk, design section 3.5).
+const socketCloseHooks: (() => void)[] = []
+export function onSocketClose(fn: () => void) { socketCloseHooks.push(fn) }
+
 export function connect() {
   if (sock) return
   applyTheme()
   sock = openSocket(addr, {
     onOpen: () => { hostState.value = 'connected'; ui.error = null; void refreshHostData(); if (everOpen) void resync(); everOpen = true },
-    onClose: () => { if (hostState.value === 'connected') hostState.value = 'offline'; else if (everOpen) hostState.value = 'offline' },
+    onClose: () => { if (hostState.value === 'connected') hostState.value = 'offline'; else if (everOpen) hostState.value = 'offline'; for (const fn of socketCloseHooks) fn() },
     onFrame,
   })
   // A first connect that never opens is an offline Host, not an endless "connecting".
