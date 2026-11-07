@@ -87,7 +87,8 @@ The panel's visible name is **Message bytes** (tab label and panel title). Code,
 4. Each field in the field list is a toggle. Nothing is lit by default. A lit field fills its bytes with the color of its `kind` (table in section 4). A wire field that holds the readable bytes (the cipher span, or the payload in the clear) also lights those bytes in Before.
 5. The field list (right side) shows name, byte range, `gloss` when it says more than the name, and the decoded value from the field's own buffer. A tour highlight `inspector:field=<name>` rings the toggle and lights nothing.
 6. Byte selection plus the `Flip this byte` button starts an attack (section 7).
-7. In Eavesdropper view the inspector parses only fields where `visibleToWire` is true. The rest is one block labeled `unreadable without the key (N bytes)`.
+7. In Eavesdropper view a field with `visibleToWire` false keeps its row when the event places it on the wire bytes. The row says `locked: the eavesdropper has no key`, and picking it lights its bytes in the sealed colors. The words hold for every mode, because ECB is locked and still shows a picture's shape. A hidden field that describes only the readable bytes has no place on the wire, so those fields stay one note: `locked: the eavesdropper has no key (N bytes)`. An event with no wire bytes shows the eavesdropper no bytes and no rows.
+8. Every row of both grids shares fixed columns: offset, 16 bytes, text. Field boundaries show by color, never by added space. Below 690 px the field list stacks under the grids.
 
 ### 1.5 Secrets panel
 

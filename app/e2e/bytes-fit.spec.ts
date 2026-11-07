@@ -44,13 +44,13 @@ for (const size of [{ width: 1536, height: 760 }, { width: 1440, height: 760 }, 
   })
 }
 
-test('a view switch turns off a lit field, so a hidden row can never stay lit', async ({ page }) => {
+test('a view switch turns off a lit field', async ({ page }) => {
   await runFreePlay(page, 1)
   await pickTextGcm1(page)
   await page.getByTestId('inspector-field-row-cipher').click()
   await expect(page.getByTestId('inspector-after').locator('.hb.lit')).toHaveCount(64)
   await page.getByTestId('view-eavesdropper').click()
-  await expect(page.getByTestId('inspector-field-row-cipher')).toHaveCount(0)
+  await expect(page.getByTestId('inspector-field-row-cipher')).toHaveAttribute('aria-pressed', 'false')
   await expect(page.getByTestId('inspector-after').locator('.hb.lit')).toHaveCount(0)
 })
 

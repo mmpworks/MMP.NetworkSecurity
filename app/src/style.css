@@ -2,12 +2,12 @@
 :root, :root[data-theme="dark"] {
   --bg: #0e1318; --surface: #151c23; --surface2: #1d2630; --line: #2a3541; --text: #e6edf3; --muted: #93a1b0;
   --readable: #56b4e9; --encrypted: #e69f00; --secret: #b39dff; --pass: #3fb950; --fail: #ff6b6b; --on-mark: #0e1318; --focus: #ffffff; --warn: #e0a82e;
-  --k-header: #8b98a6; --k-length: #009e73; --k-random: #56b4e9; --k-key: #b39dff; --k-cipher: #e69f00; --k-mac: #cc79a7; --k-id: #f0e442; --k-data: #9aa7b4;
+  --k-header: #8b98a6; --k-length: #009e73; --k-random: #56b4e9; --k-key: #b39dff; --k-cipher: #e69f00; --k-mac: #cc79a7; --k-id: #f0e442; --k-data: #9aa7b4; --sealed-bg: #3d3410; --sealed-fg: #ff9d9d;
 }
 :root[data-theme="light"] {
   --bg: #f6f8fa; --surface: #ffffff; --surface2: #e8edf2; --line: #cfd7df; --text: #1b2229; --muted: #5a6876;
   --readable: #0072b2; --encrypted: #9a5000; --secret: #6a4fc2; --pass: #176f32; --fail: #c4242f; --on-mark: #ffffff; --focus: #000000; --warn: #8a6100;
-  --k-header: #5a6876; --k-length: #007a5a; --k-random: #0072b2; --k-key: #6a4fc2; --k-cipher: #a85a00; --k-mac: #a2457e; --k-id: #6f6300; --k-data: #4d5966;
+  --k-header: #5a6876; --k-length: #007a5a; --k-random: #0072b2; --k-key: #6a4fc2; --k-cipher: #a85a00; --k-mac: #a2457e; --k-id: #6f6300; --k-data: #4d5966; --sealed-bg: #fff4b8; --sealed-fg: #b3141f;
 }
 html, body, #app { height: 100%; margin: 0; }
 html { overflow: hidden; }
@@ -82,28 +82,29 @@ body { background: var(--bg); color: var(--text); overflow: hidden; }
 
 /* Inspector */
 .inspector, .secrets, .tour { display: flex; flex-direction: column; height: 100%; min-height: 0; }
-.inspector-tools { display: flex; align-items: center; gap: 8px; padding: 6px 10px; flex: 0 0 auto; border-bottom: 1px solid var(--line); }
+.inspector-tools { display: flex; flex-wrap: wrap; align-items: center; gap: 8px; padding: 6px 10px; flex: 0 0 auto; border-bottom: 1px solid var(--line); }
 /* Message bytes: the Before grid over the After grid, the field toggles on the right. */
 .inspector-body { flex: 1 1 auto; min-height: 0; display: flex; }
 .byte-grids { flex: 1 1 auto; min-width: 0; min-height: 0; display: flex; flex-direction: column; }
 .grid-sec { flex: 1 1 auto; min-height: 0; display: flex; flex-direction: column; }
 .grid-sec.shut { flex: 0 0 auto; }
-.grid-head { all: unset; box-sizing: border-box; display: flex; align-items: baseline; gap: 8px; padding: 4px 8px 2px; cursor: pointer; font-size: 12px; flex: 0 0 auto; border-radius: 4px; }
+.grid-head { all: unset; box-sizing: border-box; width: fit-content; max-width: 100%; display: flex; align-items: baseline; gap: 8px; padding: 4px 8px 2px; cursor: pointer; font-size: 12px; flex: 0 0 auto; border-radius: 4px; }
 .grid-head.static { cursor: default; }
 .grid-head:focus-visible { outline: 2px solid var(--focus); }
-.grid-head.hl { outline: 2px solid var(--focus); }
+.grid-head.hl { outline: 2px dashed var(--focus); outline-offset: 1px; }
 .gh-title { font-weight: 700; }
 .readable-t { color: var(--readable); }
 .hidden-note { flex: 0 0 auto; padding: 6px 8px; gap: 2px; font-size: 12px; }
 .became { flex: 0 0 auto; padding: 1px 8px; font-size: 11px; color: var(--muted); border-top: 1px dashed var(--line); }
 .hex-scroll { flex: 1 1 auto; overflow: auto; min-height: 44px; position: relative; }
-.hex-space { position: relative; }
+.hex-space { position: relative; min-width: 505px; }
 .hex-row { position: absolute; left: 0; right: 0; height: 20px; display: flex; gap: 8px; align-items: center; font: 12px ui-monospace, Consolas, monospace; padding: 0 8px; }
-.hex-off { color: var(--muted); }
-.hex-cells { display: inline-flex; gap: 2px; }
-.hex-ascii { color: var(--muted); white-space: pre; }
-.span-mark { display: inline-block; width: 1px; height: 14px; }
-.hb { padding: 1px 2px; border-radius: 3px; cursor: pointer; }
+.hex-off { color: var(--muted); flex: 0 0 4ch; }
+.hex-cells { display: grid; grid-template-columns: repeat(16, 19px); gap: 2px; flex: 0 0 auto; }
+.hex-ascii { color: var(--muted); white-space: pre; flex: 0 0 16ch; }
+/* A field mark holds a test id and takes no space: field boundaries show by color, never by a gap. */
+.span-mark { position: absolute; width: 0; height: 0; }
+.hb { padding: 1px 0; text-align: center; border-radius: 3px; cursor: pointer; }
 .hb:hover { background: var(--surface2); }
 .hb.sel { outline: 2px solid var(--focus); }
 .g-before .hb, .g-before .hex-ascii { color: var(--readable); }
@@ -118,23 +119,38 @@ body { background: var(--bg); color: var(--text); overflow: hidden; }
 .hb.lit.k-mac, .swatch.k-mac { background: var(--k-mac); } .field-row.k-mac { border-left-color: var(--k-mac); }
 .hb.lit.k-id, .swatch.k-id { background: var(--k-id); } .field-row.k-id { border-left-color: var(--k-id); }
 .hb.lit.k-data, .swatch.k-data { background: var(--k-data); } .field-row.k-data { border-left-color: var(--k-data); }
-.field-list { flex: 0 0 186px; overflow: auto; border-left: 1px solid var(--line); padding: 4px; font-size: 12px; min-width: 0; box-sizing: border-box; }
+/* A field the eavesdropper can place and cannot read. */
+.hex-scroll .hb.lit.k-sealed { background: var(--sealed-bg); color: var(--sealed-fg); }
+.swatch.k-sealed { background: var(--sealed-bg); box-shadow: inset 0 0 0 1px var(--sealed-fg); } .field-row.k-sealed { border-left-color: var(--sealed-fg); }
+.field-list { flex: 0 0 180px; overflow: auto; border-left: 1px solid var(--line); padding: 4px; font-size: 12px; min-width: 0; box-sizing: border-box; }
 .fl-hint { padding: 2px 6px 6px; font-size: 11px; }
-.field-row { all: unset; box-sizing: border-box; width: 100%; display: grid; grid-template-columns: 1fr auto; gap: 2px 8px; padding: 4px 6px; border-radius: 6px; cursor: pointer; border: 1px solid var(--line); border-left: 4px solid var(--line); margin-bottom: 3px; color: var(--text); }
+.field-row { all: unset; box-sizing: border-box; width: 100%; display: grid; grid-template-columns: minmax(0, 1fr) auto; gap: 2px 8px; padding: 4px 6px; border-radius: 6px; cursor: pointer; border: 1px solid var(--line); border-left: 4px solid var(--line); margin-bottom: 3px; color: var(--text); }
 .field-row:hover { background: var(--surface2); }
 .field-row:focus-visible { outline: 2px solid var(--focus); }
 .field-row.on { background: var(--surface2); box-shadow: inset 0 0 0 1px var(--text); }
 .field-row.hl { outline: 2px dashed var(--focus); outline-offset: 1px; }
-.field-row .fname { font-weight: 700; display: inline-flex; align-items: center; gap: 6px; }
+.field-row .fname { font-weight: 700; display: inline-flex; align-items: center; gap: 6px; min-width: 0; overflow-wrap: anywhere; }
 .swatch { display: inline-block; width: 10px; height: 10px; border-radius: 2px; flex: 0 0 auto; }
 .fgloss { grid-column: 1 / -1; font-size: 11px; color: var(--muted); }
 .fval { grid-column: 1 / -1; font: 11px ui-monospace, Consolas, monospace; overflow-wrap: anywhere; }
-.field-row.unreadable { color: var(--encrypted); border-left-color: var(--encrypted); font-style: italic; cursor: default; }
+.field-note { display: block; padding: 2px 6px 6px; color: var(--encrypted); font-style: italic; }
+/* A narrow panel stacks the field list under the grids, as one line per field. */
+.inspector { container-type: inline-size; }
+@container (max-width: 690px) {
+  .inspector-body { flex-direction: column; }
+  .byte-grids { flex: 1 1 0; }
+  .field-list { flex: 0 0 auto; display: flex; flex-wrap: wrap; gap: 3px; max-height: 112px; border-left: 0; border-top: 1px solid var(--line); }
+  .fl-hint, .field-note { flex: 1 0 100%; padding-block: 0; }
+  .field-row { flex: 1 1 165px; width: auto; margin: 0; }
+  .field-row .fval, .field-row .fgloss { display: none; }
+}
 
 /* Secrets */
-.secret-cols { display: flex; gap: 8px; padding: 8px; overflow: auto; flex: 1 1 auto; min-height: 0; align-items: flex-start; }
+.secrets { overflow: auto; }
+.secrets > * { flex: 0 0 auto; }
+.secret-cols { display: flex; gap: 8px; padding: 4px 8px; align-items: flex-start; }
 .secret-col { flex: 1 1 0; min-width: 160px; }
-.col-head { font-weight: 700; text-transform: capitalize; margin-bottom: 4px; }
+.col-head { font-weight: 700; text-transform: capitalize; margin-bottom: 2px; }
 .secret-row { display: flex; flex-wrap: wrap; align-items: center; gap: 4px 8px; padding: 4px 6px; border-radius: 6px; border-left: 3px solid var(--secret); background: var(--surface2); margin-bottom: 4px; font-size: 12px; }
 .secret-row.fresh { animation: flash 1.2s ease-out 1; }
 .secret-row.hl { outline: 2px solid var(--focus); }
@@ -142,12 +158,12 @@ body { background: var(--bg); color: var(--text); overflow: hidden; }
 .sname { font-weight: 700; color: var(--secret); }
 .secret-row code { font: 11px ui-monospace, Consolas, monospace; overflow-wrap: anywhere; }
 .chip-from { font-size: 10px; border: 1px solid var(--line); border-radius: 8px; padding: 0 5px; color: var(--muted); }
-.converge { margin: 0 8px 8px; padding: 6px; border: 1px solid var(--line); border-radius: 8px; }
+.converge { margin: 0 8px 6px; padding: 4px 6px; border: 1px solid var(--line); border-radius: 8px; }
 .converge.match { border-color: var(--pass); box-shadow: 0 0 8px color-mix(in srgb, var(--pass) 40%, transparent); }
-.grids { display: flex; gap: 10px; flex-wrap: wrap; }
+.grids { display: flex; gap: 4px 10px; flex-wrap: wrap; }
 .grid32 { display: grid; grid-template-columns: repeat(16, 1fr); gap: 2px; font: 9px ui-monospace, Consolas, monospace; }
 .cell { background: var(--surface2); border-radius: 2px; padding: 1px; text-align: center; color: var(--secret); }
-.match-tag { color: var(--pass); font-weight: 700; margin-top: 4px; }
+.match-tag { color: var(--pass); font-weight: 700; margin-top: 2px; }
 
 /* Tour */
 .tour { overflow: auto; }
@@ -260,7 +276,7 @@ body { background: var(--bg); color: var(--text); overflow: hidden; }
 .vault-screen .wiz-parts li { display: flex; flex-wrap: wrap; align-items: baseline; gap: 2px 10px; }
 
 /* Keys in use (V3) */
-.keys-in-use { padding: 6px 10px; border-bottom: 1px solid var(--line); display: flex; flex-direction: column; gap: 4px; }
+.keys-in-use { padding: 4px 10px; border-bottom: 1px solid var(--line); display: flex; flex-direction: column; gap: 2px; }
 .kiu-chips { display: flex; flex-wrap: wrap; gap: 6px; }
 .kiu-chip { display: inline-flex; flex-wrap: wrap; align-items: baseline; gap: 2px 8px; padding: 3px 8px; border: 1px solid var(--line); border-radius: 8px; font-size: 12px; }
 .kiu-chip code { font: 11px ui-monospace, Consolas, monospace; overflow-wrap: anywhere; }
