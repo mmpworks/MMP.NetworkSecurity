@@ -63,9 +63,14 @@ namespace NetSec.Tls13
 
         public static byte[] ExpandLabel(Func<IHash> h, byte[] secret, string label, byte[] context, int length)
         {
+            return Hkdf.Expand(h, secret, HkdfLabel(label, context, length), length);
+        }
+
+        /// <summary>The HkdfLabel structure of RFC 8446 section 7.1: the length, "tls13 " plus the label, and the context. HKDF-Expand takes it as info.</summary>
+        public static byte[] HkdfLabel(string label, byte[] context, int length)
+        {
             byte[] fullLabel = Encoding.UTF8.GetBytes("tls13 " + label);
-            byte[] info = new ByteWriter().U16(length).U8(fullLabel.Length).Put(fullLabel).U8(context.Length).Put(context).ToArray();
-            return Hkdf.Expand(h, secret, info, length);
+            return new ByteWriter().U16(length).U8(fullLabel.Length).Put(fullLabel).U8(context.Length).Put(context).ToArray();
         }
 
         public static byte[] DeriveSecret(Func<IHash> h, byte[] secret, string label, byte[] transcriptHash)
