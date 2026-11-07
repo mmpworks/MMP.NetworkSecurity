@@ -9,21 +9,25 @@ export const HOST_PORT = 5190
 export const TOKEN = 'lesson0-token'
 const hostDll = process.env.NETSEC_HOST_DLL ?? path.resolve(__dirname, '..', 'src', 'NetSec.Host', 'bin', 'Release', 'net10.0', 'NetSec.Host.dll')
 
-// The suite runs the Release Host. A Debug build, a pull or a branch switch leaves that DLL older than the code, and the specs then test an old Host
-// with no warning. So a run refuses to start while any source file under src/ is newer than the DLL. A Host that the person names in NETSEC_HOST_DLL is theirs to keep current.
-function newestSource(dir: string): { file: string; ms: number } {
+// The suite runs the Release Host. A Debug build, a pull or a branch switch leaves that build older than the code, and the specs then test an old Host
+// with no warning. So a run refuses to start while any file under src/ (bin and obj aside) is newer than every file in the Release output folder.
+// It compares with the whole folder, not the DLL: a data file such as wizard-flows.json is copied there with no compile, and a copy keeps its source's time,
+// so a fresh copy ties and passes. A Host that the person names in NETSEC_HOST_DLL is theirs to keep current.
+// Limit: the Host also builds MMP.AsyncProxy from a sibling repo outside src/, and a change there is not seen.
+function newestFile(dir: string): { file: string; ms: number } {
   let best = { file: '', ms: 0 }
+  if (!fs.existsSync(dir)) return best
   for (const entry of fs.readdirSync(dir, { withFileTypes: true })) {
     if (entry.name === 'bin' || entry.name === 'obj') continue
     const full = path.join(dir, entry.name)
-    if (entry.isDirectory()) { const inner = newestSource(full); if (inner.ms > best.ms) best = inner }
-    else if (entry.name.endsWith('.cs') || entry.name.endsWith('.csproj')) { const ms = fs.statSync(full).mtimeMs; if (ms > best.ms) best = { file: full, ms } }
+    const found = entry.isDirectory() ? newestFile(full) : { file: full, ms: fs.statSync(full).mtimeMs }
+    if (found.ms > best.ms) best = found
   }
   return best
 }
 if (!process.env.NETSEC_HOST_DLL) {
-  const newest = newestSource(path.resolve(__dirname, '..', 'src'))
-  const built = fs.existsSync(hostDll) ? fs.statSync(hostDll).mtimeMs : 0
+  const newest = newestFile(path.resolve(__dirname, '..', 'src'))
+  const built = fs.existsSync(hostDll) ? newestFile(path.dirname(hostDll)).ms : 0
   if (built < newest.ms) {
     throw new Error(`HOST_DLL_STALE: ${built ? 'the Release Host is older than ' + path.relative(path.resolve(__dirname, '..'), newest.file) : 'no Release Host at ' + hostDll}. `
       + 'Rebuild it from the repo root: dotnet build src/NetSec.Host -c Release')
