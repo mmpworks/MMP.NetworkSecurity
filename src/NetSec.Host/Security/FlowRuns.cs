@@ -1,5 +1,6 @@
 using System.Text.Json;
 using NetSec.Errors;
+using NetSec.Keys;
 
 namespace NetSec.Host.Security;
 
@@ -146,15 +147,20 @@ public sealed class FlowRuns
             if (IsPersonal(path))
                 warnings.Add(new StepMessage(PathPersonal, "This file is in your own .ssh folder, so it may be a key you use every day. This course shows every key. Use a test key.", typeId));
             if (Array.IndexOf(types, typeId) < 0) errors.Add(new StepMessage(TypeNotInFlow, $"{typeId} is not one of the keys this set makes.", typeId));
+            else if (typeId == SecurityTypes.DukptBdk) ReadBaseKey(path, CheckValueOf(data), errors);
             else ReadOne(typeId, path, errors);
         }
         if (errors.Count > 0) return;
         foreach (string typeId in types)
         {
-            if (chosen.TryGetValue(typeId, out string? path)) _store.PlaceKey(typeId, File.ReadAllText(path));
-            else _parts.Make(typeId);
+            if (!chosen.TryGetValue(typeId, out string? path)) _parts.Make(typeId);
+            else if (typeId == SecurityTypes.DukptBdk) _store.PlaceBytes(typeId, PaymentKeys.ReadBaseKey(path, CheckValueOf(data)));
+            else _store.PlaceKey(typeId, File.ReadAllText(path));
         }
     }
+
+    static string? CheckValueOf(JsonElement data) =>
+        data.TryGetProperty("checkValue", out JsonElement value) && value.ValueKind == JsonValueKind.String ? value.GetString() : null;
 
     /// <summary>A blank or malformed path is no personal path. ReadOne then names it as unreadable.</summary>
     bool IsPersonal(string path)
@@ -164,6 +170,12 @@ public sealed class FlowRuns
         try { return Path.GetFullPath(plain).StartsWith(_personalSsh, StringComparison.OrdinalIgnoreCase); }
         catch (ArgumentException) { return false; }
         catch (NotSupportedException) { return false; }
+    }
+
+    static void ReadBaseKey(string path, string? checkValue, List<StepMessage> errors)
+    {
+        try { PaymentKeys.ReadBaseKey(path, checkValue); }
+        catch (NetSecException e) { errors.Add(new StepMessage(e.Error.Code, e.Error.Message, SecurityTypes.DukptBdk)); }
     }
 
     static void ReadOne(string typeId, string path, List<StepMessage> errors)

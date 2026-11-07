@@ -117,6 +117,15 @@ namespace NetSec.Tests
         static PadSale Sell(DukptPinPad pad = null) => PinPadCore.Sell(pad ?? NewPad(), "t1", Pin, Pan, new SeededRandom(5));
 
         [Fact]
+        public void The_pad_key_follows_the_base_key_it_is_given()
+        {
+            Assert.Equal(PinPadCore.InjectedInitialKey, Hex.Encode(PinPadCore.InitialKeyUnder(Bdk)));
+            byte[] other = (byte[])Bdk.Clone();
+            other[0] ^= 1;
+            Assert.NotEqual(PinPadCore.InjectedInitialKey, Hex.Encode(PinPadCore.InitialKeyUnder(other)));
+        }
+
+        [Fact]
         public void The_key_loaded_into_the_pad_is_the_one_the_bank_derives()
         {
             Assert.Equal(PinPadCore.InjectedInitialKey, Hex.Encode(DukptBank.DeriveInitialKey(Bdk, Hex.Decode(PinPadCore.InjectedKeyId))));
