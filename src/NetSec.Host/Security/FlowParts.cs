@@ -176,40 +176,94 @@ public sealed class FlowParts(SecurityStore store, Func<string, string?> env)
     const string KeyInCommand = "<key>";
     static readonly byte[] LessonCheckBlock = Encoding.ASCII.GetBytes("MMP.NetworkSecur");
 
-    /// <summary>OpenSSL locks one block under the key, and it must give the block the course's AES gives. Another block must give another answer.</summary>
+    /// <summary>modes-design.md section 8: HMAC and CMAC under the key, and for lab.aes-key also one AES block. Lessons 1 and 2 use the keys these ways.</summary>
     CheckFact CheckAesKey(string dir)
     {
-        byte[] key = Placed(SecurityTypes.LabAesKey).CopyMaterial(), changed = (byte[])LessonCheckBlock.Clone();
+        byte[] key = Placed(SecurityTypes.LabAesKey).CopyMaterial();
+        return AllOf(() => CheckBlock(SecurityTypes.LabAesKey, key, dir), () => CheckHmac(SecurityTypes.LabAesKey, key, dir), () => CheckCmac(SecurityTypes.LabAesKey, key, dir));
+    }
+
+    CheckFact CheckSealKey(string dir)
+    {
+        byte[] key = Placed(SecurityTypes.LabSealKey).CopyMaterial();
+        return AllOf(() => CheckHmac(SecurityTypes.LabSealKey, key, dir), () => CheckCmac(SecurityTypes.LabSealKey, key, dir));
+    }
+
+    /// <summary>Each check runs in order and the first failure is the answer. A pass names every command and every control that ran.</summary>
+    static CheckFact AllOf(params Func<CheckFact>[] checks)
+    {
+        List<CheckFact> passed = [];
+        foreach (Func<CheckFact> check in checks)
+        {
+            CheckFact fact = check();
+            if (!fact.Passed) return fact;
+            passed.Add(fact);
+        }
+        const string Between = " ; ";
+        return passed[0] with
+        {
+            Command = string.Join(Between, passed.Select(f => f.Command)),
+            Output = string.Join(Between, passed.Select(f => f.Output)),
+            ControlCommand = string.Join(Between, passed.Select(f => f.ControlCommand)),
+            ControlOutput = string.Join(Between, passed.Select(f => f.ControlOutput)),
+        };
+    }
+
+    static string[] InputFiles(string dir, string stem)
+    {
+        byte[] changed = (byte[])LessonCheckBlock.Clone();
         changed[0] ^= 1;
-        File.WriteAllBytes(Path.Combine(dir, "block.bin"), LessonCheckBlock);
-        File.WriteAllBytes(Path.Combine(dir, "changed.bin"), changed);
+        File.WriteAllBytes(Path.Combine(dir, stem + ".bin"), LessonCheckBlock);
+        File.WriteAllBytes(Path.Combine(dir, stem + "-changed.bin"), changed);
+        return [stem + ".bin", stem + "-changed.bin"];
+    }
+
+    /// <summary>OpenSSL locks one block under the key, and it must give the block the course's AES gives. Another block must give another answer.</summary>
+    CheckFact CheckBlock(string typeId, byte[] key, string dir)
+    {
+        string[] input = InputFiles(dir, "block");
         byte[] engine = new byte[LessonCheckBlock.Length];
         new AesKey(key).EncryptBlock(LessonCheckBlock, 0, engine, 0);
         string Arguments(string keyText, string file, string output) => $"enc -aes-128-ecb -nopad -K {keyText} -in {file} -out {output}";
         string hex = Hex.Encode(key);
-        return Compared(SecurityTypes.LabAesKey, dir, Hex.Encode(engine), Arguments(hex, "block.bin", "locked.bin"), Arguments(hex, "changed.bin", "changed-locked.bin"),
-            Arguments(KeyInCommand, "block.bin", "locked.bin"), Arguments(KeyInCommand, "changed.bin", "changed-locked.bin"),
+        return Compared(typeId, dir, hex, Hex.Encode(engine), Arguments(hex, input[0], "locked.bin"), Arguments(hex, input[1], "changed-locked.bin"),
+            Arguments(KeyInCommand, input[0], "locked.bin"), Arguments(KeyInCommand, input[1], "changed-locked.bin"),
             () => Hex.Encode(File.ReadAllBytes(Path.Combine(dir, "locked.bin"))), () => Hex.Encode(File.ReadAllBytes(Path.Combine(dir, "changed-locked.bin"))));
     }
 
     /// <summary>OpenSSL computes the HMAC with the key, and it must give the tag the course's HMAC gives. Another message must give another tag.</summary>
-    CheckFact CheckSealKey(string dir)
+    CheckFact CheckHmac(string typeId, byte[] key, string dir)
     {
-        byte[] key = Placed(SecurityTypes.LabSealKey).CopyMaterial(), changed = (byte[])LessonCheckBlock.Clone();
-        changed[0] ^= 1;
-        File.WriteAllBytes(Path.Combine(dir, "message.bin"), LessonCheckBlock);
-        File.WriteAllBytes(Path.Combine(dir, "changed.bin"), changed);
+        string[] input = InputFiles(dir, "hmac");
         string Arguments(string keyText, string file) => $"mac -digest SHA256 -macopt hexkey:{keyText} -in {file} HMAC";
         string hex = Hex.Encode(key);
-        return Compared(SecurityTypes.LabSealKey, dir, Hex.Encode(Hmac.Compute(Hashes.Sha256, key, LessonCheckBlock)), Arguments(hex, "message.bin"), Arguments(hex, "changed.bin"),
-            Arguments(KeyInCommand, "message.bin"), Arguments(KeyInCommand, "changed.bin"), null, null);
+        return Compared(typeId, dir, hex, Hex.Encode(Hmac.Compute(Hashes.Sha256, key, LessonCheckBlock)), Arguments(hex, input[0]), Arguments(hex, input[1]),
+            Arguments(KeyInCommand, input[0]), Arguments(KeyInCommand, input[1]), null, null);
+    }
+
+    /// <summary>OpenSSL computes the AES-CMAC with the key, and it must give the tag the course's CMAC gives. Another message must give another tag.</summary>
+    CheckFact CheckCmac(string typeId, byte[] key, string dir)
+    {
+        string[] input = InputFiles(dir, "cmac");
+        string Arguments(string keyText, string file) => $"mac -cipher AES-128-CBC -macopt hexkey:{keyText} -in {file} CMAC";
+        string hex = Hex.Encode(key);
+        return Compared(typeId, dir, hex, Hex.Encode(Cmac.Compute(new AesKey(key), LessonCheckBlock)), Arguments(hex, input[0]), Arguments(hex, input[1]),
+            Arguments(KeyInCommand, input[0]), Arguments(KeyInCommand, input[1]), null, null);
     }
 
     /// <summary>
     /// The tool and the course must give one answer, and the tool must give another for a changed input. The key is on the tool's command line,
     /// so the command this returns shows a mark in its place: the fact reaches the screen with Show keys off.
     /// </summary>
-    CheckFact Compared(string typeId, string dir, string engineAnswer, string arguments, string mustDiffer, string shownCommand, string shownControl, Func<string>? readAnswer, Func<string>? readControl)
+    CheckFact Compared(string typeId, string dir, string keyHex, string engineAnswer, string arguments, string mustDiffer, string shownCommand, string shownControl, Func<string>? readAnswer, Func<string>? readControl)
+    {
+        CheckFact fact = ComparedRaw(typeId, dir, engineAnswer, arguments, mustDiffer, shownCommand, shownControl, readAnswer, readControl);
+        // The tool's own words reach the screen. If a tool ever repeats its command line, the key must not go with them.
+        string Hidden(string? text) => (text ?? "").Replace(keyHex, KeyInCommand, StringComparison.OrdinalIgnoreCase);
+        return fact with { Output = Hidden(fact.Output), ControlOutput = fact.ControlOutput is null ? null : Hidden(fact.ControlOutput) };
+    }
+
+    CheckFact ComparedRaw(string typeId, string dir, string engineAnswer, string arguments, string mustDiffer, string shownCommand, string shownControl, Func<string>? readAnswer, Func<string>? readControl)
     {
         string? openssl = _openSsl.Locate();
         string command = "openssl " + shownCommand, control = "openssl " + shownControl;
