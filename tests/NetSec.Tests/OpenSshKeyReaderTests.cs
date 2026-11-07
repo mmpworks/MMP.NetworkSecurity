@@ -342,10 +342,14 @@ namespace NetSec.Tests
             Assert.Equal(KeyAlgorithm.Rsa2048, OpenSshKeyReader.Parse(RsaFile(n, e, d, iqmp, p, q), KeyIds.SshHostRsa, Rsa).Algorithm);
             byte[] wrongD = (byte[])d.Clone();
             wrongD[wrongD.Length - 1] ^= 2;
-            Assert.Equal(ErrorCodes.KeyFileFormat, Refusal(RsaFile(n, e, wrongD, iqmp, p, q), Rsa));
+            NetSecException dFault = Assert.Throws<NetSecException>(() => OpenSshKeyReader.Parse(RsaFile(n, e, wrongD, iqmp, p, q), KeyIds.SshHostRsa, Rsa));
+            Assert.Equal(ErrorCodes.KeyFileFormat, dFault.Error.Code);
+            Assert.Contains("d does not match e", dFault.Error.Message);
             byte[] wrongIqmp = (byte[])iqmp.Clone();
             wrongIqmp[wrongIqmp.Length - 1] ^= 1;
-            Assert.Equal(ErrorCodes.KeyFileFormat, Refusal(RsaFile(n, e, d, wrongIqmp, p, q), Rsa));
+            NetSecException iqmpFault = Assert.Throws<NetSecException>(() => OpenSshKeyReader.Parse(RsaFile(n, e, d, wrongIqmp, p, q), KeyIds.SshHostRsa, Rsa));
+            Assert.Equal(ErrorCodes.KeyFileFormat, iqmpFault.Error.Code);
+            Assert.Contains("iqmp", iqmpFault.Error.Message);
         }
 
         /// <summary>A huge public exponent would make every verify slow. e above 4 bytes is refused, and the message names the exponent.</summary>
