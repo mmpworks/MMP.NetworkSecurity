@@ -5,10 +5,8 @@
       "lesson": 6,
       "title": "One key for every sale",
       "text": [
-        "A card reader sends your PIN to a bank. The PIN must travel locked, so the reader and the bank need a key.",
-        "If every sale used one key, a thief who got that key could read every PIN ever sent. {{term:dukpt}} fixes this. Its name means derived unique key per transaction.",
-        "With DUKPT, each sale gets a new key, made from a base key and a counter. After the sale, the reader erases the key it used. A stolen reader holds no key that opens past sales.",
-        "The promise has a limit. A stolen reader still holds the keys it needs for later sales, so a thief can work out those keys. One leaked PIN key is smaller: it opens only that one sale.",
+        "A card reader sends your PIN to a bank. The PIN must travel locked, so the reader and the bank need a key. If every sale used one key, a thief who got that key could read every PIN ever sent. {{term:dukpt}} fixes this. Its name means derived unique key per transaction.",
+        "With DUKPT, each sale gets a new key, made from a base key and a counter. After the sale, the reader erases the key it used. A stolen reader holds no key that opens past sales. The promise has a limit. A stolen reader still holds the keys it needs for later sales, so a thief can work out those keys. One leaked PIN key is smaller: it opens only that one sale.",
         "This lab runs AES DUKPT, named in ANSI X9.24-3-2017. An older form uses Triple DES and has different sizes.",
         "Built to show the parts. Do not copy."
       ],

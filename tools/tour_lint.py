@@ -38,6 +38,9 @@ def steps_of(doc):
     return doc if isinstance(doc, list) else doc.get("steps", [])
 
 
+MAX_TEXT_STRINGS = 4
+
+
 def lint(path, max_grade, max_concept):
     problems = []
     with open(path, encoding="utf-8") as handle:
@@ -67,6 +70,10 @@ def lint(path, max_grade, max_concept):
             try_id = (step.get("tryIt") or {}).get("id")
             if unlock.get("ref") != try_id:
                 problems.append("%s: %s unlock.ref '%s' does not name its try-it '%s'" % (path, sid, unlock.get("ref"), try_id))
+        # A14's limit. Echo's clause holds it too, and this finds it before a full acceptance run.
+        strings = len(step.get("text", []))
+        if not 1 <= strings <= MAX_TEXT_STRINGS:
+            problems.append("%s: %s text has %d strings; allowed 1 to %d" % (path, sid, strings, MAX_TEXT_STRINGS))
         for text in step.get("text", []):
             texts.append(TERM.sub(lambda m: m.group("id").replace("-", " "), text))
             declared = set(step.get("glossary", []))
