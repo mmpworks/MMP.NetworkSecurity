@@ -32,8 +32,9 @@ The token parts and proof parts have dots between them, one byte each. Their fie
 
 | Event type | `actor` | `message` | Carries |
 |---|---|---|---|
-| `secret.derived` | `client` | none | `secrets[]`: `auth.device-key`, then `auth.challenge`, then `auth.token` |
-| `secret.derived` | `issuer` | none | `secrets[]`: `auth.issued-challenge`. The challenge is public on the wire. The issuer stores it to compare the answer |
+| `secret.derived` | `client` | none | `secrets[]`: `auth.device-key`, then `auth.token` |
+| `state.kept` | `client` | "client keeps auth.challenge, the answer it sent. ..." and "client keeps auth.last-call, the call it sent. ..." | No `secrets[]`. Both values travel in the clear, so they are no secrets. The client keeps them to resend them in the replay attacks |
+| `state.kept` | `issuer` | "issuer keeps auth.issued-challenge, the challenge it sent. ..." | No `secrets[]`. The challenge is public on the wire. The issuer keeps it to compare the answer |
 | `measure.result` | `issuer` | `token claims` | `plain`: the claims JSON as text. Bind the moment that splits a token and reads its claims here |
 | `measure.result` | `client` | `proof claims` | `plain`: the DPoP claims JSON as text, one per call |
 | `auth.message.sent`, `wire.sent` | sender | as tables | |

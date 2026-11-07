@@ -63,6 +63,16 @@ namespace NetSec.Labs
         const string ChallengeName = "auth.challenge";
         const string IssuedChallengeName = "auth.issued-challenge";
         const string IssuerPublicName = "auth.issuer-public";
+        const string LastCallName = "auth.last-call";
+
+        /// <summary>
+        /// The note that stands where a secret event stood, so every later event keeps its stream number. The value went over the wire in the clear,
+        /// so it is no secret: the side only keeps a copy to check or resend it.
+        /// </summary>
+        static StepEffect Kept(string holder, string name, string what)
+        {
+            return Effect.Note("state.kept", holder + " keeps " + name + ", " + what + ". It travels in the clear, so it is no secret.");
+        }
 
         const int LoginRequest = 1, ChallengeMessage = 2, ChallengeResponse = 3, TokenIssued = 4, LoginDone = 5;
         const int ReadTotals = 6, VoidSale = 7, Refund = 8, CallOk = 9, CallsDone = 10;
@@ -84,6 +94,8 @@ namespace NetSec.Labs
             public string TokenRole = "cashier";
             public bool TokenExpired, ReplayChallenge, ReplayProof, StolenToken, CallRefund, AnswerUnissued, UnknownDevice;
             public byte[] PresentedKey;
+            // Public protocol values each side keeps: they travel in the clear, so the trace notes them as kept state, not as secrets.
+            public byte[] IssuedChallenge, Answer, LastCall;
             public string TokenAudience = Audience;
 
             // The issuer's one enrolment row. A real issuer holds one row per subject.
@@ -258,7 +270,8 @@ namespace NetSec.Labs
             byte[] answered = s.AnswerUnissued ? new byte[ChallengeSize] : m.Body;
             byte[] response = new ByteWriter().Put(answered).Put(Challenge.Sign(s.Secret(DeviceKeyName), answered, Origin)).ToArray();
             return StepDecision.Advance(
-                Effect.Secret("client", ChallengeName, response),
+                Kept("client", ChallengeName, "the answer it sent"),
+                Effect.Store(delegate { s.Answer = response; }),
                 Send(ChallengeResponse, response, new FieldSpan("challenge", "random", ChallengeSize, 0, true), new FieldSpan("signature", "mac", -1, 0, true)));
         }
 
@@ -266,7 +279,7 @@ namespace NetSec.Labs
         {
             StepEffect keep = Effect.Secret("client", TokenName, m.Body);
             if (s.ReplayChallenge)
-                return StepDecision.Advance(keep, Send(ChallengeResponse, s.Secret(ChallengeName), new FieldSpan("challenge", "random", ChallengeSize, 0, true), new FieldSpan("signature", "mac", -1, 0, true)));
+                return StepDecision.Advance(keep, Send(ChallengeResponse, s.Answer, new FieldSpan("challenge", "random", ChallengeSize, 0, true), new FieldSpan("signature", "mac", -1, 0, true)));
             return StepDecision.Advance(keep, Send(LoginDone, new byte[0]));
         }
 
@@ -295,7 +308,8 @@ namespace NetSec.Labs
             byte[] challenge = s.Draw(ChallengeSize);
             return StepDecision.Advance(
                 Effect.Check(Challenge.EnrolledCheck, ErrorCodes.DeviceNotEnrolled),
-                Effect.Secret("issuer", IssuedChallengeName, challenge),
+                Kept("issuer", IssuedChallengeName, "the challenge it sent"),
+                Effect.Store(delegate { s.IssuedChallenge = challenge; }),
                 Send(ChallengeMessage, challenge, new FieldSpan("challenge", "random", -1, 0, true)));
         }
 
@@ -305,7 +319,7 @@ namespace NetSec.Labs
             byte[] challenge = new byte[ChallengeSize], signature = new byte[SignatureSize];
             Buffer.BlockCopy(m.Body, 0, challenge, 0, ChallengeSize);
             Buffer.BlockCopy(m.Body, ChallengeSize, signature, 0, SignatureSize);
-            if (!Same(challenge, s.Secret(IssuedChallengeName))) return StepDecision.Fail(ErrorCodes.ChallengeNotIssued, Challenge.IssuedCheck, "this issuer did not send this challenge in this login");
+            if (!Same(challenge, s.IssuedChallenge)) return StepDecision.Fail(ErrorCodes.ChallengeNotIssued, Challenge.IssuedCheck, "this issuer did not send this challenge in this login");
             if (s.Seen(challenge)) return StepDecision.Fail(ErrorCodes.ChallengeReplay, Challenge.ReplayCheck, "this challenge has been answered before");
             AuthDecision signed = Challenge.Verify(s.EnrolledKey, challenge, Origin, signature);
             if (!signed.Allowed) return StepDecision.Fail(signed.Code, signed.CheckName, signed.Detail);
@@ -354,7 +368,7 @@ namespace NetSec.Labs
         {
             if (s.ReplayProof)
             {
-                byte[] again = s.Secret("auth.last-call");
+                byte[] again = s.LastCall;
                 return StepDecision.Advance(Send(ReadTotals, again));
             }
             return Call(s, VoidSale, "void-sale");
@@ -377,7 +391,8 @@ namespace NetSec.Labs
             string[] t = token.Split('.'), p = proof.Split('.');
             byte[] proofClaims = Base64Url.Decode(p[1]);
             return StepDecision.Advance(
-                Effect.Secret("client", "auth.last-call", body),
+                Kept("client", LastCallName, "the call it sent"),
+                Effect.Store(delegate { s.LastCall = body; }),
                 Effect.Measure("proof claims", null, proofClaims),
                 Send(type, body,
                     new FieldSpan("tokenLength", "length", LengthPrefix, 0, true),
