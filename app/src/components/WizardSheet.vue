@@ -94,7 +94,7 @@ async function toLesson() { await finish(); backToLesson() }
                 <span>{{ words(`wizard.type.${t}.title`, t) }}</span>
                 <input v-model="paths[t]" class="ns-input" type="text" spellcheck="false" :aria-label="`File for ${words(`wizard.type.${t}.title`, t)}`" :data-testid="`flow-file-path-${t}`" />
               </label>
-              <label v-if="flow?.types.includes('dukpt.bdk')" class="wiz-file" data-testid="flow-file-check-value">
+              <label v-if="(flow?.types as readonly string[] | undefined)?.includes('dukpt.bdk')" class="wiz-file" data-testid="flow-file-check-value">
                 <span>{{ words('wizard.field.check-value', 'Check value from the vendor (optional)') }}</span>
                 <input v-model="checkValue" class="ns-input" type="text" spellcheck="false" :aria-label="words('wizard.field.check-value', 'Check value from the vendor (optional)')" />
               </label>
