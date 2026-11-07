@@ -1,10 +1,11 @@
 import { expect, test } from '@playwright/test'
 import * as fs from 'node:fs'
 import * as path from 'node:path'
+import { PORTS } from './ports'
 
 // The suite under acceptance/ walks lessons 1 to 11. Lesson 0 is the toy, so this spec is its only end to end proof.
 // It runs against a real Host and the tour file app/src/tours/lesson-00.json.
-const PORT = 5190
+const PORT = PORTS.host
 const TOKEN = 'lesson0-token'
 const OUT = path.join(__dirname, '..', 'test-results', 'lesson-0')
 

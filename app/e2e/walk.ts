@@ -1,9 +1,10 @@
 import { expect, type Page } from '@playwright/test'
 import * as fs from 'node:fs'
 import * as path from 'node:path'
+import { PORTS } from './ports'
 
 // Shared by the lesson specs. Each walk runs against a real Host (playwright.config.ts) and the tour file of the lesson.
-export const PORT = 5190
+export const PORT = PORTS.host
 export const TOKEN = 'lesson0-token'
 
 export function tourIds(lesson: number): string[] {

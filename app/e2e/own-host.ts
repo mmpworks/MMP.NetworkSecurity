@@ -3,10 +3,11 @@ import * as fs from 'node:fs'
 import * as os from 'node:os'
 import * as path from 'node:path'
 import type { HostAddress } from './walk'
+import { PORTS } from './ports'
 
 // A Host on its own temp security folder, for a spec that changes key state. No route removes a key once the sign-in flow makes one,
 // so a spec that runs that flow on the shared Host changes what every later spec reads. One test or one spec file uses this Host at a time.
-const OWN: HostAddress = { port: 5193, token: 'own-host-token' }
+const OWN: HostAddress = { port: PORTS.ownHost, token: 'own-host-token' }
 
 export interface OwnHost extends HostAddress { stop(): Promise<void> }
 

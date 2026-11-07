@@ -1,10 +1,11 @@
 import { _electron as electron, expect, test } from '@playwright/test'
 import * as path from 'node:path'
+import { PORTS } from './ports'
 
 // NETSEC_ORIGINS is for test runs. Electron blanks it for the Host it spawns, so a value exported in a developer's shell never
 // widens the desktop app's Host. An allowed Origin with no token gets 401 HOST_TOKEN_REFUSED; a refused Origin gets 403
 // HOST_ORIGIN_REFUSED before the token is looked at, so the status tells the two apart without knowing Electron's random token.
-const PORT = 5192
+const PORT = PORTS.electron
 const EXTRA = 'http://localhost:4181'
 
 async function probe(origin: string) {

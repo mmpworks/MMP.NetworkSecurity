@@ -3,6 +3,7 @@ import * as fs from 'node:fs'
 import * as path from 'node:path'
 import { MIN_RATIO, scanPage, setTheme } from './contrast'
 import { open, PORT, TOKEN } from './walk'
+import { PORTS } from './ports'
 
 // V1 vault page and the three exercise screens, on a real Host with the /api/security/vault routes. Contrast is tested on every screen in both themes.
 const OUT = path.join(__dirname, '..', 'test-results', 'vault-v1')
@@ -168,10 +169,10 @@ test('the broken-chain result and the limits line read at 4.5 to 1 in both theme
   for (const theme of ['light', 'dark'] as const) { await setTheme(page, theme); await contrast(page, theme, 'broken chain result') }
 })
 
-// A second Host (playwright.config.ts, port 5191) starts on a vault folder whose master.key holds 10 bytes. Every key call must refuse by name.
+// A second Host (playwright.config.ts, PORTS.badKeyHost) starts on a vault folder whose master.key holds 10 bytes. Every key call must refuse by name.
 test('a Host on a damaged master.key refuses the vault by name, and the page shows the words in both themes', async ({ page }) => {
-  await page.addInitScript(() => { (window as any).netsec = { host: { port: 5191, token: 'badkey-token' } } })
-  await page.goto('/?port=5191&token=badkey-token')
+  await page.addInitScript((port: number) => { (window as any).netsec = { host: { port, token: 'badkey-token' } } }, PORTS.badKeyHost)
+  await page.goto(`/?port=${PORTS.badKeyHost}&token=badkey-token`)
   await expect(page.getByTestId('host-chip')).toContainText(/connected/i)
   await page.getByTestId('security-setup-button').click()
   await page.getByTestId('sec-vault-exercise').click()

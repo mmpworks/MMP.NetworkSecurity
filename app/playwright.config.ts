@@ -4,8 +4,9 @@ import { defineConfig } from '@playwright/test'
 import fs from 'node:fs'
 import os from 'node:os'
 import path from 'node:path'
+import { HOST_ORIGIN_ENV, PORTS } from './e2e/ports'
 
-export const HOST_PORT = 5190
+export const HOST_PORT = PORTS.host
 export const TOKEN = 'lesson0-token'
 const hostDll = process.env.NETSEC_HOST_DLL ?? path.resolve(__dirname, '..', 'src', 'NetSec.Host', 'bin', 'Release', 'net10.0', 'NetSec.Host.dll')
 
@@ -46,7 +47,7 @@ if (!process.env.NETSEC_HOST_DLL) {
   }
 }
 
-// The Host reads its security folder once at start, and every spec on port 5190 shares that Host, so a run has one folder. Without this line the Host
+// The Host reads its security folder once at start, and every spec on the Host port shares that Host, so a run has one folder. Without this line the Host
 // falls back to the tree's .security folder, which holds keys from earlier runs. Workers inherit the value, so the config makes one folder per run.
 process.env.NETSEC_SECURITY_DIR ??= fs.mkdtempSync(path.join(os.tmpdir(), 'ns-e2e-security-'))
 // A name of its own, so NETSEC_HOST_DLL stays as the person set it and start.spec still runs the path fallback in electron/main.cjs.
@@ -60,11 +61,11 @@ export default defineConfig({
   fullyParallel: false,
   retries: 0,
   reporter: [['list']],
-  use: { baseURL: 'http://localhost:4180', viewport: { width: 1440, height: 900 }, trace: 'retain-on-failure' },
+  use: { baseURL: `http://localhost:${PORTS.preview}`, viewport: { width: 1440, height: 900 }, trace: 'retain-on-failure' },
   webServer: [
-    { command: 'npx vite preview --port 4180 --strictPort', port: 4180, reuseExistingServer: false, timeout: 60_000 },
-    { command: `dotnet "${hostDll}"`, port: HOST_PORT, reuseExistingServer: false, timeout: 60_000, env: { NETSEC_PORT: String(HOST_PORT), NETSEC_TOKEN: TOKEN } },
+    { command: `npx vite preview --port ${PORTS.preview} --strictPort`, port: PORTS.preview, reuseExistingServer: false, timeout: 60_000 },
+    { command: `dotnet "${hostDll}"`, port: HOST_PORT, reuseExistingServer: false, timeout: 60_000, env: { NETSEC_PORT: String(HOST_PORT), NETSEC_TOKEN: TOKEN, ...HOST_ORIGIN_ENV } },
     // A second Host on a damaged vault master key, for the VAULT_MASTER_KEY_BAD spec only.
-    { command: 'node e2e/start-bad-key-host.cjs', port: 5191, reuseExistingServer: false, timeout: 60_000, env: { NETSEC_HOST_DLL: hostDll } },
+    { command: 'node e2e/start-bad-key-host.cjs', port: PORTS.badKeyHost, reuseExistingServer: false, timeout: 60_000, env: { NETSEC_HOST_DLL: hostDll, NETSEC_PORT: String(PORTS.badKeyHost), ...HOST_ORIGIN_ENV } },
   ],
 })
