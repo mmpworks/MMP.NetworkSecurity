@@ -59,7 +59,7 @@ public sealed class SshExeCheck(Func<string, string?> env)
 
     /// <summary>
     /// The server is the course's own probe listener (Probe.Listen), on the learner's set. pinKeys give the host key the pin names, and userKey signs
-    /// for the client. Every wait has a limit, so one run ends inside 2 x WaitMs and the whole check ends inside the caller's HTTP limit.
+    /// for the client. Every wait has a limit, so one run ends inside 2 x WaitMs.
     /// </summary>
     static Attempt Run(string ssh, SshSuite suite, CredentialSet server, ITrainingKeySource pinKeys, ITrainingKey userKey, string dir, string name)
     {
