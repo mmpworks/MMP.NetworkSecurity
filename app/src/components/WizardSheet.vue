@@ -1,5 +1,6 @@
 <script setup lang="ts">
 import { computed, onBeforeUnmount, onMounted, reactive, ref, watch } from 'vue'
+import TextWithSpecs from './TextWithSpecs.vue'
 import { FLOWS, backToLesson, chipFor, closeSheet, sec, sendEvent, setMode, typeRow, words } from '../security'
 import TermText from './TermText.vue'
 
@@ -155,7 +156,7 @@ async function toLesson() { await finish(); backToLesson() }
           <div v-if="error" class="wiz-error" data-testid="wizard-error" role="alert">
             <code data-testid="wizard-error-code">{{ error.code }}</code>
             <p data-testid="wizard-error-fix">{{ errorWords }}</p>
-            <p v-if="error.message && error.message !== errorWords" class="muted" data-testid="wizard-error-detail">{{ error.message }}</p>
+            <p v-if="error.message && error.message !== errorWords" class="muted" data-testid="wizard-error-detail"><TextWithSpecs :text="error.message" /></p>
           </div>
         </section>
 

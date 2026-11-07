@@ -491,13 +491,13 @@ Steve's rule: any mention of a named spec on any screen, in any lesson, is a hov
 | Closes on | Esc, or leaving it. A tap elsewhere closes it too |
 | Link | Names one page. A click opens it in the system browser, and the course never loads it inside the app |
 
-**One table, as data: `app/src/specs.json`.** Each row holds `id`, `name`, `aliases`, `title`, `synopsis`, `url`, and `linkText`. A top-level `hosts` list names the hosts a link may use. Jared checks each synopsis and each link. A15 reads the synopses for reading grade, and A15a reads them for accuracy.
+**One table, as data: `app/src/specs.json`.** Each row holds `id`, `name`, `aliases`, `synopsis`, and `source`. `source` names a row in `glossary.json` `sources`, which gives the card its title and its link, so each URL is written once. The hosts a link may use are the list in `app/electron/link-hosts.cjs`, which `e2e/links.spec.ts` holds equal to the hosts of those sources (built in SC; the first draft of this section gave each row its own `url`, `title`, `linkText` and a `hosts` list). Jared checks each synopsis and each link. A15 reads the synopses for reading grade, and A15a reads them for accuracy.
 
 **How it reaches tour text and lesson JSON: the app finds spec names when it renders, so the tour files do not change.**
 
 | Choice | Result |
 |---|---|
-| **Find names at render (chosen).** `specParts(text)` in `tour.ts` splits text on a pattern built from the table's names and aliases, longest first, so `X9.24-3` wins over `X9.24`, as `splitText` splits `{{term:id}}` today | The 12 tour files stay as they are, so no A15a reader re-stamp. A new mention gets its card with no edit. Text the engine sends is covered too |
+| **Find names at render (chosen).** `specParts(text)` in `specs.ts` splits text on a pattern built from the table's names and aliases, longest first, so `X9.24-3` wins over `X9.24`, as `splitText` splits `{{term:id}}` today | The 12 tour files stay as they are, so no A15a reader re-stamp. A new mention gets its card with no edit. Text the engine sends is covered too |
 | A `{{spec:id}}` mark in the tours | Each mention is an edit, the text hash changes, and the reader re-stamps each lesson. An unmarked mention gets no card, and Host messages have no marks |
 
 | Where a spec name can reach the screen | How it gets its card |

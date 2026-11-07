@@ -1,5 +1,6 @@
 <script setup lang="ts">
 import { computed, onBeforeUnmount, onMounted, ref, watch } from 'vue'
+import TextWithSpecs from './components/TextWithSpecs.vue'
 import { Pane, Splitpanes } from 'splitpanes'
 import { vuetify } from './theme'
 import {
@@ -142,7 +143,7 @@ const shortcuts: [string, string][] = [
           <template #append><v-btn size="small" data-testid="error-retry" @click="retryConnect">Retry</v-btn></template>
         </v-alert>
         <v-alert v-else-if="ui.error" type="error" class="banner" closable data-testid="error-banner" @click:close="clearError">
-          <span data-testid="error-code">{{ ui.error.code }}</span>: {{ ui.error.message }}
+          <span data-testid="error-code">{{ ui.error.code }}</span>: <TextWithSpecs :text="ui.error.message" />
           <span class="muted"> retryable: {{ ui.error.retryable ? 'yes' : 'no' }}{{ ui.error.requestId ? ` · request ${ui.error.requestId}` : '' }}</span>
           <template v-if="ui.error.retryable" #append><v-btn size="small" data-testid="error-retry" @click="retryConnect">Retry</v-btn></template>
         </v-alert>

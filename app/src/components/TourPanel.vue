@@ -1,5 +1,6 @@
 <script setup lang="ts">
 import { computed } from 'vue'
+import TextWithSpecs from './TextWithSpecs.vue'
 import { LESSON_NOTES, active, doTryIt, lessonRow, startSession, step, steps, tour, tourBack, tourNext, tourReplay, unlock, ui } from '../store'
 import { splitText } from '../tour'
 import AttackResult from "./AttackResult.vue"
@@ -43,7 +44,7 @@ const tried = computed(() => !!step.value?.tryIt && unlock.value.open)
       <h3>{{ step.title }}</h3>
       <div data-testid="tour-text">
         <p v-for="(segs, i) in paragraphs" :key="i">
-          <template v-for="(s, j) in segs" :key="j"><Term v-if="s.kind === 'term'" :id="s.id" :label="s.text" /><template v-else>{{ s.text }}</template></template>
+          <template v-for="(s, j) in segs" :key="j"><Term v-if="s.kind === 'term'" :id="s.id" :label="s.text" /><TextWithSpecs v-else :text="s.text" /></template>
         </p>
       </div>
       <p v-if="note" class="lesson-note" data-testid="lesson-note">{{ note }}</p>

@@ -1,5 +1,6 @@
 <script setup lang="ts">
 import { ref } from 'vue'
+import TextWithSpecs from './TextWithSpecs.vue'
 import { dismissNeeds, sec, setUpNow, useBuiltinForLesson, words } from '../security'
 
 const confirm = ref(false)
@@ -11,7 +12,7 @@ const count = () => sec.needs?.problems.length ?? 0
   <v-alert v-if="sec.needs" type="warning" class="banner needs" closable data-testid="security-needs-banner" @click:close="dismissNeeds">
     <b>Lesson {{ sec.needs.lesson }} needs {{ count() }} {{ count() === 1 ? 'key' : 'keys' }} that still {{ count() === 1 ? 'needs' : 'need' }} setting up.</b>
     <div v-for="p in sec.needs.problems" :key="p.typeId" class="needs-row" :data-testid="`needs-row-${p.typeId}`">
-      <span>{{ title(p.typeId) }}: <span :data-testid="`needs-code-${p.typeId}`">{{ p.code }}</span>. {{ p.detail }}</span>
+      <span>{{ title(p.typeId) }}: <span :data-testid="`needs-code-${p.typeId}`">{{ p.code }}</span>. <TextWithSpecs :text="p.detail" /></span>
       <v-btn size="small" variant="tonal" :data-testid="`needs-setup-${p.typeId}`" @click="setUpNow(p.typeId)">Set up now</v-btn>
     </div>
     <template #append>
