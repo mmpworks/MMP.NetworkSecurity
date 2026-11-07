@@ -120,6 +120,46 @@ export function registers(events: readonly TraceEvent[], upTo: number): { held: 
   return out
 }
 
+// ---- the Eavesdropper view: what each tab may show ----
+
+/** True when every certificate the engine issued also crossed the wire in the clear, as in TLS 1.1. In TLS 1.3 the certificate travels locked. */
+export function certificatesArePublic(events: readonly TraceEvent[]): boolean {
+  const certs = events.filter(e => e.type === 'ca.certificate.issued' && e.plain)
+  const wire = events.map(e => e.wire).join('|').toLowerCase()
+  return certs.length > 0 && certs.every(e => wire.includes(e.plain.toLowerCase()))
+}
+
+// A listener has every byte of wire.sent, readable where visibleToWire is true and opaque where it is false, plus sizes, order, timing and
+// what can be computed from those alone. It has no keys, no fingerprints, no text under a lock, no check results, and no measure taken inside an endpoint.
+
+/** True when a token's fields cross the wire where a listener can read them. */
+export const tokensArePublic = (events: readonly TraceEvent[]): boolean =>
+  events.some(e => e.wire && e.fields.some(f => /^(?:token|proof)(?:Header|Claims)$/.test(f.name) && f.visibleToWire))
+
+/** Why this tab is closed to a listener, or null when it may show. A tab closes when it holds what only an endpoint knows. */
+export function closedToListener(tab: string, events: readonly TraceEvent[]): string | null {
+  switch (tab) {
+    case 'chain': return certificatesArePublic(events) ? null : 'The certificates travel locked in this lesson, so a listener cannot read them.'
+    case 'token': return tokensArePublic(events) ? null : 'The tokens travel locked in this lesson, so a listener cannot read them.'
+    case 'ladder': return 'Each side makes these keys in its own memory. None of them crosses the wire.'
+    case 'onion': return 'The wrappers open inside the gateway and the bank. A listener sees only the outer bytes.'
+    case 'timing': return 'This lab runs on one machine, so nothing here crosses a wire. It also shows the lab\'s secret, which a listener never sees.'
+    default: return null
+  }
+}
+
+/** What this tab means in the Eavesdropper view, when it stays open. */
+export function listenerLabel(tab: string, events: readonly TraceEvent[]): string | null {
+  switch (tab) {
+    case 'chain': return certificatesArePublic(events) ? 'Public: these certificates cross the wire in the clear, so a listener reads them too.' : null
+    case 'token': return tokensArePublic(events) ? 'Public: these tokens cross the wire in the clear, so a listener can decode the claims.' : null
+    default: return null
+  }
+}
+
+/** True for a measure a listener could take from the wire: repeated blocks in ciphertext, and claims in a token that crosses in the clear. */
+export const listenerCanMeasure = (e: TraceEvent): boolean => /(?:^|;)repeats=/.test(e.detail) || e.message === 'token claims' || e.message === 'proof claims'
+
 // ---- lesson 7: the race ----
 
 export interface RaceStats { messages: number; bytes: number; roundTrips: number | null }

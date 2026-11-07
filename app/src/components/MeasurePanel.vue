@@ -1,18 +1,19 @@
 <script setup lang="ts">
 import { computed } from 'vue'
-import { avalancheOf, parseDetail, percent } from '../lab'
-import { selectedEvent, shownEvents, upToSeq } from '../store'
+import { avalancheOf, listenerCanMeasure, parseDetail, percent } from '../lab'
+import { selectedEvent, shownEvents, ui, upToSeq } from '../store'
 
 // Numbers come from measure.result events and nothing else (ux-design.md: no fake data).
 const upTo = upToSeq
-const measures = computed(() => shownEvents.value.filter(e => e.type === 'measure.result' && e.seq <= upTo.value).map(e => ({ e, d: parseDetail(e.detail), av: e.message.includes('avalanche') ? avalancheOf(e.plain) : null })))
+const eve = computed(() => ui.view === 'eavesdropper')
+const measures = computed(() => shownEvents.value.filter(e => e.type === 'measure.result' && e.seq <= upTo.value && (!eve.value || listenerCanMeasure(e))).map(e => ({ e, d: parseDetail(e.detail), av: e.message.includes('avalanche') ? avalancheOf(e.plain) : null })))
 </script>
 
 <template>
   <div class="measures" data-testid="measure-panel">
-    <div v-if="!measures.length" class="empty-note">Measurements appear here when the lab takes one.</div>
+    <div v-if="!measures.length" class="empty-note" data-testid="measure-none">{{ eve ? 'These numbers come from inside an endpoint, so a listener cannot take them.' : 'Measurements appear here when the lab takes one.' }}</div>
     <div v-for="m in measures" :key="m.e.seq" class="measure-card" :data-testid="`measure-${m.e.message}`">
-      <div class="side-title">{{ m.e.message }}</div>
+      <div class="side-title">{{ eve && m.d.blocks ? 'A locked message' : m.e.message }}</div>
       <template v-if="m.av">
         <div class="avalanche" data-testid="avalanche-grid" role="img" :aria-label="`${m.av.count} of 256 bits changed`">
           <span v-for="(f, i) in m.av.flipped" :key="i" class="abit" :class="{ on: f }" />

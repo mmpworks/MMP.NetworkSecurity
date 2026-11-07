@@ -82,6 +82,7 @@ body { background: var(--bg); color: var(--text); overflow: hidden; }
 
 /* Inspector */
 .inspector, .secrets, .tour { display: flex; flex-direction: column; height: 100%; min-height: 0; }
+.listener-public { padding: 4px 10px; font-size: 12px; }
 .inspector-tools { display: flex; flex-wrap: wrap; align-items: center; gap: 8px; padding: 6px 10px; flex: 0 0 auto; border-bottom: 1px solid var(--line); }
 /* Message bytes: the Before grid over the After grid, the field toggles on the right. */
 .inspector-body { flex: 1 1 auto; min-height: 0; display: flex; }

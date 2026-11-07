@@ -21,7 +21,7 @@ import HostKeyPanel from './components/HostKeyPanel.vue'
 import TokenPanel from './components/TokenPanel.vue'
 import TimingPanel from './components/TimingPanel.vue'
 import OnionPanel from './components/OnionPanel.vue'
-import { isLadderEvent, pictureOf, protocols, raceStats } from './lab'
+import { closedToListener, isLadderEvent, listenerLabel, pictureOf, protocols, raceStats } from './lab'
 import type { TraceEvent } from './types'
 import NeedsBanner from './components/NeedsBanner.vue'
 import SecurityPage from './components/SecurityPage.vue'
@@ -78,6 +78,9 @@ watch(selectedEvent, e => { if (e) { const t = tabFor(e); ui.inspectorTab = hasT
 watch(tabs, () => { if (!hasTab(ui.inspectorTab)) ui.inspectorTab = 'bytes' })
 
 // Lesson 7: when the session holds both TLS 1.1 and TLS 1.3 streams, the diagram splits into a race.
+// The Eavesdropper view closes a tab that holds what only an endpoint knows, and it says so.
+const listenerNote = computed(() => (ui.view === 'eavesdropper' ? closedToListener(ui.inspectorTab, allEvents.value) : null))
+const tabLabel = computed(() => (ui.view === 'eavesdropper' ? listenerLabel(ui.inspectorTab, allEvents.value) : null))
 const raceMode = computed(() => { const p = protocols(shownEvents.value); return p.has('tls11') && p.has('tls13') })
 const raceView = computed(() => (ui.view === 'eavesdropper' ? 'eavesdropper' : 'endpoints') as 'endpoints' | 'eavesdropper')
 const raceUpTo = computed(() => selectedEvent.value?.seq ?? Infinity)
@@ -224,7 +227,9 @@ const shortcuts: [string, string][] = [
                   <div v-if="tabs.length > 1" class="tabs-inline" data-testid="inspector-tabs">
                     <button v-for="t in tabs" :key="t.id" type="button" class="stab" :class="{ on: ui.inspectorTab === t.id }" :data-testid="`inspector-tab-${t.id}`" @click="ui.inspectorTab = t.id">{{ t.label }}</button>
                   </div>
-                  <PicturePanel v-if="ui.inspectorTab === 'picture' && hasTab('picture')" />
+                  <div v-if="tabLabel" class="muted listener-public" data-testid="inspector-public">{{ tabLabel }}</div>
+                  <div v-if="listenerNote" class="empty-note" data-testid="inspector-closed">{{ listenerNote }}</div>
+                  <PicturePanel v-else-if="ui.inspectorTab === 'picture' && hasTab('picture')" />
                   <ChainPanel v-else-if="ui.inspectorTab === 'chain' && hasTab('chain')" />
                   <HostKeyPanel v-else-if="ui.inspectorTab === 'hostkey' && hasTab('hostkey')" />
                   <TokenPanel v-else-if="ui.inspectorTab === 'token' && hasTab('token')" />
