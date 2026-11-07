@@ -474,17 +474,35 @@ public class WizardMachineTests
     [Fact]
     public void A_base_key_file_places_those_bytes_and_a_matching_check_value_is_accepted()
     {
-        foreach (string form in new[] { "ed6429", "ff0bd7", "FF0BD7C455" })
+        foreach ((string form, string name) in new[] { ("ed6429", "AES, 3 bytes"), ("ff0bd7", "CMAC, 3 bytes"), (" FF0BD7C455 ", "CMAC, 5 bytes") })
         {
             using Rig rig = new();
             RunReply reply = PaymentFile(rig, PublishedBdk + "\n", form);
             Assert.Empty(reply.Errors);
             Assert.Equal(PublishedBdk, Convert.ToHexString(rig.Store.PlacedKey(SecurityTypes.DukptBdk)!.CopyMaterial()).ToLowerInvariant());
             Assert.Equal("follows", rig.Store.Entry(SecurityTypes.DukptPad).Binding!.Provider);
+            Assert.Contains(reply.Warnings, w => w.Code == FlowRuns.KcvMatched && w.Message == "The check value matches as " + name + ".");
         }
     }
 
+    /// <summary>The API treats a blank check value as the UI does: no value. The key is placed and no form is named.</summary>
     [Theory]
+    [InlineData("")]
+    [InlineData("   ")]
+    public void A_blank_check_value_is_no_value(string blank)
+    {
+        using Rig rig = new();
+        RunReply reply = PaymentFile(rig, PublishedBdk + "\n", blank);
+        Assert.Empty(reply.Errors);
+        Assert.NotNull(rig.Store.PlacedKey(SecurityTypes.DukptBdk));
+        Assert.DoesNotContain(reply.Warnings, w => w.Code == FlowRuns.KcvMatched);
+    }
+
+    [Theory]
+    [InlineData(PublishedBdk, "ed642", "DUKPT_KCV_FORMAT")]
+    [InlineData(PublishedBdk, "ed64291", "DUKPT_KCV_FORMAT")]
+    [InlineData(PublishedBdk, "zzzzzz", "DUKPT_KCV_FORMAT")]
+    [InlineData(PublishedBdk, "ff0bd7c455aa", "DUKPT_KCV_FORMAT")]
     [InlineData("fedcba9876543210f1f1f1f1f1f1f1", null, "DUKPT_KEY_SIZE")]
     [InlineData("fedcba9876543210f1f1f1f1f1f1f1f1f1f1", null, "DUKPT_KEY_SIZE")]
     [InlineData("not hex at all", null, "KEY_FILE_FORMAT")]

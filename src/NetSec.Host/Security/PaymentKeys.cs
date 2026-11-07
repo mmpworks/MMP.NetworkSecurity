@@ -22,12 +22,20 @@ public static class PaymentKeys
     const string PublishedBaseKey = "fedcba9876543210f1f1f1f1f1f1f1f1", PublishedKeyId = "1234567890123456";
     const string PublishedInitialKey = "1273671ea26ac29afa4d1084127652a1", PublishedPinKey = "af8cb133a78f8dc2d1359f18527593fb";
 
-    /// <summary>Reads a text file holding one test base key as 32 hex characters. A check value, when given, must match it.</summary>
-    public static byte[] ReadBaseKey(string path, string? checkValue)
+    /// <summary>
+    /// Reads a text file holding one test base key as 32 hex characters. A check value, when given, must match it, and matched names the form it
+    /// matched. A blank check value is no value.
+    /// </summary>
+    public static byte[] ReadBaseKey(string path, string? checkValue, out string? matched)
     {
+        matched = null;
+        string? given = string.IsNullOrWhiteSpace(checkValue) ? null : checkValue.Trim().ToLowerInvariant();
+        if (given is not null && (given.Length is not (ShortCheckBytes * 2) and not (LongCheckBytes * 2) || !given.All(Uri.IsHexDigit)))
+            throw new NetSecException(NetSecError.Of(ErrorCodes.DukptKcvFormat, $"A check value is {ShortCheckBytes * 2} or {LongCheckBytes * 2} hex characters. This one is {given.Length} characters."));
         byte[] key = Parse(ReadText(path));
-        if (checkValue is not null && !MatchesCheckValue(key, checkValue))
-            throw new NetSecException(NetSecError.Of(ErrorCodes.DukptKcvMismatch, "The key in this file does not match the check value you gave."));
+        if (given is null) return key;
+        matched = MatchedForm(key, given)
+            ?? throw new NetSecException(NetSecError.Of(ErrorCodes.DukptKcvMismatch, "The key in this file does not match the check value you gave, in any of its 3 forms: AES 3 bytes, CMAC 3 bytes, CMAC 5 bytes."));
         return key;
     }
 
@@ -49,16 +57,23 @@ public static class PaymentKeys
         return key;
     }
 
-    /// <summary>A vendor prints one of 2 forms: AES over a zero block, or CMAC over a zero block. Its first 3 or 5 bytes, as hex.</summary>
-    public static bool MatchesCheckValue(byte[] key, string checkValue)
+    /// <summary>
+    /// The form a vendor's check value takes, or null when it matches none. CMAC over 16 zero bytes, first 3 bytes, is the AES form in a vendor
+    /// source: the AWS Payment Cryptography API Reference, Key data type, KeyCheckValueAlgorithm (vendor source, read 2026-11-07,
+    /// https://docs.aws.amazon.com/payment-cryptography/latest/APIReference/API_Key.html). The X9.24-3 vector PDF defines no check value. AES over a
+    /// zero block, first 3 bytes, is the older form some tools still print, and CMAC first 5 bytes is a longer print of the CMAC form.
+    /// </summary>
+    public static string? MatchedForm(byte[] key, string given)
     {
-        string given = checkValue.Trim().ToLowerInvariant();
         byte[] zeros = new byte[BaseKeyBytes];
         string cmac = Convert.ToHexString(Cmac.Compute(new AesKey(key), zeros)).ToLowerInvariant();
         using Aes aes = Aes.Create();
         aes.Key = key;
         string block = Convert.ToHexString(aes.EncryptEcb(zeros, PaddingMode.None)).ToLowerInvariant();
-        return given == block[..(ShortCheckBytes * 2)] || given == cmac[..(ShortCheckBytes * 2)] || given == cmac[..(LongCheckBytes * 2)];
+        if (given == cmac[..(ShortCheckBytes * 2)]) return "CMAC, 3 bytes";
+        if (given == cmac[..(LongCheckBytes * 2)]) return "CMAC, 5 bytes";
+        if (given == block[..(ShortCheckBytes * 2)]) return "AES, 3 bytes";
+        return null;
     }
 
     public static CheckFact Check(string typeId, byte[] baseKey)
