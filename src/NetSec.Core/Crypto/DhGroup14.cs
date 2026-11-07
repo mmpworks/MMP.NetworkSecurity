@@ -22,6 +22,12 @@ namespace NetSec.Crypto
         static readonly BigUInt Generator = BigUInt.FromUInt32(2);
         static readonly BigUInt Two = BigUInt.FromUInt32(2);
 
+        /// <summary>The prime p of RFC 3526 group 14, as 256 big-endian bytes. Public; the DH walk shows it.</summary>
+        public static byte[] Prime { get { return P.ToBigEndian(Length); } }
+
+        /// <summary>The generator, 2.</summary>
+        public static byte[] GeneratorBytes { get { return Generator.ToBigEndian(); } }
+
         /// <summary>2^x mod p, as 256 big-endian bytes.</summary>
         public static byte[] Public(byte[] x)
         {
