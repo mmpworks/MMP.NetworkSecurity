@@ -83,16 +83,12 @@ public class SshExeCheckTests
     [Fact]
     public void A_run_that_hits_the_limit_leaves_no_child_process()
     {
-        DateTime started = DateTime.Now.AddSeconds(-1);
-        Run("@echo off\r\nping -n 30 127.0.0.1 >nul\r\n", SecurityTypes.SshHostEd25519);
+        // The child is a copy of ping under a name no other process on the machine has, so the count below sees this test's child only.
+        string name = "netsec-child-" + Guid.NewGuid().ToString("N")[..12];
+        string child = Path.Combine(Path.GetTempPath(), name + ".exe");
+        File.Copy(Path.Combine(Environment.SystemDirectory, "PING.EXE"), child);
+        Run($"@echo off\r\n\"{child}\" -n 30 127.0.0.1 >nul\r\n", SecurityTypes.SshHostEd25519);
         System.Threading.Thread.Sleep(500);
-        // Only this class starts ping, and xUnit runs one class's tests in order, so a ping started since this test began is its own.
-        int left = 0;
-        foreach (System.Diagnostics.Process p in System.Diagnostics.Process.GetProcessesByName("PING"))
-        {
-            try { if (p.StartTime >= started) left++; }
-            catch (InvalidOperationException) { }
-        }
-        Assert.Equal(0, left);
+        Assert.Empty(System.Diagnostics.Process.GetProcessesByName(name));
     }
 }

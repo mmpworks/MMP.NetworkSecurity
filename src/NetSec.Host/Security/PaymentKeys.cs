@@ -30,8 +30,11 @@ public static class PaymentKeys
     {
         matched = null;
         string? given = string.IsNullOrWhiteSpace(checkValue) ? null : checkValue.Trim().ToLowerInvariant();
-        if (given is not null && (given.Length is not (ShortCheckBytes * 2) and not (LongCheckBytes * 2) || !given.All(Uri.IsHexDigit)))
-            throw new NetSecException(NetSecError.Of(ErrorCodes.DukptKcvFormat, $"A check value is {ShortCheckBytes * 2} or {LongCheckBytes * 2} hex characters. This one is {given.Length} characters."));
+        string intro = $"A check value is {ShortCheckBytes * 2} or {LongCheckBytes * 2} hex characters.";
+        if (given is not null && given.Length is not (ShortCheckBytes * 2) and not (LongCheckBytes * 2))
+            throw new NetSecException(NetSecError.Of(ErrorCodes.DukptKcvFormat, $"{intro} This one is {given.Length} characters."));
+        if (given is not null && !given.All(Uri.IsHexDigit))
+            throw new NetSecException(NetSecError.Of(ErrorCodes.DukptKcvFormat, $"{intro} It holds a character that is not hex (0-9, a-f)."));
         byte[] key = Parse(ReadText(path));
         if (given is null) return key;
         matched = MatchedForm(key, given)
