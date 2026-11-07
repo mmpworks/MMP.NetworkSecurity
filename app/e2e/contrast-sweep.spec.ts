@@ -1,7 +1,7 @@
 import { expect, test, type Page } from '@playwright/test'
 import { MIN_RATIO, scanPage, setTheme, type ScanFail } from './contrast'
 import { startOwnHost, type OwnHost } from './own-host'
-import { open } from './walk'
+import { open, walkTourUntil } from './walk'
 
 // The class behind the unreadable tooltip: text that fails 4.5 to 1 on its own box. This visits every screen, tooltip, dialog, banner and chip
 // in both themes and tests every visible piece of text. Each visit prints "checked N, failed M". The test fails on any failure.
@@ -51,12 +51,8 @@ for (const theme of ['dark', 'light'] as const) {
     await page.getByRole('button', { name: /start tour/i }).click()
     await expect(page.getByTestId('tour-step-id')).toBeVisible()
     await visit(page, theme, 'lesson 1 tour step 1')
-    for (let i = 0; i < 4; i++) {
-      const next = page.getByTestId('tour-next')
-      if (await next.isDisabled()) { const t = page.getByTestId('tour-try-it-action'); if (await t.isVisible()) await t.click() }
-      await expect(next).toBeEnabled(); await next.click()
-    }
-    await visit(page, theme, 'lesson 1 tour step 5')
+    await walkTourUntil(page, 'the GCM term', () => page.getByTestId('term-gcm').first().isVisible())
+    await visit(page, theme, 'lesson 1 tour step with the GCM term')
     await hoverVisit(page, theme, 'term-gcm')
 
     // Free play on every lesson, with every inspector tab and the attack result.

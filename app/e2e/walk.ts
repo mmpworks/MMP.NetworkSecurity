@@ -20,6 +20,22 @@ export async function open(page: Page, host: HostAddress = { port: PORT, token: 
   await expect(page.getByTestId('host-chip')).toContainText(/connected/i)
 }
 
+/**
+ * Walks the running tour with Next until a step shows what a spec needs, so a tour rewrite cannot leave a spec on the wrong step.
+ * It does each try-it on the way. When no step within the cap shows it, the spec fails in seconds and names what was missing.
+ */
+export async function walkTourUntil(page: Page, what: string, shows: () => Promise<boolean>, hops = 15) {
+  for (let i = 0; i < hops; i++) {
+    if (await shows()) return
+    const next = page.getByTestId('tour-next')
+    if (await next.isDisabled()) { const t = page.getByTestId('tour-try-it-action'); if (await t.isVisible()) await t.click() }
+    await expect(next).toBeEnabled()
+    await next.click()
+    await page.waitForTimeout(300)
+  }
+  if (!(await shows())) throw new Error(`no tour step within ${hops} hops shows ${what}`)
+}
+
 export async function startTour(page: Page, lesson: number) {
   await open(page)
   await page.getByTestId(`lesson-item-${lesson}`).click()
