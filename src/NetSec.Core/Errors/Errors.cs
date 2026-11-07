@@ -95,6 +95,7 @@ namespace NetSec.Errors
         public const string KeyFileFormat = "KEY_FILE_FORMAT";
         public const string KeyFileEncrypted = "KEY_FILE_ENCRYPTED";
         public const string KeySizeNot2048 = "KEY_SIZE_NOT_2048";
+        public const string FileRowNotBuilt = "FILE_ROW_NOT_BUILT";
         public const string KeyAlgorithmNotInEngine = "KEY_ALGORITHM_NOT_IN_ENGINE";
         public const string DukptCounterExhausted = "DUKPT_COUNTER_EXHAUSTED";
         public const string DukptKsnReplay = "DUKPT_KSN_REPLAY";
