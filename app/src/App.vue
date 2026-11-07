@@ -3,10 +3,10 @@ import { computed, onBeforeUnmount, onMounted, ref, watch } from 'vue'
 import { Pane, Splitpanes } from 'splitpanes'
 import { vuetify } from './theme'
 import {
-  CE_LABEL, GLASS_NOTE, TARGET_DEVICES, active, addr, allEvents, cePanel, clearError, connect, hostState, onTheme, pauseEngine, retryConnect, runEngine, selectEvent, selectedEvent,
-  setMode, setTheme, shownEvents, stepEngine, switchSession, tour, tourBack, tourNext, tourReplay, trainingChip, ui,
+  CE_LABEL, active, addr, allEvents, cePanel, clearError, connect, hostState, onTheme, pauseEngine, retryConnect, runEngine, selectEvent, selectedEvent,
+  setMode, shownEvents, stepEngine, switchSession, tour, tourBack, tourNext, tourReplay, ui,
 } from './store'
-import type { ViewMode } from './types'
+import TopBar from './components/TopBar.vue'
 import ByteInspector from './components/ByteInspector.vue'
 import EventLog from './components/EventLog.vue'
 import LessonRail from './components/LessonRail.vue'
@@ -27,14 +27,10 @@ import NeedsBanner from './components/NeedsBanner.vue'
 import SecurityPage from './components/SecurityPage.vue'
 import VaultPage from './components/VaultPage.vue'
 import { closeVault, vault } from './vault'
-import ShowKeysSwitch from './components/ShowKeysSwitch.vue'
 import WizardSheet from './components/WizardSheet.vue'
-import { badgeCount, closeSecurity, keysChip, loadSecurity, openSecurity, sec, words } from './security'
+import { closeSecurity, loadSecurity, sec, words } from './security'
 
 const lightbox = ref(false)
-const mineCountColor = computed(() => (keysChip.value === 'Keys: built-in' ? undefined : 'primary'))
-const hostChip = computed(() => (hostState.value === 'connected' ? 'engine connected' : hostState.value === 'connecting' ? 'engine starting' : 'engine offline'))
-const hostColor = computed(() => (hostState.value === 'connected' ? 'success' : hostState.value === 'connecting' ? 'warning' : 'error'))
 const engineText = computed(() => {
   if (tour.driving) return 'stepping'
   if (ui.engine === 'waiting') { const w = shownEvents.value[shownEvents.value.length - 1]?.waiting; return w ? `waiting for ${w}` : 'waiting' }
@@ -86,10 +82,8 @@ const raceView = computed(() => (ui.view === 'eavesdropper' ? 'eavesdropper' : '
 const raceUpTo = computed(() => selectedEvent.value?.seq ?? Infinity)
 const race = computed(() => ({ left: raceStats(shownEvents.value, raceUpTo.value, 'tls11'), right: raceStats(shownEvents.value, raceUpTo.value, 'tls13') }))
 
-function setView(v: ViewMode) { ui.view = v }
 // The Message bytes pane keeps at least 360 px: a short message with every row and field in view, also under the 50 px Show keys banner. A narrow window stacks the field list under the grids, so it keeps 480 px. The diagram scrolls, so it gives up the height.
 const bytesPanePercent = Math.min(70, Math.max(46, Math.ceil((window.innerWidth < 1400 ? 480 : 360) / Math.max(1, window.innerHeight - 90) * 100)))
-function toggleTransport() { ui.transport = ui.transport === 'os' ? 'glass' : 'os' }
 
 function moveSelection(d: number) {
   const list = shownEvents.value
@@ -133,46 +127,7 @@ const shortcuts: [string, string][] = [
   <v-app>
     <v-main>
       <div class="shell" data-testid="app-root">
-        <header class="topbar">
-          <span class="app-title">Network Security Lab</span>
-          <v-tooltip location="bottom" max-width="340">
-            <template #activator="{ props: p }">
-              <v-chip v-bind="p" :color="trainingChip === 'OS TRANSPORT' ? 'info' : 'warning'" data-testid="training-only-label" tabindex="0">
-                <v-icon start size="14">{{ trainingChip === 'OS TRANSPORT' ? 'mdi-lock-outline' : 'mdi-lock-open-variant-outline' }}</v-icon>{{ trainingChip }}
-              </v-chip>
-            </template>
-            <span v-if="trainingChip === 'TRAINING ONLY'">This engine shows its keys on purpose. Never use it with real secrets. {{ GLASS_NOTE }}</span>
-            <span v-else>The OS handles the keys and this course shows none of them.</span>
-          </v-tooltip>
-          <v-tooltip location="bottom" max-width="340">
-            <template #activator="{ props: p }">
-              <v-chip v-bind="p" :color="mineCountColor" tabindex="0" data-testid="keys-chip" @click="openSecurity">
-                <v-icon start size="14">mdi-key-outline</v-icon>{{ keysChip }}
-              </v-chip>
-            </template>
-            <span>Whose key signs: the course's own, or yours. Click to change.</span>
-          </v-tooltip>
-          <v-chip :color="hostColor" data-testid="host-chip">{{ hostChip }}</v-chip>
-          <v-btn size="small" variant="tonal" prepend-icon="mdi-shield-key-outline" data-testid="security-setup-button" @click="openSecurity">
-            Security setup
-            <v-badge v-if="badgeCount" :content="badgeCount" color="warning" inline data-testid="security-badge" />
-          </v-btn>
-          <label class="target-label" title="Target device"><span class="sr-only">Target device</span>
-            <select v-model="ui.target" class="ns-select" data-testid="target-select"><option v-for="d in TARGET_DEVICES" :key="d.id" :value="d.id" :disabled="!d.enabled">{{ d.label }}</option></select>
-          </label>
-          <v-spacer />
-          <v-btn-toggle :model-value="ui.mode" mandatory density="compact" data-testid="mode-switch" @update:model-value="v => v && setMode(v)">
-            <v-btn value="tour" data-testid="mode-tour">Tour</v-btn><v-btn value="free" data-testid="mode-free">Free play</v-btn>
-          </v-btn-toggle>
-          <v-btn-toggle :model-value="ui.view" mandatory density="compact" data-testid="view-switch" @update:model-value="v => v && setView(v)">
-            <v-btn value="endpoints" data-testid="view-endpoints">Endpoints</v-btn><v-btn value="eavesdropper" data-testid="view-eavesdropper">Eavesdropper</v-btn><v-btn value="both" data-testid="view-both">Both</v-btn>
-          </v-btn-toggle>
-          <ShowKeysSwitch testid="show-keys-switch" />
-          <v-btn :variant="ui.transport === 'os' ? 'flat' : 'tonal'" :color="ui.transport === 'os' ? 'info' : undefined" data-testid="transport-switch" :aria-pressed="ui.transport === 'os'" @click="toggleTransport">OS transport</v-btn>
-          <select v-model.number="ui.speed" class="ns-select" data-testid="speed-select" aria-label="Animation speed"><option :value="0.5">0.5x</option><option :value="1">1x</option><option :value="2">2x</option></select>
-          <select :value="ui.theme" class="ns-select" data-testid="theme-select" aria-label="Theme" @change="e => setTheme((e.target as HTMLSelectElement).value as any)"><option value="system">System</option><option value="light">Light</option><option value="dark">Dark</option></select>
-          <v-btn size="small" icon="mdi-keyboard-outline" aria-label="Keyboard shortcuts" @click="ui.shortcuts = true" />
-        </header>
+        <TopBar />
 
         <v-alert v-if="hostState === 'offline'" type="error" class="banner" data-testid="host-offline">
           The engine is offline (port {{ addr.port }}).
@@ -192,7 +147,12 @@ const shortcuts: [string, string][] = [
 
         <Splitpanes v-show="!sec.open" class="main-split">
           <Pane :size="17" :min-size="11"><LessonRail /></Pane>
-          <Pane :size="50" :min-size="30">
+          <Pane :size="83" :min-size="60">
+            <div class="workspace" data-testid="workspace">
+            <!-- The AES walk mounts here and replaces the panels. Its tips and spec cards go to overlay-layer, outside this clip. -->
+            <section v-if="ui.walkOpen" data-testid="walk-root" class="walk-root" />
+            <Splitpanes v-show="!ui.walkOpen">
+          <Pane :size="60" :min-size="36">
             <Splitpanes horizontal>
               <Pane :size="100 - bytesPanePercent" :min-size="25">
                 <div class="panel">
@@ -242,11 +202,14 @@ const shortcuts: [string, string][] = [
               </Pane>
             </Splitpanes>
           </Pane>
-          <Pane :size="33" :min-size="22">
+          <Pane :size="40" :min-size="26">
             <Splitpanes horizontal>
               <Pane :size="55" :min-size="25"><div class="panel"><EventLog v-if="ui.mode === 'free'" /><TourPanel v-else /></div></Pane>
               <Pane :size="45" :min-size="20"><div class="panel"><SecretsPanel /></div></Pane>
             </Splitpanes>
+          </Pane>
+            </Splitpanes>
+            </div>
           </Pane>
         </Splitpanes>
 
@@ -260,6 +223,7 @@ const shortcuts: [string, string][] = [
           <span class="muted" data-testid="ce-label">CE lab: {{ cePanel?.label ?? CE_LABEL }}</span>
         </footer>
       </div>
+      <div class="overlay-layer" data-testid="overlay-layer" />
 
       <v-dialog v-model="lightbox" fullscreen>
         <div class="lightbox" data-testid="lightbox">

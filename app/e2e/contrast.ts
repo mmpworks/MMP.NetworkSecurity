@@ -40,8 +40,12 @@ export async function contrastOf(el: Locator): Promise<Contrast> {
 
 export const MIN_RATIO = 4.5
 
+// The theme control sits in the Settings menu. A dialog's scrim may cover the top bar, and the theme still has to change under it, so the click goes straight to the button.
 export async function setTheme(page: Page, theme: 'system' | 'light' | 'dark') {
+  const button = page.getByTestId('settings-button')
+  await button.dispatchEvent('click')
   await page.getByTestId('theme-select').selectOption(theme)
+  await button.dispatchEvent('click')
 }
 
 export interface ScanFail { where: string; text: string; ratio: number; fg: string; bg: string }

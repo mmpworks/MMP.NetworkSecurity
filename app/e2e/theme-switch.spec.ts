@@ -1,6 +1,7 @@
 import { expect, test } from '@playwright/test'
 import * as fs from 'node:fs'
 import * as path from 'node:path'
+import { setTheme } from './contrast'
 import { open } from './walk'
 
 // The theme switch: System, Light, Dark. A first run opens in Dark. The choice survives a reload, and System follows the operating system live.
@@ -19,7 +20,7 @@ test('the switch offers System, Light, Dark in that order, and a first run opens
 test('System follows the operating system while the page stays open', async ({ page }) => {
   await page.emulateMedia({ colorScheme: 'dark' })
   await open(page)
-  await page.getByTestId('theme-select').selectOption('system')
+  await setTheme(page, 'system')
   expect(await themeOf(page)).toBe('dark')
   await page.emulateMedia({ colorScheme: 'light' })
   await expect.poll(() => themeOf(page)).toBe('light')
@@ -30,7 +31,7 @@ test('System follows the operating system while the page stays open', async ({ p
 test('Light and Dark ignore the operating system, and the choice survives a reload', async ({ page }) => {
   await page.emulateMedia({ colorScheme: 'dark' })
   await open(page)
-  await page.getByTestId('theme-select').selectOption('light')
+  await setTheme(page, 'light')
   expect(await themeOf(page)).toBe('light')
   await expect(page.locator('.v-theme--nsLight').first()).toBeVisible()
   await page.reload()
@@ -38,12 +39,12 @@ test('Light and Dark ignore the operating system, and the choice survives a relo
   await expect(page.getByTestId('theme-select')).toHaveValue('light')
   expect(await themeOf(page)).toBe('light')
   await page.emulateMedia({ colorScheme: 'light' })
-  await page.getByTestId('theme-select').selectOption('dark')
+  await setTheme(page, 'dark')
   await page.reload()
   await expect(page.getByTestId('host-chip')).toContainText(/connected/i)
   await expect(page.getByTestId('theme-select')).toHaveValue('dark')
   expect(await themeOf(page)).toBe('dark')
-  await page.getByTestId('theme-select').selectOption('system')
+  await setTheme(page, 'system')
   await page.reload()
   await expect(page.getByTestId('theme-select')).toHaveValue('system')
 })
@@ -58,7 +59,7 @@ for (const theme of ['light', 'dark'] as const) {
   test(`the Security setup screen and a tour step in the ${theme} theme`, async ({ page }) => {
     fs.mkdirSync(OUT, { recursive: true })
     await open(page)
-    await page.getByTestId('theme-select').selectOption(theme)
+    await setTheme(page, theme)
     await page.getByTestId('security-setup-button').click()
     await expect(page.getByTestId('sec-page')).toBeVisible()
     await page.waitForTimeout(500)

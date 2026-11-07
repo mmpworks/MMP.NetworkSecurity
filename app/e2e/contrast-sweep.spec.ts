@@ -42,6 +42,8 @@ for (const theme of ['dark', 'light'] as const) {
     await setTheme(page, theme)
     await visit(page, theme, 'start, nothing picked')
     for (const id of ['training-only-label', 'keys-chip', 'show-keys-switch']) await hoverVisit(page, theme, id)
+    await page.getByTestId('settings-button').click()
+    await visit(page, theme, 'settings menu')
     await page.getByRole('button', { name: 'Keyboard shortcuts' }).click()
     await visit(page, theme, 'keyboard shortcuts dialog')
     await page.keyboard.press('Escape')

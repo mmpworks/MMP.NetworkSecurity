@@ -64,6 +64,7 @@ export const ui = reactive({
   error: null as HostError | null,
   engine: 'idle' as 'idle' | 'running' | 'stepping' | 'waiting' | 'finished',
   shortcuts: false,
+  walkOpen: false,
   follow: true,
   inspectorTab: 'bytes' as 'bytes' | 'picture' | 'measures' | 'chain' | 'ladder' | 'hostkey' | 'token' | 'timing' | 'onion',
 })
