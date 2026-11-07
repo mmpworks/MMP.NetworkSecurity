@@ -180,10 +180,24 @@ The attack index needs no engine data: `run-attack` already plays each run, and 
 | P4 Handshake walk | The TLS 1.3 message walk, the key schedule walk, the chain view | RFC 8448 values, lesson 4 and 5 clauses | Takes **W4** (lesson 5 record walk) and the lesson 4 half of **W3** |
 | P5 W1c | Chapter 2 modes, unchanged | W1c's clauses | Unchanged, now inside section 2 |
 | P6 HMAC and chain | `Sha256Walk`, `HmacWalk`, `SealChainWalk` | FIPS 180-4 and RFC 4231 | Takes lesson 2 from **W5** |
-| P7 Diffie-Hellman | `DhWalk`. Its live run in the course is lesson 8's legacy exchange | `pow()` references | Takes the lesson 3 half of **W3** |
+| P7 Diffie-Hellman | `DhWalk`, with paint chips beside the numbers (the requirement under this table). Its live run in the course is lesson 8's legacy exchange | `pow()` references | Takes the lesson 3 half of **W3** |
 | P8 Elliptic curves, engine today | `X25519Walk` and `Ed25519Walk` | RFC 7748, RFC 8032 | New |
 | P8b ECDSA | New Core code: P-256, ECDSA sign and verify with RFC 6979 k, then `EcdsaWalk`. Spike first | RFC 6979 A.2.5 values, and OpenSSL cross-verify both ways | New. The one slice that adds crypto to the engine |
 | P9 Feistel | `DesWalk` | DES known answers | New |
+
+**The Diffie-Hellman walk shows paint chips beside the numbers (Steve, 2026-11-07, through the lead).** Each value has a colour chip, so the colours show the two sides' secrets converging on one shared key. Mock v28's DH tab has it (https://claude.ai/artifact/Gh3NMKk3kbgtyfvk5JZEhT). The colours:
+
+| Value | Chip |
+|---|---|
+| The client's private exponent | red |
+| The server's private exponent | blue |
+| g, the generator | yellow |
+| The client's public value, and "from the client" | orange |
+| The server's public value, and "from the server" | green |
+| The shared secret, on both sides | brown |
+| n, the prime | no chip |
+
+The numbers stay the engine's (R5). The chips are a screen layer on top of `DhWalk`'s values. Nancy builds them in P7.
 
 The kill condition in section 6 covers P0 to P3. P4 onward is a second plan step, which Steve orders after his look.
 

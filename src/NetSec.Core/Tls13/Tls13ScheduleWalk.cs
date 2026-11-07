@@ -78,9 +78,13 @@ namespace NetSec.Tls13
                 new string[] { "ClientHello", "ServerHello", "EncryptedExtensions", "Certificate", "CertificateVerify", "Finished (server)" },
                 Rfc8448Trace.ClientHello, Rfc8448Trace.ServerHello, Rfc8448Trace.EncryptedExtensions, Rfc8448Trace.Certificate,
                 Rfc8448Trace.CertificateVerify, Rfc8448Trace.ServerFinished);
+            // The hash of ClientHello through CertificateVerify is the server Finished's context. It gets no step of its own: RFC 8448 publishes
+            // no value for it, and every step the walk shows must match a published value. The verify_data it feeds is checked.
             byte[] beforeServerFinished = Tls13KeySchedule.HashOf(h, Concat(Rfc8448Trace.ClientHello, Rfc8448Trace.ServerHello,
                 Rfc8448Trace.EncryptedExtensions, Rfc8448Trace.Certificate, Rfc8448Trace.CertificateVerify));
             byte[] sFinishedKey = Expand(steps, h, "s_finished_key", sHs, "finished", HashLength);
+            // Secret shows the Finished key the step before made. Output comes from the real path, VerifyData(traffic secret, ...), which makes
+            // that key again inside. So Secret is a parallel computation, not the value VerifyData received. The RFC values check both.
             Add(steps, new Tls13ScheduleStep { Name = "s_finished_verify_data", Kind = Tls13StepKind.VerifyData, Secret = sFinishedKey,
                 Context = beforeServerFinished, Output = Tls13KeySchedule.VerifyData(h, sHs, beforeServerFinished) });
 
