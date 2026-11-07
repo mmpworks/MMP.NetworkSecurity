@@ -22,9 +22,11 @@ test('[A17.ui.every-attack-row-has-a-button] each attack row the Host lists has 
   const missing: string[] = [];
   let total = 0;
   for (const lesson of withAttacks) {
+    // The drawer belongs to free play (EventLog.vue), as in app/e2e/lesson-0.spec.ts: pick free mode, then start it.
     await page.getByTestId(`lesson-item-${lesson.lesson}`).click();
-    const start = page.getByRole('button', { name: /start tour/i });
-    if (await start.isVisible().catch(() => false)) await start.click();
+    await page.getByTestId('mode-free').click();
+    const freeStart = page.getByTestId('free-start');
+    if (await freeStart.isVisible().catch(() => false)) await freeStart.click();
     await expect(page.getByTestId('attacks-drawer'), `lesson ${lesson.lesson} shows the attacks drawer`).toBeAttached({ timeout: 30_000 });
     for (const a of lesson.attacks) {
       total++;
