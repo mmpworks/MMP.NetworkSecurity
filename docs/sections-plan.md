@@ -159,7 +159,14 @@ So no new walk type in this plan runs on a session's own key: each runs on a pub
 3. The P-256 code is walk-only. No handshake ever offers it (non-goal 5).
 4. It is not constant-time. The walk says so, and links to lesson 11, which teaches timing leaks.
 
-The attack index needs no engine data: `run-attack` already plays each run, and each run's check is already a trace event.
+The attack index needs no engine data: `run-attack` already plays each run, and each run's check is already a trace event. Its content is `app/src/attacks.json` (P3, content half).
+
+**The two-run layout needs no engine change (checked 2026-11-07).**
+1. Lesson 7's race is one session with two protocol streams, split by `protocolOf` in `lab.ts` (`raceStats`). It is not two sessions. So the two-run layout reuses the race's screen shape, and the data pairing is new app code.
+2. An attack is a fork: the Host reruns the whole lesson with the parent's seed and the attack's plan (`Program.cs`, `Attack`), and sends `session.forked` with `parentId`. The parent run stays in the store's `ui.sessions`. So both runs already exist side by side.
+3. Every trace frame carries `streamId` and `streamSeq` (`Trace.cs`, the JSON writer). The two runs pair event by event on that key until the attack changes the run. The app gap: `host.ts` keeps `streamId` and drops `streamSeq`. P3's screen half adds it.
+4. A flip-byte attack changes bytes in one message, so Message bytes diffs the two events with one key. A scenario attack changes the run's options, so its pairs end where the runs part, and the screen marks that point.
+5. One clock for both panes is app code: the race steps one session, and the two-run layout steps two by the paired key.
 
 ## 5. Slices and the work they change
 
