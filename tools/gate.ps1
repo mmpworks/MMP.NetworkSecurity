@@ -79,6 +79,25 @@ switch ($Slice) {
 # ---------------------------------------------------------------- base gate
 Step 'layer_check' { python tools/layer_check.py src/NetSec.Core }
 Step 'secret_guard' { python -I tools/secret_guard.py }
+
+# >>> walk-routes-listed
+# A19.repo.walk-routes-listed went red on main after builder PRs added a walk route with no row in Echo's list (checks/walk_routes.json).
+# The check is fast and needs no build, so the builder's own gate runs it here. Builders do not write acceptance/, so the red sends them to Echo.
+$walkRoutes = @(python -I acceptance/checks/docs_checks.py --root $root --ids A19.repo.walk-routes-listed 2>&1 | ForEach-Object { "$_" } |
+    Where-Object { $_ -like '@@CLAUSE *' } | ForEach-Object { ($_ -replace '^@@CLAUSE ', '') | ConvertFrom-Json }) | Select-Object -First 1
+if ($walkRoutes -and $walkRoutes.status -eq 'NOT RUN') { Skip 'A19.repo.walk-routes-listed' "$($walkRoutes.reason): $($walkRoutes.detail)" }
+else {
+    Step 'A19.repo.walk-routes-listed' {
+        if (-not $walkRoutes) { 'GATE_WALK_ROUTES_NO_RESULT: acceptance/checks/docs_checks.py printed no clause line'; $global:LASTEXITCODE = 1 }
+        elseif ($walkRoutes.status -ne 'PASS') {
+            "FAIL $($walkRoutes.reason): $($walkRoutes.detail)"
+            'Ask Echo for the list row before filing. Builders do not write acceptance/.'
+            $global:LASTEXITCODE = 1
+        }
+        else { $walkRoutes.detail; $global:LASTEXITCODE = 0 }
+    }
+}
+# <<< walk-routes-listed
 Step 'dotnet build src/NetSec.Core' { dotnet build src/NetSec.Core -c Release --nologo -v q }
 Step 'dotnet build src/NetSec.Core.NetCF' { dotnet build src/NetSec.Core.NetCF -c Release --nologo -v q $cf }
 Step 'dotnet test net10.0' { dotnet test tests/NetSec.Tests -c Release -f net10.0 $cf --nologo --logger trx --results-directory "$trx-net10" @hang }
