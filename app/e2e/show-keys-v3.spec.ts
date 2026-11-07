@@ -329,5 +329,5 @@ test('OFF: the binary hover in What each side knows and in Message bytes shows n
   for (let i = 0; i + 8 <= key.length; i += 2) expect(joined.includes(key.slice(i, i + 8)), `4 key bytes from offset ${i / 2} in the tips`).toBe(false)
   await page.mouse.move(5, 300)
   await page.locator('[data-testid^=convergence-grid-] .cell').first().hover()
-  await shot(page, '06-off-binary-hover')
+  await shot(page, '08-off-binary-hover')
 })
