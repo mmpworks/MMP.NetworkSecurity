@@ -1,0 +1,34 @@
+// Checks the spec hover card: opens on hover, stays while the pointer moves onto it, closes after, and works on the panel line.
+const path = require('path');
+const { chromium } = require(path.join(process.argv[2], 'node_modules', 'playwright'));
+const dir = process.argv[3];
+(async () => {
+  const browser = await chromium.launch();
+  const page = await browser.newPage({ viewport: { width: 1280, height: 900 } });
+  const errors = [];
+  page.on('pageerror', e => errors.push(String(e)));
+  await page.goto('file:///' + dir + '/aes-walk-mock.page.html');
+  const shown = () => page.evaluate(() => !document.querySelector('#speccard').hidden);
+  await page.hover('header .spec');
+  console.log('opens on hover:', await shown());
+  console.log('link:', await page.getAttribute('#speccard a', 'href'), '|', await page.textContent('#speccard a'));
+  await page.screenshot({ path: dir + '/look-spec.png', clip: { x: 0, y: 0, width: 800, height: 280 } });
+  await page.hover('#speccard a');
+  await page.waitForTimeout(500);
+  console.log('stays while on the card:', await shown());
+  await page.mouse.move(1000, 800);
+  await page.waitForTimeout(500);
+  console.log('closes after leaving:', !(await shown()));
+  await page.hover('#run-fips .specmark');
+  console.log('opens on the example button:', await shown());
+  await page.mouse.move(1000, 800);
+  await page.waitForTimeout(500);
+  await page.evaluate(() => { cur = firstOfRound(1) + 1; render(); });
+  console.log('ShiftRows panel has spec:', await page.locator('#says .spec').count());
+  await page.hover('#says .spec');
+  console.log('opens on the panel line:', await shown());
+  await page.keyboard.press('Escape');
+  console.log('Esc closes:', !(await shown()));
+  console.log('page errors:', errors.length, errors.slice(0, 3));
+  await browser.close();
+})().catch(e => { console.error(e); process.exit(1); });

@@ -1,0 +1,45 @@
+// Drives the GCM tab: the byte-by-byte stream, pause, the flip, and the phone width.
+const path = require('path');
+const { chromium } = require(path.join(process.argv[2], 'node_modules', 'playwright'));
+const dir = process.argv[3];
+(async () => {
+  const browser = await chromium.launch();
+  const page = await browser.newPage({ viewport: { width: 1280, height: 1300 } });
+  const errors = [];
+  page.on('pageerror', e => errors.push(String(e)));
+  await page.goto('file:///' + dir + '/aes-walk-mock.page.html');
+  await page.click('#tab-gcm');
+  console.log('at rest:', await page.textContent('#gcap b'));
+  await page.click('#gnext');
+  console.log('byte 0:', await page.textContent('#gcap b'), '|', (await page.textContent('#gcap span')).slice(0, 110));
+  const check = await page.evaluate(() => {
+    let ok = 0, total = 0, sent = [];
+    D.gcm.blocks.forEach(b => b.plain.forEach((p, j) => { total++; if ((p ^ b.stream[j]) === b.cipher[j]) ok++; sent.push(b.stream[j] ^ b.cipher[j]); }));
+    return { ok, total, back: String.fromCharCode(...sent) };
+  });
+  console.log('XOR holds:', check.ok, 'of', check.total, '| the receiver XORs back:', check.back);
+  await page.evaluate(() => { speed = 0.3; });
+  await page.click('#gplay');
+  await page.waitForFunction(() => gp.pos >= 18, null, { timeout: 15000 });
+  await page.click('#gplay');
+  await page.waitForTimeout(100);
+  const a = await page.evaluate(() => gp.pos);
+  await page.waitForTimeout(1500);
+  const b = await page.evaluate(() => gp.pos);
+  console.log('paused at byte', a, '| held:', a === b, '| label', await page.textContent('#gplay'));
+  await page.evaluate(() => { speed = 1; renderGcm(); });
+  await page.screenshot({ path: dir + '/look-gcm.png', fullPage: true });
+  await page.click('#gplay');
+  await page.evaluate(() => { speed = 0.05; });
+  await page.waitForFunction(() => gp.pos >= gcmTotal(), null, { timeout: 20000 });
+  console.log('end:', await page.textContent('#gcap b'), '|', await page.textContent('#gcap span'));
+  console.log('tag steps:', await page.locator('#gtable tr').count() - 1);
+  console.log('verdict:', await page.textContent('#gverdict'));
+  await page.click('#gflip');
+  console.log('after flip:', await page.textContent('#gverdict'));
+  console.log('tags differ:', (await page.textContent('#gsent')) !== (await page.textContent('#gcalc')));
+  await page.setViewportSize({ width: 400, height: 900 });
+  console.log('phone scrollWidth:', await page.evaluate(() => document.documentElement.scrollWidth));
+  console.log('page errors:', errors.length, errors.slice(0, 3));
+  await browser.close();
+})().catch(e => { console.error(e); process.exit(1); });

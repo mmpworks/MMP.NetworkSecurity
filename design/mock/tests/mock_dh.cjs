@@ -1,0 +1,54 @@
+// Drives the Diffie-Hellman tab. Checks tables with BigInt, apart from the script's Python.
+const path = require('path');
+const { chromium } = require(path.join(process.argv[2], 'node_modules', 'playwright'));
+const dir = process.argv[3];
+const modpow = (b, e, n) => { let r = 1n, x = BigInt(b) % BigInt(n), k = BigInt(e); const m = BigInt(n); while (k > 0n) { if (k & 1n) r = r * x % m; x = x * x % m; k >>= 1n; } return Number(r); };
+(async () => {
+  const browser = await chromium.launch();
+  const page = await browser.newPage({ viewport: { width: 1280, height: 1200 } });
+  const errors = [];
+  page.on('pageerror', e => errors.push(String(e)));
+  await page.goto('file:///' + dir + '/aes-walk-mock.page.html');
+  await page.click('#tab-dh');
+  const dh = await page.evaluate(() => ({ n: D.dh.n, g: D.dh.g, pow: D.dh.pow, x: D.dh.x25519 }));
+  let powOk = 0, powAll = 0, agree = 0, pairs = 0;
+  for (let b = 0; b < dh.n; b++) for (let e = 1; e < dh.n; e++) { powAll++; if (dh.pow[b][e] === modpow(b, e, dh.n)) powOk++; }
+  for (let a = 1; a < dh.n; a++) for (let b = 1; b < dh.n; b++) { pairs++; if (dh.pow[dh.pow[dh.g][a]][b] === dh.pow[dh.pow[dh.g][b]][a]) agree++; }
+  console.log('table holds:', powOk, 'of', powAll, '| both sides agree:', agree, 'of', pairs, 'pairs');
+  await page.evaluate(() => { speed = 0.1; });
+  await page.click('#dplay');
+  await page.waitForFunction(() => dv.p >= 3, null, { timeout: 15000 });
+  await page.click('#dplay');
+  await page.waitForTimeout(100);
+  const a = await page.evaluate(() => dv.p);
+  await page.waitForTimeout(800);
+  console.log('paused at', a, '| held:', a === await page.evaluate(() => dv.p), '| label', await page.textContent('#dplay'), '| chain:', (await page.textContent('#dchain')).slice(0, 40));
+  console.log('server private hidden before step 2?', await page.evaluate(() => { dv.p = 1; renderDh(); return document.querySelector('#dserver .dhnum').textContent; }));
+  await page.evaluate(() => { dStop(); dv.p = 5; renderDh(); });
+  await page.screenshot({ path: dir + '/look-dh.png', fullPage: true });
+  await page.click('#dall');
+  await page.click('#dmix');
+  console.log('mix:', await page.textContent('#dlisten'));
+  await page.click('#dtry');
+  await page.waitForFunction(() => document.querySelector('#dlisten').className.includes('bad'), null, { timeout: 15000 });
+  console.log('try:', await page.textContent('#dlisten'));
+  await page.selectOption('#da', '2');
+  await page.selectOption('#db', '2');
+  console.log('after change, cap:', await page.textContent('#dcap b'), '| listen cleared:', (await page.textContent('#dlisten')) === '');
+  await page.click('#dmix');
+  console.log('chance pair:', await page.textContent('#dlisten'));
+  await page.selectOption('#da', '6');
+  await page.selectOption('#db', '15');
+  await page.click('#dmidbtn');
+  const mid = await page.evaluate(() => [...document.querySelectorAll('#dmid .dhsecret')].map(e => e.textContent));
+  console.log('middle secrets [client, m-client, m-server, server]:', mid.join(' '), '| pairs match:', mid[0] === mid[1] && mid[2] === mid[3]);
+  await page.hover('#dmid .spec');
+  console.log('spec in middle card:', await page.getAttribute('#speccard a', 'href'));
+  console.log('private choices:', await page.evaluate(() => [document.querySelector('#da').options[0].value, document.querySelector('#da').options[document.querySelector('#da').options.length - 1].value].join(' to ')));
+  console.log('real rows:', await page.evaluate(() => document.querySelectorAll('#dreal .seal-row').length), '| secret', dh.x.s.slice(0, 16));
+  await page.screenshot({ path: dir + '/look-dh-mid.png', fullPage: true });
+  await page.setViewportSize({ width: 400, height: 900 });
+  console.log('phone scrollWidth:', await page.evaluate(() => document.documentElement.scrollWidth));
+  console.log('page errors:', errors.length, errors.slice(0, 3));
+  await browser.close();
+})().catch(e => { console.error(e); process.exit(1); });
