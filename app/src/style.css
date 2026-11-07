@@ -387,10 +387,6 @@ body { overflow: hidden; }
 .gl-row.flash, .gl-term.flash { outline: 3px solid var(--accent); outline-offset: -3px; }
 .term-more { margin-top: 4px; font-size: 12px; opacity: .8; }
 @media (max-width: 900px) { .gl-compare { grid-template-columns: minmax(0, 1fr); } }
-/* A field name never breaks inside the word. In a narrow field list the byte range takes its own line under the name. */
-@container (max-width: 250px) { .field-row > .muted { grid-column: 1 / -1; } }
-/* A small button keeps room for its label, so the label is never cut. */
-.v-btn--size-x-small:not(.v-btn--icon) { height: 24px !important; }
 /* A field name never breaks inside the word: it has the first line to itself, and the byte range sits at the end of the value line. A row keeps 3 lines. */
 .field-row > .muted { order: 3; grid-column: 2; white-space: nowrap; }
 /* The toolbar buttons keep room for their label, so the label is never cut. */
