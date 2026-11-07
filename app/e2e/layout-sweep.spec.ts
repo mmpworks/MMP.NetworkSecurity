@@ -53,7 +53,8 @@ const scan = (page: Page) => page.evaluate((freeText: string) => {
     if (svg && svg.getBoundingClientRect().width < sc.clientWidth - 2) faults.push({ kind: 'diagram short', where: name(sc.closest('[data-testid]') ?? sc), text: `${Math.round(svg.getBoundingClientRect().width)} of ${sc.clientWidth}` })
   }
   // 5. A button never cuts its label.
-  for (const b of root.querySelectorAll('.v-btn')) { const r = b.getBoundingClientRect(); if (r.width > 0 && b.scrollHeight > b.clientHeight + 1) faults.push({ kind: 'label cut', where: name(b), text: (b.textContent ?? '').trim().slice(0, 30) }) }
+  // Height and width: a label can be cut at the bottom or at the side.
+  for (const b of root.querySelectorAll('.v-btn')) { const r = b.getBoundingClientRect(); if (r.width > 0 && (b.scrollHeight > b.clientHeight + 1 || b.scrollWidth > b.clientWidth + 1)) faults.push({ kind: 'label cut', where: name(b), text: (b.textContent ?? '').trim().slice(0, 30) }) }
   // 6. A key card keeps its size and its buttons on one line.
   for (const row of root.querySelectorAll('.secret-row')) {
     const tops = [...row.querySelectorAll(':scope > .muted, :scope > .v-btn')].map(e => Math.round(e.getBoundingClientRect().top + e.getBoundingClientRect().height / 2))
