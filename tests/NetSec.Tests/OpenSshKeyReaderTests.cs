@@ -313,5 +313,23 @@ namespace NetSec.Tests
             System.IO.File.WriteAllBytes(Path.Combine(big, "host.key"), new byte[65 * 1024]);
             Assert.Equal(ErrorCodes.KeyFileFormat, Assert.Throws<NetSecException>(() => CredentialSet.FromFiles(big)).Error.Code);
         }
+
+        /// <summary>The key type comes from the file. A long or unprintable one must not reach the message, so the message says an unknown type.</summary>
+        [Fact]
+        public void A_long_or_unprintable_key_type_is_not_printed()
+        {
+            string bad = "ssh-x" + new string('A', 200) + "\u001b[2J";
+            byte[] pub = Ed25519.PublicFrom(Seed());
+            byte[] blob = new Raw().Text(bad).Bytes(pub).ToArray();
+            byte[] section = new Raw().U32(7).U32(7).Text(bad).Bytes(pub).Text("c").Pad(8).ToArray();
+            NetSecException e = Assert.Throws<NetSecException>(() => OpenSshKeyReader.Parse(Armor(File(blob, section)), KeyIds.SshClient, Ed));
+            Assert.DoesNotContain("\u001b", e.Error.Message);
+            Assert.DoesNotContain(new string('A', 40), e.Error.Message);
+            Assert.Contains("an unknown type", e.Error.Message);
+            byte[] otherBlob = new Raw().Text(Ed).Bytes(pub).ToArray();
+            NetSecException mismatch = Assert.Throws<NetSecException>(() => OpenSshKeyReader.Parse(Armor(File(otherBlob, section)), KeyIds.SshClient, Ed));
+            Assert.DoesNotContain("\u001b", mismatch.Error.Message);
+            Assert.Contains("an unknown type", mismatch.Error.Message);
+        }
     }
 }
