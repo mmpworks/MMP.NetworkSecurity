@@ -776,6 +776,8 @@ Lesson 6 also gains a line for all modes: a real HSM shows only a key id and a c
 
 ### 9.1 Slices
 
+**Owner of V4's file path, V5, V6, and V7: Richard, by the lead, 2026-11-06.** Build order, re-ranked by reading the code: V7, V6, V5, then V4's file path, which adds no type to the count of 15. Steve chose these before W1b.
+
 Each slice is vertical and merges to a running `main`. Builders never write `acceptance/`. Agents use canary test keys only.
 
 | Slice | Delivers | Closes on |
@@ -797,7 +799,9 @@ Each slice is vertical and merges to a running `main`. Builders never write `acc
 2. Lesson 11's six event types: `timing.lab.started`, `timing.samples`, `timing.managed`, `timing.verdict`, `timing.guess.finished`, and `timing.failed`. They hold `Stopwatch` samples (`Timing.cs:94`), native tick counts, and results that follow them. That leaves lesson 11 nothing to compare, so **the golden covers 11 labs, and lesson 11 is out by these names.** Clause A12 still judges it.
 3. The Host's `<sessionId>/keys` stream, which does not exist in the golden.
 
-**Kill condition.** The work ends when a cold reader runs lesson 10 on their own test keys from a fresh clone, an `acceptance/` referee confirms it, and the count is N of 259, or at **2026-11-12 17:00 local**, whichever comes first. The product's `Verified` never counts. The report states N of 259, and names each clause not met. **The reader's run happens at V8, after all 15 types land, because Steve wants every mode (lead, 2026-11-05).** Lesson 10 is whole at V4, and that does not end the work. If the date comes first, the reader runs on what exists.
+**Kill condition.** The work ends when a cold reader runs lesson 10 on their own test keys from a fresh clone, an `acceptance/` referee confirms it, and the count is N of 259, or at **2026-11-12 17:00 local**, whichever comes first. The product's `Verified` never counts. The report states N of 259, and names each clause not met.
+
+**Every report on these slices gives 2 numbers: N of 15 types take own keys, and own certificate files, yes or no.** "Done" is both: 15 of 15 and yes. The count of 15 alone never means every mode is done, because V4's file path adds no type to it. (Lead, 2026-11-06.) The date applies to 15 of 15, by Steve's choice of slices. **The reader's run happens at V8, after all 15 types land, because Steve wants every mode (lead, 2026-11-05).** Lesson 10 is whole at V4, and that does not end the work. If the date comes first, the reader runs on what exists.
 
 **Complexity hotspots, named now.**
 

@@ -126,6 +126,55 @@ namespace NetSec.Tests
             Assert.True(hits.Length == 0, "lesson " + lesson + " on own keys shows these built-in keys: " + string.Join(", ", hits));
         }
 
+        sealed class BytesKey : ITrainingKey
+        {
+            readonly byte[] _key;
+            public BytesKey(byte[] key) { _key = key; }
+            public string KeyId { get { return "bytes"; } }
+            public KeyAlgorithm Algorithm { get { return KeyAlgorithm.Raw; } }
+            public byte[] CopyMaterial() { return (byte[])_key.Clone(); }
+            public byte[] CopyPublic() { return new byte[0]; }
+        }
+
+        static LabContext LessonContext(ITrainingKey own, string typeId)
+        {
+            Credential[] mine = own == null ? new Credential[0] : new[] { Own(typeId, own) };
+            return new LabContext { Seed = 7, Random = new SeededRandom(7), Credentials = new CredentialSet(Training, mine) };
+        }
+
+        [Fact]
+        public void A_lesson_key_is_drawn_when_the_learner_has_none_and_the_learners_when_they_do()
+        {
+            byte[] own = new byte[LabCredentials.LessonKeyBytes];
+            own[0] = 9;
+            byte[] seeded = new byte[LabCredentials.LessonKeyBytes];
+            new SeededRandom(7).Fill(seeded, 0, seeded.Length);
+            Assert.Equal(seeded, LabCredentials.LessonKey(LessonContext(null, SecurityTypes.LabAesKey), SecurityTypes.LabAesKey));
+            Assert.Equal(own, LabCredentials.LessonKey(LessonContext(new BytesKey(own), SecurityTypes.LabAesKey), SecurityTypes.LabAesKey));
+        }
+
+        /// <summary>The rest of a run reads the same random bytes on own keys, so its nonces and IVs stay comparable.</summary>
+        [Fact]
+        public void A_lesson_key_draws_even_when_the_learner_has_one()
+        {
+            LabContext builtIn = LessonContext(null, SecurityTypes.LabSealKey);
+            LabContext own = LessonContext(new BytesKey(new byte[LabCredentials.LessonKeyBytes]), SecurityTypes.LabSealKey);
+            LabCredentials.LessonKey(builtIn, SecurityTypes.LabSealKey);
+            LabCredentials.LessonKey(own, SecurityTypes.LabSealKey);
+            byte[] next = new byte[8], nextOwn = new byte[8];
+            builtIn.Random.Fill(next, 0, next.Length);
+            own.Random.Fill(nextOwn, 0, nextOwn.Length);
+            Assert.Equal(next, nextOwn);
+        }
+
+        [Fact]
+        public void A_lesson_key_of_another_length_is_refused_by_name()
+        {
+            LabContext c = LessonContext(new BytesKey(new byte[24]), SecurityTypes.LabAesKey);
+            NetSec.Errors.NetSecException e = Assert.Throws<NetSec.Errors.NetSecException>(() => LabCredentials.LessonKey(c, SecurityTypes.LabAesKey));
+            Assert.Equal(NetSec.Errors.ErrorCodes.SecurityTypeNotReady, e.Error.Code);
+        }
+
         [Fact]
         public void The_scan_sees_a_built_in_key_when_one_is_there()
         {
