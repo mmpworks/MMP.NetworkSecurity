@@ -1,13 +1,11 @@
 using System.Diagnostics;
 using System.Net;
-using MMP.AsyncProxy;
+using System.Net.Sockets;
 using NetSec.Io;
 using NetSec.Keys;
-using NetSec.Machine;
 using NetSec.Pki;
 using NetSec.Platform;
 using NetSec.Ssh;
-using NetSec.Trace;
 
 namespace NetSec.Host.Security;
 
@@ -22,7 +20,7 @@ public sealed class SshExeCheck(Func<string, string?> env)
     const string Pinned = @"C:\Windows\System32\OpenSSH\ssh.exe", Host = "127.0.0.1", Hello = "hello";
     const string Modern = "-o KexAlgorithms=curve25519-sha256 -o Ciphers=aes128-ctr -o MACs=hmac-sha2-256 -o HostKeyAlgorithms=ssh-ed25519";
     const string Legacy = "-o KexAlgorithms=diffie-hellman-group14-sha1 -o Ciphers=aes128-cbc -o MACs=hmac-sha1 -o HostKeyAlgorithms=ssh-rsa";
-    const int WaitMs = 30_000;
+    const int WaitMs = 20_000;
 
     // What ssh.exe prints when it refuses each control. Any other failure proves nothing about the key.
     const string HostKeyRefused = "REMOTE HOST IDENTIFICATION HAS CHANGED", UserKeyRefused = "Permission denied (publickey)";
@@ -59,52 +57,53 @@ public sealed class SshExeCheck(Func<string, string?> env)
 
     sealed record Attempt(int Code, string Output, string Shown);
 
-    /// <summary>serverKeys hold the host key the server shows. pinKeys give the host key the pin names. userKey signs for the client.</summary>
-    static Attempt Run(string ssh, SshSuite suite, ITrainingKeySource serverKeys, ITrainingKeySource pinKeys, ITrainingKey userKey, string dir, string name)
+    /// <summary>
+    /// The server is the course's own probe listener (Probe.Listen), on the learner's set. pinKeys give the host key the pin names, and userKey signs
+    /// for the client. Every wait has a limit, so one run ends inside 2 x WaitMs and the whole check ends inside the caller's HTTP limit.
+    /// </summary>
+    static Attempt Run(string ssh, SshSuite suite, CredentialSet server, ITrainingKeySource pinKeys, ITrainingKey userKey, string dir, string name)
     {
         string userFile = Path.Combine(dir, name + ".key"), pinFile = Path.Combine(dir, name + "-known_hosts");
         File.WriteAllText(userFile, OpenSshFile.Ed25519Private(userKey, "learner"));
         try
         {
             if (!ToOneReader(userFile)) return new Attempt(OpenSslTool.CouldNotStart, "icacls could not limit the key file to one reader", "icacls");
-            LinkListener socket = new(new IPEndPoint(IPAddress.Loopback, 0));
-            int port = socket.Port;
-            File.WriteAllText(pinFile, SshSetup.KnownHostLine(pinKeys, suite, Host, port));
-            IFuture<SocketLink> accepted = socket.Accept();
+            ProbeListener listener = Probe.Listen(new ProbeRequest { Protocol = WireProtocol.Ssh, Host = Host, SshSuite = suite, Credentials = server });
+            File.WriteAllText(pinFile, SshSetup.KnownHostLine(pinKeys, suite, Host, listener.Port));
             string flags = suite == SshSuite.Legacy ? Legacy : Modern;
-            string tail = $" -i \"{{0}}\" -p {port} {SshSetup.DefaultUser}@{Host} echo {Hello}";
-            string head = $"-F NUL -o BatchMode=yes -o StrictHostKeyChecking=yes -o UserKnownHostsFile=\"{pinFile}\" -o ConnectTimeout=20 {flags}";
+            string tail = $" -i \"{{0}}\" -p {listener.Port} {SshSetup.DefaultUser}@{Host} echo {Hello}";
+            // -n: ssh.exe reads no stdin. Without it, ssh.exe inherits the Host's stdin, a pipe from whoever started the Host, and a run could wait on it.
+            string head = $"-n -F NUL -o BatchMode=yes -o StrictHostKeyChecking=yes -o UserKnownHostsFile=\"{pinFile}\" -o ConnectTimeout=10 {flags}";
             string shown = "ssh.exe " + head.Replace(dir + Path.DirectorySeparatorChar, "") + string.Format(tail, name + ".key");
-            using Process? process = TryStart(new ProcessStartInfo(ssh, head + string.Format(tail, userFile)) { WorkingDirectory = dir, RedirectStandardOutput = true, RedirectStandardError = true, UseShellExecute = false, CreateNoWindow = true });
-            if (process is null)
-            {
-                socket.Close();
-                return new Attempt(OpenSslTool.CouldNotStart, "ssh.exe could not start", shown);
-            }
-            GlassSshSession? server = null;
-            if (accepted.Wait(WaitMs))
-            {
-                SshServerOptions options = SshSetup.Server(serverKeys, suite, new OsRandom(), null);
-                server = new GlassSshSession(SshEngine.Server(options, new TraceStream("check", "check", "check", null, "server", new MonotonicClock()), null, "client"),
-                    accepted.Result, new ListSink(), new FreeRunGate(), null, WaitMs, null, null);
-                server.Run();
-            }
-            socket.Close();
-            Task<string> errors = process.StandardError.ReadToEndAsync();
-            string output = process.StandardOutput.ReadToEnd();
-            if (!process.WaitForExit(WaitMs))
-            {
-                process.Kill();
-                return new Attempt(OpenSslTool.TimedOut, "ssh.exe did not finish in 30 s", shown);
-            }
-            server?.Finished.Wait(WaitMs);
-            return new Attempt(process.ExitCode, (output + errors.Result).Trim(), shown);
+            Attempt done = RunSsh(ssh, head + string.Format(tail, userFile), dir, shown);
+            if (!listener.Result.Wait(WaitMs)) EndListener(listener.Port);
+            return done;
         }
         finally
         {
             // A copy of the learner's private key leaves the store only for this run.
             File.Delete(userFile);
         }
+    }
+
+    static Attempt RunSsh(string ssh, string arguments, string dir, string shown)
+    {
+        using Process? process = TryStart(new ProcessStartInfo(ssh, arguments) { WorkingDirectory = dir, RedirectStandardOutput = true, RedirectStandardError = true, UseShellExecute = false, CreateNoWindow = true });
+        if (process is null) return new Attempt(OpenSslTool.CouldNotStart, "ssh.exe could not start", shown);
+        Task<string> output = process.StandardOutput.ReadToEndAsync(), errors = process.StandardError.ReadToEndAsync();
+        if (!process.WaitForExit(WaitMs))
+        {
+            process.Kill();
+            return new Attempt(OpenSslTool.TimedOut, "ssh.exe did not finish in 30 s", shown);
+        }
+        return new Attempt(process.ExitCode, (output.Result + errors.Result).Trim(), shown);
+    }
+
+    /// <summary>A listener whose client never came waits for ever. One connection that closes at once ends it.</summary>
+    static void EndListener(int port)
+    {
+        try { using TcpClient poke = new(); poke.Connect(IPAddress.Loopback, port); }
+        catch (SocketException) { }
     }
 
     static bool ToOneReader(string file)
