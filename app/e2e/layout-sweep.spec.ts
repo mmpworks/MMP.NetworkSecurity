@@ -59,26 +59,35 @@ const scan = (page: Page) => page.evaluate((freeText: string) => {
     if (tops.length > 1 && Math.max(...tops) - Math.min(...tops) > 4) faults.push({ kind: 'card line split', where: name(row), text: '' })
   }
   // 4. A field name shows whole.
-  for (const f of root.querySelectorAll('.field-row .fname')) if (f.scrollWidth > f.clientWidth + 1) faults.push({ kind: 'name cut', where: name(f.closest('[data-testid]') ?? f), text: (f.textContent ?? '').trim() })
+  for (const f of root.querySelectorAll('.field-row .fname, .secret-row > .sname')) if (f.scrollWidth > f.clientWidth + 1) faults.push({ kind: 'name cut', where: name(f.closest('[data-testid]') ?? f), text: (f.textContent ?? '').trim() })
   return faults
 }, FREE_TEXT)
 
 const unique = (list: Fault[]) => [...new Map(list.map(f => [`${f.kind}|${f.where}|${f.text}`, f])).values()].map(f => `${f.kind}: ${f.where} "${f.text}"`)
 
+// Each lesson with the message it picks: lesson 3 for the longest field names, 1 for the first bytes a learner sees, 5 for the certificate chain, 10 for the token panel.
+const LESSONS: [number, RegExp | null][] = [[3, /MlKemCiphertext/i], [1, /TextGcm1/], [5, null], [10, null]]
+
 for (const size of SIZES) {
-  test(`at ${size.width} x ${size.height}, lesson 3 in all 3 views: no broken word, nothing sticks out, the diagrams fill their panes`, async ({ page }) => {
-    test.setTimeout(120_000)
+  test(`at ${size.width} x ${size.height}, lessons 3, 1, 5 and 10 in all 3 views: no broken word, nothing sticks out, the diagrams fill their panes`, async ({ page }) => {
+    test.setTimeout(240_000)
     await page.setViewportSize(size)
-    await runFreePlay(page, 3)
-    await page.locator('[data-testid^=diagram-message-]', { hasText: /MlKemCiphertext/i }).first().click()
-    const tab = page.getByTestId('inspector-tab-bytes')
-    if (await tab.count()) await tab.click()
     const all: string[] = []
-    for (const view of VIEWS) {
-      await page.getByTestId(`view-${view}`).click()
-      await page.waitForTimeout(700)
-      all.push(...unique(await scan(page)).map(f => `${view}: ${f}`))
+    for (const [lesson, message] of LESSONS) {
+      await runFreePlay(page, lesson)
+      if (message) await page.locator('[data-testid^=diagram-message-]', { hasText: message }).first().click()
+      for (const view of VIEWS) {
+        await page.getByTestId(`view-${view}`).click()
+        await page.waitForTimeout(700)
+        // Every tab that this lesson shows, in this view.
+        const tabs = await page.locator('[data-testid^=inspector-tab-]').evaluateAll(list => list.map(t => t.getAttribute('data-testid')!))
+        for (const tab of tabs.length ? tabs : ['']) {
+          if (tab) { await page.getByTestId(tab).click(); await page.waitForTimeout(300) }
+          all.push(...unique(await scan(page)).map(f => `lesson ${lesson}, ${view}${tab ? ', ' + tab.replace('inspector-tab-', '') : ''}: ${f}`))
+        }
+      }
+      await page.getByTestId('view-endpoints').click()
     }
-    expect(all, `layout faults at ${size.width} x ${size.height}`).toEqual([])
+    expect([...new Set(all)], `layout faults at ${size.width} x ${size.height}`).toEqual([])
   })
 }

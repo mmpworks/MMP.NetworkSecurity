@@ -1,5 +1,5 @@
 <script setup lang="ts">
-import { computed, nextTick, ref, watch } from 'vue'
+import { computed, nextTick, onBeforeUnmount, onMounted, ref, watch } from 'vue'
 import { HEAD_H, ROW_H, layoutDiagram, protocolOf } from '../layout'
 import { isHighlighted, lessonRow, replayTick, selectEvent, selectedEvent, shownEvents, ui } from '../store'
 import type { ViewMode } from '../types'
@@ -12,6 +12,12 @@ const events = computed(() => (props.protocol ? shownEvents.value.filter(e => pr
 const layout = computed(() => layoutDiagram(events.value, lessonRow.value?.lanes ?? [], props.view))
 const zoom = ref(1)
 const box = ref<HTMLElement | null>(null)
+// The drawing is at least as wide as its pane. The lanes keep their places, and the lane band and the row highlight run the full width.
+const boxW = ref(0)
+let sizer: ResizeObserver | null = null
+onMounted(() => { if (!box.value || typeof ResizeObserver !== 'function') return; sizer = new ResizeObserver(() => { boxW.value = box.value?.clientWidth ?? 0 }); sizer.observe(box.value) })
+onBeforeUnmount(() => sizer?.disconnect())
+const viewW = computed(() => Math.max(layout.value.width, boxW.value / zoom.value))
 const reduced = typeof matchMedia === 'function' && matchMedia('(prefers-reduced-motion: reduce)').matches
 
 const clamp = (z: number) => Math.min(4, Math.max(0.25, z))
@@ -85,7 +91,7 @@ const pulse = computed(() => replayTick.value)
       <span v-if="view === 'eavesdropper'" class="eve-count" data-testid="eve-count">The eavesdropper read {{ layout.learned }} of {{ layout.total }} messages</span>
     </div>
     <div ref="box" class="diagram-scroll" @wheel="onWheel" @scroll="onScroll">
-      <svg :width="layout.width * zoom" :height="layout.height * zoom" :viewBox="`0 0 ${layout.width} ${layout.height}`" xmlns="http://www.w3.org/2000/svg">
+      <svg :width="viewW * zoom" :height="layout.height * zoom" :viewBox="`0 0 ${viewW} ${layout.height}`" xmlns="http://www.w3.org/2000/svg">
         <defs>
           <pattern id="hatch" width="6" height="6" patternUnits="userSpaceOnUse" patternTransform="rotate(45)"><line x1="0" y1="0" x2="0" y2="6" class="hatch-line" /></pattern>
           <marker id="arr" viewBox="0 0 10 10" refX="9" refY="5" markerWidth="7" markerHeight="7" orient="auto-start-reverse"><path d="M0,0 L10,5 L0,10 z" fill="context-stroke" /></marker>
@@ -93,11 +99,11 @@ const pulse = computed(() => replayTick.value)
         <line v-for="l in layout.lanes" :key="l.name" :x1="l.x" :x2="l.x" :y1="HEAD_H" :y2="layout.height" class="lane-line" />
         <circle v-if="waitingLane" :cx="waitingLane.x" :cy="HEAD_H + 12" r="9" class="wait-ring" data-testid="engine-waiting-ring" />
         <g v-for="r in layout.rows.filter(x => x.kind === 'divider')" :key="r.seq" class="divider-row">
-          <line :x1="20" :x2="layout.width - 20" :y1="r.y" :y2="r.y" class="divider-line" />
+          <line :x1="20" :x2="viewW - 20" :y1="r.y" :y2="r.y" class="divider-line" />
           <text :x="layout.width / 2" :y="r.y - 6" text-anchor="middle" class="divider-text" data-testid="round-divider">{{ r.label }}</text>
         </g>
         <g v-for="r in layout.rows.filter(x => x.kind !== 'divider')" :key="r.seq" class="row" :class="{ sel: selectedEvent?.seq === r.seq, hl: isHighlighted('diagram', 'message', r.label) }" :data-testid="`diagram-message-${r.seq}`" @click="selectEvent(r.seq)">
-          <rect x="0" :y="r.y - ROW_H / 2 + 6" :width="layout.width" :height="ROW_H - 8" class="row-band" />
+          <rect x="0" :y="r.y - ROW_H / 2 + 6" :width="viewW" :height="ROW_H - 8" class="row-band" />
           <template v-if="r.kind === 'arrow'">
             <line :x1="r.fromX" :x2="arrowEnd(r)" :y1="r.y" :y2="r.y" class="arrow" :class="r.protectedBytes ? 'enc' : 'readable'" marker-end="url(#arr)" />
             <text :x="mid(r)" :y="r.y - 9" text-anchor="middle" class="arrow-label" :class="{ unreadable: r.unreadable }">{{ r.label }}</text>
@@ -124,7 +130,7 @@ const pulse = computed(() => replayTick.value)
         </g>
         <!-- Lane names ride the top edge of the scroll box, so a long run never hides who sends what. Drawn last, so they sit on top. -->
         <g class="lane-heads" :transform="`translate(0, ${headTop})`">
-          <rect x="0" y="0" :width="layout.width" :height="HEAD_H - 4" class="lane-band" />
+          <rect x="0" y="0" :width="viewW" :height="HEAD_H - 4" class="lane-band" />
           <g v-for="l in layout.lanes" :key="l.name" :data-testid="`diagram-lane-${l.name}`" :class="{ hl: isHighlighted('diagram', 'lane', l.name) }">
             <rect :x="l.x - 70" y="8" width="140" height="34" rx="8" class="lane-head" />
             <text :x="l.x" y="30" text-anchor="middle" class="lane-name">{{ l.name }}</text>

@@ -162,14 +162,14 @@ body { overflow: hidden; }
 /* A field the eavesdropper can place and cannot read. */
 .hex-scroll .hb.lit.k-sealed { background: var(--sealed-bg); color: var(--sealed-fg); }
 .swatch.k-sealed { background: var(--sealed-bg); box-shadow: inset 0 0 0 1px var(--sealed-fg); } .field-row.k-sealed { border-left-color: var(--sealed-fg); }
-.field-list { flex: 0 0 180px; overflow: auto; border-left: 1px solid var(--line); padding: 4px; font-size: 12px; min-width: 0; box-sizing: border-box; }
+.field-list { container-type: inline-size; flex: 0 0 clamp(200px, 15vw, 290px); overflow: auto; border-left: 1px solid var(--line); padding: 4px; font-size: 12px; min-width: 0; box-sizing: border-box; }
 .fl-hint { padding: 2px 6px 6px; font-size: 11px; }
 .field-row { all: unset; box-sizing: border-box; width: 100%; display: grid; grid-template-columns: minmax(0, 1fr) auto; gap: 2px 8px; padding: 4px 6px; border-radius: 6px; cursor: pointer; border: 1px solid var(--line); border-left: 4px solid var(--line); margin-bottom: 3px; color: var(--text); }
 .field-row:hover { background: var(--surface2); }
 .field-row:focus-visible { outline: 2px solid var(--focus); }
 .field-row.on { background: var(--surface2); box-shadow: inset 0 0 0 1px var(--text); }
 .field-row.hl { outline: 2px dashed var(--focus); outline-offset: 1px; }
-.field-row .fname { font-weight: 700; display: inline-flex; align-items: center; gap: 6px; min-width: 0; overflow-wrap: anywhere; }
+.field-row .fname { font-weight: 700; display: inline-flex; align-items: center; gap: 6px; min-width: 0; white-space: nowrap; }
 .swatch { display: inline-block; width: 10px; height: 10px; border-radius: 2px; flex: 0 0 auto; }
 .fgloss { grid-column: 1 / -1; font-size: 11px; color: var(--muted); }
 .fval { grid-column: 1 / -1; font: 10.5px var(--mono); white-space: nowrap; overflow: hidden; text-overflow: ellipsis; min-width: 0; }
@@ -188,9 +188,9 @@ body { overflow: hidden; }
 /* Secrets */
 .secrets { overflow: auto; }
 .secrets > * { flex: 0 0 auto; }
-.secret-cols { display: flex; gap: 8px; padding: 4px 8px; align-items: flex-start; }
-/* No width floor: 2 columns of 160 px did not fit the 328 px right column at 1280 wide. The key text wraps. */
-.secret-col { flex: 1 1 0; min-width: 0; }
+.secret-cols { display: flex; flex-wrap: wrap; gap: 8px; padding: 4px 8px; align-items: flex-start; }
+/* Each holder's column keeps at least 140 px, so a key name fits. With a third holder (lesson 10's issuer), that column moves under the first 2. */
+.secret-col { flex: 1 1 140px; min-width: 0; }
 .col-head { font-weight: 700; text-transform: capitalize; margin-bottom: 2px; }
 .secret-row { display: flex; flex-wrap: wrap; align-items: center; gap: 4px 8px; padding: 4px 6px; border-radius: 6px; border-left: 3px solid var(--secret); background: var(--surface2); margin-bottom: 4px; font-size: 12px; }
 .secret-row.fresh { animation: flash 1.2s ease-out 1; }
@@ -385,3 +385,13 @@ body { overflow: hidden; }
 .gl-row.flash, .gl-term.flash { outline: 3px solid var(--accent); outline-offset: -3px; }
 .term-more { margin-top: 4px; font-size: 12px; opacity: .8; }
 @media (max-width: 900px) { .gl-compare { grid-template-columns: minmax(0, 1fr); } }
+/* A field name never breaks inside the word. In a narrow field list the byte range takes its own line under the name. */
+@container (max-width: 250px) { .field-row > .muted { grid-column: 1 / -1; } }
+/* A small button keeps room for its label, so the label is never cut. */
+.v-btn--size-x-small:not(.v-btn--icon) { height: 24px !important; }
+/* A key card: the name, the value, then one line with the size and the buttons, then one line with what the value came from. */
+.secret-row { display: grid; grid-template-columns: minmax(0, 1fr) auto auto; align-items: center; }
+.secret-row > .sname, .secret-row > code, .secret-row > .from-list { grid-column: 1 / -1; }
+.from-list { display: flex; flex-wrap: wrap; gap: 3px; order: 10; }
+/* A key name is one identifier, so it stays on one line. */
+.secret-row > .sname { white-space: nowrap; overflow: hidden; text-overflow: ellipsis; min-width: 0; }
