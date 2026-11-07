@@ -4652,6 +4652,17 @@
    "counts": false
   },
   {
+   "id": "SELF.product-not-built-code-is-not-run",
+   "base": "SELF.product-not-built-code-is-not-run",
+   "assertion": "SELF",
+   "group": "selftest",
+   "build": "host",
+   "slice": "S0",
+   "referee": "stand-ins built on the BCL, python cryptography and real OpenSSL runs",
+   "roles": [],
+   "counts": false
+  },
+  {
    "id": "SELF.referee-protocols",
    "base": "SELF.referee-protocols",
    "assertion": "SELF",

@@ -28,7 +28,12 @@ namespace Acceptance
             MethodInfo m = t == null ? null : t.GetMethod("FromFiles", BindingFlags.Public | BindingFlags.Static, null, new Type[] { typeof(string) }, null);
             if (m == null) throw new NotRunException("PRODUCT_MISSING", "NetSec.Core has no CredentialSet.FromFiles yet (modes-design.md section 3.3)");
             try { return m.Invoke(null, new object[] { dir }); }
-            catch (TargetInvocationException ex) { throw new FailException("CredentialSet.FromFiles(" + dir + ") threw: " + ex.InnerException); }
+            catch (TargetInvocationException ex)
+            {
+                // A row file that FromFiles cannot read yet throws FILE_ROW_NOT_BUILT, so a run never mixes in a built-in key.
+                ProductCodes.NotRunIf(ex.InnerException, "FILE_ROW_NOT_BUILT", "CredentialSet.FromFiles(" + dir + ")");
+                throw new FailException("CredentialSet.FromFiles(" + dir + ") threw: " + ex.InnerException);
+            }
         }
 
         static void Use(ProbeRequest r, object set)

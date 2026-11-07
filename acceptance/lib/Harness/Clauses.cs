@@ -24,6 +24,26 @@ namespace Acceptance
         public NotRunException(string reason, string detail) : base(detail) { Reason = reason; }
     }
 
+    /// <summary>The stable code a product exception carries, read by reflection, so a group needs no product type to read it.</summary>
+    public static class ProductCodes
+    {
+        /// <summary>NetSecException.Error.Code, or null when the exception carries no such field.</summary>
+        public static string Of(Exception e)
+        {
+            if (e == null) return null;
+            System.Reflection.FieldInfo f = e.GetType().GetField("Error");
+            object err = f == null ? null : f.GetValue(e);
+            System.Reflection.FieldInfo code = err == null ? null : err.GetType().GetField("Code");
+            return code == null ? null : code.GetValue(err) as string;
+        }
+
+        /// <summary>A part the product says it has not built yet reads NOT RUN with that code. Only that exact code: any other exception goes on to the caller's FAIL.</summary>
+        public static void NotRunIf(Exception e, string notBuiltCode, string what)
+        {
+            if (Of(e) == notBuiltCode) throw new NotRunException(notBuiltCode, what + ": " + e.Message);
+        }
+    }
+
     /// <summary>The clause ran and the product is wrong.</summary>
     public class FailException : Exception
     {

@@ -30,6 +30,25 @@ namespace Acceptance
             catch (FailException ex) { return "FAIL: " + ex.Message; }
         }
 
+        sealed class FakeError { public string Code; }
+        sealed class FakeProductException : Exception { public readonly FakeError Error; public FakeProductException(string code) : base(code + ": a fake") { Error = new FakeError { Code = code }; } }
+
+        [Clause("SELF.product-not-built-code-is-not-run")]
+        public static string ProductNotBuiltCodeIsNotRun(Ctx c)
+        {
+            const string Code = "FILE_ROW_NOT_BUILT";
+            Check.Equal("the code read from a product-shaped exception", Code, ProductCodes.Of(new FakeProductException(Code)));
+            Check.True(ProductCodes.Of(new InvalidOperationException("plain")) == null, "a plain exception carries no product code");
+            bool notRun = false;
+            try { ProductCodes.NotRunIf(new FakeProductException(Code), Code, "a read"); }
+            catch (NotRunException e) { notRun = e.Reason == Code; }
+            Check.True(notRun, "the named code should read NOT RUN");
+            ProductCodes.NotRunIf(new FakeProductException("KEY_FILE_UNREADABLE"), Code, "a read");
+            ProductCodes.NotRunIf(new InvalidOperationException("plain"), Code, "a read");
+            ProductCodes.NotRunIf(null, Code, "a read");
+            return "only the named code reads NOT RUN; another code, a plain exception, and none each go on to the caller's FAIL";
+        }
+
         [Clause("SELF.reference-passes")]
         public static string ReferencePasses(Ctx c)
         {
