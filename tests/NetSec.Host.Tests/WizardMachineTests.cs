@@ -503,6 +503,7 @@ public class WizardMachineTests
     [InlineData(PublishedBdk, "ed64291", "DUKPT_KCV_FORMAT")]
     [InlineData(PublishedBdk, "zzzzzz", "DUKPT_KCV_FORMAT")]
     [InlineData(PublishedBdk, "ff0bd7c455aa", "DUKPT_KCV_FORMAT")]
+    [InlineData(PublishedBdk, "ed64zz", "DUKPT_KCV_FORMAT")]
     [InlineData("fedcba9876543210f1f1f1f1f1f1f1", null, "DUKPT_KEY_SIZE")]
     [InlineData("fedcba9876543210f1f1f1f1f1f1f1f1f1f1", null, "DUKPT_KEY_SIZE")]
     [InlineData("not hex at all", null, "KEY_FILE_FORMAT")]
@@ -514,6 +515,20 @@ public class WizardMachineTests
         Assert.Contains(reply.Errors, e => e.Code == code && e.TypeId == SecurityTypes.DukptBdk);
         Assert.Null(rig.Store.Entry(SecurityTypes.DukptBdk).Binding);
         Assert.Null(rig.Store.Entry(SecurityTypes.DukptPad).Binding);
+    }
+
+    /// <summary>Each format fault names its own reason: a wrong length says the length, and a right length with a letter past f says not hex.</summary>
+    [Theory]
+    [InlineData("ed642", "This one is 5 characters.")]
+    [InlineData("ff0bd7c455aa", "This one is 12 characters.")]
+    [InlineData("zzzzzz", "It holds a character that is not hex (0-9, a-f).")]
+    [InlineData("ed64zz", "It holds a character that is not hex (0-9, a-f).")]
+    public void A_check_value_format_fault_names_its_reason(string checkValue, string reason)
+    {
+        using Rig rig = new();
+        RunReply reply = PaymentFile(rig, PublishedBdk + "\n", checkValue);
+        StepMessage fault = Assert.Single(reply.Errors, e => e.Code == "DUKPT_KCV_FORMAT");
+        Assert.EndsWith(reason, fault.Message);
     }
 
     [Fact]
