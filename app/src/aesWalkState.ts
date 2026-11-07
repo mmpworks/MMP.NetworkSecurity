@@ -34,11 +34,12 @@ export async function fetchAesBlock(sessionId: string) {
   if (!sec.showKeys) return
   aesWalk.loading = true
   try {
-    const body = await hostGet(addr, `/api/sessions/${encodeURIComponent(sessionId)}/walk/aes/block`)
+    // Chapter 1 is block 1 of the run's text, at the key size the run used (design section 3.4).
+    const body = await hostGet(addr, `/api/sessions/${encodeURIComponent(sessionId)}/walk/aes/block?source=text&keyBits=128`)
     if (gen !== aesWalk.gen || !sec.showKeys) return
     aesWalk.block = body as AesBlockReply
   } catch (e: any) {
-    if (gen === aesWalk.gen) aesWalk.error = String(e?.body?.code ?? (e?.status ? `HTTP_${e.status}` : 'WALK_FAILED'))
+    if (gen === aesWalk.gen) aesWalk.error = String(e?.body?.message ?? e?.body?.code ?? (e?.status ? `HTTP_${e.status}` : 'WALK_FAILED'))
   } finally {
     if (gen === aesWalk.gen) aesWalk.loading = false
   }
