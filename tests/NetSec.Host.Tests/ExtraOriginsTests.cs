@@ -38,6 +38,8 @@ namespace NetSec.Host.Tests
         [InlineData("http://localhost:1023")]
         [InlineData("http://localhost:65536")]
         [InlineData("http://localhost:99999")]
+        [InlineData("http://localhost:٤١٨١")]   // Arabic-Indic digits: .NET \d matches them and int.Parse then throws
+        [InlineData("http://localhost:0664066106680661")]   // Arabic-Indic digits: .NET d matches them, int.Parse then throws
         [InlineData("http://localhost")]
         [InlineData("http://evil.example:4181")]
         [InlineData("http://localhost.evil.example:4181")]

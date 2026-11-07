@@ -13,7 +13,7 @@ public static class ExtraOrigins
 {
     public const string Variable = "NETSEC_ORIGINS";
 
-    static readonly Regex Shape = new(@"^http://(?<host>localhost|127\.0\.0\.1):(?<port>\d{1,5})\z", RegexOptions.CultureInvariant);
+    static readonly Regex Shape = new(@"^http://(?<host>localhost|127\.0\.0\.1):(?<port>[0-9]{1,5})\z", RegexOptions.CultureInvariant);
 
     public sealed record Result(IReadOnlyList<string> Accepted, IReadOnlyList<string> Dropped);
 
