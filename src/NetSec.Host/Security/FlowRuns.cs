@@ -17,6 +17,8 @@ public sealed class FlowRuns
 {
     public const string StepStale = "WIZARD_STEP_STALE", RunNotFound = "WIZARD_RUN_NOT_FOUND", FlowUnknown = "WIZARD_FLOW_UNKNOWN", PartNotBuilt = "WIZARD_PART_NOT_BUILT", TypeNotInFlow = "WIZARD_TYPE_NOT_IN_FLOW";
     public const string PathPersonal = "KEY_PATH_PERSONAL";
+    /// <summary>A note, not a refusal: the form the vendor's check value matched. The wizard shows warnings by code, so this one stays in the reply.</summary>
+    public const string KcvMatched = "DUKPT_KCV_MATCHED";
     const string CheckState = "Check", ReviewState = "Review";
 
     readonly Lock _gate = new();
@@ -154,7 +156,11 @@ public sealed class FlowRuns
         foreach (string typeId in types)
         {
             if (!chosen.TryGetValue(typeId, out string? path)) _parts.Make(typeId);
-            else if (typeId == SecurityTypes.DukptBdk) _store.PlaceBytes(typeId, PaymentKeys.ReadBaseKey(path, CheckValueOf(data)));
+            else if (typeId == SecurityTypes.DukptBdk)
+            {
+                _store.PlaceBytes(typeId, PaymentKeys.ReadBaseKey(path, CheckValueOf(data), out string? matched));
+                if (matched is not null) warnings.Add(new StepMessage(KcvMatched, $"The check value matches as {matched}.", typeId));
+            }
             else _store.PlaceKey(typeId, File.ReadAllText(path));
         }
     }
@@ -174,7 +180,7 @@ public sealed class FlowRuns
 
     static void ReadBaseKey(string path, string? checkValue, List<StepMessage> errors)
     {
-        try { PaymentKeys.ReadBaseKey(path, checkValue); }
+        try { PaymentKeys.ReadBaseKey(path, checkValue, out _); }
         catch (NetSecException e) { errors.Add(new StepMessage(e.Error.Code, e.Error.Message, SecurityTypes.DukptBdk)); }
     }
 
