@@ -1,6 +1,6 @@
 # MMP.NetworkSecurity: the 3-section plan
 
-Owners: Richard (map, engine data, slices) and Nancy (screens). Decision owner: Steve. Reader before Steve: Jared. Date: 2026-11-07. Status: plan only. No code comes from this document until Steve answers section 8.
+Owners: Richard (map, engine data, slices) and Nancy (screens). Decision owner: Steve. Reader before Steve: Jared. Date: 2026-11-07. Status: plan, with Steve's answers to section 8 recorded on 2026-11-07. Slices build from it.
 
 ## The two changes I would make
 
@@ -15,7 +15,7 @@ Owners: Richard (map, engine data, slices) and Nancy (screens). Decision owner: 
 4. The engine already holds every method the new walks need, with one exception: AES, SHA-256, HMAC, DES, the Diffie-Hellman group, X25519, Ed25519 and the TLS 1.3 key schedule are there. ECDSA is not, and Steve wants it, so its slice adds new engine code. Each new walk needs a new read-only walk type and a new route. No walk adds a field to W1a's frozen AES walk types (section 4).
 5. A walk that runs on a session's own key gives that key away row by row. So each walk names its key. No new walk type in this plan runs on a session's own key: each runs on a public practice key or an RFC vector. W1a's block walk and the session trace keep their existing Show keys OFF rules (section 4).
 6. The order is: the section shell, the AES walk with the long text (W1b), the attack index inside Lessons, the Handshake walk, then one technique walk per slice (section 5).
-7. Kill condition: by 2026-11-27, 3 sections live, 12 of 12 lessons in Lessons, 52 of 52 tour attack runs reachable, the AES walk in section 2 with the long text visible, and Steve has stepped through each section in the app (section 6).
+7. Kill condition: by 2026-11-27, 3 sections live, 12 of 12 lessons in Lessons, 56 of 56 registered attack runs reachable from the attack index, the AES walk in section 2 with the long text visible, and Steve has stepped through each section in the app (section 6).
 
 ## Requirements
 
@@ -61,7 +61,7 @@ All 12 lessons go in section 3, Lessons, with their numbers kept. The last colum
 | HMAC tab: SHA-256, the HMAC steps, the chain, the daily seal | Techniques: HMAC and the chain | Open list, no design. The daily seal has no engine code (section 4) |
 | Feistel tab | Techniques: Feistel | Open list, no design |
 | Diffie-Hellman tab | Techniques: Diffie-Hellman | Open list (W3), no design |
-| Elliptic curves: key agreement (ECDH, X25519) and signatures (ECDSA, Ed25519) | Techniques: elliptic curves | New. X25519 and Ed25519 run in the engine today. ECDSA does not (section 4). ECDH on P-256 is question Q2 |
+| Elliptic curves: key agreement (ECDH, X25519) and signatures (ECDSA, Ed25519) | Techniques: elliptic curves | New. X25519 and Ed25519 run in the engine today. ECDSA does not (section 4). X25519 carries ECDH, so there is no ECDH walk on P-256 (Steve, Q2) |
 
 ### 1.3 The wizard and Security setup
 
@@ -74,7 +74,7 @@ All 12 lessons go in section 3, Lessons, with their numbers kept. The last colum
 
 ### 1.4 Attack runs
 
-The engine registers **56** runs: 54 ids in `Labs.cs` and 2 in `Lesson11Timing.cs`. The tours play **52**. All of them stay in their lessons, in section 3. Q1 asks whether Lessons also gets an index by kind. The kinds below are mine. Nancy's screen lines may rename them.
+The engine registers **56** runs: 54 ids in `Labs.cs` and 2 in `Lesson11Timing.cs`. The live Host's `GET /api/lessons` and `/api/lessons/0` list the same 56 (Echo, 2026-11-07). The tours play **52**. All of them stay in their lessons, in section 3, and Lessons also gets an index of all 56 by kind (Steve, Q1). The kinds below are mine. Nancy's screen lines may rename them.
 
 | Kind | Runs | Count |
 |---|---|---|
@@ -92,7 +92,7 @@ The engine registers **56** runs: 54 ids in `Labs.cs` and 2 in `Lesson11Timing.c
 | In the engine, in no tour | L0-flip-wire-byte, L2-flip-hmac-message, L2-flip-cmac-tag, L10-wrong-role | 4 |
 | **Engine runs, total** | | **56** |
 
-The 4 runs in no tour stay out of the index in this plan's first step. The kill condition counts the 52 tour runs. L10-wrong-role appears in no test and no spec either. That is a test gap for Echo, and it is outside this plan.
+The index lists all 56. An entry for a run that a tour plays opens its tour step. An entry for one of the 4 runs in no tour opens its lesson's free play at the run's button (`attack-<attackId>`, which the free-play log draws for every registered run). Kinds for the 4: L0-flip-wire-byte, L2-flip-hmac-message and L2-flip-cmac-tag change bytes on the wire. L10-wrong-role asks for what was never granted. The kill condition counts 56. The index reads the registry from `GET /api/lessons`, so a run added later appears with no edit to the index.
 
 The 5 "Switch to the eavesdropper view" try-its and lesson 7's "Run both handshakes" are views and runs, not attacks. They stay in their lessons.
 
@@ -102,7 +102,7 @@ Nancy writes this section. Her lines come after Steve's clipping fix. Until they
 
 1. **Section switch:** 3 tabs at the top of the left rail: Handshake, Techniques, Lessons. Lessons shows today's lesson rail, with the numbers kept.
 2. **R1, the long text:** a strip that stays in section 2's layout on every technique tab, above the walk. Each walk names which bytes of the long text it is using.
-3. **Attack index (if Q1 is A):** inside Lessons, a list grouped by kind (section 1.4). Each entry opens its lesson at the tour step that plays the run.
+3. **Attack index:** inside Lessons, a list of all 56 runs grouped by kind (section 1.4). Each entry opens its lesson at the tour step that plays the run, or at its free-play button when no tour plays it.
 4. **Links:** each lesson has a link to its walk (section 1.1), and each walk links back to its lessons.
 5. **Security setup, the wizard, the vault and the glossary:** in the shared area, reached from the top bar, as today.
 
@@ -112,7 +112,7 @@ Nancy writes this section. Her lines come after Steve's clipping fix. Until they
 |---|---|---|
 | Lesson rail | Moves | Becomes section 3, Lessons. Lesson numbers and ids unchanged |
 | Tours, tour steps, try-its | Stay | No text or id change |
-| The 52 tour attack runs | Stay in tours | If Q1 is A: `attacks.json` (new) with attack id, kind, lesson, tour step, the check that catches it, and the guard sentence. Content only |
+| The 56 registered attack runs | Stay in tours and free play | `attacks.json` (new) with attack id, kind, tour step (or none), and the guard sentence. Content only. The check name and code come from `GET /api/lessons` |
 | AES walk (W1b) | New screens in section 2 | Adds the long text (was W2) |
 | HMAC and chain walk | New | Section 2 |
 | Feistel walk | New | Section 2, on the engine's DES |
@@ -161,7 +161,7 @@ The attack index needs no engine data: `run-attack` already plays each run, and 
 | P1 section shell | The 3-section switch, with today's rail as Lessons, from Nancy's lines. No engine change | The specs pass with every lesson reachable. 12 of 12 lessons in Lessons | Builds on Nancy's shell (#196). The ux-refresh slices stay as planned |
 | P2 = W1b | The AES walk in section 2, chapter 1, with the long text (R1). Engine half built on `feat/w1b-aes-walk` | W1b's clauses, plus a long-text clause | **W1b becomes the AES walk in section 2.** It takes W2's long text forward. W2 keeps the S-box build, tap-a-byte and the flip spread |
 | Stop: show Steve | Steve steps through section 2 in the app | His reaction in `docs/learnings.md` | Unchanged stop from `walkthrough-design.md` |
-| P3 attack index (if Q1 is A) | `attacks.json`, the list by kind inside Lessons, each entry opening its tour step | 52 of 52 tour runs reachable, each plays its run and shows its check | None to the tours |
+| P3 attack index | `attacks.json`, the list by kind inside Lessons, each entry opening its tour step or its free-play button | 56 of 56 registered runs reachable, each plays its run and shows its check | None to the tours |
 | P4 Handshake walk | The TLS 1.3 message walk, the key schedule walk, the chain view | RFC 8448 values, lesson 4 and 5 clauses | Takes **W4** (lesson 5 record walk) and the lesson 4 half of **W3** |
 | P5 W1c | Chapter 2 modes, unchanged | W1c's clauses | Unchanged, now inside section 2 |
 | P6 HMAC and chain | `Sha256Walk`, `HmacWalk`, `SealChainWalk` | FIPS 180-4 and RFC 4231 | Takes lesson 2 from **W5** |
@@ -178,7 +178,7 @@ This plan's first step ends when all of these hold, by **2026-11-27**:
 
 1. 3 of 3 sections are live in the app.
 2. 12 of 12 lessons are in the Lessons section, with their numbers kept.
-3. If Q1 is A: 52 of 52 tour attack runs are reachable from the attack index, and each plays its run. If Q1 is B: 52 of 52 still play from their tour steps.
+3. 56 of 56 registered attack runs (the count `GET /api/lessons` and `/api/lessons/0` give) are reachable from the attack index, and each plays its run.
 4. The AES walk (W1b) runs in section 2, and the long text is on screen on every technique tab that exists.
 5. Steve has stepped through each section in the app and reacted.
 
@@ -197,8 +197,8 @@ A progress report states these 5 counts. It does not substitute the fact that bu
 
 | Id | Question | Option A | Option B | My pick |
 |---|---|---|---|---|
-| Q1 | Lessons: list the attack runs a second way? | Lessons also gets an index of the 52 tour runs, grouped by kind. Each entry opens the lesson at the step that plays it | No index. Each run stays only in its tour step | **A.** It answers "how do things break" in one place, and no tour or clause changes |
-| Q2 | Key agreement on elliptic curves: is X25519 enough, or do you also want ECDH on P-256? | X25519 carries ECDH. P-256 appears only in the ECDSA walk | Also an ECDH walk on P-256, on the same new P-256 code | **A.** X25519 is ECDH on Curve25519, and the lessons run it today. B adds a walk on code no lesson runs |
+| Q1 | Lessons: list the attack runs a second way? | Lessons also gets an index of the attack runs, grouped by kind. Each entry opens the lesson at the step that plays it | No index. Each run stays only in its tour step | **A.** It answers "how do things break" in one place, and no tour or clause changes. **Steve: A** |
+| Q2 | Key agreement on elliptic curves: is X25519 enough, or do you also want ECDH on P-256? | X25519 carries ECDH. P-256 appears only in the ECDSA walk | Also an ECDH walk on P-256, on the same new P-256 code | **A.** X25519 is ECDH on Curve25519, and the lessons run it today. B adds a walk on code no lesson runs. **Steve: A** |
 
 Nancy may add 1 screen question here.
 
@@ -206,6 +206,8 @@ Nancy may add 1 screen question here.
 1. Elliptic-curve methods mean both key agreement (ECDH, X25519) and signatures (ECDSA, Ed25519). Both go in section 2.
 2. W1b becomes the AES walk inside section 2, and it goes before V4's certificate file path.
 3. Section 3 is named Lessons ("let's call 'attacks' lessons"). Today's lesson list, with its attack runs, becomes section 3. This answers the old question about lessons 6, 8, 9 and 10: they stay in Lessons with the rest. It also settles lesson numbers: Lessons keeps 0 to 11.
+4. Q1: A. Lessons gets an index of the attack runs by kind. The index lists all 56 registered runs, the live count from `GET /api/lessons`.
+5. Q2: A. X25519 is enough for key agreement. There is no ECDH walk on P-256. ECDSA keeps P-256 (slice P8b).
 
 ## 9. Prior art
 
@@ -215,4 +217,4 @@ Jared read 23df25c (same-vendor fresh read). His anchor: a git grep on origin/ma
 
 ## Disposition
 
-Plan only. Jared reads this head. Steve answers section 8. Then the lead starts P1.
+Jared passed this plan (35e95ce). Steve answered every question in section 8 on 2026-11-07. The lead starts P1. Nancy builds the W1b screens after SC lands.
