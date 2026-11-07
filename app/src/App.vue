@@ -66,8 +66,9 @@ const tabs = computed(() => {
   return list
 })
 const hasTab = (id: TabId) => tabs.value.some(t => t.id === id)
-// The AES walk tab shows when the run holds aes.key. It opens Techniques at the AES walk, on this run's block.
-const hasAesKey = computed(() => !!active.value && shownEvents.value.some(e => e.secrets.some(s => s.name === 'aes.key')))
+// The AES walk tab shows when the run holds aes.key and has sent its text, which is when the engine can build the block (AesWalkFacts reads both).
+// It opens Techniques at the AES walk, on this run's block.
+const hasAesKey = computed(() => !!active.value && shownEvents.value.some(e => e.secrets.some(s => s.name === 'aes.key')) && shownEvents.value.some(e => e.type === 'aes.message.sent'))
 const aesWalkOpen = computed(() => ui.section === 'techniques' && ui.walkItem.techniques === 'aes')
 function tabFor(e: TraceEvent): TabId {
   if (e.message.startsWith('Picture')) return 'picture'
