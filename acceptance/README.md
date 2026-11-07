@@ -179,7 +179,7 @@ Disposition: merge. Then the builders' slices V0 to V8 turn the clauses from NOT
 
 The wizard is driven by step kind (explain, choose or generate, file, review, prove, done), so the state names of `modes-design.md` and `wizards-ux.md`, which differ, do not matter to the suite.
 
-How a clause is proven to bite. `selftest/FakeHost/` is a Host built from `CONTRACT.md` section 5 and nothing else. `SELF.a17-clauses-pass-and-bite` runs each real clause on the faithful fake (it must PASS) and again on the fake with one named defect (it must FAIL). `ACC_SELF_LOG=<file>` writes the reason of each FAIL, so a person can check that each defect fails for the right reason. `SELF.a17-absent-host-is-not-run` runs every clause with no Host and expects NOT RUN `PRODUCT_MISSING`. The text, repository, cold-reader and referee clauses have stand-in trees of their own: `SELF.a17-text-checks-bite`, `SELF.a17-a15a-binding-bites`, `SELF.a17-repo-guard-bites`, `SELF.a17-cold-clause-bites`, `SELF.a17-intermediate-referee-bites`.
+How a clause is proven to bite. `selftest/FakeHost/` is a Host built from `CONTRACT.md` section 5 and nothing else. `SELF.a17-clauses-pass-and-bite-*` (4 rows by area) runs each real clause on the faithful fake (it must PASS) and again on the fake with one named defect (it must FAIL). `ACC_SELF_LOG=<file>` writes the reason of each FAIL, so a person can check that each defect fails for the right reason. `SELF.a17-absent-host-is-not-run` runs every clause with no Host and expects NOT RUN `PRODUCT_MISSING`. The text, repository, cold-reader and referee clauses have stand-in trees of their own: `SELF.a17-text-checks-bite`, `SELF.a17-a15a-binding-bites`, `SELF.a17-repo-guard-bites`, `SELF.a17-cold-clause-bites`, `SELF.a17-intermediate-referee-bites`.
 The five `a17probe` clauses also run on today's engines with `--prop a17probe.training=1`, which uses the training files and no `Credentials`. That proves the OpenSSL, `ssh.exe` and Go wiring on the real product (4 PASS, 1 has no training form).
 
 Two rules from the lead. A clause on a type that no outside tool can judge (payment keys, the passkey-shaped login) says `known-answer` in its name or its text, and never reads as proved by a referee. The product's own word `Verified` never counts: only a referee in `acceptance/` does.
@@ -204,7 +204,7 @@ Anchor rules:
 1. No expected value comes from product code. `RefAes` (`lib/Harness/RefAes.cs`) shares no code with `NetSec.Core` and builds its S-box from the field inverse.
 2. `pdftotext` prints some FIPS values one line above their label, so `extract_nist.py` reads the n-th value for the n-th label. A reader that matches a label to the value on its line gets 370 values and wrong labels.
 3. `SELF.walk-vector-flip-fails` changes one hex digit of each of the 372 values in a copy of the file, and each change FAILS its clause.
-4. `SELF.walk-clauses-pass-and-bite` and the rows `A19.host.*` of `SELF.a17-clauses-pass-and-bite` run a canned walk, and the clauses FAIL it.
+4. `SELF.walk-clauses-pass-and-bite` and the rows `A19.host.*` of `SELF.a17-clauses-pass-and-bite-walk-host` run a canned walk, and the clauses FAIL it.
 
 Limit: the e2e clauses have never run against a built panel. Their test ids are ASSUMED (`CONTRACT.md` section 6).
 
