@@ -109,15 +109,20 @@ public class WizardMachineTests
         Assert.Equal(2, rig.Store.Vault.Describe(SecurityTypes.TokenIssuer).Versions);
     }
 
+    /// <summary>Every flow now has a maker. SSH key files have no reader yet, so the file branch is where a part not built still shows.</summary>
     [Fact]
-    public void A_flow_with_no_maker_stays_on_make_and_names_each_part()
+    public void A_file_with_no_reader_stays_on_the_file_step_and_names_the_part()
     {
         using Rig rig = new();
+        Directory.CreateDirectory(rig.Root);
+        string key = Path.Combine(rig.Root, "user.key");
+        File.WriteAllText(key, "a key file");
         FlowRun run = rig.Runs.Start("my-ssh")!.Run;
         run = Move(rig.Runs, run, "next", NoData).Run;
-        RunReply made = Move(rig.Runs, run, "make", NoData);
-        Assert.Equal("Make", made.Run.State);
-        Assert.Equal(4, made.Errors.Count(e => e.Code == FlowRuns.PartNotBuilt));
+        run = Move(rig.Runs, run, "use-files", NoData).Run;
+        RunReply read = Move(rig.Runs, run, "files", PathsData(SecurityTypes.SshClient, key));
+        Assert.Equal(run.State, read.Run.State);
+        Assert.Contains(read.Errors, e => e.Code == FlowRuns.PartNotBuilt && e.TypeId == SecurityTypes.SshClient);
         Assert.Equal(SecurityStore.StateBuiltIn, rig.Store.StateOf(SecurityTypes.SshClient));
     }
 
@@ -502,5 +507,42 @@ public class WizardMachineTests
         run = Move(rig.Runs, run, "use-files", NoData).Run;
         RunReply reply = Move(rig.Runs, run, "files", PaymentData(Path.Combine(rig.Root, "no-such-file.txt")));
         Assert.Contains(reply.Errors, e => e.Code == "KEY_FILE_UNREADABLE");
+    }
+
+    [Fact]
+    public void Ssh_keys_made_for_the_learner_pass_with_ssh_exe_and_each_control_is_refused()
+    {
+        using Rig rig = new();
+        FlowRun run = rig.Runs.Start("my-ssh")!.Run;
+        run = Move(rig.Runs, run, "next", NoData).Run;
+        RunReply review = Move(rig.Runs, run, "make", NoData);
+        Assert.Equal(4, review.Facts.Count);
+        Assert.Equal("follows", rig.Store.Entry(SecurityTypes.SshKnownHosts).Binding!.Provider);
+        RunReply check = Move(rig.Runs, Move(rig.Runs, review.Run, "next", NoData).Run, "check", NoData);
+        Assert.Equal(4, check.Facts.Count);
+        string userKey = Convert.ToHexString(rig.Store.PlacedKey(SecurityTypes.SshClient)!.CopyMaterial());
+        foreach (CheckFact fact in check.Facts.Cast<CheckFact>())
+        {
+            Assert.True(fact.Passed, fact.TypeId + ": " + fact.Message + " " + fact.Output + " | control: " + fact.ControlOutput);
+            Assert.Equal("ssh.exe", fact.Judge);
+            Assert.Equal("checked-with-ssh-exe", fact.Says);
+            Assert.Contains("StrictHostKeyChecking=yes", fact.Command);
+            Assert.Contains("hello", fact.Output);
+            Assert.Contains(fact.TypeId == SecurityTypes.SshClient ? "Permission denied (publickey)" : "REMOTE HOST IDENTIFICATION HAS CHANGED", fact.ControlOutput);
+            Assert.DoesNotContain(userKey, fact.Output + fact.ControlOutput, StringComparison.OrdinalIgnoreCase);
+        }
+        Assert.Contains(check.Facts.Cast<CheckFact>(), f => f.TypeId == SecurityTypes.SshHostRsa && f.Command.Contains("HostKeyAlgorithms=ssh-rsa"));
+        Assert.Empty(Directory.GetFiles(Path.Combine(rig.Store.Root, "proof"), "*.key", SearchOption.AllDirectories));
+    }
+
+    [Fact]
+    public void Ssh_check_with_no_ssh_exe_names_the_referee_missing()
+    {
+        using Rig rig = new(name => name == "NETSEC_SSH" ? Path.Combine(Path.GetTempPath(), "no-such-ssh.exe") : Environment.GetEnvironmentVariable(name));
+        FlowRun run = rig.Runs.Start("my-ssh")!.Run;
+        run = Move(rig.Runs, run, "next", NoData).Run;
+        run = Move(rig.Runs, run, "make", NoData).Run;
+        RunReply check = Move(rig.Runs, Move(rig.Runs, run, "next", NoData).Run, "check", NoData);
+        Assert.All(check.Facts.Cast<CheckFact>(), f => Assert.Equal("REFEREE_MISSING", f.Code));
     }
 }
