@@ -48,8 +48,10 @@ test('nothing is lit until a field is picked, and a field lights only its own by
 
 test('a field value reads the wire bytes at its own offsets', async ({ page }) => {
   await pickTextGcm1(page)
-  await expect(page.getByTestId('inspector-field-value-nonce')).toHaveText(await byteText(page, 4, 16))
-  await expect(page.getByTestId('inspector-field-value-type')).toHaveText(await byteText(page, 0, 1))
+  // The byte cells scramble in for 700 ms, so this waits for them to settle on the field's value.
+  const nonce = await page.getByTestId('inspector-field-value-nonce').innerText()
+  await expect.poll(() => byteText(page, 4, 16)).toBe(nonce)
+  await expect.poll(() => byteText(page, 0, 1)).toBe(await page.getByTestId('inspector-field-value-type').innerText())
 })
 
 test('the cipher field lights the readable bytes it was made from', async ({ page }) => {

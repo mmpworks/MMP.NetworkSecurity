@@ -143,16 +143,16 @@ export function closedToListener(tab: string, events: readonly TraceEvent[]): st
     case 'token': return tokensArePublic(events) ? null : 'The tokens travel locked in this lesson, so a listener cannot read them.'
     case 'ladder': return 'Each side makes these keys in its own memory. None of them crosses the wire.'
     case 'onion': return 'The wrappers open inside the gateway and the bank. A listener sees only the outer bytes.'
+    case 'timing': return 'This lab runs on one machine, so nothing here crosses a wire. It also shows the lab\'s secret, which a listener never sees.'
     default: return null
   }
 }
 
 /** What this tab means in the Eavesdropper view, when it stays open. */
-export function listenerLabel(tab: string, events: readonly TraceEvent[]): { kind: 'public' | 'lab'; text: string } | null {
+export function listenerLabel(tab: string, events: readonly TraceEvent[]): string | null {
   switch (tab) {
-    case 'chain': return certificatesArePublic(events) ? { kind: 'public', text: 'Public: these certificates cross the wire in the clear, so a listener reads them too.' } : null
-    case 'token': return tokensArePublic(events) ? { kind: 'public', text: 'Public: these tokens cross the wire in the clear, so a listener can decode the claims.' } : null
-    case 'timing': return { kind: 'lab', text: 'This lab runs on one machine, so nothing here crosses a wire.' }
+    case 'chain': return certificatesArePublic(events) ? 'Public: these certificates cross the wire in the clear, so a listener reads them too.' : null
+    case 'token': return tokensArePublic(events) ? 'Public: these tokens cross the wire in the clear, so a listener can decode the claims.' : null
     default: return null
   }
 }

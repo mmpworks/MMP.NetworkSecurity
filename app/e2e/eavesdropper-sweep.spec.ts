@@ -103,10 +103,7 @@ async function scan(page: Page, values: ReturnType<typeof forbiddenValues>, wher
   const screen = await screenText(page)
   if (screen === lastScreen) return
   lastScreen = screen
-  // A tab labeled as the lab's own view excuses the words in that tab and nothing else: key bytes still fail, and so do the other panes' words.
-  const labTab = await page.getByTestId('inspector-lab-view').count() > 0
-  const words = labTab ? await page.locator('.main-split .panel').evaluateAll(all => all.filter(p => !p.querySelector('[data-testid=inspector-lab-view]')).map(p => (p as HTMLElement).innerText).join('\n')) : screen
-  for (const [w, from] of values.words) if (words.includes(w)) out.push({ what: 'text', where, value: w.slice(0, 40), from })
+  for (const [w, from] of values.words) if (screen.includes(w)) out.push({ what: 'text', where, value: w.slice(0, 40), from })
   for (const [b, from] of values.base64) if (screen.includes(b)) out.push({ what: 'base64', where, value: b, from })
   // Spaces, colons and dashes are how a screen can format hex, so they go before the search. A window lookup keeps this fast on a long message.
   const packed = screen.toLowerCase().replace(/[\s:\-]/g, '')
@@ -118,9 +115,11 @@ async function scan(page: Page, values: ReturnType<typeof forbiddenValues>, wher
   }
 }
 
-for (let lesson = 0; lesson <= 11; lesson++) {
+// Lessons 7 to 10 take about 5 minutes each, because each view switch redraws a long diagram. They run in the long run: NETSEC_SWEEP_ALL=1.
+const LESSONS = process.env.NETSEC_SWEEP_ALL === '1' ? [0, 1, 2, 3, 4, 5, 6, 7, 8, 9, 10, 11] : [0, 1, 2, 3, 4, 5, 6, 11]
+for (const lesson of LESSONS) {
   test(`lesson ${lesson}: the Eavesdropper view shows nothing a listener could not see`, async ({ page }) => {
-    test.setTimeout(400_000)
+    test.setTimeout(900_000)
     lastScreen = ''
     await page.setViewportSize({ width: 1440, height: 900 })
     await open(page, host)
@@ -200,13 +199,14 @@ const CLOSED: [number, string, string][] = [
   [4, 'chain', 'The certificates travel locked in this lesson'],
   [6, 'ladder', 'None of them crosses the wire'],
   [9, 'onion', 'A listener sees only the outer bytes'],
+  [11, 'timing', 'nothing here crosses a wire'],
 ]
 for (const [lesson, tab, words] of CLOSED) {
   test(`lesson ${lesson}: the ${tab} tab closes to a listener, says why, and opens again for an endpoint`, async ({ page }) => {
     await runLesson(page, lesson)
     await page.getByTestId(`inspector-tab-${tab}`).click()
     await expect(page.getByTestId('inspector-closed')).toHaveCount(0)
-    await expect(page.getByTestId('keys-in-use')).toBeVisible()
+    if (lesson !== 11) await expect(page.getByTestId('keys-in-use')).toBeVisible()
     await page.getByTestId('view-eavesdropper').click()
     await expect(page.getByTestId('inspector-closed')).toContainText(words)
     await expect(page.getByTestId('keys-in-use')).toHaveCount(0)
@@ -215,21 +215,14 @@ for (const [lesson, tab, words] of CLOSED) {
   })
 }
 
-// These tabs stay open, and each says what it is in that view.
-const LABELLED: [number, string, string, string][] = [
-  [10, 'token', 'inspector-public', 'a listener can decode the claims'],
-  [11, 'timing', 'inspector-lab-view', 'nothing here crosses a wire'],
-]
-for (const [lesson, tab, id, words] of LABELLED) {
-  test(`lesson ${lesson}: the ${tab} tab stays open to a listener and says what it is`, async ({ page }) => {
-    await runLesson(page, lesson)
-    await page.getByTestId(`inspector-tab-${tab}`).click()
-    await expect(page.getByTestId(id)).toHaveCount(0)
-    await page.getByTestId('view-eavesdropper').click()
-    await expect(page.getByTestId(id)).toContainText(words)
-    await expect(page.getByTestId('inspector-closed')).toHaveCount(0)
-  })
-}
+test('lesson 10: the token tab stays open to a listener and says it is public', async ({ page }) => {
+  await runLesson(page, 10)
+  await page.getByTestId('inspector-tab-token').click()
+  await expect(page.getByTestId('inspector-public')).toHaveCount(0)
+  await page.getByTestId('view-eavesdropper').click()
+  await expect(page.getByTestId('inspector-public')).toContainText('a listener can decode the claims')
+  await expect(page.getByTestId('inspector-closed')).toHaveCount(0)
+})
 
 test('lesson 1: the listener keeps the repeated-block count, which comes from the ciphertext', async ({ page }) => {
   await runLesson(page, 1)

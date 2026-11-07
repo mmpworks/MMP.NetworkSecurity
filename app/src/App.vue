@@ -227,7 +227,7 @@ const shortcuts: [string, string][] = [
                   <div v-if="tabs.length > 1" class="tabs-inline" data-testid="inspector-tabs">
                     <button v-for="t in tabs" :key="t.id" type="button" class="stab" :class="{ on: ui.inspectorTab === t.id }" :data-testid="`inspector-tab-${t.id}`" @click="ui.inspectorTab = t.id">{{ t.label }}</button>
                   </div>
-                  <div v-if="tabLabel" class="muted listener-public" :data-testid="tabLabel.kind === 'public' ? 'inspector-public' : 'inspector-lab-view'">{{ tabLabel.text }}</div>
+                  <div v-if="tabLabel" class="muted listener-public" data-testid="inspector-public">{{ tabLabel }}</div>
                   <div v-if="listenerNote" class="empty-note" data-testid="inspector-closed">{{ listenerNote }}</div>
                   <PicturePanel v-else-if="ui.inspectorTab === 'picture' && hasTab('picture')" />
                   <ChainPanel v-else-if="ui.inspectorTab === 'chain' && hasTab('chain')" />
