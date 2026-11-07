@@ -1,6 +1,7 @@
 <script setup lang="ts">
 import { computed, reactive } from 'vue'
-import { isHighlighted, isOsTransport, selectedEvent, shownEvents, ui, upToSeq } from '../store'
+import { isHighlighted, isOsTransport, lessonRow, selectedEvent, shownEvents, ui, upToSeq } from '../store'
+import { holderColumns } from '../lab'
 import KeysInUse from './KeysInUse.vue'
 
 // With Show keys OFF a row holds no hex. It shows its fingerprint and its length, and two rows are the same key when their fingerprints match.
@@ -20,7 +21,7 @@ const rows = computed<Row[]>(() => {
   return [...m.values()]
 })
 const eve = computed(() => ui.view === 'eavesdropper')
-const holders = computed(() => [...new Set(rows.value.map(r => r.holder))])
+const holders = computed(() => holderColumns(rows.value.map(r => r.holder), lessonRow.value?.lanes ?? []))
 const colsFor = (h: string) => rows.value.filter(r => r.holder === h)
 
 // Public values an eavesdropper keeps: random numbers and key shares that travelled in the clear.

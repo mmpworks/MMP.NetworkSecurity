@@ -295,3 +295,6 @@ export function onionOf(events: readonly TraceEvent[], upTo: number): Onion {
     gatewayNote: relayed?.detail ?? '',
   }
 }
+
+/** The holders that What each side knows shows, in column order. */
+export const holderColumns = (seen: readonly string[], _lanes: readonly string[]): string[] => [...new Set(seen)]
