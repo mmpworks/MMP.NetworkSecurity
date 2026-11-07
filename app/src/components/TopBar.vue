@@ -1,13 +1,13 @@
 <script setup lang="ts">
 import { computed } from 'vue'
-import { GLASS_NOTE, TARGET_DEVICES, hostState, setMode, trainingChip, ui } from '../store'
+import { GLASS_NOTE, TARGET_DEVICES, hostState, trainingChip, ui } from '../store'
+import { SECTIONS } from '../sections'
 import type { ViewMode } from '../types'
 import { badgeCount, keysChip, openSecurity } from '../security'
 import SettingsMenu from './SettingsMenu.vue'
 import ShowKeysSwitch from './ShowKeysSwitch.vue'
 
-// Grouped by job: what you study, where it runs, your keys. OS transport stays here at every width, because clause A16.ui.os-transport-label-and-hidden-secrets clicks it.
-const MODES = [['tour', 'Tour'], ['free', 'Free play']] as const
+// Grouped by job: the section and the view, where it runs, your keys. Tour and Free play sit inside Lessons, at the head of their panel. OS transport stays here at every width, because clause A16.ui.os-transport-label-and-hidden-secrets clicks it.
 const VIEWS: readonly (readonly [ViewMode, string])[] = [['endpoints', 'Endpoints'], ['eavesdropper', 'Eavesdropper'], ['both', 'Both']]
 const hostWord = computed(() => (hostState.value === 'connected' ? 'Connected' : hostState.value === 'connecting' ? 'Starting' : 'Offline'))
 const ownKeys = computed(() => keysChip.value !== 'Keys: built-in')
@@ -26,10 +26,10 @@ function toggleTransport() { ui.transport = ui.transport === 'os' ? 'glass' : 'o
       <span v-if="trainingChip === 'TRAINING ONLY'">This engine shows its keys on purpose. Never use it with real secrets. {{ GLASS_NOTE }}</span>
       <span v-else>The OS handles the keys and this course shows none of them.</span>
     </v-tooltip>
-    <span class="seg" role="group" aria-label="Mode" data-testid="mode-switch">
-      <button v-for="[id, label] in MODES" :key="id" type="button" :aria-pressed="ui.mode === id" :data-testid="`mode-${id}`" @click="setMode(id)">{{ label }}</button>
+    <span class="seg" role="group" aria-label="Section" data-testid="section-switch">
+      <button v-for="s in SECTIONS" :key="s.id" type="button" :aria-pressed="ui.section === s.id" :data-testid="`section-${s.id}`" @click="ui.section = s.id">{{ s.label }}</button>
     </span>
-    <span class="seg" role="group" aria-label="View" data-testid="view-switch">
+    <span v-if="ui.section === 'lessons'" class="seg" role="group" aria-label="View" data-testid="view-switch">
       <button v-for="[id, label] in VIEWS" :key="id" type="button" :aria-pressed="ui.view === id" :data-testid="`view-${id}`" @click="ui.view = id">{{ label }}</button>
     </span>
     <v-spacer />

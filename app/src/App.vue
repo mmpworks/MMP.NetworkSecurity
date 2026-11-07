@@ -13,6 +13,8 @@ import { paneShares } from './panes'
 import ByteInspector from './components/ByteInspector.vue'
 import EventLog from './components/EventLog.vue'
 import LessonRail from './components/LessonRail.vue'
+import SectionRail from './components/SectionRail.vue'
+import { sectionOf } from './sections'
 import SecretsPanel from './components/SecretsPanel.vue'
 import SequenceDiagram from './components/SequenceDiagram.vue'
 import TourPanel from './components/TourPanel.vue'
@@ -91,6 +93,7 @@ const race = computed(() => ({ left: raceStats(shownEvents.value, raceUpTo.value
 const win = ref({ w: window.innerWidth, h: window.innerHeight })
 const onResize = () => { win.value = { w: window.innerWidth, h: window.innerHeight } }
 const shares = computed(() => paneShares(win.value.w, win.value.h))
+const placeholderItem = computed(() => sectionOf(ui.section).items.find(i => i.id === ui.walkItem[ui.section]) ?? null)
 const bytesPanePercent = computed(() => shares.value.bytes)
 
 function moveSelection(d: number) {
@@ -156,12 +159,18 @@ const shortcuts: [string, string][] = [
         <WizardSheet v-if="sec.run" />
 
         <Splitpanes v-show="!sec.open && !ui.glossaryOpen" class="main-split">
-          <Pane :size="shares.rail" :min-size="11"><LessonRail /></Pane>
+          <Pane :size="shares.rail" :min-size="11"><LessonRail v-if="ui.section === 'lessons'" /><SectionRail v-else /></Pane>
           <Pane :size="100 - shares.rail" :min-size="60">
             <div class="workspace" data-testid="workspace">
             <!-- The AES walk mounts here and replaces the panels. Its tips and spec cards go to overlay-layer, outside this clip. -->
             <section v-if="ui.walkOpen" data-testid="walk-root" class="walk-root" />
-            <Splitpanes v-show="!ui.walkOpen">
+            <!-- Handshake and Techniques: the walk screens arrive in their slices. Until then the workspace says which slice brings the picked walk. -->
+            <section v-if="ui.section !== 'lessons'" class="section-placeholder" data-testid="section-placeholder">
+              <h2>{{ sectionOf(ui.section).label }}</h2>
+              <p v-if="placeholderItem">{{ placeholderItem.label }} arrives in slice {{ placeholderItem.slice }}.</p>
+              <p v-else>Pick a walk on the left. Each walk arrives in its own slice.</p>
+            </section>
+            <Splitpanes v-show="!ui.walkOpen && ui.section === 'lessons'">
           <Pane :size="100 - shares.side" :min-size="36">
             <Splitpanes horizontal>
               <Pane :size="100 - bytesPanePercent" :min-size="25">

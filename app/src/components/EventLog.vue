@@ -2,6 +2,7 @@
 import { computed, ref } from 'vue'
 import { active, allEvents, attack, isHighlighted, lessonRow, loadTrace, pauseEngine, restartSession, runEngine, selectedEvent, selectEvent, startSession, stepEngine, ui } from '../store'
 import { holderColumns } from '../lab'
+import ModeSwitch from './ModeSwitch.vue'
 
 const actor = ref('')
 const type = ref('')
@@ -17,7 +18,7 @@ const rows = computed(() => allEvents.value.filter(e => (!eve.value || e.type ==
 
 <template>
   <div class="tour" data-testid="event-log">
-    <div class="inspector-tools"><span class="side-title">FREE PLAY</span><span class="muted">{{ eve ? `${rows.length} on the wire` : `${allEvents.length} events` }}</span></div>
+    <div class="inspector-tools"><ModeSwitch /><span class="muted">{{ eve ? `${rows.length} on the wire` : `${allEvents.length} events` }}</span></div>
     <div class="btn-row">
       <v-btn v-if="!active" :disabled="ui.lesson == null || !lessonRow?.built" data-testid="free-start" @click="startSession('free')">Start free play</v-btn>
       <v-btn data-testid="free-run" :disabled="!active" @click="runEngine">Run</v-btn>
