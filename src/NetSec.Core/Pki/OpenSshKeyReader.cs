@@ -117,8 +117,8 @@ namespace NetSec.Pki
             if (c.U32("check value") != c.U32("check value")) throw Refuse(ErrorCodes.KeyFileFormat, "The 2 check values differ. The file is damaged, or it is encrypted.");
             string type = c.Text("key type");
             string publicType = new Cursor(publicBlob, 0, publicBlob.Length).Text("public key type");
-            if (type != publicType) throw Refuse(ErrorCodes.KeyFileFormat, "The private key type " + type + " differs from the public key type " + publicType + ".");
-            if (type != expectedType) throw Refuse(ErrorCodes.KeyAlgorithmNotInEngine, "This file holds an " + type + " key, and this role takes " + expectedType + ".");
+            if (type != publicType) throw Refuse(ErrorCodes.KeyFileFormat, "The private key type " + Shown(type) + " differs from the public key type " + Shown(publicType) + ".");
+            if (type != expectedType) throw Refuse(ErrorCodes.KeyAlgorithmNotInEngine, "This file holds " + Shown(type) + ", and this role takes " + expectedType + ".");
             ITrainingKey key = type == Ed25519Type ? ReadEd25519(c, publicBlob, keyId) : ReadRsa(c, publicBlob, keyId);
             c.Bytes("comment");
             for (int pad = 1; !c.AtEnd; pad++)
@@ -209,6 +209,15 @@ namespace NetSec.Pki
         }
 
         static bool Equal(byte[] a, byte[] b) { return a.Length == b.Length && Same(a, 0, b); }
+
+        /// <summary>A key type from the file, quoted, when it is short and printable ASCII. Else "an unknown type": the file chose those bytes.</summary>
+        static string Shown(string type)
+        {
+            const int Longest = 32;
+            if (type.Length == 0 || type.Length > Longest) return "an unknown type";
+            foreach (char ch in type) if (ch < 0x21 || ch > 0x7E) return "an unknown type";
+            return "an " + type + " key";
+        }
 
         static NetSecException Encrypted() { return Refuse(ErrorCodes.KeyFileEncrypted, "This key has a passphrase. A test key needs none."); }
 
