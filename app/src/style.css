@@ -426,6 +426,7 @@ body { overflow: hidden; }
 .aw-sizes { display: flex; align-items: center; gap: 6px; }
 .aw-key-source { margin: 0; font-weight: 600; }
 .aw-key-source-practice { color: var(--warn); }
+.aw-row { display: contents; }
 .aw-cell[tabindex] { cursor: pointer; }
 .aw-cell.aw-picked { border-color: var(--accent); box-shadow: 0 0 0 2px var(--accent) inset; }
 /* Key schedule (design section 2.2b): one 4 by 4 grid per round key, cells like block cells with a position mark and a word name. */

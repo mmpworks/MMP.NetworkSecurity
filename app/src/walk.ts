@@ -33,6 +33,8 @@ export interface AesBlockReply {
   keyWords: AesKeyWordRow[]
   forward: AesRun
   inverse: AesRun | null
+  /** Whether this run sent the block in ECB (design sections 2.2g and 2.4). */
+  wire?: { status: 'notSent' | 'match' | 'differs' | string; message: string }
 }
 
 /**

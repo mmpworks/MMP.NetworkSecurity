@@ -5,7 +5,8 @@ import { byteAt } from '../walk'
 
 // The S-box view (design section 2.3). The table is the engine's own, from the tables route. A lookup is position arithmetic:
 // the byte's first digit picks the row and the second picks the column. The view computes no byte.
-const props = defineProps<{ table: string; byte: string; inverse: boolean }>()
+// `noGrid` is set when no block grid is on screen (Show keys off), so the view does not ask for a click on one.
+const props = defineProps<{ table: string; byte: string; inverse: boolean; noGrid?: boolean }>()
 const DIGITS = '0123456789abcdef'.split('')
 
 const row = computed(() => props.byte.charAt(0).toLowerCase())
@@ -37,7 +38,7 @@ const value = computed(() => (props.byte.length === 2 ? at(row.value, col.value)
       </tbody>
     </table>
     <div class="aw-sbox-words">
-      <p class="muted">{{ gloss.sbox.pick }}</p>
+      <p v-if="!noGrid" class="muted">{{ gloss.sbox.pick }}</p>
       <p class="muted">{{ gloss.sbox.facts }}</p>
       <p v-if="inverse">{{ gloss.sbox.inverse }}</p>
     </div>

@@ -72,7 +72,8 @@ function back() { if (at.value > 0) at.value-- }
     <div class="aw-bench">
       <!-- The key schedule stops show the key, not the block, so the block grid steps aside there. -->
       <div v-if="stop.kind !== 'keys'" class="aw-grid" role="grid" aria-label="The state, 4 rows by 4 columns">
-        <template v-for="r in ROWS" :key="r">
+        <!-- Each row wrapper is display: contents, so the 4 by 4 CSS grid still places the cells, and assistive tech still reads rows. -->
+        <div v-for="r in ROWS" :key="r" class="aw-row" role="row">
           <span
             v-for="c in ROWS" :key="c" class="aw-cell" role="gridcell" :data-testid="`aes-walk-cell-${r}-${c}`"
             :class="{ 'aw-picked': canPick && picked === cellIndex(r, c) }"
@@ -80,7 +81,7 @@ function back() { if (at.value > 0) at.value-- }
             :data-letter="letter(r, c) || undefined" data-hex-byte
             @click="pick(r, c)" @keydown.enter.prevent="pick(r, c)" @keydown.space.prevent="pick(r, c)"
           >{{ cellText(stop, r, c) }}</span>
-        </template>
+        </div>
       </div>
       <div class="aw-right">
         <div class="aw-words">

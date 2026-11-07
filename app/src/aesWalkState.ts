@@ -42,11 +42,10 @@ export async function fetchAesBlock(sessionId: string) {
   aesWalk.loading = true
   try {
     // Chapter 1 is block 1 of the run's text, at the key size the picker holds (design sections 2.2b and 3.4).
-    const [body, tables] = await Promise.all([
+    const [body] = await Promise.all([
       hostGet(addr, `/api/sessions/${encodeURIComponent(sessionId)}/walk/aes/block?source=text&keyBits=${aesWalk.keyBits}`),
-      aesWalk.tables ?? hostGet(addr, '/api/walk/aes/tables'),
+      loadAesTables(),
     ])
-    aesWalk.tables = tables as AesTables
     if (gen !== aesWalk.gen || !sec.showKeys) return
     aesWalk.block = body as AesBlockReply
   } catch (e: any) {
@@ -54,6 +53,12 @@ export async function fetchAesBlock(sessionId: string) {
   } finally {
     if (gen === aesWalk.gen) aesWalk.loading = false
   }
+}
+
+/** The public tables, fetched once. The route stays open with Show keys off, so the closed walk can still show the S-box (design section 2.3). */
+export async function loadAesTables(): Promise<AesTables> {
+  if (!aesWalk.tables) aesWalk.tables = await hostGet(addr, '/api/walk/aes/tables') as AesTables
+  return aesWalk.tables
 }
 
 /** The key size picker: the walk fetches the run's block again at the new size. */

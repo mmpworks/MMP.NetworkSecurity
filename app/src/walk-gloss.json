@@ -12,6 +12,11 @@
     "InvSubBytes": "Each byte is looked up in the inverse S-box table, which undoes the S-box.",
     "InvMixColumns": "Each column is multiplied by the inverse matrix, which undoes MixColumns."
   },
+  "wire": {
+    "notSent": "A teaching example. AES runs on this text block alone, the way ECB uses it. This run did not send this block in ECB.",
+    "match": "This run sent this block in ECB. The locked block on the wire equals the walk's output.",
+    "differs": "This run sent this block in ECB, and a tamper plan changed it on the wire. The walk shows the block the sender locked."
+  },
   "keySource": {
     "run": "This run's key",
     "practice": "A practice key. It never ran in the lesson"
@@ -37,7 +42,7 @@
     "pick": "Click a byte in the grid to see the 4 products that made it.",
     "reduced": "too big for a byte, so it is reduced by 11b"
   },
-  "closed":"Show keys is off. These steps show the key and the round keys, so they stay closed. Turn Show keys on to walk them. The S-box table, the key size table, the round constants, the field definition, and the modes walk stay open.",
+  "closed":"Show keys is off. These steps show the key and the round keys, so they stay closed. Turn Show keys on to walk them. The S-box table below and the modes walk stay open.",
   "definition": [
     "A field is a set of values with add, subtract, multiply and divide, where every answer stays in the set. Only divide by zero is not allowed. They follow the usual rules of arithmetic.",
     "A finite field has a fixed number of values. Another name for it is a Galois field. The field that AES uses has 256 values, one for each byte. Its name is GF(2^8).",
