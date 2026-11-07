@@ -35,7 +35,7 @@ function expectWholePanel(m: Awaited<ReturnType<typeof measure>>) {
   expect(m.pageBar, 'a scrollbar on the page edge').toBe(0)
 }
 
-for (const size of [{ width: 1536, height: 760 }, { width: 1440, height: 760 }, { width: 1440, height: 900 }]) {
+for (const size of [{ width: 1536, height: 760 }, { width: 1440, height: 760 }, { width: 1440, height: 900 }, { width: 1280, height: 640 }]) {
   test(`at ${size.width} x ${size.height} TextGcm1 shows all 5 fields and no cut row`, async ({ page }) => {
     await page.setViewportSize(size)
     await runFreePlay(page, 1)

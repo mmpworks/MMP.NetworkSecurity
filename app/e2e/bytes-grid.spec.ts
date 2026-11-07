@@ -187,3 +187,39 @@ for (const size of [{ width: 1440, height: 760 }, { width: 1536, height: 760 }, 
     if (size.width >= 1440) expect(m.whole, 'the panel scrolls on a short lesson').toBeLessThanOrEqual(m.shown + 1)
   })
 }
+
+// The line between the 2 grids says what happened to the bytes. A grid that is too short for its own rows must not paint them over that line.
+// The app sets its pane shares when the window opens, so each size runs twice: opened at that size, and opened at 1440 x 770 and then resized, as a learner does.
+for (const [size, resized] of [[{ width: 1440, height: 770 }, false], [{ width: 1280, height: 640 }, false], [{ width: 1280, height: 640 }, true]] as const) {
+  test(`at ${size.width} x ${size.height}${resized ? ', resized from 1440 x 770,' : ''} the "locked with the key, then sent" line covers no hex row`, async ({ page }) => {
+    await page.setViewportSize(resized ? { width: 1440, height: 770 } : size)
+    await freePlay(page, 1)
+    await pick(page, 'TextGcm1')
+    if (resized) { await page.setViewportSize(size); await page.waitForTimeout(500) }
+    await expect(page.locator('.became')).toHaveText(/locked with the key, then sent/)
+    const hits = await page.evaluate(() => {
+      const line = document.querySelector('.became')!.getBoundingClientRect()
+      return [...document.querySelectorAll('.inspector .hex-scroll')].map(e => e.getBoundingClientRect()).filter(r => r.bottom > line.top + 1 && r.top < line.bottom - 1).length
+    })
+    expect(hits, 'hex grids that reach into the line').toBe(0)
+  })
+}
+
+// Binary hover: every hex byte cell, in the bytes panel and in the match grids, shows its byte in binary.
+test('a hex byte in the bytes panel and in a match grid shows its binary on hover', async ({ page }) => {
+  await freePlay(page, 1)
+  await pick(page, 'TextGcm1')
+  const tip = page.getByTestId('binary-tip')
+  const first = page.locator('[data-testid^=inspector-byte-]').first()
+  const text = (await first.textContent())!.trim()
+  await first.hover()
+  await expect(tip).toHaveText(`${text} = ${parseInt(text, 16).toString(2).padStart(8, '0').replace(/^(?<hi>.{4})/, '$<hi> ')}`)
+  const cell = page.locator('[data-testid^=convergence-grid-] .cell').first()
+  const c = (await cell.textContent())!.trim()
+  await cell.hover()
+  await expect(tip).toContainText(`${c} = `)
+  await page.mouse.move(5, 300)
+  await expect(tip).toHaveCount(0)
+  const unmarked = await page.evaluate(() => [...document.querySelectorAll('.inspector .hb, .grid32 .cell')].filter(e => !e.hasAttribute('data-hex-byte')).length)
+  expect(unmarked, 'hex cells with no binary hover').toBe(0)
+})
