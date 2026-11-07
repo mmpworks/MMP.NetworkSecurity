@@ -196,7 +196,7 @@ $pending = @($sel | Where-Object { -not $results.ContainsKey($_.id) })
 # ------------------------------------------------------------------ vectors made at run time
 # The X9.24-3 test vectors stay out of git (prd.md licence checklist item 1). fetch-x9.ps1 downloads the PDF into the ignored _cache folder and
 # records its SHA-256; extract_x9.py writes the vector file next to it. If either step fails, the clauses that need the file say VECTORS_MISSING.
-$needX9 = @($sel | Where-Object { $_.id -like 'A3.vec.*' -or $_.id -like 'A3.pinblock.*' -or $_.id -eq 'SELF.dukpt-vectors-pass' -or $_.id -eq 'SELF.vector-provenance' }).Count -gt 0
+$needX9 = @($sel | Where-Object { $_.id -like 'A3.vec.*' -or $_.id -like 'A3.pinblock.*' -or $_.id -like 'A3.sales1000.*' -or $_.id -like 'A3.erasure.*' -or $_.id -eq 'A17.payment.known-answer-vectors-through-flow-code' -or $_.id -eq 'SELF.dukpt-vectors-pass' -or $_.id -eq 'SELF.vector-provenance' }).Count -gt 0
 $x9Out = Join-Path $acc 'vectors\_cache\x9-24-3-aes-dukpt.nsv'
 if ($needX9 -and -not (Test-Path $x9Out)) {
     Say "fetching the X9.24-3 test vectors (ignored by git) and extracting them"
