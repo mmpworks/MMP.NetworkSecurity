@@ -87,7 +87,7 @@ test('real Electron at 1440 x 770 shows all 5 fields and no cut row, in Free pla
       await win.screenshot({ path: testInfo.outputPath('electron-at-failure.png') }).catch(() => {})
       const shown = await win.locator('.statusbar').innerText({ timeout: 2000 }).catch(() => 'no status bar')
       const session = /session (?<id>\S+)/.exec(shown)?.groups?.id ?? ''
-      const host = (p: string) => fetch(`http://127.0.0.1:5192${p}`, { headers: { Authorization: `Bearer ${FIT_TOKEN}` } }).then(r => r.json(), () => null)
+      const host = (p: string) => fetch(`http://127.0.0.1:5192${p}`, { headers: { Authorization: `Bearer ${FIT_TOKEN}` } }).then(r => r.json()).catch(() => null)
       const body = session ? await host(`/api/sessions/${session}/events`) : null
       const held: any[] = Array.isArray(body) ? body : body?.events ?? []
       const report = {
