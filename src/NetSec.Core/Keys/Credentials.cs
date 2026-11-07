@@ -113,6 +113,63 @@ namespace NetSec.Keys
 
         public static CredentialSet BuiltIn(ITrainingKeySource keys) { return new CredentialSet(keys, null); }
 
+        const string ProviderFile = "file";
+
+        // modes-design.md section 3.3. Rows this build does not read yet. A file of one is refused by name, so a run never mixes in a built-in key in silence.
+        static readonly string[] RowsNotBuilt =
+        {
+            "root.pem", "root.key", "anchors.pem", "srv.pem", "srv.key", "client.pem", "client.key", "rsa.pem", "rsa.key",
+            "issuer.key", "device.key", "bdk.hex", "aes.hex", "seal.hex",
+        };
+
+        /// <summary>
+        /// The learner's keys from a folder named as modes-design.md section 3.3 names them, for a probe or a test. Labs never use this call. A missing
+        /// file leaves that one type built-in. user.pub, when present, must name the key in user.key, and known_hosts, when present, is the pin.
+        /// </summary>
+        public static CredentialSet FromFiles(string directory)
+        {
+            if (directory == null) throw new ArgumentNullException("directory");
+            if (!System.IO.Directory.Exists(directory)) throw Refuse(ErrorCodes.KeyFileUnreadable, "The folder " + directory + " does not exist.");
+            foreach (string name in RowsNotBuilt)
+                if (System.IO.File.Exists(System.IO.Path.Combine(directory, name)))
+                    throw Refuse(ErrorCodes.FileRowNotBuilt, "This build does not read " + name + " yet. Take it out of the folder, or wait for that slice.");
+            List<Credential> mine = new List<Credential>();
+            AddKey(mine, directory, "host.key", SecurityTypes.SshHostEd25519, KeyIds.SshHostEd25519, NetSec.Pki.OpenSshKeyReader.Ed25519Type);
+            AddKey(mine, directory, "rsa-host.key", SecurityTypes.SshHostRsa, KeyIds.SshHostRsa, NetSec.Pki.OpenSshKeyReader.RsaType);
+            ITrainingKey user = AddKey(mine, directory, "user.key", SecurityTypes.SshClient, KeyIds.SshClient, NetSec.Pki.OpenSshKeyReader.Ed25519Type);
+            CheckUserPub(directory, user);
+            string pin = System.IO.Path.Combine(directory, "known_hosts");
+            if (System.IO.File.Exists(pin))
+            {
+                NetSec.Pki.OpenSshKeyReader.ReadText(pin);
+                mine.Add(new Credential(SecurityTypes.SshKnownHosts, CredentialMode.Mine, ProviderFile, 1, "", null));
+            }
+            return new CredentialSet(new TrainingKeySource(), mine.ToArray());
+        }
+
+        static ITrainingKey AddKey(List<Credential> mine, string directory, string file, string typeId, string keyId, string sshType)
+        {
+            string path = System.IO.Path.Combine(directory, file);
+            if (!System.IO.File.Exists(path)) return null;
+            ITrainingKey key = NetSec.Pki.OpenSshKeyReader.Read(path, keyId, sshType);
+            mine.Add(new Credential(typeId, CredentialMode.Mine, ProviderFile, 1, "", key));
+            return key;
+        }
+
+        static void CheckUserPub(string directory, ITrainingKey user)
+        {
+            string path = System.IO.Path.Combine(directory, "user.pub");
+            if (!System.IO.File.Exists(path)) return;
+            if (user == null) throw Refuse(ErrorCodes.KeyFileFormat, "The folder holds user.pub and no user.key. The client needs its private key.");
+            byte[] blob = NetSec.Pki.OpenSshKeyReader.PublicBlobOfLine(NetSec.Pki.OpenSshKeyReader.ReadText(path));
+            byte[] want = NetSec.Pki.OpenSshKeyReader.Ed25519BlobOf(user.CopyPublic());
+            bool same = blob.Length == want.Length;
+            for (int i = 0; same && i < want.Length; i++) same = blob[i] == want[i];
+            if (!same) throw Refuse(ErrorCodes.KeyFileFormat, "user.pub names another key than user.key.");
+        }
+
+        static NetSecException Refuse(string code, string message) { return new NetSecException(NetSecError.Of(code, message)); }
+
         public ITrainingKey Find(string keyId)
         {
             string typeId = SecurityTypes.OfKey(keyId);
