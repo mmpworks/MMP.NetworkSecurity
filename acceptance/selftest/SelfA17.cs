@@ -63,6 +63,7 @@ namespace Acceptance
             new Case("A17.attacks.every-row-forks-to-its-code", AttackRowClauses.EveryRowForksToItsCode, "attack-finish-other-code", "attack-finish-no-check", "attack-row-unavailable"),
             new Case("A19.host.practice-key-192-256", AesWalkHostClauses.PracticeKeySizes, "walk-practice-no-xor", "walk-practice-says-run", "walk-block-open-off"),
             new Case("A19.host.tls13-schedule-open-and-rfc8448", Tls13WalkClauses.ScheduleOpenAndRfc8448, "schedule-closed-off", "schedule-step-flip", "schedule-other-keysource"),
+            new Case("A19.host.typed-routes-follow-key-size", AesWalkHostClauses.TypedRoutesFollowKeySize, "typed-size-ignored", "typed-bad-size-accepted"),
             new Case("A19.host.typed-routes-open-with-keys-off", AesWalkHostClauses.TypedRoutesOpen, "typed-closed-off", "typed-run-key"),
             new Case("A19.host.show-keys-off-closes-block-first", AesWalkHostClauses.OffClosesBlock, "walk-block-open-off", "walk-session-before-toggle", "walk-off-error-bytes", "walk-tables-closed-off"),
             new Case("A19.host.replies-carry-no-store", AesWalkHostClauses.NoStore, "walk-no-store-missing"),
