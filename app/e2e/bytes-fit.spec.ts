@@ -23,9 +23,11 @@ const measure = (page: Page) => page.evaluate(() => {
   return { railWhole: rail.scrollHeight, railShown: rail.clientHeight, pageBar: innerWidth - document.documentElement.clientWidth, fields: rows.length, fieldsInView: rows.filter(r => r.top >= list.top - 1 && r.bottom <= list.bottom + 1).length, grids, barRows: new Set(middles).size }
 })
 
-function expectWholePanel(m: Awaited<ReturnType<typeof measure>>) {
-  expect(m.fieldsInView, 'field rows in view').toBe(5)
-  expect(m.grids, 'the Before and After grids').toHaveLength(2)
+// The Eavesdropper view hides the Before grid, so it shows 1 grid. Every field row is in view in every view.
+function expectWholePanel(m: Awaited<ReturnType<typeof measure>>, view = 'endpoints') {
+  expect(m.fields, 'field rows').toBe(5)
+  expect(m.fieldsInView, `field rows in view, of ${m.fields}`).toBe(m.fields)
+  expect(m.grids, 'the Before and After grids').toHaveLength(view === 'eavesdropper' ? 1 : 2)
   for (const g of m.grids) {
     expect(g.whole, 'a hex row is cut').toBeLessThanOrEqual(g.shown)
     expect(g.wholeWide, 'a hex column is cut').toBeLessThanOrEqual(g.shownWide)
@@ -35,12 +37,17 @@ function expectWholePanel(m: Awaited<ReturnType<typeof measure>>) {
   expect(m.pageBar, 'a scrollbar on the page edge').toBe(0)
 }
 
-for (const size of [{ width: 1536, height: 760 }, { width: 1440, height: 760 }, { width: 1440, height: 900 }, { width: 1280, height: 640 }]) {
-  test(`at ${size.width} x ${size.height} TextGcm1 shows all 5 fields and no cut row`, async ({ page }) => {
+// Every size in all 3 views. 1984 x 1030 is Steve's window less Electron's title bar and menu bar.
+for (const size of [{ width: 1536, height: 760 }, { width: 1440, height: 760 }, { width: 1440, height: 900 }, { width: 1280, height: 640 }, { width: 1984, height: 1030 }]) {
+  test(`at ${size.width} x ${size.height} TextGcm1 shows all 5 fields and no cut row, in all 3 views`, async ({ page }) => {
     await page.setViewportSize(size)
     await runFreePlay(page, 1)
     await pickTextGcm1(page)
-    expectWholePanel(await measure(page))
+    for (const view of ['endpoints', 'eavesdropper', 'both']) {
+      await page.getByTestId(`view-${view}`).click()
+      await page.waitForTimeout(600)
+      await test.step(view, async () => expectWholePanel(await measure(page), view))
+    }
   })
 }
 

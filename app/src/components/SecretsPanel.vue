@@ -76,7 +76,7 @@ const copy = (hex: string) => { try { void navigator.clipboard?.writeText(hex) }
             <span class="sname">{{ r.name }}</span>
             <code :data-testid="`secret-value-${r.holder}-${r.name}`">{{ open.has(h + r.name) && r.hex ? r.hex : short(valueOf(r)) || 'Fingerprint not available' }}</code>
             <span class="muted">{{ r.hex ? r.hex.length >> 1 : r.length }} bytes</span>
-            <span v-for="d in r.derivedFrom" :key="d" class="chip-from">{{ d }}</span>
+            <span v-if="r.derivedFrom.length" class="from-list"><span v-for="d in r.derivedFrom" :key="d" class="chip-from">{{ d }}</span></span>
             <v-btn v-if="r.hex" size="x-small" variant="text" :data-testid="`secret-reveal-${r.holder}-${r.name}`" @click="toggle(h + r.name)">{{ open.has(h + r.name) ? 'Hide' : 'Show all' }}</v-btn>
             <v-btn v-if="r.hex" size="x-small" variant="text" icon="mdi-content-copy" aria-label="Copy value" @click="copy(r.hex)" />
           </div>
