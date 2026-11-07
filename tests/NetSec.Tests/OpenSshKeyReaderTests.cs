@@ -323,12 +323,13 @@ namespace NetSec.Tests
             byte[] blob = new Raw().Text(bad).Bytes(pub).ToArray();
             byte[] section = new Raw().U32(7).U32(7).Text(bad).Bytes(pub).Text("c").Pad(8).ToArray();
             NetSecException e = Assert.Throws<NetSecException>(() => OpenSshKeyReader.Parse(Armor(File(blob, section)), KeyIds.SshClient, Ed));
-            Assert.DoesNotContain("\u001b", e.Error.Message);
+            // Ordinal: a culture compare ignores a control character and finds it everywhere.
+            Assert.DoesNotContain("\u001b", e.Error.Message, StringComparison.Ordinal);
             Assert.DoesNotContain(new string('A', 40), e.Error.Message);
             Assert.Contains("an unknown type", e.Error.Message);
             byte[] otherBlob = new Raw().Text(Ed).Bytes(pub).ToArray();
             NetSecException mismatch = Assert.Throws<NetSecException>(() => OpenSshKeyReader.Parse(Armor(File(otherBlob, section)), KeyIds.SshClient, Ed));
-            Assert.DoesNotContain("\u001b", mismatch.Error.Message);
+            Assert.DoesNotContain("\u001b", mismatch.Error.Message, StringComparison.Ordinal);
             Assert.Contains("an unknown type", mismatch.Error.Message);
         }
     }
