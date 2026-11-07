@@ -85,10 +85,13 @@ Step 'secret_guard' { python -I tools/secret_guard.py }
 # The check is fast and needs no build, so the builder's own gate runs it here. Builders do not write acceptance/, so the red sends them to Echo.
 $walkRoutes = @(python -I acceptance/checks/docs_checks.py --root $root --ids A19.repo.walk-routes-listed 2>&1 | ForEach-Object { "$_" } |
     Where-Object { $_ -like '@@CLAUSE *' } | ForEach-Object { ($_ -replace '^@@CLAUSE ', '') | ConvertFrom-Json }) | Select-Object -First 1
-if ($walkRoutes -and $walkRoutes.status -eq 'NOT RUN') { Skip 'A19.repo.walk-routes-listed' "$($walkRoutes.reason): $($walkRoutes.detail)" }
+# Only PRODUCT_MISSING (the walk is not built in this tree yet) may skip. Any other NOT RUN, such as NOT_IN_GROUP after a clause rename, fails the step,
+# so the gate cannot skip forever without a word.
+if ($walkRoutes -and $walkRoutes.status -eq 'NOT RUN' -and $walkRoutes.reason -eq 'PRODUCT_MISSING') { Skip 'A19.repo.walk-routes-listed' "$($walkRoutes.reason): $($walkRoutes.detail)" }
 else {
     Step 'A19.repo.walk-routes-listed' {
         if (-not $walkRoutes) { 'GATE_WALK_ROUTES_NO_RESULT: acceptance/checks/docs_checks.py printed no clause line'; $global:LASTEXITCODE = 1 }
+        elseif ($walkRoutes.status -eq 'NOT RUN') { "GATE_WALK_ROUTES_UNEXPECTED: $($walkRoutes.reason): $($walkRoutes.detail)"; $global:LASTEXITCODE = 1 }
         elseif ($walkRoutes.status -ne 'PASS') {
             "FAIL $($walkRoutes.reason): $($walkRoutes.detail)"
             'Ask Echo for the list row before filing. Builders do not write acceptance/.'
