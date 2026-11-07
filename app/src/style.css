@@ -281,7 +281,7 @@ body { overflow: hidden; }
 .sec-head { display: flex; align-items: center; gap: 12px; flex-wrap: wrap; }
 .sec-title { font-size: 20px; font-weight: 700; margin: 0; }
 .sec-line { margin: 8px 0 12px; font-weight: 600; }
-.sec-goal { display: flex; align-items: center; gap: 12px; flex-wrap: wrap; padding: 12px; border: 1px solid var(--line); border-radius: 8px; background: var(--surface2); }
+.sec-goal { display: flex; align-items: center; gap: 12px; flex-wrap: wrap; padding: 14px 16px; border: 1px solid var(--line); border-radius: 14px; background: var(--surface); }
 .sec-flows { display: flex; gap: 8px; flex-wrap: wrap; margin: 12px 0; }
 .sec-group { font-size: 14px; font-weight: 700; margin: 16px 0 6px; color: var(--muted); text-transform: none; }
 .sec-row { display: grid; grid-template-columns: minmax(200px, 1fr) auto minmax(180px, auto) 110px auto; gap: 8px 12px; align-items: center; padding: 8px 6px; border-bottom: 1px solid var(--line); }
@@ -320,7 +320,7 @@ body { overflow: hidden; }
 
 /* Practice vault */
 .vault-keys { display: flex; flex-direction: column; gap: 6px; margin: 12px 0; }
-.vault-key { display: flex; flex-wrap: wrap; align-items: center; gap: 4px 12px; padding: 8px 10px; border: 1px solid var(--line); border-radius: 8px; }
+.vault-key { display: flex; flex-wrap: wrap; align-items: center; gap: 4px 12px; padding: 10px 14px; border: 1px solid var(--line); border-radius: 14px; background: var(--surface); }
 .vault-key code, .vault-screen code { font: 12px var(--mono); overflow-wrap: anywhere; }
 .vault-hidden { flex: 1 1 100%; font-size: 13px; border-left: 3px solid var(--warn); padding-left: 8px; }
 .vault-tabs { display: flex; gap: 8px; margin: 12px 0; flex-wrap: wrap; }
@@ -336,3 +336,16 @@ body { overflow: hidden; }
 .kiu-chips { display: flex; flex-wrap: wrap; gap: 6px; }
 .kiu-chip { display: inline-flex; flex-wrap: wrap; align-items: baseline; gap: 2px 8px; padding: 3px 8px; border: 1px solid var(--line); border-radius: 8px; font-size: 12px; }
 .kiu-chip code { font: 11px var(--mono); overflow-wrap: anywhere; }
+
+/* The approved mock's controls on every screen: an outlined button, a filled accent button for the main action, and a segmented switch for a choice of 2 or 3. */
+.v-btn { letter-spacing: 0 !important; font-family: var(--body); border-radius: 9px; }
+.v-btn--variant-tonal { border: 1px solid var(--line); }
+.v-btn--variant-tonal .v-btn__underlay { opacity: 0 !important; }
+.v-btn--variant-tonal.text-error { border-color: currentColor; }
+.v-btn--variant-tonal.text-primary:not(.v-btn--disabled) { background: var(--accent); border-color: var(--accent); color: var(--accent-fg) !important; font-weight: 700; }
+.v-btn-group { background: var(--surface2); padding: 3px; gap: 3px; border-radius: 10px; height: auto !important; border: 0; }
+.v-btn-group .v-btn { border: 0; border-radius: 7px !important; background: transparent; }
+.v-btn-group .v-btn.v-btn--active { background: var(--surface); font-weight: 700; box-shadow: 0 1px 2px rgba(0, 0, 0, .18); }
+.v-btn-group .v-btn .v-btn__overlay { opacity: 0 !important; }
+.wizard.v-card { border-radius: 14px; border: 1px solid var(--line); }
+.sec-title { font-family: var(--display); }
