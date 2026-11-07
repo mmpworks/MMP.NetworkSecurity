@@ -100,12 +100,13 @@ const screenText = (page: Page) => page.locator('.main-split').evaluate(root => 
 })
 
 async function scan(page: Page, values: ReturnType<typeof forbiddenValues>, where: string, out: Finding[]) {
-  // A tab labeled as the lab's own view says what it is, and it has no wire to compare with.
-  if (await page.getByTestId('inspector-lab-view').count()) return
   const screen = await screenText(page)
   if (screen === lastScreen) return
   lastScreen = screen
-  for (const [w, from] of values.words) if (screen.includes(w)) out.push({ what: 'text', where, value: w.slice(0, 40), from })
+  // A tab labeled as the lab's own view excuses the words in that tab and nothing else: key bytes still fail, and so do the other panes' words.
+  const labTab = await page.getByTestId('inspector-lab-view').count() > 0
+  const words = labTab ? await page.locator('.main-split .panel').evaluateAll(all => all.filter(p => !p.querySelector('[data-testid=inspector-lab-view]')).map(p => (p as HTMLElement).innerText).join('\n')) : screen
+  for (const [w, from] of values.words) if (words.includes(w)) out.push({ what: 'text', where, value: w.slice(0, 40), from })
   for (const [b, from] of values.base64) if (screen.includes(b)) out.push({ what: 'base64', where, value: b, from })
   // Spaces, colons and dashes are how a screen can format hex, so they go before the search. A window lookup keeps this fast on a long message.
   const packed = screen.toLowerCase().replace(/[\s:\-]/g, '')
@@ -126,16 +127,17 @@ for (let lesson = 0; lesson <= 11; lesson++) {
     await page.getByTestId(`lesson-item-${lesson}`).click()
     await page.getByTestId('mode-free').click()
     await page.getByTestId('free-start').click()
-    // What the screen says before the engine runs is fixed text, and no message put it there. The session starts held at its first step.
+    // What the screen says before the engine runs is fixed text, unless an event already stored put it there. The session starts held at its first step.
     await expect(page.getByTestId('free-run')).toBeVisible()
     await page.getByTestId('diagram').waitFor()
     const fixedText = await screenText(page)
+    const early = (await eventsOf(page)).map(e => `${textOf(e.plain)}|${e.message}|${e.detail}`).join('|')
     await page.getByTestId('free-run').click()
     await expect(page.getByTestId('engine-state')).toContainText(/finished/, { timeout: 90_000 })
     const events = await eventsOf(page)
     expect(events.length, 'events from the engine, or this sweep proves nothing').toBeGreaterThan(0)
     const values = forbiddenValues(events)
-    for (const w of [...values.words.keys()]) if (fixedText.includes(w)) values.words.delete(w)
+    for (const w of [...values.words.keys()]) if (fixedText.includes(w) && !early.includes(w)) values.words.delete(w)
 
     const found: Finding[] = []
     const onWire = events.filter(e => e.type === 'wire.sent')
