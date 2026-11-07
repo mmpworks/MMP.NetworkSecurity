@@ -1,12 +1,12 @@
 <script setup lang="ts">
 import { computed } from 'vue'
 import { avalancheOf, listenerCanMeasure, parseDetail, percent } from '../lab'
-import { selectedEvent, shownEvents, ui, upToSeq } from '../store'
+import { allEvents, selectedEvent, shownEvents, ui, upToSeq } from '../store'
 
 // Numbers come from measure.result events and nothing else (ux-design.md: no fake data).
 const upTo = upToSeq
 const eve = computed(() => ui.view === 'eavesdropper')
-const measures = computed(() => shownEvents.value.filter(e => e.type === 'measure.result' && e.seq <= upTo.value && (!eve.value || listenerCanMeasure(e))).map(e => ({ e, d: parseDetail(e.detail), av: e.message.includes('avalanche') ? avalancheOf(e.plain) : null })))
+const measures = computed(() => shownEvents.value.filter(e => e.type === 'measure.result' && e.seq <= upTo.value && (!eve.value || listenerCanMeasure(e, allEvents.value))).map(e => ({ e, d: parseDetail(e.detail), av: e.message.includes('avalanche') ? avalancheOf(e.plain) : null })))
 </script>
 
 <template>

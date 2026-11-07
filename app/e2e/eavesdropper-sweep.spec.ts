@@ -1,7 +1,7 @@
 import { expect, test, type Page } from '@playwright/test'
 import { createHash } from 'node:crypto'
 import { startOwnHost, type OwnHost } from './own-host'
-import { certificatesArePublic, closedToListener } from '../src/lab'
+import { certificatesArePublic, closedToListener, listenerCanMeasure } from '../src/lab'
 import { open } from './walk'
 
 // A listener sees the wire and nothing else. This walks every lesson's tabs and events in the Eavesdropper view, and it fails on readable text or key
@@ -115,8 +115,9 @@ async function scan(page: Page, values: ReturnType<typeof forbiddenValues>, wher
   }
 }
 
-// Lessons 7 to 10 take about 5 minutes each, because each view switch redraws a long diagram. They run in the long run: NETSEC_SWEEP_ALL=1.
-const LESSONS = process.env.NETSEC_SWEEP_ALL === '1' ? [0, 1, 2, 3, 4, 5, 6, 7, 8, 9, 10, 11] : [0, 1, 2, 3, 4, 5, 6, 11]
+// The rule (lead, 2026-11-06): lessons 0 to 6 in every suite. All 12 with NETSEC_SWEEP_ALL=1, in Echo's long run and on any PR that touches the Eavesdropper view.
+// Lessons 7 to 10 take about 5 minutes each, because each view switch redraws a long diagram.
+const LESSONS = process.env.NETSEC_SWEEP_ALL === '1' ? [0, 1, 2, 3, 4, 5, 6, 7, 8, 9, 10, 11] : [0, 1, 2, 3, 4, 5, 6]
 for (const lesson of LESSONS) {
   test(`lesson ${lesson}: the Eavesdropper view shows nothing a listener could not see`, async ({ page }) => {
     test.setTimeout(900_000)
@@ -284,6 +285,13 @@ test('a token that crosses in the clear stays open, and one under a lock closes'
   const f = (name: string, visibleToWire: boolean) => ({ name, offset: 0, length: 1, kind: 'data', visibleToWire, gloss: '' })
   expect(closedToListener('token', [{ type: 'wire.sent', plain: '', wire: 'aa', fields: [f('tokenClaims', true)] } as any])).toBeNull()
   expect(closedToListener('token', [{ type: 'wire.sent', plain: '', wire: 'aa', fields: [f('tokenClaims', false)] } as any])).toContain('locked')
+})
+
+test('a measure of token claims shows the listener only while the token crosses in the clear', () => {
+  const field = (visibleToWire: boolean) => ({ name: 'tokenClaims', offset: 0, length: 1, kind: 'data', visibleToWire, gloss: '' })
+  const claims = { type: 'measure.result', message: 'token claims', detail: '', plain: 'aa', wire: '', fields: [] } as any
+  expect(listenerCanMeasure(claims, [claims, { type: 'wire.sent', plain: '', wire: 'aa', fields: [field(true)] } as any])).toBe(true)
+  expect(listenerCanMeasure(claims, [claims, { type: 'wire.sent', plain: '', wire: 'aa', fields: [field(false)] } as any])).toBe(false)
 })
 
 test('a certificate that crosses the wire in the clear is public, and one that does not is closed', async () => {

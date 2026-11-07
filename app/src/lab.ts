@@ -158,7 +158,7 @@ export function listenerLabel(tab: string, events: readonly TraceEvent[]): strin
 }
 
 /** True for a measure a listener could take from the wire: repeated blocks in ciphertext, and claims in a token that crosses in the clear. */
-export const listenerCanMeasure = (e: TraceEvent): boolean => /(?:^|;)repeats=/.test(e.detail) || e.message === 'token claims' || e.message === 'proof claims'
+export const listenerCanMeasure = (e: TraceEvent, events: readonly TraceEvent[]): boolean => /(?:^|;)repeats=/.test(e.detail) || ((e.message === 'token claims' || e.message === 'proof claims') && tokensArePublic(events))
 
 // ---- lesson 7: the race ----
 
