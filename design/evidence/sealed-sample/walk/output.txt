@@ -1,0 +1,32 @@
+intact chain, real seal
+  Status: PASS
+  ExitCode: 0
+
+last event cut, real seal
+  Status: FAIL
+  Step: 10
+  Reason: merkle root mismatch — ledger contents do not produce sealed root
+  ExitCode: 1
+
+rewritten with the key, real seal
+  Status: FAIL
+  Step: 10
+  Reason: merkle root mismatch — ledger contents do not produce sealed root
+  ExitCode: 1
+
+rewritten, root replaced, real signature
+  Status: FAIL
+  Step: 11
+  Reason: signature verification failed
+  ExitCode: 1
+
+rewritten, seal signed with the writer's own key, verified with the real public key
+  Status: FAIL
+  Step: 11
+  Reason: signature verification failed
+  ExitCode: 1
+
+the same file, verified with the writer's public key
+  Status: PASS
+  ExitCode: 0
+
