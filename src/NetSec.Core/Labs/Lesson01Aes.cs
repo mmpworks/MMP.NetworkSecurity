@@ -5,6 +5,7 @@ using MMP.AsyncProxy;
 using NetSec.Bytes;
 using NetSec.Crypto;
 using NetSec.Errors;
+using NetSec.Keys;
 using NetSec.Machine;
 using NetSec.Trace;
 
@@ -61,8 +62,7 @@ namespace NetSec.Labs
         public IFuture<LabResult> Run(LabContext c)
         {
             if (c == null) throw new ArgumentNullException("c");
-            byte[] key = new byte[BlockSize];
-            c.Random.Fill(key, 0, key.Length);
+            byte[] key = LabCredentials.LessonKey(c, SecurityTypes.LabAesKey);
 
             Session clientSession = new Session(LabPair.Fork(c));
             clientSession.TextInEcb = LabPair.Option(c, OptionTextMode) == "ecb";

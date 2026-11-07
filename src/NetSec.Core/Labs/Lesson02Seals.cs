@@ -4,6 +4,7 @@ using MMP.AsyncProxy;
 using NetSec.Bytes;
 using NetSec.Crypto;
 using NetSec.Errors;
+using NetSec.Keys;
 using NetSec.Machine;
 using NetSec.Trace;
 
@@ -23,9 +24,9 @@ namespace NetSec.Labs
         public const string CmacCheck = "CMAC compare";
         public const string AvalancheName = "SHA-256 avalanche";
 
-        const int KeySize = 16;
         const int HashBlock = 64;
         const int LengthPrefix = 2;
+        const int KeySize = LabCredentials.LessonKeyBytes;
         const string KeyName = "seal.key";
         const string Start0 = "Start";
 
@@ -55,8 +56,7 @@ namespace NetSec.Labs
         public IFuture<LabResult> Run(LabContext c)
         {
             if (c == null) throw new ArgumentNullException("c");
-            byte[] key = new byte[KeySize];
-            c.Random.Fill(key, 0, key.Length);
+            byte[] key = LabCredentials.LessonKey(c, SecurityTypes.LabSealKey);
             Session clientSession = new Session(LabPair.Fork(c)), serverSession = new Session(LabPair.Fork(c));
             clientSession.Remember(KeyName, key);
             serverSession.Remember(KeyName, key);

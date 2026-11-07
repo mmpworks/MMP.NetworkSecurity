@@ -111,6 +111,24 @@ namespace NetSec.Labs
     public static class LabCredentials
     {
         public static CredentialSet Of(LabContext c) { return c.Credentials ?? CredentialSet.BuiltIn(new TrainingKeySource()); }
+
+        /// <summary>The bytes of a key lessons 1 and 2 use. All are this long, so a flow can make them.</summary>
+        public const int LessonKeyBytes = 16;
+
+        /// <summary>
+        /// A lesson's data key: the learner's when the set holds one, else drawn from the run's random source. It draws either way, so the
+        /// rest of the run reads the same random bytes, and a built-in run stays as the golden trace recorded it.
+        /// </summary>
+        public static byte[] LessonKey(LabContext c, string typeId)
+        {
+            byte[] drawn = new byte[LessonKeyBytes];
+            c.Random.Fill(drawn, 0, drawn.Length);
+            ITrainingKey mine = Of(c).MineOrNull(typeId);
+            if (mine == null) return drawn;
+            byte[] own = mine.CopyMaterial();
+            if (own.Length != LessonKeyBytes) throw new NetSecException(NetSecError.Of(ErrorCodes.SecurityTypeNotReady, typeId + " holds " + own.Length + " bytes, and this lesson needs " + LessonKeyBytes + "."));
+            return own;
+        }
     }
 
     public static class LabCatalog

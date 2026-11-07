@@ -16,6 +16,7 @@ public sealed class SecurityStore
     public const string ModeBuiltIn = "BuiltIn", ModeMine = "Mine";
     public const string StateBuiltIn = "BuiltIn", StateUnconfigured = "Unconfigured", StateConfigured = "Configured", StateVerified = "Verified", StateBroken = "Broken";
     const string ProviderFile = "file";
+    const string ByteKeyFile = "key.hex";
     public const string ProviderVault = "vault";
 
     /// <summary>The caller name a flow's own review and check use when they read a key out of the vault.</summary>
@@ -131,6 +132,21 @@ public sealed class SecurityStore
         }
     }
 
+    /// <summary>A key that is plain bytes, as hex in its file. As with PlaceKey, the old version stays on disk.</summary>
+    public void PlaceBytes(string typeId, byte[] key)
+    {
+        lock (_gate)
+        {
+            TypeEntry e = EntryOf(_modes, typeId);
+            int version = (e.Binding?.Version ?? 0) + 1;
+            string relative = Path.Combine("files", typeId, "v" + version, ByteKeyFile);
+            string full = FullPath(relative);
+            Directory.CreateDirectory(Path.GetDirectoryName(full)!);
+            File.WriteAllText(full, Convert.ToHexString(key).ToLowerInvariant());
+            Put(typeId, e with { Mode = ModeMine, Binding = new KeyBinding(ProviderFile, version, relative, HashOf(full)) });
+        }
+    }
+
     /// <summary>The key goes in as a new version of the vault key named for the type. The key's policy was set when the first version went in, and stays.</summary>
     /// <summary>
     /// A folder made before slice V1 holds the my-login keys as key.pem files. On first start each one moves into the vault, under the caller
@@ -217,7 +233,8 @@ public sealed class SecurityStore
     {
         KeyBinding? b = Entry(typeId).Binding;
         if (b?.Provider == ProviderVault) return new SeedKey(typeId, Vaulted(() => Vault.Export(typeId, caller, b.Version)));
-        return b?.KeyFile is null ? null : KeyFileReader.ReadPrivateKey(FullPath(b.KeyFile), typeId);
+        if (b?.KeyFile is null) return null;
+        return Path.GetFileName(b.KeyFile) == ByteKeyFile ? ReadBytesKey(typeId, FullPath(b.KeyFile)) : KeyFileReader.ReadPrivateKey(FullPath(b.KeyFile), typeId);
     }
 
     Credential? Open(string typeId, string caller)
@@ -234,6 +251,26 @@ public sealed class SecurityStore
     }
 
     public static string FingerprintOf(byte[] publicPart) => Fingerprints.OfPublic(publicPart);
+
+    static ITrainingKey ReadBytesKey(string typeId, string path)
+    {
+        try { return new BytesKey(typeId, Convert.FromHexString(File.ReadAllText(path).Trim())); }
+        catch (FormatException) { throw new NetSec.Errors.NetSecException(NetSec.Errors.NetSecError.Of(NetSec.Errors.ErrorCodes.KeyFileFormat, $"{typeId}: the key file does not hold hex.")); }
+        catch (IOException e) { throw new NetSec.Errors.NetSecException(NetSec.Errors.NetSecError.Of(NetSec.Errors.ErrorCodes.KeyFileUnreadable, $"{typeId}: {e.Message}")); }
+    }
+
+    /// <summary>
+    /// A symmetric key has no public half. Its "public" part is a hash that cannot give the key back, so a fingerprint can tell 2 keys apart
+    /// with Show keys off. Empty bytes would give every such key one fingerprint.
+    /// </summary>
+    sealed class BytesKey(string keyId, byte[] key) : ITrainingKey
+    {
+        static readonly byte[] Label = System.Text.Encoding.ASCII.GetBytes("MMP.NetworkSecurity lesson key fingerprint");
+        public string KeyId => keyId;
+        public KeyAlgorithm Algorithm => KeyAlgorithm.Raw;
+        public byte[] CopyMaterial() => (byte[])key.Clone();
+        public byte[] CopyPublic() => SHA256.HashData([.. Label, .. key]);
+    }
 
     /// <summary>An Ed25519 seed taken out of the vault, in the shape the glass engines read.</summary>
     sealed class SeedKey(string keyId, byte[] seed) : ITrainingKey

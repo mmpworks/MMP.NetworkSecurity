@@ -382,4 +382,48 @@ public class WizardMachineTests
         Assert.Equal(run.RunId, again.OpenRunOf("my-login"));
         Assert.Equal("Make", again.Find(run.RunId)!.Run.State);
     }
+
+    [Fact]
+    public void Each_lesson_key_is_checked_with_hmac_and_cmac_and_the_aes_key_also_on_one_block()
+    {
+        using Rig rig = new();
+        FlowRun run = rig.Runs.Start("my-lesson-keys")!.Run;
+        run = Move(rig.Runs, run, "next", NoData).Run;
+        run = Move(rig.Runs, run, "make", NoData).Run;
+        RunReply check = Move(rig.Runs, Move(rig.Runs, run, "next", NoData).Run, "check", NoData);
+        CheckFact[] facts = check.Facts.Cast<CheckFact>().ToArray();
+        Assert.Equal(2, facts.Length);
+        foreach (CheckFact fact in facts)
+        {
+            Assert.True(fact.Passed, fact.TypeId + ": " + fact.Message + " " + fact.Output);
+            Assert.Contains(" HMAC", fact.Command);
+            Assert.Contains(" CMAC", fact.Command);
+            Assert.Equal(fact.TypeId == SecurityTypes.LabAesKey, fact.Command.Contains("enc -aes-128-ecb"));
+            string hex = Convert.ToHexString(rig.Store.PlacedKey(fact.TypeId)!.CopyMaterial());
+            Assert.DoesNotContain(hex, fact.Command + fact.Output + fact.ControlCommand + fact.ControlOutput, StringComparison.OrdinalIgnoreCase);
+        }
+    }
+
+    /// <summary>A tool that refuses the key and repeats its command line in the error. What reaches the screen must not hold the key.</summary>
+    [Fact]
+    public void A_tool_that_refuses_the_key_and_echoes_its_command_does_not_show_the_key()
+    {
+        string root = Path.Combine(Path.GetTempPath(), "netsec-echo-" + Guid.NewGuid().ToString("N"));
+        Directory.CreateDirectory(root);
+        string tool = Path.Combine(root, "openssl.cmd");
+        File.WriteAllText(tool, "@echo error: cannot use the key given in: %* 1>&2\r\n@exit /b 1\r\n");
+        using Rig rig = new(name => name == "NETSEC_OPENSSL" ? tool : null);
+        FlowRun run = rig.Runs.Start("my-lesson-keys")!.Run;
+        run = Move(rig.Runs, run, "next", NoData).Run;
+        run = Move(rig.Runs, run, "make", NoData).Run;
+        RunReply check = Move(rig.Runs, Move(rig.Runs, run, "next", NoData).Run, "check", NoData);
+        foreach (CheckFact fact in check.Facts.Cast<CheckFact>())
+        {
+            Assert.Equal("CHECK_FAILED", fact.Code);
+            Assert.Contains("cannot use the key given in", fact.Output);
+            Assert.Contains("<key>", fact.Output);
+            string hex = Convert.ToHexString(rig.Store.PlacedKey(fact.TypeId)!.CopyMaterial());
+            Assert.DoesNotContain(hex, fact.Output + fact.ControlOutput, StringComparison.OrdinalIgnoreCase);
+        }
+    }
 }

@@ -1,5 +1,6 @@
 #nullable enable
 using System;
+using System.Linq;
 using System.Collections.Generic;
 using System.Diagnostics;
 using System.IO;
@@ -67,6 +68,21 @@ public class SecurityLiveTests
         {
             HttpResponseMessage r = await _http.PostAsync("http://127.0.0.1:" + Port + path, new StringContent(json, Encoding.UTF8, "application/json"));
             return ((int)r.StatusCode, await r.Content.ReadAsStringAsync());
+        }
+
+        /// <summary>Walks a flow to its check and returns the check step's reply, which is what reaches the screen.</summary>
+        public async Task<string> CheckReply(string flowId)
+        {
+            string run = JsonDocument.Parse((await Post("/api/security/flows/" + flowId + "/runs", "{}")).Body).RootElement.GetProperty("runId").GetString()!;
+            int seq = 1;
+            string last = "";
+            foreach (string ev in new[] { "next", "make", "next", "check" })
+            {
+                (int status, string body) = await Post("/api/security/runs/" + run + "/events", JsonSerializer.Serialize(new { @event = ev, stepSeq = seq++, data = new { } }));
+                Assert.True(status == 200, ev + " got " + status + ": " + body);
+                last = body;
+            }
+            return last;
         }
 
         public async Task MakeFlow(string flowId)
@@ -157,5 +173,28 @@ public class SecurityLiveTests
         (int status, string body) = await host.Get("/api/security");
         Assert.Equal(200, status);
         Assert.Contains("Broken", body);
+    }
+    /// <summary>The Check step reaches the screen with Show keys off, and OpenSSL takes the key on its command line. So the reply shows a mark in its place, and it still shows who judged.</summary>
+    [Fact]
+    public async Task The_lesson_key_check_shows_no_key_in_its_command()
+    {
+        using Host host = new();
+        string reply = await host.CheckReply("my-lesson-keys");
+        JsonElement[] facts = JsonDocument.Parse(reply).RootElement.GetProperty("step").GetProperty("facts").EnumerateArray().ToArray();
+        Assert.Equal(2, facts.Length);
+        Assert.All(facts, f =>
+        {
+            Assert.True(f.GetProperty("passed").GetBoolean(), f.ToString());
+            Assert.Equal("openssl", f.GetProperty("judge").GetString());
+            Assert.Contains("<key>", f.GetProperty("command").GetString());
+        });
+        foreach (string typeId in new[] { "lab.aes-key", "lab.seal-key" })
+        {
+            (int status, string body) = await host.Get($"/api/security/types/{typeId}/key");
+            Assert.Equal(200, status);
+            string hex = JsonDocument.Parse(body).RootElement.GetProperty("hex").GetString()!;
+            Assert.Equal(32, hex.Length);
+            Assert.DoesNotContain(hex, reply, StringComparison.OrdinalIgnoreCase);
+        }
     }
 }
