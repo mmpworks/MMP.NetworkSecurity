@@ -19,7 +19,7 @@ const needTitle = (n: number) => { const c = lessonNeeds(n).length; return `${c}
     >
       <span class="rail-num">{{ l.lesson }}</span>
       <span class="rail-body">
-        <span class="rail-title">{{ l.title }}</span>
+        <span class="rail-title" :title="l.title">{{ l.title }}</span>
         <span class="rail-status" :data-testid="`lesson-status-${l.lesson}`">{{ status(l.lesson, l.built) }}</span>
       </span>
       <span

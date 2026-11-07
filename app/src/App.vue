@@ -7,6 +7,8 @@ import {
   setMode, shownEvents, stepEngine, switchSession, tour, tourBack, tourNext, tourReplay, ui,
 } from './store'
 import TopBar from './components/TopBar.vue'
+import BinaryTip from './components/BinaryTip.vue'
+import { paneShares } from './panes'
 import ByteInspector from './components/ByteInspector.vue'
 import EventLog from './components/EventLog.vue'
 import LessonRail from './components/LessonRail.vue'
@@ -86,7 +88,8 @@ const race = computed(() => ({ left: raceStats(shownEvents.value, raceUpTo.value
 // The share follows the window live. A share set only when the window opened left the Before grid too short after a resize, and its rows covered the line under it.
 const win = ref({ w: window.innerWidth, h: window.innerHeight })
 const onResize = () => { win.value = { w: window.innerWidth, h: window.innerHeight } }
-const bytesPanePercent = computed(() => Math.min(70, Math.max(46, Math.ceil((win.value.w < 1400 ? 480 : 360) / Math.max(1, win.value.h - 90) * 100))))
+const shares = computed(() => paneShares(win.value.w, win.value.h))
+const bytesPanePercent = computed(() => shares.value.bytes)
 
 function moveSelection(d: number) {
   const list = shownEvents.value
@@ -149,13 +152,13 @@ const shortcuts: [string, string][] = [
         <WizardSheet v-if="sec.run" />
 
         <Splitpanes v-show="!sec.open" class="main-split">
-          <Pane :size="17" :min-size="11"><LessonRail /></Pane>
-          <Pane :size="83" :min-size="60">
+          <Pane :size="shares.rail" :min-size="11"><LessonRail /></Pane>
+          <Pane :size="100 - shares.rail" :min-size="60">
             <div class="workspace" data-testid="workspace">
             <!-- The AES walk mounts here and replaces the panels. Its tips and spec cards go to overlay-layer, outside this clip. -->
             <section v-if="ui.walkOpen" data-testid="walk-root" class="walk-root" />
             <Splitpanes v-show="!ui.walkOpen">
-          <Pane :size="60" :min-size="36">
+          <Pane :size="100 - shares.side" :min-size="36">
             <Splitpanes horizontal>
               <Pane :size="100 - bytesPanePercent" :min-size="25">
                 <div class="panel">
@@ -205,7 +208,7 @@ const shortcuts: [string, string][] = [
               </Pane>
             </Splitpanes>
           </Pane>
-          <Pane :size="40" :min-size="26">
+          <Pane :size="shares.side" :min-size="26">
             <Splitpanes horizontal>
               <Pane :size="55" :min-size="25"><div class="panel"><EventLog v-if="ui.mode === 'free'" /><TourPanel v-else /></div></Pane>
               <Pane :size="45" :min-size="20"><div class="panel"><SecretsPanel /></div></Pane>
@@ -226,7 +229,7 @@ const shortcuts: [string, string][] = [
           <span class="muted" data-testid="ce-label">CE lab: {{ cePanel?.label ?? CE_LABEL }}</span>
         </footer>
       </div>
-      <div class="overlay-layer" data-testid="overlay-layer" />
+      <div class="overlay-layer" data-testid="overlay-layer"><BinaryTip /></div>
 
       <v-dialog v-model="lightbox" fullscreen>
         <div class="lightbox" data-testid="lightbox">
