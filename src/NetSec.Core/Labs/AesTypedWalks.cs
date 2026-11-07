@@ -142,8 +142,11 @@ namespace NetSec.Labs
             view.CbcRepeats = Repeats(view.Rows, false);
             if (flipBlock == -1) return view;
 
+            // The ranges are checked before the multiply, so a large flipBlock from a request body cannot wrap the index.
+            if (flipBlock < 0 || flipBlock >= view.Rows.Length || flipBit < 0 || flipBit > 127)
+                throw AesTypedText.Refuse(ErrorCodes.WalkBadArgument, "The flipped bit must land on a byte of the text, not on padding.");
             int byteIndex = flipBlock * BlockSize + flipBit / 8;
-            if (flipBlock < 0 || flipBit < 0 || flipBit > 127 || byteIndex >= text.Length)
+            if (byteIndex >= text.Length)
                 throw AesTypedText.Refuse(ErrorCodes.WalkBadArgument, "The flipped bit must land on a byte of the text, not on padding.");
             byte[] flipped = (byte[])padded.Clone();
             flipped[byteIndex] ^= (byte)(0x80 >> (flipBit % 8));

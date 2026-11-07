@@ -126,6 +126,9 @@ namespace NetSec.Tests
         [InlineData(0, 128)]     // Past the block
         [InlineData(1, 0)]       // Block 1 does not exist in a 4-byte text
         [InlineData(-2, 0)]
+        [InlineData(268435456, 0)]   // x 16 wraps to 0 in an int: it must not flip block 0
+        [InlineData(134217729, 0)]   // x 16 wraps negative in an int: it must not index the array
+        [InlineData(int.MaxValue, 127)]
         public void A_flip_off_the_text_is_refused(int flipBlock, int flipBit)
         {
             NetSecException e = Assert.Throws<NetSecException>(() =>

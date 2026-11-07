@@ -47,6 +47,7 @@ public class AesTypedRoutesLiveTests
     [InlineData("/api/walk/aes/typed-block", "{\"text\":\"\"}", "WALK_TEXT_EMPTY")]
     [InlineData("/api/walk/aes/typed-block", "{}", "WALK_TEXT_EMPTY")]
     [InlineData("/api/walk/aes/long-text", "{\"text\":\"Pump\",\"flipBlock\":0,\"flipBit\":40}", "WALK_BAD_ARGUMENT")]
+    [InlineData("/api/walk/aes/long-text", "{\"text\":\"Pump\",\"flipBlock\":134217729,\"flipBit\":0}", "WALK_BAD_ARGUMENT")]   // Wrapped negative before the fix: a 500
     public async Task A_text_the_routes_cannot_walk_is_a_400_with_its_code(string path, string json, string code)
     {
         using SecurityLiveTests.Host host = new();
