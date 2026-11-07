@@ -65,6 +65,8 @@ export const ui = reactive({
   engine: 'idle' as 'idle' | 'running' | 'stepping' | 'waiting' | 'finished',
   shortcuts: false,
   walkOpen: false,
+  glossaryOpen: false,
+  glossaryFocus: null as string | null,
   follow: true,
   inspectorTab: 'bytes' as 'bytes' | 'picture' | 'measures' | 'chain' | 'ladder' | 'hostkey' | 'token' | 'timing' | 'onion',
 })
@@ -487,3 +489,7 @@ export function isHighlighted(panel: string, kind: string, name: string): boolea
 
 /** Panels show everything up to the selected event. With no explicit selection they show everything shown, so a check that comes after the last byte still appears. */
 export const upToSeq = computed(() => (ui.selectedSeq != null ? selectedEvent.value?.seq ?? Infinity : Infinity))
+
+/** Opens the glossary page, at one entry when an id is given. */
+export function openGlossary(id: string | null = null) { ui.glossaryFocus = id; ui.glossaryOpen = true }
+export function closeGlossary() { ui.glossaryOpen = false; ui.glossaryFocus = null }

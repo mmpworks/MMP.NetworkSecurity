@@ -348,3 +348,40 @@ body { overflow: hidden; }
 .v-btn-group .v-btn.v-btn--active { background: var(--surface); font-weight: 700; box-shadow: 0 1px 2px rgba(0, 0, 0, .18); }
 .v-btn-group .v-btn .v-btn__overlay { opacity: 0 !important; }
 .wizard.v-card { border-radius: 14px; border: 1px solid var(--line); }
+
+/* Glossary page. Status tags use the pass, warn and fail colors, with the word always in the tag, so color is never the only sign. */
+.gl-search { width: 280px; }
+.gl-line { margin: 4px 0 8px; }
+.gl-h { font: 700 18px/1.2 var(--display); margin: 18px 0 8px; }
+.gl-table-wrap { overflow-x: auto; border: 1px solid var(--line); border-radius: 14px; background: var(--surface); }
+.gl-table { width: 100%; border-collapse: collapse; font-size: 13px; }
+.gl-table th { text-align: left; color: var(--muted); font-weight: 700; padding: 8px 10px; border-bottom: 1px solid var(--line); white-space: nowrap; }
+.gl-table td { padding: 8px 10px; border-bottom: 1px solid var(--line); vertical-align: top; }
+.gl-row { cursor: pointer; }
+.gl-row:hover, .gl-row.open { background: var(--surface2); }
+.gl-row:focus-visible { outline: 3px solid var(--accent); outline-offset: -3px; }
+.gl-detail td { background: var(--surface2); }
+.gl-detail p { margin: 0 0 6px; max-width: 90ch; }
+/* The tag sits on the panel color: the light theme's warn color reads 4.47 to 1 on surface2, under the 4.5 floor. */
+.gl-status { display: inline-block; padding: 1px 8px; border-radius: 7px; border: 1px solid currentColor; font-weight: 700; background: var(--surface); }
+.gl-status.st-current { color: var(--pass); }
+.gl-status.st-legacy { color: var(--warn); }
+.gl-status.st-broken { color: var(--fail); }
+.gl-mark { display: inline-block; margin-left: 4px; padding: 0 6px; border-radius: 6px; border: 1px dashed var(--muted); color: var(--muted); font-size: 11px; font-weight: 700; }
+.gl-mark.warn { border-color: var(--warn); color: var(--warn); }
+.gl-link { margin-left: 6px; color: var(--accent); text-decoration: underline dotted; text-underline-offset: 3px; }
+.gl-compare { display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); gap: 14px; }
+.gl-side, .gl-myth, .gl-tls { border: 1px solid var(--line); border-radius: 14px; background: var(--surface); padding: 12px 16px; }
+.gl-side h3, .gl-tls h3 { font: 700 16px var(--display); margin: 0 0 6px; }
+.gl-side h4 { font-size: 12px; letter-spacing: .06em; text-transform: uppercase; color: var(--muted); margin: 10px 0 4px; }
+.gl-side ul, .gl-tls ol { margin: 0; padding-left: 20px; display: grid; gap: 6px; }
+.gl-note { margin-top: 10px; color: var(--muted); }
+.gl-myth, .gl-tls { margin-top: 14px; }
+.gl-myth p, .gl-tls p { margin: 0 0 6px; }
+.gl-terms { display: grid; grid-template-columns: repeat(auto-fill, minmax(280px, 1fr)); gap: 8px; margin: 0; }
+.gl-term { border: 1px solid var(--line); border-radius: 10px; padding: 8px 10px; background: var(--surface); }
+.gl-term dt { font-weight: 700; }
+.gl-term dd { margin: 2px 0 0; }
+.gl-row.flash, .gl-term.flash { outline: 3px solid var(--accent); outline-offset: -3px; }
+.term-more { margin-top: 4px; font-size: 12px; opacity: .8; }
+@media (max-width: 900px) { .gl-compare { grid-template-columns: minmax(0, 1fr); } }

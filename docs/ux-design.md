@@ -251,6 +251,13 @@ All controls reach focus in a logical order, show a 2 px focus ring, and carry a
 5. Seed list (about 45): AES, block, key, IV, nonce, ECB, CBC, GCM, tag, hash, MAC, HMAC, CMAC, KDF, HKDF, key share, X25519, ML-KEM, hybrid, ciphertext, plaintext, handshake, transcript, record, alert, certificate, CA, chain, signature, Ed25519, ML-DSA, TLS, SSH, host key, session key, DUKPT, KSN, BDK, PIN block, token, DPoP, mTLS, role, capability, constant-time, downgrade.
 6. Test: every `{{term:id}}` and every `<Term id>` resolves. Every glossary `short` passes the grade script.
 
+## 5a. Links out of the app
+
+1. The app never opens a second window. `electron/main.cjs` denies every `window.open` and every `target="_blank"` link.
+2. A link to a host on `electron/link-hosts.cjs` opens in the learner's own web browser through `shell.openExternal`. It must be https. Any other link does nothing.
+3. A host matches only in full, never by suffix. The list equals the hosts of the sources in `src/glossary.json`. `e2e/links.spec.ts` fails when the two differ, so a new source host needs a deliberate edit to the list.
+4. The app window never navigates away from its own page.
+
 ## 6. Stable `data-testid` names
 
 Pattern: kebab-case. Lists use `-<n>` for index or `-<name>` for a stable key. The names never change after S8 lands.

@@ -1,6 +1,7 @@
 // Electron's main process. It starts NetSec.Host with a fresh session token, opens one window, and ends the Host on exit.
 // Set NETSEC_HOST=external to skip spawning and use a Host you started yourself (then set NETSEC_PORT and NETSEC_TOKEN too).
-const { app, BrowserWindow, screen } = require('electron')
+const { app, BrowserWindow, screen, shell } = require('electron')
+const { isAllowedLink } = require('./link-hosts.cjs')
 const { fitWindow } = require('./window-size.cjs')
 const { spawn, execFileSync } = require('node:child_process')
 const crypto = require('node:crypto')
@@ -56,6 +57,23 @@ async function createWindow() {
   const win = new BrowserWindow({
     ...fitWindow(screen.getPrimaryDisplay().workArea), title: 'Network Security Lab', backgroundColor: '#10141f',
     webPreferences: { preload: path.join(__dirname, 'preload.cjs'), contextIsolation: true, additionalArguments: [`--netsec-port=${PORT}`, `--netsec-token=${TOKEN}`] },
+  })
+  // Links: the app never opens a second window. A link to a listed host opens in the learner's own browser, and any other link does nothing.
+  win.webContents.setWindowOpenHandler(({ url }) => {
+    // The OS gets the URL in the form the rule parsed and checked, never the raw string.
+    if (isAllowedLink(url)) void shell.openExternal(new URL(url).href)
+    return { action: 'deny' }
+  })
+  // The window stays on the app's own page: a link clicked without a new-window target cannot carry it away.
+  // A URL that does not parse is refused too, so the guard fails closed.
+  win.webContents.on('will-navigate', (event, url) => {
+    try {
+      const here = new URL(win.webContents.getURL())
+      const next = new URL(url)
+      if (next.protocol !== here.protocol || next.host !== here.host || next.pathname !== here.pathname) event.preventDefault()
+    } catch {
+      event.preventDefault()
+    }
   })
   const devUrl = process.env.VITE_DEV_SERVER_URL
   if (devUrl) await win.loadURL(devUrl)

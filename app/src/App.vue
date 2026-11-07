@@ -4,7 +4,7 @@ import { Pane, Splitpanes } from 'splitpanes'
 import { vuetify } from './theme'
 import {
   CE_LABEL, active, addr, allEvents, cePanel, clearError, connect, hostState, onTheme, pauseEngine, retryConnect, runEngine, selectEvent, selectedEvent,
-  setMode, shownEvents, stepEngine, switchSession, tour, tourBack, tourNext, tourReplay, ui,
+  closeGlossary, setMode, shownEvents, stepEngine, switchSession, tour, tourBack, tourNext, tourReplay, ui,
 } from './store'
 import TopBar from './components/TopBar.vue'
 import BinaryTip from './components/BinaryTip.vue'
@@ -27,6 +27,7 @@ import { closedToListener, isLadderEvent, listenerLabel, pictureOf, protocols, r
 import type { TraceEvent } from './types'
 import NeedsBanner from './components/NeedsBanner.vue'
 import SecurityPage from './components/SecurityPage.vue'
+import GlossaryPage from './components/GlossaryPage.vue'
 import VaultPage from './components/VaultPage.vue'
 import { closeVault, vault } from './vault'
 import WizardSheet from './components/WizardSheet.vue'
@@ -104,6 +105,7 @@ function onKey(ev: KeyboardEvent) {
   if (ev.ctrlKey || ev.metaKey || ev.altKey) return
   const k = ev.key
   const inDiagram = !!t?.closest?.('.diagram')
+  if (ui.glossaryOpen) { if (k === 'Escape') closeGlossary(); return }
   if (sec.open) { if (k === 'Escape' && !sec.run) { if (vault.open) closeVault(); else closeSecurity() } return }
   if (k === 'Escape') { lightbox.value = false; ui.shortcuts = false }
   else if (k === 'ArrowRight' && !ev.shiftKey || k === 'n' || k === 'N') void tourNext()
@@ -147,11 +149,12 @@ const shortcuts: [string, string][] = [
 
         <NeedsBanner />
         <v-alert v-if="!sec.showKeys" type="info" class="banner" data-testid="show-keys-off-banner">{{ words('wizard.keys.off-banner') }}</v-alert>
-        <SecurityPage v-if="sec.open && !vault.open" />
-        <VaultPage v-if="sec.open && vault.open" />
+        <GlossaryPage v-if="ui.glossaryOpen" />
+        <SecurityPage v-if="sec.open && !vault.open && !ui.glossaryOpen" />
+        <VaultPage v-if="sec.open && vault.open && !ui.glossaryOpen" />
         <WizardSheet v-if="sec.run" />
 
-        <Splitpanes v-show="!sec.open" class="main-split">
+        <Splitpanes v-show="!sec.open && !ui.glossaryOpen" class="main-split">
           <Pane :size="shares.rail" :min-size="11"><LessonRail /></Pane>
           <Pane :size="100 - shares.rail" :min-size="60">
             <div class="workspace" data-testid="workspace">
