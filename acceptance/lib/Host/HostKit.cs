@@ -193,8 +193,9 @@ namespace Acceptance
         }
 
         /// <summary>
-        /// How long a run may send no frame before the suite stops reading. It must outlast the product's own read deadline (30 s,
-        /// lessons-4-5-names.md for L5-flip-record-length), or the suite stops just as that lab ends by name with LINK_DEADLINE.
+        /// How long a run may send no frame before the suite stops reading. It must outlast the product's own read deadline,
+        /// FrameEngine.DeadlineMs = 30000 in src/NetSec.Core/Labs/FrameEngine.cs (lessons-4-5-names.md, L5-flip-record-length),
+        /// or the suite stops just as that lab ends by name with LINK_DEADLINE. Change both together.
         /// </summary>
         const int SilentFrameSeconds = 45;
 

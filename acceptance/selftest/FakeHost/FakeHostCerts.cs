@@ -105,8 +105,9 @@ namespace Acceptance
 
         Dictionary<string, object> CertAttack(string id, string code)
         {
-            Dictionary<string, object> d = D("attackId", id, "kind", "cert", "expectCode", code, "expectCheck", "certificate chain", "available", CanIssueNow);
-            if (!CanIssueNow) d["whyNot"] = "ATTACK_NEEDS_CA_KEY";
+            bool can = CanIssueNow && !M("attack-row-unavailable");
+            Dictionary<string, object> d = D("attackId", id, "kind", "cert", "expectCode", code, "expectCheck", "certificate chain", "available", can);
+            if (!can) d["whyNot"] = "ATTACK_NEEDS_CA_KEY";
             return d;
         }
 

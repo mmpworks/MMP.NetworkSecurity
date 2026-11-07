@@ -69,10 +69,12 @@ namespace Acceptance
                     }
                 }
                 Check.True(rows > 0, "GET /api/lessons lists no attack row");
+                // A fresh Host on built-in keys can run every row, so none may be unavailable or unbuilt here. Without this floor, a change that
+                // marked rows unavailable would still pass. A row is unavailable for a reason only after the learner's own keys are in use.
+                if (unavailable.Count > 0) misses.Add(unavailable.Count + " rows are unavailable on a fresh Host on built-in keys: " + string.Join(", ", unavailable.ToArray()));
+                if (notBuilt.Count > 0) misses.Add("rows of an unbuilt lesson: " + string.Join(", ", notBuilt.ToArray()));
                 if (misses.Count > 0) throw new FailException(misses.Count + " of " + rows + " attack rows miss: " + string.Join("; ", misses.ToArray()));
-                return rows + " attack rows on the live Host: " + caught + " forks end with their code and name their check, " + noCheck + " expect no check and are not caught"
-                    + (unavailable.Count > 0 ? ", " + unavailable.Count + " unavailable with a reason: " + string.Join(", ", unavailable.ToArray()) : "")
-                    + (notBuilt.Count > 0 ? ", not built: " + string.Join(", ", notBuilt.ToArray()) : "");
+                return rows + " attack rows on the live Host, all available on built-in keys: " + caught + " forks end with their code and name their check, " + noCheck + " expect no check and are not caught";
             }
         }
     }
