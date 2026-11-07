@@ -2,7 +2,7 @@
   "about": "Spec cards (docs/walkthrough-design.md section 2.2h). Each row names a spec as it appears on screen. Its title and link come from the glossary.json source it names, so each URL is written once. specParts finds the names and aliases at render, longest first.",
   "specs": [
     { "id": "fips46-3", "name": "FIPS 46-3", "aliases": [], "source": "fips46-3",
-      "synopsis": "The US standard for DES, a block cipher with a 56-bit key. NIST withdrew it in 2005, because a 56-bit key is too short." },
+      "synopsis": "The US standard for DES, a block cipher with a 56-bit key. NIST withdrew it in 2005, because it no longer gave the security needed. A 56-bit key falls to a brute-force search." },
     { "id": "fips180-4", "name": "FIPS 180-4", "aliases": [], "source": "fips180-4",
       "synopsis": "The US standard for the SHA-1 and SHA-2 hash functions, which include SHA-256. It gives the padding and the rounds." },
     { "id": "fips186-5", "name": "FIPS 186-5", "aliases": [], "source": "fips186-5",
@@ -42,7 +42,7 @@
     { "id": "pkcs1", "name": "PKCS #1", "aliases": ["PKCS#1"], "source": "rfc8017",
       "synopsis": "The RSA standard: RSA keys, encryption and signatures, including the old v1.5 padding. RFC 8017 is its current text." },
     { "id": "pkcs8", "name": "PKCS#8", "aliases": ["PKCS #8"], "source": "rfc5958",
-      "synopsis": "The file format for a private key of any algorithm. RFC 5958 is its current text." },
+      "synopsis": "The structure that holds a private key of any algorithm, with its attributes. RFC 5958 is its current text." },
     { "id": "x9-24-3", "name": "X9.24-3", "aliases": ["ANSI X9.24-3-2017", "X9.24-3-2017", "ANSI X9.24-3"], "source": "x9-24-3-2017",
       "synopsis": "The ANSI standard for AES DUKPT, a scheme that gives each payment its own key. ANSI sells the text." }
   ]
