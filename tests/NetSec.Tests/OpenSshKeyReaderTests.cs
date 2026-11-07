@@ -332,5 +332,31 @@ namespace NetSec.Tests
             Assert.DoesNotContain("\u001b", mismatch.Error.Message, StringComparison.Ordinal);
             Assert.Contains("an unknown type", mismatch.Error.Message);
         }
+
+        /// <summary>Numbers that pass p x q = n can still be a broken key. A one-block round trip finds a wrong d, and q x iqmp mod p = 1 finds a wrong iqmp.</summary>
+        [Fact]
+        public void Rsa_numbers_with_a_wrong_d_or_iqmp_are_refused()
+        {
+            byte[][] k = RsaNumbers(TrainingRsaHost.CopyMaterial());
+            byte[] n = k[0], e = k[1], d = k[2], p = k[3], q = k[4], iqmp = k[7];
+            Assert.Equal(KeyAlgorithm.Rsa2048, OpenSshKeyReader.Parse(RsaFile(n, e, d, iqmp, p, q), KeyIds.SshHostRsa, Rsa).Algorithm);
+            byte[] wrongD = (byte[])d.Clone();
+            wrongD[wrongD.Length - 1] ^= 2;
+            Assert.Equal(ErrorCodes.KeyFileFormat, Refusal(RsaFile(n, e, wrongD, iqmp, p, q), Rsa));
+            byte[] wrongIqmp = (byte[])iqmp.Clone();
+            wrongIqmp[wrongIqmp.Length - 1] ^= 1;
+            Assert.Equal(ErrorCodes.KeyFileFormat, Refusal(RsaFile(n, e, d, wrongIqmp, p, q), Rsa));
+        }
+
+        /// <summary>A huge public exponent would make every verify slow. e above 4 bytes is refused, and the message names the exponent.</summary>
+        [Fact]
+        public void An_rsa_exponent_above_4_bytes_is_refused()
+        {
+            byte[][] k = RsaNumbers(TrainingRsaHost.CopyMaterial());
+            byte[] huge = new byte[] { 1, 0, 0, 0, 1 };
+            NetSecException ex = Assert.Throws<NetSecException>(() => OpenSshKeyReader.Parse(RsaFile(k[0], huge, k[2], k[7], k[3], k[4]), KeyIds.SshHostRsa, Rsa));
+            Assert.Equal(ErrorCodes.KeyFileFormat, ex.Error.Code);
+            Assert.Contains("exponent", ex.Error.Message);
+        }
     }
 }
