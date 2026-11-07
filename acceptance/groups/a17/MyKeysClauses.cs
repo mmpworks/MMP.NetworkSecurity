@@ -131,6 +131,10 @@ namespace Acceptance
                     if (hex.Length >= MinNeedleHexChars) needles.Add(new Needle { TypeId = MiniJson.Str(ev, "typeId") ?? "?", Kind = "secret", Hex = hex });
                 }
             }
+            // Lessons 1 and 2 draw a built-in key per run, so key.in-use holds no bytes for it. The run names the drawn key as a secret, and both runs here use one seed, so a run that falls back to the draw shows these bytes.
+            string drawn = lesson == 1 ? "aes.key" : lesson == 2 ? "seal.key" : null;
+            foreach (A17.SecretRef s in A17.Secrets(baseline))
+                if (s.Name == drawn && (s.Hex ?? "").Length >= MinNeedleHexChars) needles.Add(new Needle { TypeId = Needs(lesson)[0], Kind = "secret", Hex = s.Hex.ToLowerInvariant() });
             if (needles.Count == 0)
                 throw new NotRunException("PRODUCT_MISSING", "no built-in key bytes are in reach for lesson " + lesson + " (the key route shows none, and the built-in run has no key.in-use secret), so the own-key run has nothing to be scanned for: " + string.Join("; ", refused.ToArray()));
             return needles;

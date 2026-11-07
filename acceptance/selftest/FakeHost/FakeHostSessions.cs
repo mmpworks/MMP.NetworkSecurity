@@ -235,7 +235,9 @@ namespace Acceptance
                     RawSecret k = Raw("key." + id, "host", key);
                     k.NonExportable = Active(t) && t.KeepHidden;
                     k.PublicFingerprint = PublicFingerprintOf(key);
-                    Add(s, "keys", "key.in-use", k);
+                    // As the real Host: lessons 1 and 2 draw a built-in key per run, so key.in-use holds no bytes for it.
+                    if (lesson <= 2 && !Active(t)) Add(s, "keys", "key.in-use");
+                    else Add(s, "keys", "key.in-use", k);
                     SessionEv last = s.Events[s.Events.Count - 1];
                     last.Base["typeId"] = id; last.Base["version"] = (double)t.Version; last.Base["provider"] = t.Provider;
                 }

@@ -280,6 +280,8 @@ namespace Acceptance
             bool nonExportable = Active(t) && t.KeepHidden;
             bool showHex = _showKeys && (!nonExportable || M("nonexportable-leaks"));
             if (M("mine-key-route-no-hex") && Active(t)) showHex = false;
+            // As the real Host: lessons 1 and 2 draw a built-in key per run, so the route has no built-in bytes to show.
+            if (!Active(t) && (t.TypeId == "lab.aes-key" || t.TypeId == "lab.seal-key")) showHex = false;
             if (M("nonexportable-hides-all") && Active(t)) showHex = false;
             Dictionary<string, object> r = D("typeId", t.TypeId, "version", (double)t.Version, "provider", t.Provider, "fingerprint", Fingerprint(key));
             if (t.TypeId == "token.issuer")
