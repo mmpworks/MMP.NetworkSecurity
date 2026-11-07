@@ -190,6 +190,49 @@ namespace Acceptance
             return values + " values on 2 seeds and 2 key sizes equal RefAes under the key from the seed, each output equals the BCL, and OFF closes both sizes";
         }
 
+        /// <summary>The fixed practice key of design section 2.2g: SHAKE256 of the public label "MMP.NetworkSecurity practice key 128", 16 bytes. This group links no product code, so the .NET library computes it.</summary>
+        public static byte[] TypedPracticeKey()
+        {
+            return Shake256.HashData(Encoding.UTF8.GetBytes("MMP.NetworkSecurity practice key 128"), 16);
+        }
+
+        static string EcbHex(byte[] key, byte[] block)
+        {
+            using (Aes aes = Aes.Create()) { aes.Key = key; return Hex.Encode(aes.EncryptEcb(block, PaddingMode.None)).ToLowerInvariant(); }
+        }
+
+        /// <summary>
+        /// Design section 2.2g and the 3.5 table: /typed-block and /long-text run only on the public practice key, need no session, and stay open
+        /// with Show keys OFF. Each answer must name keySource typed-practice, and its cipher bytes must equal AES under that key.
+        /// </summary>
+        [Clause("A19.host.typed-routes-open-with-keys-off")]
+        public static string TypedRoutesOpen(Ctx c)
+        {
+            byte[] key = TypedPracticeKey(), block = Encoding.ASCII.GetBytes(TextBlock);
+            string want = EcbHex(key, block);
+            using (HostProc h = A17.Host(c, "walk-typed"))
+            {
+                SetShowKeys(h, false);
+                Reply t = HostHttp.Post(h, "/api/walk/aes/typed-block", A17.Obj("text", TextBlock));
+                Check.True(t.Ok && t.Json != null, "OFF, no session: POST /api/walk/aes/typed-block got " + t + ". The route runs on the public practice key, so it stays open");
+                Dictionary<string, object> walk = MiniJson.Obj(t.Json, "walk");
+                Check.True(walk != null, "the typed-block reply has no walk");
+                Check.Equal("keySource of the typed block", "typed-practice", MiniJson.Str(walk, "keySource"));
+                Check.Equal("the typed block's cipher bytes under the practice key", want, (MiniJson.Str(MiniJson.Obj(walk, "forward"), "output") ?? "").ToLowerInvariant());
+
+                Reply l = HostHttp.Post(h, "/api/walk/aes/long-text", A17.Obj("text", TextBlock + TextBlock));
+                Check.True(l.Ok && l.Json != null, "OFF, no session: POST /api/walk/aes/long-text got " + l);
+                Check.Equal("keySource of the long text", "typed-practice", MiniJson.Str(l.Json, "keySource"));
+                List<object> rows = MiniJson.Arr(l.Json, "rows");
+                Check.True(rows != null && rows.Count >= 2, "the long-text reply has fewer than 2 rows");
+                Dictionary<string, object> r0 = MiniJson.AsObject(rows[0]), r1 = MiniJson.AsObject(rows[1]);
+                Check.Equal("ECB of the long text's first block under the practice key", want, (MiniJson.Str(r0, "ecb") ?? "").ToLowerInvariant());
+                Check.True(MiniJson.Bool(r1, "ecbRepeat", false) && MiniJson.Str(r1, "ecb") == MiniJson.Str(r0, "ecb"), "two equal text blocks should give one ECB block twice, with ecbRepeat on the second");
+                SetShowKeys(h, true);
+            }
+            return "with Show keys OFF and no session, both typed routes answer under the practice key: keySource typed-practice, and the cipher bytes equal AES under SHAKE256 of the public label";
+        }
+
         [Clause("A19.host.show-keys-off-closes-block-first")]
         public static string OffClosesBlock(Ctx c)
         {

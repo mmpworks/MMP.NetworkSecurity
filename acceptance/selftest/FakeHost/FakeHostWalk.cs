@@ -64,6 +64,48 @@ namespace Acceptance
             return null;
         }
 
+        /// <summary>Design section 2.2g: /typed-block and /long-text run on the public practice key and stay open with Show keys OFF.</summary>
+        bool TypedRoute(HttpListenerContext ctx, string path, Dictionary<string, object> body)
+        {
+            if (path != "/api/walk/aes/typed-block" && path != "/api/walk/aes/long-text") return false;
+            if (M("walk-routes-missing")) return false;
+            // Design section 2.2g: both run on the public practice key and stay open with Show keys OFF.
+            if (!_showKeys && M("typed-closed-off")) { WalkFail(ctx, 409, "KEYS_HIDDEN", "closed"); return true; }
+            byte[] typedKey = M("typed-run-key") ? CannedWalkKey : AesWalkHostClauses.TypedPracticeKey();
+            byte[] text = Encoding.UTF8.GetBytes((body == null ? null : MiniJson.Str(body, "text")) ?? "");
+            if (path.EndsWith("typed-block", StringComparison.Ordinal))
+            {
+                byte[] block = new byte[16];
+                int used = Math.Min(16, text.Length);
+                Array.Copy(text, block, used);
+                for (int i = used; i < 16; i++) block[i] = (byte)(16 - used);
+                WalkRun fw = new RefAes(typedKey).Encrypt(block);
+                WalkWrite(ctx, 200, D("walk", D("source", "typed", "keyBits", 128.0, "rounds", 10.0, "keySource", "typed-practice", "inputHex", Hex.Encode(block), "forward", RunJson(fw)),
+                    "cut", D("block", Hex.Encode(block), "usedBytes", (double)used, "paddingBytes", (double)(16 - used))), false);
+                return true;
+            }
+            int pad = 16 - text.Length % 16;
+            byte[] all = new byte[text.Length + pad];
+            Array.Copy(text, all, text.Length);
+            for (int i = text.Length; i < all.Length; i++) all[i] = (byte)pad;
+            List<object> rows = new List<object>();
+            string prev = null;
+            using (System.Security.Cryptography.Aes aes = System.Security.Cryptography.Aes.Create())
+            {
+                aes.Key = typedKey;
+                for (int b = 0; b < all.Length / 16; b++)
+                {
+                    byte[] blk = new byte[16];
+                    Array.Copy(all, b * 16, blk, 0, 16);
+                    string ecb = Hex.Encode(aes.EncryptEcb(blk, System.Security.Cryptography.PaddingMode.None));
+                    rows.Add(D("block", (double)b, "data", Hex.Encode(blk), "ecb", ecb, "ecbRepeat", ecb == prev));
+                    prev = ecb;
+                }
+            }
+            WalkWrite(ctx, 200, D("keySource", "typed-practice", "blocks", (double)rows.Count, "rows", rows), false);
+            return true;
+        }
+
         /// <summary>True when the path is a walk route. The route has answered by then.</summary>
         bool WalkRoute(HttpListenerContext ctx, string path)
         {
