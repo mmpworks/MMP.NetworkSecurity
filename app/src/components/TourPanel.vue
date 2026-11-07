@@ -10,11 +10,18 @@ const noTour = computed(() => steps.value.length === 0)
 const last = computed(() => tour.stepIndex >= steps.value.length - 1)
 const canStart = computed(() => !!lessonRow.value?.built && !noTour.value)
 const note = computed(() => (ui.lesson != null ? LESSON_NOTES[ui.lesson] ?? '' : ''))
+// The button stays after the try-it is done, because a learner can run it again.
+const tried = computed(() => !!step.value?.tryIt && unlock.value.open)
 </script>
 
 <template>
   <div class="tour" data-testid="tour-panel">
-    <div class="inspector-tools"><span class="side-title">TOUR</span><span v-if="tour.active && step" class="muted" data-testid="tour-progress">Step {{ tour.stepIndex + 1 }} of {{ steps.length }}</span></div>
+    <div class="tour-head">
+      <div class="tour-line"><span class="side-title">TOUR</span><span v-if="tour.active && step" class="muted" data-testid="tour-progress">Step {{ tour.stepIndex + 1 }} of {{ steps.length }}</span></div>
+      <div v-if="tour.active && step" class="stepsbar" :style="{ gridTemplateColumns: `repeat(${steps.length}, minmax(0, 1fr))` }" aria-hidden="true" data-testid="tour-steps-bar">
+        <i v-for="(_, i) in steps" :key="i" :class="{ done: i < tour.stepIndex, now: i === tour.stepIndex }" />
+      </div>
+    </div>
 
     <div v-if="ui.lesson == null" class="empty-note">Pick a lesson on the left to begin.</div>
     <div v-else-if="!lessonRow?.built" class="empty-note">Lesson {{ ui.lesson }} is not built yet. The engine for it comes in a later slice.</div>
@@ -31,6 +38,7 @@ const note = computed(() => (ui.lesson != null ? LESSON_NOTES[ui.lesson] ?? '' :
     </div>
 
     <div v-else class="tour-step">
+      <div class="tour-body">
       <div class="muted step-id" data-testid="tour-step-id">{{ step.id }}</div>
       <h3>{{ step.title }}</h3>
       <div data-testid="tour-text">
@@ -39,17 +47,18 @@ const note = computed(() => (ui.lesson != null ? LESSON_NOTES[ui.lesson] ?? '' :
         </p>
       </div>
       <p v-if="note" class="lesson-note" data-testid="lesson-note">{{ note }}</p>
-      <div v-if="step.tryIt" class="tryit" data-testid="tour-try-it">
-        <div class="side-title">TRY IT</div>
-        <v-btn color="primary" data-testid="tour-try-it-action" @click="doTryIt">{{ step.tryIt.label }}</v-btn>
-      </div>
-      <div class="btn-row">
-        <v-btn :disabled="tour.stepIndex === 0" data-testid="tour-back" @click="tourBack">Back</v-btn>
-        <v-btn data-testid="tour-replay" @click="tourReplay">Replay step</v-btn>
-        <v-btn color="primary" variant="flat" :disabled="!unlock.open" data-testid="tour-next" @click="tourNext">{{ last ? "Finish" : "Next" }}</v-btn>
+      <div v-if="step.tryIt" class="tryit" :class="{ done: tried }" data-testid="tour-try-it">
+        <div class="side-title">{{ tried ? "DONE" : "TRY IT" }}</div>
+        <v-btn color="primary" :variant="tried ? 'outlined' : 'flat'" data-testid="tour-try-it-action" @click="doTryIt">{{ step.tryIt.label }}</v-btn>
       </div>
       <AttackResult />
-      <div class="next-reason" data-testid="next-reason">{{ unlock.open ? "" : unlock.reason }}</div>
+      </div>
+      <div class="tour-foot">
+        <v-btn :disabled="tour.stepIndex === 0" data-testid="tour-back" @click="tourBack">Back</v-btn>
+        <v-btn data-testid="tour-replay" @click="tourReplay">Replay step</v-btn>
+        <div class="next-reason" data-testid="next-reason">{{ unlock.open ? "" : unlock.reason }}</div>
+        <v-btn color="primary" variant="flat" :disabled="!unlock.open" data-testid="tour-next" @click="tourNext">{{ last ? "Finish" : "Next" }}</v-btn>
+      </div>
     </div>
   </div>
 </template>
