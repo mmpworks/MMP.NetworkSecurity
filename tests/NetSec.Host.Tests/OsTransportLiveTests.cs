@@ -100,8 +100,18 @@ public sealed class OsTransportLiveTests
             };
             _server.ErrorDataReceived += (_, e) => Note("err", e.Data);
             _server.Start();
-            _server.BeginOutputReadLine();
-            _server.BeginErrorReadLine();
+            // The constructor must not throw with openssl running: nothing would dispose it (Jared, #233).
+            try
+            {
+                _server.BeginOutputReadLine();
+                _server.BeginErrorReadLine();
+            }
+            catch
+            {
+                try { _server.Kill(entireProcessTree: true); } catch (InvalidOperationException) { }
+                _server.Dispose();
+                throw;
+            }
         }
 
         /// <summary>The hex secrets of every line the server logged, as NSS key log lines hold them.</summary>
