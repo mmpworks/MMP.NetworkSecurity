@@ -4465,8 +4465,41 @@
    "counts": false
   },
   {
-   "id": "SELF.a17-clauses-pass-and-bite",
-   "base": "SELF.a17-clauses-pass-and-bite",
+   "id": "SELF.a17-clauses-pass-and-bite-lessons",
+   "base": "SELF.a17-clauses-pass-and-bite-lessons",
+   "assertion": "SELF",
+   "group": "selftest",
+   "build": "host",
+   "slice": "S0",
+   "referee": "stand-ins built on the BCL, python cryptography and real OpenSSL runs",
+   "roles": [],
+   "counts": false
+  },
+  {
+   "id": "SELF.a17-clauses-pass-and-bite-rest",
+   "base": "SELF.a17-clauses-pass-and-bite-rest",
+   "assertion": "SELF",
+   "group": "selftest",
+   "build": "host",
+   "slice": "S0",
+   "referee": "stand-ins built on the BCL, python cryptography and real OpenSSL runs",
+   "roles": [],
+   "counts": false
+  },
+  {
+   "id": "SELF.a17-clauses-pass-and-bite-vault-keys",
+   "base": "SELF.a17-clauses-pass-and-bite-vault-keys",
+   "assertion": "SELF",
+   "group": "selftest",
+   "build": "host",
+   "slice": "S0",
+   "referee": "stand-ins built on the BCL, python cryptography and real OpenSSL runs",
+   "roles": [],
+   "counts": false
+  },
+  {
+   "id": "SELF.a17-clauses-pass-and-bite-walk-host",
+   "base": "SELF.a17-clauses-pass-and-bite-walk-host",
    "assertion": "SELF",
    "group": "selftest",
    "build": "host",
@@ -4522,6 +4555,17 @@
   {
    "id": "SELF.a17-repo-guard-bites",
    "base": "SELF.a17-repo-guard-bites",
+   "assertion": "SELF",
+   "group": "selftest",
+   "build": "host",
+   "slice": "S0",
+   "referee": "stand-ins built on the BCL, python cryptography and real OpenSSL runs",
+   "roles": [],
+   "counts": false
+  },
+  {
+   "id": "SELF.a17-rows-hold-each-case-once",
+   "base": "SELF.a17-rows-hold-each-case-once",
    "assertion": "SELF",
    "group": "selftest",
    "build": "host",

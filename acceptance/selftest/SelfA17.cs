@@ -117,8 +117,55 @@ namespace Acceptance
             return "only WIZARD_PART_NOT_BUILT throws NOT RUN; a second code, another code, and no code each go on to the clause's own check";
         }
 
-        [Clause("SELF.a17-clauses-pass-and-bite")]
-        public static string ClausesPassAndBite(Ctx c)
+        // One row ran all cases and outgrew the runner's 900 s budget for one clause. The cases now run in 4 rows by area. The last row takes
+        // every case the first 3 leave, so each case runs in exactly one row, and a new case cannot fall between them.
+        static bool LessonRow(string id) { return id.StartsWith("A17.lesson-", StringComparison.Ordinal); }
+        static bool HostWalkRow(string id) { return id.StartsWith("A19.host.", StringComparison.Ordinal); }
+        static bool VaultKeysRow(string id) { return id.StartsWith("A17.vault", StringComparison.Ordinal) || id.StartsWith("A17.show-keys", StringComparison.Ordinal); }
+
+        static bool RestRow(string id) { return !LessonRow(id) && !HostWalkRow(id) && !VaultKeysRow(id); }
+
+        static readonly KeyValuePair<string, Predicate<string>>[] Rows = new KeyValuePair<string, Predicate<string>>[]
+        {
+            new KeyValuePair<string, Predicate<string>>("lessons", LessonRow),
+            new KeyValuePair<string, Predicate<string>>("walk-host", HostWalkRow),
+            new KeyValuePair<string, Predicate<string>>("vault-keys", VaultKeysRow),
+            new KeyValuePair<string, Predicate<string>>("rest", RestRow),
+        };
+
+        /// <summary>Each case runs in exactly one of the 4 rows, and no row is empty. A case in no row would never be proven, and a case in 2 rows would cost its time twice.</summary>
+        [Clause("SELF.a17-rows-hold-each-case-once")]
+        public static string RowsHoldEachCaseOnce(Ctx c)
+        {
+            Dictionary<string, int> perRow = new Dictionary<string, int>();
+            foreach (KeyValuePair<string, Predicate<string>> r in Rows) perRow[r.Key] = 0;
+            List<string> wrong = new List<string>();
+            foreach (Case k in Cases)
+            {
+                List<string> holders = new List<string>();
+                foreach (KeyValuePair<string, Predicate<string>> r in Rows) if (r.Value(k.Id)) { holders.Add(r.Key); perRow[r.Key]++; }
+                if (holders.Count != 1) wrong.Add(k.Id + " sits in " + holders.Count + " rows [" + string.Join(", ", holders.ToArray()) + "]");
+            }
+            Check.True(wrong.Count == 0, wrong.Count + " cases are not in exactly one row: " + string.Join("; ", wrong.ToArray()));
+            foreach (KeyValuePair<string, int> kv in perRow) Check.True(kv.Value > 0, "the row " + kv.Key + " holds no case");
+            List<string> counts = new List<string>();
+            foreach (KeyValuePair<string, int> kv in perRow) counts.Add(kv.Key + " " + kv.Value);
+            return Cases.Length + " cases, each in exactly one row: " + string.Join(", ", counts.ToArray());
+        }
+
+        [Clause("SELF.a17-clauses-pass-and-bite-lessons")]
+        public static string PassAndBiteLessons(Ctx c) { return ClausesPassAndBite(c, LessonRow); }
+
+        [Clause("SELF.a17-clauses-pass-and-bite-walk-host")]
+        public static string PassAndBiteWalkHost(Ctx c) { return ClausesPassAndBite(c, HostWalkRow); }
+
+        [Clause("SELF.a17-clauses-pass-and-bite-vault-keys")]
+        public static string PassAndBiteVaultKeys(Ctx c) { return ClausesPassAndBite(c, VaultKeysRow); }
+
+        [Clause("SELF.a17-clauses-pass-and-bite-rest")]
+        public static string PassAndBiteRest(Ctx c) { return ClausesPassAndBite(c, RestRow); }
+
+        static string ClausesPassAndBite(Ctx c, Predicate<string> inRow)
         {
             int passes = 0, bites = 0;
             List<string> notRun = new List<string>();
@@ -126,6 +173,7 @@ namespace Acceptance
             string only = Environment.GetEnvironmentVariable("ACC_SELF_ONLY");
             foreach (Case k in Cases)
             {
+                if (!inRow(k.Id)) continue;
                 if (!string.IsNullOrEmpty(only) && k.Id.IndexOf(only, StringComparison.Ordinal) < 0) continue;
                 string good = Against(c, k, "");
                 // On the faithful fake, the fake is the product, so PRODUCT_MISSING here means the clause cannot reach what it needs. A lesson 1 clause went dark this way until a person read the code.
