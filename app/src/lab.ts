@@ -129,16 +129,31 @@ export function certificatesArePublic(events: readonly TraceEvent[]): boolean {
   return certs.length > 0 && certs.every(e => wire.includes(e.plain.toLowerCase()))
 }
 
+// A listener has every byte of wire.sent, readable where visibleToWire is true and opaque where it is false, plus sizes, order, timing and
+// what can be computed from those alone. It has no keys, no fingerprints, no text under a lock, no check results, and no measure taken inside an endpoint.
+
 /** Why this tab is closed to a listener, or null when it may show. A tab closes when it holds what only an endpoint knows. */
 export function closedToListener(tab: string, events: readonly TraceEvent[]): string | null {
   switch (tab) {
     case 'chain': return certificatesArePublic(events) ? null : 'The certificates travel locked in this lesson, so a listener cannot read them.'
-    case 'token': return 'The token and its claims travel locked, so a listener cannot read them.'
     case 'ladder': return 'Each side makes these keys in its own memory. None of them crosses the wire.'
-    case 'timing': return 'This lab measures code on one machine. Nothing here crosses a wire.'
     default: return null
   }
 }
+
+/** What this tab means in the Eavesdropper view, when it stays open. */
+export function listenerLabel(tab: string, events: readonly TraceEvent[]): { kind: 'public' | 'lab'; text: string } | null {
+  switch (tab) {
+    case 'chain': return certificatesArePublic(events) ? { kind: 'public', text: 'Public: these certificates cross the wire in the clear, so a listener reads them too.' } : null
+    case 'token': return { kind: 'public', text: 'Public: these tokens cross the wire in the clear, so a listener can decode the claims.' }
+    case 'onion': return { kind: 'lab', text: 'The lab\'s view: a listener sees the outer bytes, and none of these states.' }
+    case 'timing': return { kind: 'lab', text: 'This lab runs on one machine, so nothing here crosses a wire.' }
+    default: return null
+  }
+}
+
+/** True for a measure a listener could take from the wire: repeated blocks in ciphertext, and claims in a token that crosses in the clear. */
+export const listenerCanMeasure = (e: TraceEvent): boolean => /(?:^|;)repeats=/.test(e.detail) || e.message === 'token claims' || e.message === 'proof claims'
 
 // ---- lesson 7: the race ----
 
