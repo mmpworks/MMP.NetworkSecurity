@@ -187,3 +187,20 @@ for (const size of [{ width: 1440, height: 760 }, { width: 1536, height: 760 }, 
     if (size.width >= 1440) expect(m.whole, 'the panel scrolls on a short lesson').toBeLessThanOrEqual(m.shown + 1)
   })
 }
+
+// The line between the 2 grids says what happened to the bytes. A grid that is too short for its own rows must not paint them over that line.
+// The app sets its pane shares when the window opens, so each size runs twice: opened at that size, and opened at 1440 x 770 and then resized, as a learner does.
+for (const [size, resized] of [[{ width: 1440, height: 770 }, false], [{ width: 1280, height: 640 }, false], [{ width: 1280, height: 640 }, true]] as const) {
+  test(`at ${size.width} x ${size.height}${resized ? ', resized from 1440 x 770,' : ''} the "locked with the key, then sent" line covers no hex row`, async ({ page }) => {
+    await page.setViewportSize(resized ? { width: 1440, height: 770 } : size)
+    await freePlay(page, 1)
+    await pick(page, 'TextGcm1')
+    if (resized) { await page.setViewportSize(size); await page.waitForTimeout(500) }
+    await expect(page.locator('.became')).toHaveText(/locked with the key, then sent/)
+    const hits = await page.evaluate(() => {
+      const line = document.querySelector('.became')!.getBoundingClientRect()
+      return [...document.querySelectorAll('.inspector .hex-scroll')].map(e => e.getBoundingClientRect()).filter(r => r.bottom > line.top + 1 && r.top < line.bottom - 1).length
+    })
+    expect(hits, 'hex grids that reach into the line').toBe(0)
+  })
+}
