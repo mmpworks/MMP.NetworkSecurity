@@ -1,0 +1,82 @@
+$ verifier verify --ledger ledger.ndjson --root-key seal-pub.pem --master-key ikm.bin
+verifier report
+  ledger:        ledger.ndjson
+  entry_count:   5
+  seal_date:     2026-11-06
+  signing_key:   sha256:f088f2682375e656577a5fd416e5ab565017e086243c5169bf0fa273b8f3ddc2
+  steps:
+    [PASS] chain-linkage
+    [PASS] merkle-root
+    [PASS] seal-signature
+    [PASS] per-event-mac
+  overall:       PASS (full, key-bound)
+exit code: 0
+
+$ verifier verify --ledger cut-last.ndjson --root-key seal-pub.pem --master-key ikm.bin
+verifier report
+  ledger:        cut-last.ndjson
+  entry_count:   4
+  seal_date:     2026-11-06
+  signing_key:   sha256:f088f2682375e656577a5fd416e5ab565017e086243c5169bf0fa273b8f3ddc2
+  steps:
+    [PASS] chain-linkage
+    [FAIL] merkle-root        — merkle root does not match (recomputed=bze+HybOB1dF2ZEDLUu2Iuh6BBX0j7Jct+q30E0Olpw=, claimed=d2nDOs/91J5kjfjfP/7AXjl84+B3TllZZ2Aw6G0edeE=)
+  overall:       FAIL
+verifier: merkle-root: merkle root does not match (recomputed=bze+HybOB1dF2ZEDLUu2Iuh6BBX0j7Jct+q30E0Olpw=, claimed=d2nDOs/91J5kjfjfP/7AXjl84+B3TllZZ2Aw6G0edeE=)
+exit code: 1
+
+$ verifier verify --ledger rewrite-old-seal.ndjson --root-key seal-pub.pem --master-key ikm.bin
+verifier report
+  ledger:        rewrite-old-seal.ndjson
+  entry_count:   5
+  seal_date:     2026-11-06
+  signing_key:   sha256:f088f2682375e656577a5fd416e5ab565017e086243c5169bf0fa273b8f3ddc2
+  steps:
+    [PASS] chain-linkage
+    [FAIL] merkle-root        — merkle root does not match (recomputed=7LTZ2PjI+EoUVdrdrL7Sqa4xePOljyXka92LFbDUAlM=, claimed=d2nDOs/91J5kjfjfP/7AXjl84+B3TllZZ2Aw6G0edeE=)
+  overall:       FAIL
+verifier: merkle-root: merkle root does not match (recomputed=7LTZ2PjI+EoUVdrdrL7Sqa4xePOljyXka92LFbDUAlM=, claimed=d2nDOs/91J5kjfjfP/7AXjl84+B3TllZZ2Aw6G0edeE=)
+exit code: 1
+
+$ verifier verify --ledger rewrite-new-root.ndjson --root-key seal-pub.pem --master-key ikm.bin
+verifier report
+  ledger:        rewrite-new-root.ndjson
+  entry_count:   5
+  seal_date:     2026-11-06
+  signing_key:   sha256:f088f2682375e656577a5fd416e5ab565017e086243c5169bf0fa273b8f3ddc2
+  steps:
+    [PASS] chain-linkage
+    [PASS] merkle-root
+    [FAIL] seal-signature     — seal signature does not verify under the supplied public key
+  overall:       FAIL
+verifier: seal-signature: seal signature does not verify under the supplied public key
+exit code: 1
+
+$ verifier verify --ledger rewrite-own-signature.ndjson --root-key seal-pub.pem --master-key ikm.bin
+verifier report
+  ledger:        rewrite-own-signature.ndjson
+  entry_count:   5
+  seal_date:     2026-11-06
+  signing_key:   sha256:102d0e268b4cf1a8369eb3217c7cfd5056d7ab48fdce519827a5c3973a04da42
+  steps:
+    [PASS] chain-linkage
+    [PASS] merkle-root
+    [FAIL] seal-signature     — signing_key_fingerprint does not match supplied public key (computed=f088f2682375e656577a5fd416e5ab565017e086243c5169bf0fa273b8f3ddc2, claimed=102d0e268b4cf1a8369eb3217c7cfd5056d7ab48fdce519827a5c3973a04da42)
+  overall:       FAIL
+verifier: seal-signature: signing_key_fingerprint does not match supplied public key (computed=f088f2682375e656577a5fd416e5ab565017e086243c5169bf0fa273b8f3ddc2, claimed=102d0e268b4cf1a8369eb3217c7cfd5056d7ab48fdce519827a5c3973a04da42)
+exit code: 1
+
+$ verifier verify --ledger rewrite-own-signature.ndjson --root-key own-key-pub.pem --master-key ikm.bin
+verifier report
+  ledger:        rewrite-own-signature.ndjson
+  entry_count:   5
+  seal_date:     2026-11-06
+  signing_key:   sha256:102d0e268b4cf1a8369eb3217c7cfd5056d7ab48fdce519827a5c3973a04da42
+  steps:
+    [PASS] chain-linkage
+    [PASS] merkle-root
+    [PASS] seal-signature
+    [PASS] per-event-mac
+  overall:       PASS (full, key-bound)
+exit code: 0
+

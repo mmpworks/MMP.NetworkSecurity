@@ -1,0 +1,14 @@
+Sealed sample for the chain cases. Verifier commit 6469627. All keys here are throwaway test keys.
+
+PATH 1: the verifier command line, ledger format. Build from E:/dev/ffiec/verifier:
+  go build -o verifier.exe ./cmd/verifier
+  ./verifier gen-fixture --out-ledger ledger.ndjson --out-pub seal-pub.pem --out-ikm ikm.bin --entries 5 --seal-date 2026-11-06
+  python make_cases.py      (makes the tampered copies; first checks it reproduces every hash, tag and the root)
+  bash run_cases.sh         (real output: output.txt)
+
+PATH 2: the section 7 walk, the format the mock shows. Run from E:/dev/ffiec/verifier:
+  go run -overlay <this folder>/walk/overlay.json ./cmd/sealwalk cmd/verifier/testdata/simulator-custody.golden cmd/verifier/testdata/simulator-custody-key.hex
+  (real output: walk/output.txt. The program is walk/sealwalk.go. The overlay adds it at build time, so the repo gets no new file.)
+
+The seal in PATH 2 is made by sealwalk.go with a new Ed25519 key on each run, with no hardware key store. dev_mode is true.
+Rewrite in PATH 2 adds one byte to the canonical text of event 3, then makes a new tag and link for events 3 onward.
