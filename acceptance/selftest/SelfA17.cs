@@ -62,6 +62,7 @@ namespace Acceptance
             new Case("A19.host.block-real-run-two-seeds", AesWalkHostClauses.BlockRealRun, "walk-canned", "walk-state-flip", "walk-inverse-order", "walk-key-row-flip", "walk-input-other", "walk-word-test-wrong"),
             new Case("A17.attacks.every-row-forks-to-its-code", AttackRowClauses.EveryRowForksToItsCode, "attack-finish-other-code", "attack-finish-no-check", "attack-row-unavailable"),
             new Case("A19.host.practice-key-192-256", AesWalkHostClauses.PracticeKeySizes, "walk-practice-no-xor", "walk-practice-says-run", "walk-block-open-off"),
+            new Case("A19.host.typed-routes-open-with-keys-off", AesWalkHostClauses.TypedRoutesOpen, "typed-closed-off", "typed-run-key"),
             new Case("A19.host.show-keys-off-closes-block-first", AesWalkHostClauses.OffClosesBlock, "walk-block-open-off", "walk-session-before-toggle", "walk-off-error-bytes", "walk-tables-closed-off"),
             new Case("A19.host.replies-carry-no-store", AesWalkHostClauses.NoStore, "walk-no-store-missing"),
             new Case("A19.host.errors-carry-a-code", AesWalkHostClauses.Errors, "walk-lesson-wrong-code", "walk-bad-argument-500", "walk-no-request-id"),
