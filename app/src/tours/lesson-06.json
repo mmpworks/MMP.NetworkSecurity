@@ -271,7 +271,7 @@
       "title": "What to take away",
       "text": [
         "DUKPT gives every sale its own key. The reader erases each key after use, and the bank rebuilds keys from one base key and the KSN.",
-        "All keys in this lab are made up, and anyone can read the base key in the source. A real base key is usually kept inside secure hardware.",
+        "All keys in this lab are made up, and anyone can read the base key in the source. A real base key is usually kept inside secure hardware, and a real HSM shows only a key id and a check value. This lab also reuses one reader id, so a counter repeats across runs under one key. That is a lab shortcut.",
         "Built to show the parts. Do not copy."
       ],
       "glossary": [],

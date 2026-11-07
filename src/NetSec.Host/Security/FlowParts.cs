@@ -27,9 +27,10 @@ public sealed class FlowParts(SecurityStore store, Func<string, string?> env)
     [
         SecurityTypes.RootCa, SecurityTypes.TlsTrust, SecurityTypes.Tls13Server, SecurityTypes.Tls13Client, SecurityTypes.Tls11Server,
         SecurityTypes.TokenIssuer, SecurityTypes.DeviceEnrolment, SecurityTypes.LabAesKey, SecurityTypes.LabSealKey,
+        SecurityTypes.DukptBdk, SecurityTypes.DukptPad,
     ];
 
-    static readonly HashSet<string> ImportBuilt = [SecurityTypes.TokenIssuer, SecurityTypes.DeviceEnrolment];
+    static readonly HashSet<string> ImportBuilt = [SecurityTypes.TokenIssuer, SecurityTypes.DeviceEnrolment, SecurityTypes.DukptBdk];
 
     // What OpenSSL says when it refuses each control. Any other failure proves nothing about the key, such as a tool that ran out of memory or timed out.
     const string SignatureRefused = "Signature Verification Failure", ChainRefused = "verification failed";
@@ -40,11 +41,11 @@ public sealed class FlowParts(SecurityStore store, Func<string, string?> env)
     /// <summary>The engines read an imported token or device key as an Ed25519 seed.</summary>
     public static KeyAlgorithm ImportedAlgorithm(string typeId) => KeyAlgorithm.Ed25519;
 
-    public static string JudgeOf(string typeId) => typeId == SecurityTypes.DeviceEnrolment ? JudgeNone : JudgeOpenSsl;
+    public static string JudgeOf(string typeId) => typeId is SecurityTypes.DeviceEnrolment or SecurityTypes.DukptBdk or SecurityTypes.DukptPad ? JudgeNone : JudgeOpenSsl;
 
     public static string SaysOf(string typeId) => typeId switch
     {
-        SecurityTypes.DeviceEnrolment => SaysNoOutsideJudge,
+        SecurityTypes.DeviceEnrolment or SecurityTypes.DukptBdk or SecurityTypes.DukptPad => SaysNoOutsideJudge,
         SecurityTypes.TokenIssuer => SaysSignatureOnly,
         SecurityTypes.LabAesKey or SecurityTypes.LabSealKey => SaysWithOpenSsl,
         _ => SaysAgainstRoot,
@@ -54,16 +55,16 @@ public sealed class FlowParts(SecurityStore store, Func<string, string?> env)
     {
         switch (typeId)
         {
-            case SecurityTypes.TlsTrust: store.PlaceDerived(typeId); break;
+            case SecurityTypes.TlsTrust or SecurityTypes.DukptPad: store.PlaceDerived(typeId); break;
             case SecurityTypes.Tls11Server: store.PlaceKey(typeId, NewRsaPem()); break;
-            case SecurityTypes.LabAesKey or SecurityTypes.LabSealKey: store.PlaceBytes(typeId, NewLessonKey()); break;
+            case SecurityTypes.LabAesKey or SecurityTypes.LabSealKey or SecurityTypes.DukptBdk: store.PlaceBytes(typeId, NewLessonKey()); break;
             default: store.PlaceKey(typeId, NewEd25519Pem()); break;
         }
     }
 
     public ReviewFact Review(string typeId)
     {
-        ITrainingKey? key = store.PlacedKey(typeId) ?? store.PlacedKey(SecurityTypes.RootCa);
+        ITrainingKey? key = store.PlacedKey(typeId) ?? store.PlacedKey(typeId == SecurityTypes.DukptPad ? SecurityTypes.DukptBdk : SecurityTypes.RootCa);
         return new ReviewFact(typeId, NameOf(typeId), ReadOnlyNotAfter, key is null ? "" : AlgorithmOf(key), key is null ? "" : SecurityStore.FingerprintOf(key.CopyPublic()));
     }
 
@@ -76,6 +77,7 @@ public sealed class FlowParts(SecurityStore store, Func<string, string?> env)
             SecurityTypes.DeviceEnrolment => CheckDevice(),
             SecurityTypes.LabAesKey => CheckAesKey(proofDirectory),
             SecurityTypes.LabSealKey => CheckSealKey(proofDirectory),
+            SecurityTypes.DukptBdk or SecurityTypes.DukptPad => PaymentKeys.Check(typeId, Placed(SecurityTypes.DukptBdk).CopyMaterial()),
             SecurityTypes.RootCa => CheckRoot(proofDirectory),
             SecurityTypes.TlsTrust => CheckChain(typeId, SecurityTypes.Tls13Server, proofDirectory),
             _ => CheckChain(typeId, typeId, proofDirectory),

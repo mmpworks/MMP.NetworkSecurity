@@ -102,6 +102,8 @@ namespace NetSec.Errors
         public const string EnvelopeMalformed = "ENVELOPE_MALFORMED";
         public const string DukptPinBlockFormat = "DUKPT_PINBLOCK_FORMAT";
         public const string DukptKeyNotHeld = "DUKPT_KEY_NOT_HELD";
+        public const string DukptKeySize = "DUKPT_KEY_SIZE";
+        public const string DukptKcvMismatch = "DUKPT_KCV_MISMATCH";
         public const string AesWalkDiverged = "AES_WALK_DIVERGED";
         public const string WalkNotBuilt = "WALK_NOT_BUILT";
         public const string WalkBadArgument = "WALK_BAD_ARGUMENT";

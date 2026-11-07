@@ -46,7 +46,8 @@ const startLesson = computed(() => sec.returnLesson)
 
 function make() { const { event, data } = sourceEvent('make'); void sendEvent(event, data) }
 function useFiles() { const { event, data } = sourceEvent('files'); void sendEvent(event, data) }
-function sendPaths() { void sendEvent('files', { paths: Object.fromEntries(Object.entries(paths).filter(([, v]) => v.trim())) }) }
+const checkValue = ref('')
+function sendPaths() { void sendEvent('files', { checkValue: checkValue.value.trim() || undefined, paths: Object.fromEntries(Object.entries(paths).filter(([, v]) => v.trim())) }) }
 // Leaving the Done screen ends the run on the Host, so no "Setup paused" remains for a finished set.
 async function finish() { if (forward.value) await sendEvent(forward.value); await closeSheet(true) }
 async function builtinAgain() { await finish(); for (const t of flow.value?.types ?? []) await setMode(t, 'BuiltIn') }
@@ -92,6 +93,10 @@ async function toLesson() { await finish(); backToLesson() }
               <label v-for="t in flow?.types ?? []" :key="t" class="wiz-file" :data-testid="`flow-file-row-${t}`">
                 <span>{{ words(`wizard.type.${t}.title`, t) }}</span>
                 <input v-model="paths[t]" class="ns-input" type="text" spellcheck="false" :aria-label="`File for ${words(`wizard.type.${t}.title`, t)}`" :data-testid="`flow-file-path-${t}`" />
+              </label>
+              <label v-if="flow?.types.includes('dukpt.bdk')" class="wiz-file" data-testid="flow-file-check-value">
+                <span>{{ words('wizard.field.check-value', 'Check value from the vendor (optional)') }}</span>
+                <input v-model="checkValue" class="ns-input" type="text" spellcheck="false" :aria-label="words('wizard.field.check-value', 'Check value from the vendor (optional)')" />
               </label>
               <v-btn color="primary" :disabled="sec.busy || !can('files')" data-testid="flow-files-send" @click="sendPaths">Use these files</v-btn>
             </template>
