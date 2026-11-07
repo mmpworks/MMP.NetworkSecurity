@@ -279,7 +279,7 @@ body { overflow: hidden; }
 .keys-switch input:focus-visible + .ks-track { outline: 2px solid var(--focus); outline-offset: 2px; }
 .sec-page { flex: 1 1 auto; min-height: 0; overflow: auto; padding: 16px 24px 32px; max-width: 1100px; margin: 0 auto; width: 100%; }
 .sec-head { display: flex; align-items: center; gap: 12px; flex-wrap: wrap; }
-.sec-title { font-size: 20px; font-weight: 700; margin: 0; }
+.sec-title { font-family: var(--display); font-size: 20px; font-weight: 700; margin: 0; }
 .sec-line { margin: 8px 0 12px; font-weight: 600; }
 .sec-goal { display: flex; align-items: center; gap: 12px; flex-wrap: wrap; padding: 14px 16px; border: 1px solid var(--line); border-radius: 14px; background: var(--surface); }
 .sec-flows { display: flex; gap: 8px; flex-wrap: wrap; margin: 12px 0; }
@@ -348,4 +348,3 @@ body { overflow: hidden; }
 .v-btn-group .v-btn.v-btn--active { background: var(--surface); font-weight: 700; box-shadow: 0 1px 2px rgba(0, 0, 0, .18); }
 .v-btn-group .v-btn .v-btn__overlay { opacity: 0 !important; }
 .wizard.v-card { border-radius: 14px; border: 1px solid var(--line); }
-.sec-title { font-family: var(--display); }

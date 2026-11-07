@@ -30,7 +30,9 @@ async function freePlay(page: Page, lesson: number) {
 }
 const rowText = async (page: Page) => (await page.locator('[data-testid^="secret-row-"]').allInnerTexts()).join('\n')
 // The panel shortens long hex to 16 characters, an ellipsis and 8. A value that starts with hex is key bytes; a fingerprint starts with `fp:`.
+// Key bytes on screen: a key row that starts with 8 hex bytes, or a match grid with 16 or more cells. A fingerprint fills 8 cells, and the shortest key 16.
 const bytesShown = async (page: Page) => (await page.locator('[data-testid^="secret-value-"]').allInnerTexts()).some(t => /^[0-9a-f]{16}/i.test(t.trim()))
+  || (await page.locator('[data-testid^=convergence-grid-]').evaluateAll(grids => grids.map(g => g.querySelectorAll('.cell').length))).some(n => n >= 16)
 const noBytesOnScreen = async (page: Page) => expect.poll(() => bytesShown(page)).toBe(false)
 
 async function contrast(page: Page, theme: string, screen: string) {
@@ -321,7 +323,11 @@ test('OFF: the binary hover in What each side knows and in Message bytes shows n
       const cell = set.nth(i)
       await cell.hover()
       const shown = (await cell.textContent())!.trim()
-      if (/^[0-9a-f]{2}$/i.test(shown)) { await expect(tip).toContainText(`${shown.toLowerCase()} = `); tips.push(shown.toLowerCase()) } else await expect(tip).toHaveCount(0)
+      if (/^[0-9a-f]{2}$/i.test(shown)) {
+        // The whole tip is pinned to its cell: its byte and that byte's 8 bits, and nothing more.
+        await expect(tip).toHaveText(new RegExp(`^${shown.toLowerCase()} = [01]{4} [01]{4}$`))
+        tips.push((await tip.innerText()).split(' = ')[0])
+      } else await expect(tip).toHaveCount(0)
     }
   }
   expect(tips.length, 'tips read').toBeGreaterThan(16)
