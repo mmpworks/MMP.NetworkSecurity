@@ -89,3 +89,26 @@ test('real Electron opens a glossary source in the outside browser, refuses an u
     expect(win.url(), 'the app left its page').toBe(page)
   } finally { await app.close() }
 })
+
+test('a term inside the wizard keeps its hover and opens no glossary page behind the dialog', async ({ page }) => {
+  await open(page)
+  await page.getByTestId('security-setup-button').click()
+  await page.getByTestId('flow-my-login').click()
+  const term = page.getByTestId('wizard-sheet').getByTestId('term-token').first()
+  await expect(term).toBeVisible()
+  await term.click()
+  await term.press('Enter')
+  await term.press(' ')
+  await page.waitForTimeout(300)
+  await expect(page.getByTestId('glossary-page')).toHaveCount(0)
+  await expect(page.getByTestId('wizard-sheet')).toBeVisible()
+  await expect(page.getByTestId('sec-page')).toBeAttached()
+})
+
+test('Space on a term in a tour opens its entry, as Enter does', async ({ page }) => {
+  await startTour(page, 1)
+  await walkTourUntil(page, 'the GCM term', () => page.getByTestId('term-gcm').first().isVisible())
+  await page.getByTestId('term-gcm').first().focus()
+  await page.keyboard.press(' ')
+  await expect(page.getByTestId('glossary-page')).toBeVisible()
+})
