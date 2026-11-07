@@ -105,8 +105,9 @@ namespace Acceptance
 
         Dictionary<string, object> CertAttack(string id, string code)
         {
-            Dictionary<string, object> d = D("attackId", id, "kind", "cert", "expectCode", code, "expectCheck", "certificate chain", "available", CanIssueNow);
-            if (!CanIssueNow) d["whyNot"] = "ATTACK_NEEDS_CA_KEY";
+            bool can = CanIssueNow && !M("attack-row-unavailable");
+            Dictionary<string, object> d = D("attackId", id, "kind", "cert", "expectCode", code, "expectCheck", "certificate chain", "available", can);
+            if (!can) d["whyNot"] = "ATTACK_NEEDS_CA_KEY";
             return d;
         }
 
@@ -179,6 +180,21 @@ namespace Acceptance
                     SendText(ws, D("type", "session.finished", "sessionId", ecb.Id, "outcome", "accepted", "code", "LAB_OK"));
                     return true;
                 }
+                string certCode = aid == "L4-expired-cert" ? "CERT_EXPIRED" : aid == "L4-wrong-name" || aid == "L10-wrong-client-name" ? "CERT_NAME" : null;
+                if (certCode != null)
+                {
+                    // A certificate row: the fork ends caught by the chain check with the row's code, as the real Host does.
+                    Session cf = new Session { Id = "s" + (++_next), Lesson = parent.Lesson, Seed = parent.Seed };
+                    BuildEvents(cf, parent.Seed);
+                    _sessions[cf.Id] = cf;
+                    cf.File = Path.Combine(Dir, "session-" + cf.Id + ".ndjson");
+                    File.WriteAllText(cf.File, "\n");
+                    SendText(ws, D("type", "session.started", "sessionId", cf.Id, "transportKind", "glass", "trainingOnly", true, "sessionFile", cf.File, "showKeys", _showKeys));
+                    SendText(ws, D("type", "session.forked", "sessionId", cf.Id, "parentId", parent.Id, "attackId", aid));
+                    foreach (SessionEv e in cf.Events) SendText(ws, D("type", "trace", "event", Render(e, _showKeys)));
+                    SendText(ws, D("type", "session.finished", "sessionId", cf.Id, "outcome", "caught", "code", M("attack-finish-other-code") ? "CERT_UNKNOWN_CRITICAL" : certCode, "check", M("attack-finish-no-check") ? null : "certificate chain"));
+                    return true;
+                }
                 if (aid != "L4-flip-cert-byte") { SendText(ws, D("type", "error", "requestId", MiniJson.Str(m, "requestId"), "code", "ATTACK_NOT_FOUND", "message", "No such attack, or that byte cannot be flipped.")); return false; }
                 Session fork = new Session { Id = "s" + (++_next), Lesson = parent.Lesson, Seed = parent.Seed };
                 BuildEvents(fork, parent.Seed);
@@ -191,7 +207,7 @@ namespace Acceptance
                 SendText(ws, D("type", "session.forked", "sessionId", fork.Id, "parentId", parent.Id, "attackId", aid));
                 SendForeignSession(ws);
                 foreach (SessionEv e in fork.Events) SendText(ws, D("type", "trace", "event", Render(e, _showKeys)));
-                SendText(ws, D("type", "session.finished", "sessionId", fork.Id, "outcome", "rejected", "code", fork.FinishCode));
+                SendText(ws, D("type", "session.finished", "sessionId", fork.Id, "outcome", "caught", "code", fork.FinishCode, "check", "certificate chain"));
                 return true;
             }
         }

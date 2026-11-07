@@ -60,6 +60,7 @@ namespace Acceptance
             new Case("A17.lesson-9.my-keys", MyKeysClauses.L9, "mine-run-differs", "builtin-half"),
             new Case("A19.host.tables-equal-fips-and-stay-open", AesWalkHostClauses.TablesEqualFips, "walk-table-flip", "walk-tables-closed-off"),
             new Case("A19.host.block-real-run-two-seeds", AesWalkHostClauses.BlockRealRun, "walk-canned", "walk-state-flip", "walk-inverse-order", "walk-key-row-flip", "walk-input-other", "walk-word-test-wrong"),
+            new Case("A17.attacks.every-row-forks-to-its-code", AttackRowClauses.EveryRowForksToItsCode, "attack-finish-other-code", "attack-finish-no-check", "attack-row-unavailable"),
             new Case("A19.host.practice-key-192-256", AesWalkHostClauses.PracticeKeySizes, "walk-practice-no-xor", "walk-practice-says-run", "walk-block-open-off"),
             new Case("A19.host.show-keys-off-closes-block-first", AesWalkHostClauses.OffClosesBlock, "walk-block-open-off", "walk-session-before-toggle", "walk-off-error-bytes", "walk-tables-closed-off"),
             new Case("A19.host.replies-carry-no-store", AesWalkHostClauses.NoStore, "walk-no-store-missing"),

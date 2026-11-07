@@ -1442,6 +1442,17 @@
    "counts": true
   },
   {
+   "id": "A17.attacks.every-row-forks-to-its-code",
+   "base": "A17.attacks.every-row-forks-to-its-code",
+   "assertion": "A17",
+   "group": "a17",
+   "build": "host",
+   "slice": "V0",
+   "referee": "test over HTTP and WebSocket, OpenSSL, ssh.exe, Go referees; known-answer where no outside referee exists",
+   "roles": [],
+   "counts": true
+  },
+  {
    "id": "A17.attacks.hit-named-field",
    "base": "A17.attacks.hit-named-field",
    "assertion": "A17",
@@ -1897,6 +1908,17 @@
    "base": "A17.show-keys.off-holds-no-secret",
    "assertion": "A17",
    "group": "a17",
+   "build": "host",
+   "slice": "V0",
+   "referee": "test over HTTP and WebSocket, OpenSSL, ssh.exe, Go referees; known-answer where no outside referee exists",
+   "roles": [],
+   "counts": true
+  },
+  {
+   "id": "A17.ui.every-attack-row-has-a-button",
+   "base": "A17.ui.every-attack-row-has-a-button",
+   "assertion": "A17",
+   "group": "e2e",
    "build": "host",
    "slice": "V0",
    "referee": "test over HTTP and WebSocket, OpenSSL, ssh.exe, Go referees; known-answer where no outside referee exists",
