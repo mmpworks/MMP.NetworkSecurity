@@ -76,7 +76,7 @@ const canFlip = computed(() => ui.selectedByte != null && !!ev.value?.wire && !i
       <v-spacer />
       <v-btn size="x-small" color="error" :disabled="!canFlip" data-testid="flip-byte-button" @click="flipSelectedByte">Flip this byte</v-btn>
     </div>
-    <div v-if="view?.neverOnWire" class="empty-note" data-testid="inspector-no-wire">This event never crossed the wire, so a listener sees nothing of it.</div>
+    <div v-if="view?.neverOnWire" class="empty-note" data-testid="inspector-no-wire">This step happens inside an endpoint, so a listener sees nothing of it.</div>
     <div v-else-if="!ev || !view || (!view.before && !view.after && !view.beforeHidden)" class="empty-note">{{ ev ? 'This event moves no bytes.' : 'Bytes appear here when the engine sends a message.' }}</div>
     <div v-else class="inspector-body">
       <div class="byte-grids">

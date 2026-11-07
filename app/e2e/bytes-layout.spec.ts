@@ -61,7 +61,7 @@ test('an engine event with no wire bytes shows only the fields that fit its byte
   expect(v.fields).toEqual([])
 })
 
-test('an event that never crossed the wire shows the eavesdropper nothing', () => {
+test('a step inside an endpoint shows the eavesdropper nothing', () => {
   // Lesson 7, tls.record.received: the receiver's readable text, with no wire bytes.
   const received = ev({ type: 'tls.record.received', plain: hexOf(19, 0x68), wire: '', fields: [f('application_data', 0, 19, 'data', false)] })
   const v = bytesView(received, 'eavesdropper')

@@ -155,7 +155,7 @@ test('an event with no wire bytes shows the eavesdropper no bytes and no rows', 
   await page.getByTestId('view-eavesdropper').click()
   await expect(page.getByTestId('inspector')).not.toContainText(text.slice(0, 8))
   await expect(page.getByTestId('inspector').locator('.field-row')).toHaveCount(0)
-  await expect(page.getByTestId('inspector-no-wire')).toBeVisible()
+  await expect(page.getByTestId('inspector-no-wire')).toHaveText('This step happens inside an endpoint, so a listener sees nothing of it.')
 })
 
 // What each side knows: a row never sits under the box below it, and the panel has one scroll. A short lesson fits with no scroll at 1440 wide.

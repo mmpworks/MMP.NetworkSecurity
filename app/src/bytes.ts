@@ -16,7 +16,7 @@ export interface BytesView {
   after: { hex: string } | null
   /** True when the eavesdropper view hides readable bytes that the endpoints can see. */
   beforeHidden: boolean
-  /** True in the eavesdropper view for an event with readable bytes that never crossed the wire: a listener sees nothing of it. */
+  /** True in the eavesdropper view for an event with readable bytes and no wire bytes. It happens inside an endpoint, so a listener sees nothing of it. */
   neverOnWire: boolean
   /** The buffer the fields describe. */
   fieldsOn: 'before' | 'after'
