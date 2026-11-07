@@ -127,6 +127,8 @@ namespace Acceptance
             {
                 if (!string.IsNullOrEmpty(only) && k.Id.IndexOf(only, StringComparison.Ordinal) < 0) continue;
                 string good = Against(c, k, "");
+                // On the faithful fake, the fake is the product, so PRODUCT_MISSING here means the clause cannot reach what it needs. A lesson 1 clause went dark this way until a person read the code.
+                if (good.StartsWith("NOT RUN PRODUCT_MISSING")) Check.True(false, k.Id + " cannot reach what it needs on the faithful fake: " + good);
                 if (good.StartsWith("NOT RUN")) { notRun.Add(k.Id + " (" + good.Substring(0, Math.Min(good.Length, 90)) + ")"); continue; }
                 Check.True(good.StartsWith("PASS"), k.Id + " should PASS on the faithful fake, gave " + good);
                 passes++;
