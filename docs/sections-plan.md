@@ -1,6 +1,6 @@
 # MMP.NetworkSecurity: the 3-section plan
 
-Owners: Richard (map, engine data, slices) and Nancy (screens). Decision owner: Steve. Reader before Steve: Jared. Date: 2026-11-07. Status: plan, with Steve's answers to section 8 recorded on 2026-11-07. Slices build from it.
+Owners: Richard (map, engine data, slices) and Nancy (screens). Decision owner: Steve. Reader before Steve: Jared. Date: 2026-11-07. Status: plan, with Steve's answers to Q1 and Q2 recorded on 2026-11-07. Slices build from it. Nancy's screen questions Q3 and Q4 are open.
 
 ## The two changes I would make
 
@@ -98,13 +98,19 @@ The 5 "Switch to the eavesdropper view" try-its and lesson 7's "Run both handsha
 
 ## 2. Screens (Nancy)
 
-Nancy writes this section. Her lines come after Steve's clipping fix. Until they arrive, these are my proposals, for her to replace:
+Nancy's screen lines, 2026-11-07, with her update for Steve's answers. Plan only.
 
-1. **Section switch:** 3 tabs at the top of the left rail: Handshake, Techniques, Lessons. Lessons shows today's lesson rail, with the numbers kept.
-2. **R1, the long text:** a strip that stays in section 2's layout on every technique tab, above the walk. Each walk names which bytes of the long text it is using.
-3. **Attack index:** inside Lessons, a list of all 56 runs grouped by kind (section 1.4). Each entry opens its lesson at the tour step that plays the run, or at its free-play button when no tour plays it.
-4. **Links:** each lesson has a link to its walk (section 1.1), and each walk links back to its lessons.
-5. **Security setup, the wizard, the vault and the glossary:** in the shared area, reached from the top bar, as today.
+1. **Section switch.** A segmented switch at the left of the top bar, right after the brand: Handshake / Techniques / Lessons. It takes the place of Tour / Free play, and the mode becomes a smaller control inside the section. The bar keeps its one row: at 1280 the 3 labels cost about the width the mode switch frees. The rail lists the current section only:
+   - Handshake: its walks (the wire and the eavesdropper view, the TLS 1.3 messages and key schedule, the certificate chain).
+   - Techniques: AES, HMAC and chain, Feistel, Diffie-Hellman, X25519, Ed25519, ECDSA P-256. One item each. X25519 is the only elliptic-curve key-agreement item. Both signature families stay.
+   - Lessons: today's 12 lessons, numbered as now, and one more item at the bottom, "Attack runs".
+2. **R1, "the long text is always visible".** A pinned strip across the top of the workspace in Techniques, above the walk root. It shows one line of the long cleartext, mono, with the current block highlighted. It scrolls sideways, and the walk's chosen block stays in view. It stays while the learner moves between the Techniques items. A walk that shows a value derived from the text draws a link line from the strip to its grid. Height 44 px, so 1280 x 640 still fits the walk. It mounts outside `walk-root`, so the walk's clip cannot cut it. It reads the rows of `POST /api/walk/aes/long-text`, and the typed-block route feeds the walk's text box. Both routes stay open with Show keys off, so the strip shows with Show keys off too.
+3. **Attack runs (the index, Steve's Q1).** "Attack runs" opens an index of all 56 runs grouped by kind. Each row names the attack, its lesson, and the check that catches it. The group labels on screen are Nancy's: tamper, replay, downgrade, swapped key or identity, nonce reuse, length extension, timing, token misuse. Slice P3 fixes how section 1.4's kinds map to these labels. A click on a row opens that lesson with the attack run: the normal run beside the attacked run (the Both layout, which #219 made fill its panes), the changed message diffed in Message bytes with changed bytes lit, and the catching check under both, pass on the left and fail on the right. Back returns to the index with the row kept.
+4. **Security setup, wizard, vault, glossary.** A shared area outside the 3 sections, reached from the top bar (Security setup) and from Settings (Glossary). Each replaces the workspace and keeps the bar, as today.
+5. **Shell changes.** `workspace` and `walk-root` stay. Techniques adds the pinned strip as a sibling above `walk-root` inside `workspace`. `overlay-layer` is unchanged. The rail component takes the section as a prop. The Endpoints / Eavesdropper / Both views stay, and an attack run from the index opens in Both.
+6. **Links.** Each lesson links to its walk (section 1.1), and each walk links back to its lessons.
+
+Nancy's 2 screen questions for Steve are in section 8 as Q3 and Q4.
 
 ## 3. What moves and what is new
 
@@ -200,7 +206,12 @@ A progress report states these 5 counts. It does not substitute the fact that bu
 | Q1 | Lessons: list the attack runs a second way? | Lessons also gets an index of the attack runs, grouped by kind. Each entry opens the lesson at the step that plays it | No index. Each run stays only in its tour step | **A.** It answers "how do things break" in one place, and no tour or clause changes. **Steve: A** |
 | Q2 | Key agreement on elliptic curves: is X25519 enough, or do you also want ECDH on P-256? | X25519 carries ECDH. P-256 appears only in the ECDSA walk | Also an ECDH walk on P-256, on the same new P-256 code | **A.** X25519 is ECDH on Curve25519, and the lessons run it today. B adds a walk on code no lesson runs. **Steve: A** |
 
-Nancy may add 1 screen question here.
+Nancy's 2 screen questions (section 2), open:
+
+| Id | Question | Option A | Option B | Nancy's pick |
+|---|---|---|---|---|
+| Q3 | Where does the long text live in Techniques? | A pinned strip above the walk, one line, scrolling sideways | A side column, wrapped, about 280 px wide | **A.** The walk needs the width at 1280, and one line keeps byte offsets readable |
+| Q4 | When a learner opens an attack run from the index, what shows first? | The normal run and the attacked run side by side | The attacked run alone, with a "show the normal run" toggle | **A.** The difference is the lesson, and the Both layout already exists |
 
 **Answered (2026-11-07, Steve, through the lead):**
 1. Elliptic-curve methods mean both key agreement (ECDH, X25519) and signatures (ECDSA, Ed25519). Both go in section 2.
@@ -217,4 +228,4 @@ Jared read 23df25c (same-vendor fresh read). His anchor: a git grep on origin/ma
 
 ## Disposition
 
-Jared passed this plan (35e95ce). Steve answered every question in section 8 on 2026-11-07. The lead starts P1. Nancy builds the W1b screens after SC lands.
+Jared passed this plan (35e95ce). Steve answered Q1 and Q2 in section 8 on 2026-11-07. Nancy's screen questions Q3 and Q4 wait for him. The lead starts P1. Nancy builds the W1b screens after SC lands.
