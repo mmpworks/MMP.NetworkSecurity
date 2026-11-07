@@ -120,7 +120,7 @@ Licences not read: the installed tools themselves (.NET, Node, PowerShell, Visua
 
 ## Fonts in the app
 
-These fonts ship inside the Electron app, Latin subset only. Each is under the SIL Open Font License 1.1. The full license text is in each package's `LICENSE` file under `app/node_modules/@fontsource/`.
+These fonts ship inside the Electron app, Latin subset only. Each is under the SIL Open Font License 1.1. The full license text is in each package's `LICENSE` file under `app/node_modules/@fontsource/`. If the app is ever packaged for release, the OFL text must ship inside the package with the fonts.
 
 | Font | Package | Copyright |
 |---|---|---|
