@@ -22,27 +22,36 @@ public static class AesWalkRoutes
         app.MapGet("/api/sessions/{id}/walk/aes/block", (HttpContext http, string id, string? source, string? keyBits) =>
             NoStore(http, Block(security.ShowKeys, sessions.Find(id), id, source, keyBits)));
         // Section 2.2g: the learner's own text. It runs under the public practice key and reads no run, so it stays open with Show keys off.
-        app.MapPost("/api/walk/aes/typed-block", (HttpContext http, TypedText body) => NoStore(http, Typed(() => TypedBlock(body.Text))));
+        app.MapPost("/api/walk/aes/typed-block", (HttpContext http, TypedText body) => NoStore(http, Typed(() => TypedBlock(body))));
         app.MapPost("/api/walk/aes/long-text", (HttpContext http, LongTextAsk body) => NoStore(http, Typed(() => LongText(body))));
     }
 
-    public sealed record TypedText(string? Text);
+    /// <summary>KeyBits is 128, 192 or 256, and 128 when absent, so a typed block follows the key size picker (design section 2.2g).</summary>
+    public sealed record TypedText(string? Text, int? KeyBits = null);
 
-    public sealed record LongTextAsk(string? Text, int? FlipBlock, int? FlipBit);
+    public sealed record LongTextAsk(string? Text, int? FlipBlock, int? FlipBit, int? KeyBits = null);
 
-    static IResult TypedBlock(string? text)
+    static int PracticeBits(int? keyBits) => keyBits ?? 128;
+
+    /// <summary>The public practice key at the asked size. Any other size is a named refusal.</summary>
+    static byte[] PracticeKey(int bits) => bits is 128 or 192 or 256
+        ? AesPractice.Key(bits)
+        : throw new NetSecException(NetSecError.Of(ErrorCodes.WalkBadArgument, "keyBits must be 128, 192 or 256."));
+
+    static IResult TypedBlock(TypedText ask)
     {
-        AesTypedBlock typed = AesTypedBlocks.Cut(text ?? "");
-        byte[] key = AesPractice.Key(128), cipher = new byte[BlockSize];
+        byte[] key = PracticeKey(PracticeBits(ask.KeyBits)), cipher = new byte[BlockSize];
+        AesTypedBlock typed = AesTypedBlocks.Cut(ask.Text ?? "");
         new AesKey(key).EncryptBlock(typed.Block, 0, cipher, 0);
         return Results.Json(AesWalkJson.TypedBlock(typed, AesWalks.Block(key, typed.Block, cipher)));
     }
 
     static IResult LongText(LongTextAsk ask)
     {
-        byte[] text = AesTypedText.Bytes(ask.Text ?? "");
+        int bits = PracticeBits(ask.KeyBits);
+        byte[] key = PracticeKey(bits), text = AesTypedText.Bytes(ask.Text ?? "");
         int flipBlock = ask.FlipBlock ?? -1;
-        return Results.Json(AesWalkJson.LongText(AesLongText.Build(AesPractice.Key(128), AesPractice.Iv(), text, flipBlock, ask.FlipBit ?? 0)));
+        return Results.Json(AesWalkJson.LongText(AesLongText.Build(key, AesPractice.Iv(), text, flipBlock, ask.FlipBit ?? 0), bits));
     }
 
     /// <summary>A refusal from the text rules is a 400 with its code. The walk's own guard still applies.</summary>
