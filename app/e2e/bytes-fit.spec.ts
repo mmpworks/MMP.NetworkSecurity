@@ -18,7 +18,8 @@ const measure = (page: Page) => page.evaluate(() => {
   const list = box(document.querySelector('.field-list')!)
   const rows = [...document.querySelectorAll('.field-list .field-row')].map(box)
   const grids = [...document.querySelectorAll('.hex-scroll')].map(e => ({ shown: e.clientHeight, whole: e.scrollHeight, shownWide: e.clientWidth, wholeWide: e.scrollWidth }))
-  const middles = [...document.querySelectorAll('.topbar > *')].map(e => Math.round(box(e).top + box(e).height / 2))
+  // A hidden child (the brand name below 1700 wide) has no box and is no row.
+  const middles = [...document.querySelectorAll('.topbar > *')].filter(e => box(e).height > 0).map(e => Math.round(box(e).top + box(e).height / 2))
   const rail = document.querySelector('.rail')!
   return { railWhole: rail.scrollHeight, railShown: rail.clientHeight, pageBar: innerWidth - document.documentElement.clientWidth, fields: rows.length, fieldsInView: rows.filter(r => r.top >= list.top - 1 && r.bottom <= list.bottom + 1).length, grids, barRows: new Set(middles).size }
 })

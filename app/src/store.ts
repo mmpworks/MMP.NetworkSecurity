@@ -65,6 +65,9 @@ export const ui = reactive({
   engine: 'idle' as 'idle' | 'running' | 'stepping' | 'waiting' | 'finished',
   shortcuts: false,
   walkOpen: false,
+  // The section the app shows, and the walk picked in each walk section. Lessons is first on open, so every lesson, tour and spec starts where it did.
+  section: 'lessons' as 'handshake' | 'techniques' | 'lessons',
+  walkItem: {} as Partial<Record<'handshake' | 'techniques' | 'lessons', string>>,
   glossaryOpen: false,
   glossaryFocus: null as string | null,
   follow: true,

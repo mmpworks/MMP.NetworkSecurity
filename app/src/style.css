@@ -397,3 +397,10 @@ body { overflow: hidden; }
 .from-list { display: flex; flex-wrap: wrap; gap: 3px; order: 10; }
 /* A key name is one identifier, so it stays on one line. */
 .secret-row > .sname { white-space: nowrap; overflow: hidden; text-overflow: ellipsis; min-width: 0; }
+
+/* Sections (slice P1). A small segmented switch heads the Tour and Free play panel. Below 1700 wide, the bar drops its brand name to keep its one row: the window title still names the app. */
+.seg-small button { padding: 2px 8px; font-size: 12px; }
+@media (max-width: 1700px) { .topbar > .app-title { display: none; } }
+.section-placeholder { padding: 24px 28px; }
+.section-placeholder h2 { font: 700 20px/1.2 var(--display); margin: 0 0 8px; }
+.section-placeholder p { color: var(--muted); margin: 0; }

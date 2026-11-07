@@ -4,6 +4,7 @@ import TextWithSpecs from './TextWithSpecs.vue'
 import { LESSON_NOTES, active, doTryIt, lessonRow, startSession, step, steps, tour, tourBack, tourNext, tourReplay, unlock, ui } from '../store'
 import { splitText } from '../tour'
 import AttackResult from "./AttackResult.vue"
+import ModeSwitch from "./ModeSwitch.vue"
 import Term from "./Term.vue"
 
 const paragraphs = computed(() => (step.value?.text ?? []).map(splitText))
@@ -18,7 +19,7 @@ const tried = computed(() => !!step.value?.tryIt && unlock.value.open)
 <template>
   <div class="tour" data-testid="tour-panel">
     <div class="tour-head">
-      <div class="tour-line"><span class="side-title">TOUR</span><span v-if="tour.active && step" class="muted" data-testid="tour-progress">Step {{ tour.stepIndex + 1 }} of {{ steps.length }}</span></div>
+      <div class="tour-line"><ModeSwitch /><span v-if="tour.active && step" class="muted" data-testid="tour-progress">Step {{ tour.stepIndex + 1 }} of {{ steps.length }}</span></div>
       <div v-if="tour.active && step" class="stepsbar" :style="{ gridTemplateColumns: `repeat(${steps.length}, minmax(0, 1fr))` }" aria-hidden="true" data-testid="tour-steps-bar">
         <i v-for="(_, i) in steps" :key="i" :class="{ done: i < tour.stepIndex, now: i === tour.stepIndex }" />
       </div>
