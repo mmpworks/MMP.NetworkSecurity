@@ -95,7 +95,7 @@ public sealed class SshExeCheck(Func<string, string?> env, int waitMs = SshExeCh
         Task<string> output = process.StandardOutput.ReadToEndAsync(), errors = process.StandardError.ReadToEndAsync();
         if (!process.WaitForExit(waitMs))
         {
-            process.Kill();
+            process.Kill(entireProcessTree: true);
             return new Attempt(OpenSslTool.TimedOut, $"ssh.exe did not finish in {waitMs / 1000.0:0.#} s", shown);
         }
         return new Attempt(process.ExitCode, (output.Result + errors.Result).Trim(), shown);
