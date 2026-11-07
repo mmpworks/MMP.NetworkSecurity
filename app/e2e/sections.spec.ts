@@ -54,7 +54,8 @@ test('the mode switch sits inside Lessons, and Tour and Free play still switch',
   await expect(page.getByTestId('tour-panel')).toBeVisible()
 })
 
-for (const size of [{ width: 1280, height: 640 }, { width: 1440, height: 770 }, { width: 1984, height: 1030 }]) {
+// 1366 and 1536 sit in the band where the brand name hides: the bar must keep its row there too.
+for (const size of [{ width: 1280, height: 640 }, { width: 1366, height: 768 }, { width: 1440, height: 770 }, { width: 1536, height: 760 }, { width: 1984, height: 1030 }]) {
   test(`at ${size.width} x ${size.height} the top bar keeps one row with the 3 sections, in every section`, async ({ page }) => {
     await page.setViewportSize(size)
     await open(page)
