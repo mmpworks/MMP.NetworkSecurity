@@ -1,4 +1,5 @@
 import { expect, test, type Page } from '@playwright/test'
+import { createHash } from 'node:crypto'
 import { startOwnHost, type OwnHost } from './own-host'
 import { certificatesArePublic, closedToListener } from '../src/lab'
 import { open } from './walk'
@@ -9,12 +10,16 @@ let host: OwnHost
 test.beforeAll(async () => { host = await startOwnHost() })
 test.afterAll(async () => { await host.stop() })
 
-interface Ev { seq: number; type: string; message: string; actor: string; check: string; plain: string; wire: string; secrets: { name: string; hex: string; holder: string }[] }
+interface Ev { seq: number; type: string; message: string; detail: string; locked: boolean; fields: { name: string; offset: number; length: number; visibleToWire: boolean }[]; plain: string; wire: string; secrets: { name: string; hex: string; holder: string }[] }
 interface Finding { what: string; where: string; value: string; from: string }
 
 const textOf = (hex: string) => { let s = ''; for (let i = 0; i + 1 < hex.length; i += 2) s += String.fromCharCode(parseInt(hex.slice(i, i + 2), 16)); return s }
-// Runs of 6 or more letters, digits and spaces, with at least one letter: words a learner would read.
-const wordsIn = (hex: string) => [...textOf(hex).matchAll(/[A-Za-z0-9 ,.:_-]{6,}/g)].map(m => m[0].trim()).filter(w => w.length >= 6 && /[A-Za-z]/.test(w) && !/^[0-9a-f]+$/i.test(w))
+// Runs of 6 or more letters, digits and spaces with a letter in them, and runs of 12 or more digits, which is a card number's shape.
+const wordsIn = (text: string) => [
+  ...[...text.matchAll(/[A-Za-z0-9 ,.:_-]{6,}/g)].map(m => m[0].trim()).filter(w => w.length >= 6 && /[A-Za-z]/.test(w) && !/^[0-9a-f]+$/i.test(w)),
+  ...[...text.matchAll(/\d{12,}/g)].map(m => m[0]),
+]
+const base64Of = (hex: string) => Buffer.from(hex, 'hex').toString('base64')
 
 // A listener can decode base64 too: a token's claims cross the wire in the clear this way, and lesson 10 teaches that.
 const decodedOnWire = (hex: string) => [...textOf(hex).matchAll(/[A-Za-z0-9_-]{16,}/g)].map(m => Buffer.from(m[0], 'base64url').toString('latin1')).join('|')
@@ -25,30 +30,74 @@ async function eventsOf(page: Page): Promise<Ev[]> {
   const body = (await r.json()) as { events?: any[] } | any[]
   return (Array.isArray(body) ? body : body.events ?? []).map((f: any) => {
     const e = f.event ?? f
-    return { seq: Number(f.seq ?? e.seq), type: String(e.type ?? ''), message: String(e.message ?? ''), actor: String(e.actor ?? ''), check: String(e.check?.name ?? ''), plain: String(e.plain ?? '').toLowerCase(), wire: String(e.wire ?? '').toLowerCase(), secrets: (e.secrets ?? []).map((s: any) => ({ name: String(s.name), holder: String(s.holder), hex: String(s.hex ?? '').toLowerCase() })) }
+    return {
+      seq: Number(f.seq ?? e.seq), type: String(e.type ?? ''), message: String(e.message ?? ''), detail: String(e.detail ?? ''),
+      fields: e.fields ?? [], locked: (e.fields ?? []).some((x: any) => x.visibleToWire === false), plain: String(e.plain ?? '').toLowerCase(), wire: String(e.wire ?? '').toLowerCase(),
+      secrets: (e.secrets ?? []).map((x: any) => ({ name: String(x.name), holder: String(x.holder), hex: String(x.hex ?? '').toLowerCase() })),
+    }
   })
 }
 
-// Everything the session put on the wire, as hex and as text. A value found here is public.
+// An SSH host key crosses in the clear, so its fingerprint follows from the wire. This checks that against the bytes: the name stays forbidden if no wire key hashes to it.
+function fingerprintsOnWire(events: Ev[]): Set<string> {
+  const out = new Set<string>()
+  for (const e of events) for (const f of e.fields) {
+    if (f.name !== 'hostKey' || !f.visibleToWire || !e.wire) continue
+    const bytes = Buffer.from(e.wire.slice(f.offset * 2, (f.offset + f.length) * 2), 'hex')
+    for (const blob of [bytes, bytes.subarray(4)]) out.add('SHA256:' + createHash('sha256').update(blob).digest('base64').replace(/=+$/, ''))
+  }
+  return out
+}
+
+// Everything the session put on the wire, as hex and as text, is public. Everything else an event holds is forbidden on this screen.
 function forbiddenValues(events: Ev[]) {
   const wireHex = events.map(e => e.wire).join('|')
-  // The event log names each event's type, actor and check. Those are labels, so a word that is also a label proves nothing.
-  const wireText = events.map(e => `${textOf(e.wire)}|${decodedOnWire(e.wire)}|${e.type}|${e.actor}|${e.check}`).join('|')
+  const wireText = events.map(e => `${textOf(e.wire)}|${decodedOnWire(e.wire)}`).join('|')
+  // A token that crosses in the clear makes its claims public, and the measures of those claims name them.
+  const tokensPublic = events.some(e => e.wire && e.fields.some(f => /^(?:token|proof)(?:Header|Claims)$/.test(f.name) && f.visibleToWire))
+  const publicNames = [...new Set(events.filter(e => e.wire && !e.locked).map(e => e.message)), ...fingerprintsOnWire(events), ...(tokensPublic ? ['token claims', 'proof claims'] : [])]
   const words = new Map<string, string>()
-  const hexes = new Map<string, string>()
+  const hex8 = new Map<string, string>()
+  const hex4 = new Map<string, string>()
+  const base64 = new Map<string, string>()
+  const label = (e: Ev) => `${e.type} ${e.message}`.trim()
   for (const e of events) {
-    for (const w of wordsIn(e.plain)) if (!wireText.includes(w)) words.set(w, `${e.type} ${e.message}`.trim())
-    // 8-byte windows of readable bytes that no wire holds.
-    for (let i = 0; i + 16 <= e.plain.length; i += 16) { const h = e.plain.slice(i, i + 16); if (!wireHex.includes(h)) hexes.set(h, `plain of ${e.type} ${e.message}`.trim()) }
-    for (const s of e.secrets) if (s.hex.length >= 16 && !wireHex.includes(s.hex.slice(0, 16))) hexes.set(s.hex.slice(0, 16), `secret ${s.holder}.${s.name}`)
+    for (const w of wordsIn(textOf(e.plain))) if (!wireText.includes(w)) words.set(w, label(e))
+    // Only the listener's own events have a name it can read: a locked message, or a step inside an endpoint, keeps its name hidden.
+    if ((e.locked || !e.wire) && e.message.length >= 4 && !publicNames.some(n => n.includes(e.message))) words.set(e.message, `name of ${label(e)}`)
+    // A detail reads key=value;key=value. The keys are the app's own words, and the values are what an event holds.
+    if (e.locked || !e.wire) for (const pair of e.detail.split(';')) for (const w of wordsIn(pair.split('=').pop() ?? '')) if (!wireText.includes(w)) words.set(w, `detail of ${label(e)}`)
+    // 8-byte windows of readable bytes that no wire holds, at every byte offset.
+    for (let i = 0; i + 16 <= e.plain.length; i += 2) { const h = e.plain.slice(i, i + 16); if (!wireHex.includes(h)) hex8.set(h, `plain of ${label(e)}`) }
+    if (e.plain.length >= 24 && !wireHex.includes(e.plain)) base64.set(base64Of(e.plain).slice(0, 16), `plain of ${label(e)}, as base64`)
+    for (const x of e.secrets) {
+      if (x.hex.length < 8 || wireHex.includes(x.hex)) continue
+      // The first and last 4 bytes, because a screen can shorten a key to either end.
+      hex4.set(x.hex.slice(0, 8), `secret ${x.holder}.${x.name}`)
+      hex4.set(x.hex.slice(-8), `secret ${x.holder}.${x.name}`)
+      base64.set(base64Of(x.hex).slice(0, 16), `secret ${x.holder}.${x.name}, as base64`)
+    }
   }
-  return { words, hexes }
+  return { words, hex8, hex4, base64 }
 }
 
 let lastScreen = ''
-// The panels only: the status bar names the session, and the rail names lessons, and neither comes from a message.
-// Tooltips and spoken labels count as screen text.
-const screenText = (page: Page) => page.locator('.main-split').evaluate(root => [(root as HTMLElement).innerText, ...[...root.querySelectorAll('[title],[aria-label]')].flatMap(e => [e.getAttribute('title') ?? '', e.getAttribute('aria-label') ?? ''])].join('\n'))
+// The panels, with hidden text, tooltips and spoken labels. Event rows and attack buttons are read on their own terms, so no value can hide behind a label.
+// The status bar names the session and the rail names lessons, and neither comes from a message.
+const screenText = (page: Page) => page.locator('.main-split').evaluate(root => {
+  const parts: string[] = []
+  const attrs: string[] = []
+  const walk = (n: Node) => {
+    if (n.nodeType === 3) { parts.push(n.textContent ?? ''); return }
+    if (n.nodeType !== 1) return
+    const e = n as Element
+    if (e.matches('.log-row, [data-testid^=attack-], select')) return
+    for (const a of ['title', 'aria-label']) { const v = e.getAttribute(a); if (v) attrs.push(v) }
+    n.childNodes.forEach(walk)
+  }
+  walk(root)
+  return [parts.join(' '), parts.join(''), ...attrs].join('\n')
+})
 
 async function scan(page: Page, values: ReturnType<typeof forbiddenValues>, where: string, out: Finding[]) {
   // A tab labeled as the lab's own view says what it is, and it has no wire to compare with.
@@ -56,14 +105,21 @@ async function scan(page: Page, values: ReturnType<typeof forbiddenValues>, wher
   const screen = await screenText(page)
   if (screen === lastScreen) return
   lastScreen = screen
-  const packed = screen.toLowerCase().replace(/\s+/g, '')
   for (const [w, from] of values.words) if (screen.includes(w)) out.push({ what: 'text', where, value: w.slice(0, 40), from })
-  for (const [h, from] of values.hexes) if (packed.includes(h)) out.push({ what: 'hex', where, value: h, from })
+  for (const [b, from] of values.base64) if (screen.includes(b)) out.push({ what: 'base64', where, value: b, from })
+  // Spaces, colons and dashes are how a screen can format hex, so they go before the search. A window lookup keeps this fast on a long message.
+  const packed = screen.toLowerCase().replace(/[\s:\-]/g, '')
+  for (let i = 0; i + 8 <= packed.length; i++) {
+    const four = values.hex4.get(packed.slice(i, i + 8))
+    if (four) out.push({ what: 'hex', where, value: packed.slice(i, i + 8), from: four })
+    const eight = i + 16 <= packed.length ? values.hex8.get(packed.slice(i, i + 16)) : undefined
+    if (eight) out.push({ what: 'hex', where, value: packed.slice(i, i + 16), from: eight })
+  }
 }
 
 for (let lesson = 0; lesson <= 11; lesson++) {
   test(`lesson ${lesson}: the Eavesdropper view shows nothing a listener could not see`, async ({ page }) => {
-    test.setTimeout(240_000)
+    test.setTimeout(400_000)
     lastScreen = ''
     await page.setViewportSize({ width: 1440, height: 900 })
     await open(page, host)
@@ -77,29 +133,51 @@ for (let lesson = 0; lesson <= 11; lesson++) {
     await page.getByTestId('free-run').click()
     await expect(page.getByTestId('engine-state')).toContainText(/finished/, { timeout: 90_000 })
     const events = await eventsOf(page)
+    expect(events.length, 'events from the engine, or this sweep proves nothing').toBeGreaterThan(0)
     const values = forbiddenValues(events)
-    await page.getByTestId('view-eavesdropper').click()
+    for (const w of [...values.words.keys()]) if (fixedText.includes(w)) values.words.delete(w)
 
-    // Attack buttons are labels too, and the lesson shows them whichever view is on.
-    const labels = (await page.locator('[data-testid^=attack-]').allInnerTexts()).join('|')
-    for (const w of [...values.words.keys()]) if (labels.includes(w) || fixedText.includes(w)) values.words.delete(w)
     const found: Finding[] = []
+    const onWire = events.filter(e => e.type === 'wire.sent')
+    // One event per kind: switching views for each one would add many minutes to everyone's suite. Every on-wire row below is still read.
+    const insideEndpoint = [...new Map(events.filter(e => e.type !== 'wire.sent' && (e.plain || e.wire || e.secrets.length)).map(e => [`${e.type}|${e.message}`, e])).values()]
+    let scanned = 0
+
+    // A step inside an endpoint, a reception among them, has no row in this view, so it is picked as an endpoint would, and the view then switches.
+    for (const e of insideEndpoint) {
+      await page.getByTestId('view-endpoints').click()
+      const row = page.getByTestId(`event-row-${e.seq}`)
+      expect(await row.count(), `event ${e.seq} ${e.type} has no row in the Endpoints view`).toBe(1)
+      await row.click()
+      await page.getByTestId('view-eavesdropper').click()
+      await scan(page, values, `event ${e.seq} ${e.type} ${e.message}`, found)
+      scanned++
+    }
+
+    await page.getByTestId('view-eavesdropper').click()
     const tabs = await page.locator('[data-testid^=inspector-tab-]').evaluateAll(all => all.map(e => e.getAttribute('data-testid')!))
     for (const tab of tabs) {
       await page.getByTestId(tab).click()
       await scan(page, values, tab, found)
     }
-    const withBytes = events.filter(e => e.plain || e.wire || e.secrets.length)
-    for (const e of withBytes) {
+
+    // The log lists on-wire events only, and each row holds only its number, its sender and its type.
+    const rows = await page.locator('.log-row').evaluateAll(all => all.map(e => [...e.children].map(c => (c.textContent ?? '').trim())))
+    expect(rows.length, 'log rows in this view, one per on-wire event').toBe(onWire.length)
+    for (const r of rows) expect(r.length === 3 && /^\d+$/.test(r[0]) && r[2] === 'wire.sent', `a log row holds more than its number, sender and type: ${r.join(' | ')}`).toBeTruthy()
+
+    for (const e of onWire) {
       const row = page.getByTestId(`event-row-${e.seq}`)
-      if (!(await row.count())) continue
+      expect(await row.count(), `event ${e.seq} ${e.message} is on the wire and has no row`).toBe(1)
       await row.click()
-      // A lesson with one view has no tab row, so this reads the tab without waiting for one.
       const tab = await page.locator('[data-testid^=inspector-tab-].on').evaluateAll(all => all[0]?.getAttribute('data-testid') ?? 'no tab row')
       await scan(page, values, `event ${e.seq} ${e.type} ${e.message} on ${tab}`, found)
+      scanned++
     }
+    expect(scanned, 'events scanned').toBe(onWire.length + insideEndpoint.length)
+
     const unique = [...new Map(found.map(f => [`${f.what}|${f.value}`, f])).values()]
-    console.log(`lesson ${lesson}: ${values.words.size} texts and ${values.hexes.size} hex values not on the wire, ${events.length} events (${withBytes.length} with bytes), ${tabs.length} tabs, ${unique.length} shown`)
+    console.log(`lesson ${lesson}: forbids ${values.words.size} texts, ${values.hex8.size} windows, ${values.hex4.size} key ends, ${values.base64.size} base64. ${events.length} events, ${scanned} scanned, ${tabs.length} tabs, ${unique.length} shown`)
     for (const f of unique.slice(0, 12)) console.log(`  SHOWN ${f.what} "${f.value}" from ${f.from}, at ${f.where}`)
     expect(unique, `lesson ${lesson}`).toEqual([])
   })
@@ -119,6 +197,7 @@ async function runLesson(page: Page, lesson: number) {
 const CLOSED: [number, string, string][] = [
   [4, 'chain', 'The certificates travel locked in this lesson'],
   [6, 'ladder', 'None of them crosses the wire'],
+  [9, 'onion', 'A listener sees only the outer bytes'],
 ]
 for (const [lesson, tab, words] of CLOSED) {
   test(`lesson ${lesson}: the ${tab} tab closes to a listener, says why, and opens again for an endpoint`, async ({ page }) => {
@@ -137,7 +216,6 @@ for (const [lesson, tab, words] of CLOSED) {
 // These tabs stay open, and each says what it is in that view.
 const LABELLED: [number, string, string, string][] = [
   [10, 'token', 'inspector-public', 'a listener can decode the claims'],
-  [9, 'onion', 'inspector-lab-view', 'none of these states'],
   [11, 'timing', 'inspector-lab-view', 'nothing here crosses a wire'],
 ]
 for (const [lesson, tab, id, words] of LABELLED) {
@@ -167,6 +245,37 @@ test('lesson 2: the avalanche count comes from inside an endpoint, so the listen
   await expect(page.getByTestId('measure-none')).toContainText('inside an endpoint')
 })
 
+test('a locked message keeps its name from the listener', async ({ page }) => {
+  await runLesson(page, 1)
+  await page.locator('[data-testid^=diagram-message-]', { hasText: 'TextGcm1' }).first().click({ timeout: 8000 })
+  await page.getByTestId('inspector-tab-bytes').click()
+  await expect(page.getByTestId('inspector')).toContainText('TextGcm1')
+  await page.getByTestId('view-eavesdropper').click()
+  await expect(page.getByTestId('inspector')).toContainText('Locked message')
+  await expect(page.getByTestId('inspector')).not.toContainText('TextGcm1')
+})
+
+test('the log lists on-wire events only, and it counts them', async ({ page }) => {
+  await runLesson(page, 1)
+  const all = await page.locator('.log-row').count()
+  await page.getByTestId('view-eavesdropper').click()
+  const wire = await page.locator('.log-row').count()
+  expect(wire, 'on-wire rows').toBeGreaterThan(0)
+  expect(wire, 'fewer rows than the endpoints see').toBeLessThan(all)
+  await expect(page.getByTestId('event-log')).toContainText(`${wire} on the wire`)
+  await page.getByTestId('view-endpoints').click()
+  await expect(page.locator('.log-row')).toHaveCount(all)
+})
+
+test('lesson 8: the host key is public, and the client\'s verdict on it is not', async ({ page }) => {
+  await runLesson(page, 8)
+  await page.getByTestId('inspector-tab-hostkey').click()
+  await expect(page.getByTestId('hostkey-status').first()).toBeVisible()
+  await page.getByTestId('view-eavesdropper').click()
+  await expect(page.getByTestId('hostkey-fingerprint').first()).toBeVisible()
+  await expect(page.getByTestId('hostkey-status')).toHaveCount(0)
+})
+
 test('lesson 7: the TLS 1.1 certificate crosses in the clear, so the listener sees it, and the screen says it is public', async ({ page }) => {
   await runLesson(page, 7)
   await page.locator('[data-testid^=diagram-message-]', { hasText: 'Certificate' }).first().click({ timeout: 8000 })
@@ -174,6 +283,12 @@ test('lesson 7: the TLS 1.1 certificate crosses in the clear, so the listener se
   await page.getByTestId('view-eavesdropper').click()
   await expect(page.getByTestId('inspector-public-bytes')).toContainText('Public')
   await expect(page.getByTestId('inspector-after')).toBeVisible()
+})
+
+test('a token that crosses in the clear stays open, and one under a lock closes', () => {
+  const f = (name: string, visibleToWire: boolean) => ({ name, offset: 0, length: 1, kind: 'data', visibleToWire, gloss: '' })
+  expect(closedToListener('token', [{ type: 'wire.sent', plain: '', wire: 'aa', fields: [f('tokenClaims', true)] } as any])).toBeNull()
+  expect(closedToListener('token', [{ type: 'wire.sent', plain: '', wire: 'aa', fields: [f('tokenClaims', false)] } as any])).toContain('locked')
 })
 
 test('a certificate that crosses the wire in the clear is public, and one that does not is closed', async () => {

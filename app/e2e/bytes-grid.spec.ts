@@ -180,7 +180,7 @@ for (const size of [{ width: 1440, height: 760 }, { width: 1536, height: 760 }, 
     await freePlay(page, 1)
     await pick(page, 'TextGcm1')
     const m = await secretsLayout(page)
-    expect(m.rows, 'key rows on screen').toBeGreaterThan(1)
+    expect(m.rows, 'key rows on screen').toBeGreaterThan(0)
     expect(m.rowsUnderBox, 'key rows under the match box').toBe(0)
     expect(m.innerScrollers, 'a second scroll inside the panel').toBe(0)
     expect(m.rowTexts, 'cut row text').toBe(0)

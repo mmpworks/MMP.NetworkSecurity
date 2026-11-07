@@ -13,7 +13,7 @@ const measures = computed(() => shownEvents.value.filter(e => e.type === 'measur
   <div class="measures" data-testid="measure-panel">
     <div v-if="!measures.length" class="empty-note" data-testid="measure-none">{{ eve ? 'These numbers come from inside an endpoint, so a listener cannot take them.' : 'Measurements appear here when the lab takes one.' }}</div>
     <div v-for="m in measures" :key="m.e.seq" class="measure-card" :data-testid="`measure-${m.e.message}`">
-      <div class="side-title">{{ m.e.message }}</div>
+      <div class="side-title">{{ eve && m.d.blocks ? 'A locked message' : m.e.message }}</div>
       <template v-if="m.av">
         <div class="avalanche" data-testid="avalanche-grid" role="img" :aria-label="`${m.av.count} of 256 bits changed`">
           <span v-for="(f, i) in m.av.flipped" :key="i" class="abit" :class="{ on: f }" />

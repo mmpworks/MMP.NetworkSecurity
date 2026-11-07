@@ -39,8 +39,8 @@ const repeats = computed(() => {
           <figcaption>Clear picture</figcaption>
         </figure>
         <figure>
-          <canvas ref="locked" width="64" height="64" class="pic-canvas" data-testid="picture-locked" :aria-label="`The picture locked with ${pic.mode}`" />
-          <figcaption>Locked with {{ pic.mode.replace('Picture', '') }}{{ eve ? ' (what the eavesdropper sees)' : '' }}</figcaption>
+          <canvas ref="locked" width="64" height="64" class="pic-canvas" data-testid="picture-locked" :aria-label="eve ? 'The locked picture' : `The picture locked with ${pic.mode}`" />
+          <figcaption>{{ eve ? 'Locked picture: what the eavesdropper sees' : `Locked with ${pic.mode.replace('Picture', '')}` }}</figcaption>
         </figure>
       </div>
       <div v-if="repeats" class="muted" data-testid="picture-repeats">{{ repeats.repeats }} of {{ repeats.blocks }} locked blocks repeat an earlier block</div>

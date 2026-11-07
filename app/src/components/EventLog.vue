@@ -8,12 +8,14 @@ const checksOnly = ref(false)
 const traceFile = ref('')
 import AttackResult from './AttackResult.vue'
 const actors = computed(() => [...new Set(allEvents.value.map(e => e.actor).filter(Boolean))])
-const rows = computed(() => allEvents.value.filter(e => (!actor.value || e.actor === actor.value) && (!type.value || e.type.includes(type.value)) && (!checksOnly.value || e.check)))
+// In the Eavesdropper view the log lists what a listener sees: the on-wire events, with no check names.
+const eve = computed(() => ui.view === 'eavesdropper')
+const rows = computed(() => allEvents.value.filter(e => (!eve.value || e.type === 'wire.sent') && (!actor.value || e.actor === actor.value) && (!type.value || e.type.includes(type.value)) && (!checksOnly.value || e.check)))
 </script>
 
 <template>
   <div class="tour" data-testid="event-log">
-    <div class="inspector-tools"><span class="side-title">FREE PLAY</span><span class="muted">{{ allEvents.length }} events</span></div>
+    <div class="inspector-tools"><span class="side-title">FREE PLAY</span><span class="muted">{{ eve ? `${rows.length} on the wire` : `${allEvents.length} events` }}</span></div>
     <div class="btn-row">
       <v-btn v-if="!active" :disabled="ui.lesson == null || !lessonRow?.built" data-testid="free-start" @click="startSession('free')">Start free play</v-btn>
       <v-btn data-testid="free-run" :disabled="!active" @click="runEngine">Run</v-btn>
@@ -41,7 +43,7 @@ const rows = computed(() => allEvents.value.filter(e => (!actor.value || e.actor
         v-for="e in rows" :key="e.seq" class="log-row" :class="{ sel: selectedEvent?.seq === e.seq, fail: e.check?.result === 'fail' }"
         :data-testid="`event-row-${e.seq}`" tabindex="0" @click="selectEvent(e.seq)" @keydown.enter="selectEvent(e.seq)"
       >
-        <span class="muted">{{ e.seq }}</span><span>{{ e.actor }}</span><span>{{ e.type }}</span><span v-if="e.check" :class="[e.check.result === 'fail' ? 'chk-fail-t' : 'chk-pass-t', { hl: isHighlighted('check', 'name', e.check.name) }]">{{ e.check.result === 'fail' ? '✕' : '✓' }} {{ e.check.name }}</span>
+        <span class="muted">{{ e.seq }}</span><span>{{ e.actor }}</span><span>{{ e.type }}</span><span v-if="e.check && !eve" :class="[e.check.result === 'fail' ? 'chk-fail-t' : 'chk-pass-t', { hl: isHighlighted('check', 'name', e.check.name) }]">{{ e.check.result === 'fail' ? '✕' : '✓' }} {{ e.check.name }}</span>
       </div>
     </div>
   </div>

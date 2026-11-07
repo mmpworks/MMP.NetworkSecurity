@@ -72,7 +72,7 @@ const canFlip = computed(() => ui.selectedByte != null && !!ev.value?.wire && !i
   <div class="inspector" data-testid="inspector">
     <div class="inspector-tools">
       <span class="side-title" data-testid="inspector-title">MESSAGE BYTES</span>
-      <span v-if="ev" class="muted">{{ ev.message || ev.type }}</span>
+      <span v-if="ev" class="muted">{{ eve && (locked || !ev.wire) ? 'Locked message' : ev.message || ev.type }}</span>
       <span v-if="eve && view?.after && !locked" class="muted" data-testid="inspector-public-bytes">Public: nothing locks this message, so a listener reads it too.</span>
       <v-spacer />
       <v-btn size="x-small" color="error" :disabled="!canFlip" data-testid="flip-byte-button" @click="flipSelectedByte">Flip this byte</v-btn>
