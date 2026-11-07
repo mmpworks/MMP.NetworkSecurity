@@ -63,7 +63,7 @@ function expectOneGrid(m: Awaited<ReturnType<typeof measure>>, where: string) {
   expect(m.gridCut, `${where}: a hex row cut at the right`).toBe(0)
 }
 
-const LOCKED = 'locked to the listener'
+const LOCKED = 'unreadable to the listener'
 const MESSAGES: [number, string[]][] = [[1, ['TextGcm1', 'TextCbc', 'PictureEcb']], [5, ['ClientHello', 'Finished']], [8, ['KEXINIT']]]
 for (const width of [1100, 1280, 1440]) {
   test(`at ${width} wide every byte column and the text column line up, and nothing overflows`, async ({ page }) => {

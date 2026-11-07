@@ -123,7 +123,7 @@ const canFlip = computed(() => ui.selectedByte != null && !!ev.value?.wire && !i
           >
             <span class="fname"><i class="swatch" :class="sealed(f) ? 'k-sealed' : `k-${f.kind}`" /><span><template v-for="(part, i) in nameParts(f.name)" :key="i">{{ part }}<wbr /></template></span></span>
             <span class="muted">{{ where(f) }}</span>
-            <span v-if="sealed(f)" class="fgloss" title="The eavesdropper has no key, so these bytes stay locked.">locked to the listener</span>
+            <span v-if="sealed(f)" class="fgloss" title="The eavesdropper has no key, so these bytes stay locked.">unreadable to the listener</span>
             <span v-else-if="f.gloss && f.gloss.toLowerCase() !== f.name.toLowerCase()" class="fgloss">{{ f.gloss }}</span>
             <span class="fval" :data-testid="`inspector-field-value-${f.name}`">{{ decoded(f) }}</span>
           </button>
