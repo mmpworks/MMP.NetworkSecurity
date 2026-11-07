@@ -21,7 +21,8 @@ const scan = (page: Page) => page.evaluate((freeText: string) => {
     const parent = n.parentElement
     if (!parent || parent.closest(freeText)) continue
     const text = n.textContent ?? ''
-    for (const m of text.matchAll(/\S{3,}/g)) {
+    // A dot, an underscore or a hyphen joins 2 words, so a break there is between words.
+    for (const m of text.matchAll(/[^\s._-]{3,}/g)) {
       const r = document.createRange()
       r.setStart(n, m.index!)
       r.setEnd(n, m.index! + m[0].length)
@@ -57,6 +58,11 @@ const scan = (page: Page) => page.evaluate((freeText: string) => {
   for (const row of root.querySelectorAll('.secret-row')) {
     const tops = [...row.querySelectorAll(':scope > .muted, :scope > .v-btn')].map(e => Math.round(e.getBoundingClientRect().top + e.getBoundingClientRect().height / 2))
     if (tops.length > 1 && Math.max(...tops) - Math.min(...tops) > 4) faults.push({ kind: 'card line split', where: name(row), text: '' })
+  }
+  // 7. In a wide bytes panel the field list sits beside the grids, and each field row shows its value line.
+  for (const insp of root.querySelectorAll('.inspector')) {
+    if (insp.getBoundingClientRect().width < 700) continue
+    for (const v of insp.querySelectorAll('.field-row .fval')) if (v.getBoundingClientRect().height === 0) faults.push({ kind: 'value hidden', where: name(v.closest('[data-testid]') ?? v), text: '' })
   }
   // 4. A field name shows whole.
   for (const f of root.querySelectorAll('.field-row .fname, .secret-row > .sname')) if (f.scrollWidth > f.clientWidth + 1) faults.push({ kind: 'name cut', where: name(f.closest('[data-testid]') ?? f), text: (f.textContent ?? '').trim() })

@@ -65,6 +65,8 @@ const hiddenAt = (off: number) => (ev.value?.fields ?? []).some(f => !f.visibleT
 const decoded = (f: TraceField) => { const h = fieldHex.value.slice(f.offset * 2, (f.offset + Math.min(f.length, 12)) * 2); return f.length > 12 ? `${h}…` : h }
 const where = (f: TraceField) => (f.length === 1 ? `byte ${f.offset}` : `bytes ${f.offset} to ${f.offset + f.length - 1}`)
 const pick = (off: number) => { ui.selectedByte = off }
+// A long field name may break only after a dot or an underscore, where one word ends and the next begins. It never breaks inside a word.
+const nameParts = (name: string) => name.split(/(?<=[._])/)
 const canFlip = computed(() => ui.selectedByte != null && !!ev.value?.wire && !isOsTransport.value)
 </script>
 
@@ -111,16 +113,17 @@ const canFlip = computed(() => ui.selectedByte != null && !!ev.value?.wire && !i
         </section>
       </div>
       <div class="field-list" role="group" aria-label="Fields of this message">
-        <div class="fl-hint muted">{{ fields.length ? 'Pick a field to light its bytes.' : 'This message lists no fields.' }}</div>
-        <div v-if="eve && unreadableBytes" class="field-note">locked: the eavesdropper has no key ({{ unreadableBytes }} bytes)</div>
+        <div v-if="!(eve && unreadableBytes)" class="fl-hint muted">{{ fields.length ? 'Pick a field to light its bytes.' : 'This message lists no fields.' }}</div>
+        <!-- One line, not two: the locked note shares the hint's place, so every field row stays in view in the Eavesdropper view. -->
+        <div v-if="eve && unreadableBytes" class="field-note">Locked: the eavesdropper has no key ({{ unreadableBytes }} bytes).</div>
         <template v-for="f in fields" :key="fieldKey(f)">
           <button
             type="button" class="field-row" :class="[sealed(f) ? 'k-sealed' : `k-${f.kind}`, { on: isLit(f), unreadable: sealed(f), hl: isHighlighted('inspector', 'field', f.name) }]"
             :aria-pressed="isLit(f)" :data-testid="`inspector-field-row-${f.name}`" @click="toggleField(fieldKey(f))"
           >
-            <span class="fname"><i class="swatch" :class="sealed(f) ? 'k-sealed' : `k-${f.kind}`" />{{ f.name }}</span>
+            <span class="fname"><i class="swatch" :class="sealed(f) ? 'k-sealed' : `k-${f.kind}`" /><span><template v-for="(part, i) in nameParts(f.name)" :key="i">{{ part }}<wbr /></template></span></span>
             <span class="muted">{{ where(f) }}</span>
-            <span v-if="sealed(f)" class="fgloss">locked: the eavesdropper has no key</span>
+            <span v-if="sealed(f)" class="fgloss" title="The eavesdropper has no key, so these bytes stay locked.">locked to the listener</span>
             <span v-else-if="f.gloss && f.gloss.toLowerCase() !== f.name.toLowerCase()" class="fgloss">{{ f.gloss }}</span>
             <span class="fval" :data-testid="`inspector-field-value-${f.name}`">{{ decoded(f) }}</span>
           </button>
