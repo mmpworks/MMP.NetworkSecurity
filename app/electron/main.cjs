@@ -60,14 +60,20 @@ async function createWindow() {
   })
   // Links: the app never opens a second window. A link to a listed host opens in the learner's own browser, and any other link does nothing.
   win.webContents.setWindowOpenHandler(({ url }) => {
-    if (isAllowedLink(url)) void shell.openExternal(url)
+    // The OS gets the URL in the form the rule parsed and checked, never the raw string.
+    if (isAllowedLink(url)) void shell.openExternal(new URL(url).href)
     return { action: 'deny' }
   })
   // The window stays on the app's own page: a link clicked without a new-window target cannot carry it away.
+  // A URL that does not parse is refused too, so the guard fails closed.
   win.webContents.on('will-navigate', (event, url) => {
-    const here = new URL(win.webContents.getURL())
-    const next = new URL(url)
-    if (next.protocol !== here.protocol || next.host !== here.host || next.pathname !== here.pathname) event.preventDefault()
+    try {
+      const here = new URL(win.webContents.getURL())
+      const next = new URL(url)
+      if (next.protocol !== here.protocol || next.host !== here.host || next.pathname !== here.pathname) event.preventDefault()
+    } catch {
+      event.preventDefault()
+    }
   })
   const devUrl = process.env.VITE_DEV_SERVER_URL
   if (devUrl) await win.loadURL(devUrl)

@@ -12,11 +12,11 @@ const HOSTS = new Set([
   'x9.org',
 ])
 
-/** True only for an https URL whose host is on the list. A URL that does not parse is refused. */
+/** True only for an https URL on the default port whose host is on the list, with no user info. A URL that does not parse is refused. */
 function isAllowedLink(url) {
   try {
     const u = new URL(url)
-    return u.protocol === 'https:' && HOSTS.has(u.hostname) && !u.username && !u.password
+    return u.protocol === 'https:' && HOSTS.has(u.hostname) && u.port === '' && !u.username && !u.password
   } catch {
     return false
   }

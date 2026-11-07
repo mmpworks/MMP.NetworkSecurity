@@ -13,7 +13,7 @@ test('the link list equals the hosts of the glossary sources', () => {
   expect([...HOSTS].sort()).toEqual(sourceHosts)
 })
 
-test('the rule takes every glossary source and refuses http, look-alike hosts, other schemes and text that is no URL', () => {
+test('the rule takes every glossary source and refuses http, look-alike hosts, user info, a port, other schemes and text that is no URL', () => {
   for (const s of Object.values(glossary.sources)) expect(isAllowedLink(s.url), s.url).toBe(true)
   const refused = [
     'http://csrc.nist.gov/pubs/fips/46-3/final',
@@ -22,6 +22,14 @@ test('the rule takes every glossary source and refuses http, look-alike hosts, o
     'https://evil.example/csrc.nist.gov',
     'https://nist.gov/',
     'https://user:pw@doi.org/',
+    'https://doi.org@evil.example/',
+    'https://csrc.nist.gov@evil.example/',
+    'https://doi.org:4444/10.6028/x',
+    'https://csrc.nist.gov:8443/pubs/fips/46-3/final',
+    'https://sub.csrc.nist.gov/',
+    'https://evilcsrc.nist.gov/',
+    'ftp://csrc.nist.gov/',
+    '',
     'javascript:alert(1)',
     'file:///C:/Windows/notepad.exe',
     'not a url',
