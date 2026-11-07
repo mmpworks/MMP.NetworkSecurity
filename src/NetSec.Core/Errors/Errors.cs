@@ -105,6 +105,7 @@ namespace NetSec.Errors
         public const string DukptKeyNotHeld = "DUKPT_KEY_NOT_HELD";
         public const string DukptKeySize = "DUKPT_KEY_SIZE";
         public const string DukptKcvMismatch = "DUKPT_KCV_MISMATCH";
+        public const string DukptKcvFormat = "DUKPT_KCV_FORMAT";
         public const string AesWalkDiverged = "AES_WALK_DIVERGED";
         public const string WalkNotBuilt = "WALK_NOT_BUILT";
         public const string WalkBadArgument = "WALK_BAD_ARGUMENT";

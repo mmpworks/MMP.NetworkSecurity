@@ -722,7 +722,7 @@ public static class WizardMachine { public static WizardDecision Decide(WizardTa
 | `CHAIN_INCOMPLETE` | A leaf under an issuing CA must come with its intermediate, for a client too. Jared ran it: Go refused a leaf-only mutual TLS client, and passed with `-cert_chain` |
 | `CERT_SIGNATURE_ALG_UNSUPPORTED` | **Engine and flow code.** An RSA or P-256 root. Today it reads `CERT_SIGNATURE`, which says tampering. Names the OS transport as the route |
 | `KNOWN_HOSTS_LINE_BAD` | The line does not parse. Wildcards refused, as `SshKnownHosts` does |
-| `DUKPT_KEY_SIZE`, `DUKPT_KCV_MISMATCH` | A test BDK must be 16 bytes this round, since lessons use AES-128. The file's key does not match the check value the learner gave |
+| `DUKPT_KEY_SIZE`, `DUKPT_KCV_MISMATCH`, `DUKPT_KCV_FORMAT` | A test BDK must be 16 bytes this round, since lessons use AES-128. The file's key does not match the check value the learner gave, in any of its 3 forms. The check value is not 6 or 10 hex characters. A blank check value is no value |
 | `VAULT_KEY_UNKNOWN`, `VAULT_OP_REFUSED`, `VAULT_EXPORT_REFUSED`, `VAULT_UNWRAP_FAILED`, `VAULT_AUDIT_FAILED` | Section 4. The last one is the refusal when an audit row cannot be written. Jared's doc calls the refusal `KEY_NOT_EXPORTABLE`. The spike printed `VAULT_EXPORT_REFUSED`, and that name stands |
 | `KEYS_HIDDEN` | The key log was asked for with Show keys OFF |
 | `REFEREE_MISSING`, `CHECK_FAILED` | Tool absent, or it said no, with its output attached |

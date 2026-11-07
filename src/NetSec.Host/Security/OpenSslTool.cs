@@ -30,7 +30,7 @@ public sealed class OpenSslTool(Func<string, string?> env)
         string output = process.StandardOutput.ReadToEnd();
         if (!process.WaitForExit(30_000))
         {
-            process.Kill();
+            process.Kill(entireProcessTree: true);
             return (TimedOut, "the tool did not finish in 30 s");
         }
         return (process.ExitCode, (output + errors.Result).Trim());

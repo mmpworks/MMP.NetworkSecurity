@@ -78,4 +78,17 @@ public class SshExeCheckTests
         Assert.Contains("did not finish in 1.5 s", fact.Output);
         Assert.Empty(Directory.GetFiles(dir, "*.key"));
     }
+
+    /// <summary>The time limit stops the whole tree. A fake ssh.exe that starts a child must leave no child behind.</summary>
+    [Fact]
+    public void A_run_that_hits_the_limit_leaves_no_child_process()
+    {
+        // The child is a copy of ping under a name no other process on the machine has, so the count below sees this test's child only.
+        string name = "netsec-child-" + Guid.NewGuid().ToString("N")[..12];
+        string child = Path.Combine(Path.GetTempPath(), name + ".exe");
+        File.Copy(Path.Combine(Environment.SystemDirectory, "PING.EXE"), child);
+        Run($"@echo off\r\n\"{child}\" -n 30 127.0.0.1 >nul\r\n", SecurityTypes.SshHostEd25519);
+        System.Threading.Thread.Sleep(500);
+        Assert.Empty(System.Diagnostics.Process.GetProcessesByName(name));
+    }
 }
