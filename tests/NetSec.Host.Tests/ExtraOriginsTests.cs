@@ -163,6 +163,27 @@ namespace NetSec.Host.Tests
         }
     }
 
+    public sealed class BlankOriginsHostFixture : HostFixture
+    {
+        public BlankOriginsHostFixture() : base(new Dictionary<string, string> { ["NETSEC_ORIGINS"] = "" }) { }
+    }
+
+    /// <summary>Electron sets NETSEC_ORIGINS to an empty string for the Host it spawns. The Host must read that as unset.</summary>
+    public class ExtraOriginsBlankLiveTests(BlankOriginsHostFixture host) : IClassFixture<BlankOriginsHostFixture>
+    {
+        [Fact]
+        public async Task An_empty_variable_reads_as_unset_nothing_logged_and_an_extra_origin_refused()
+        {
+            using HttpClient http = new HttpClient();
+            using HttpRequestMessage req = new HttpRequestMessage(HttpMethod.Get, $"http://127.0.0.1:{host.Port}/api/health");
+            req.Headers.TryAddWithoutValidation("Origin", "http://localhost:4181");
+            req.Headers.TryAddWithoutValidation("Authorization", "Bearer " + host.Token);
+            using HttpResponseMessage res = await http.SendAsync(req);
+            Assert.Equal(403, (int)res.StatusCode);
+            Assert.DoesNotContain(host.StartLines, l => l.StartsWith("HOST-ORIGINS"));
+        }
+    }
+
     public class ElectronOriginsPinTests
     {
         [Fact]
