@@ -56,23 +56,28 @@ internal static class ProcessWaits
     }
 
     /// <summary>
-    /// The synchronous form, for a synchronous test or helper: no Task wait at all. Standard error is read by event while standard output is
-    /// read to its end, so neither pipe can fill and stall the process. The parameterless WaitForExit then waits for both streams to end.
+    /// The synchronous form, for a synchronous test or helper: no Task wait at all. Both pipes are read by event, so neither can fill and stall
+    /// the process, and the limit runs from the start: a reader that waited for the end of standard output first would let a hung child, or a
+    /// grandchild that holds the handle, run past the limit (Jared, #233). On exit the parameterless WaitForExit drains both streams.
     /// A process still running at the limit is killed with its tree, and Exited is false.
     /// </summary>
     public static (bool Exited, int Code, string Output, string Errors) ReadAll(Process process, TimeSpan limit)
     {
-        System.Text.StringBuilder errors = new();
+        System.Text.StringBuilder output = new(), errors = new();
+        process.OutputDataReceived += (_, e) => { if (e.Data != null) lock (output) output.AppendLine(e.Data); };
         process.ErrorDataReceived += (_, e) => { if (e.Data != null) lock (errors) errors.AppendLine(e.Data); };
+        process.BeginOutputReadLine();
         process.BeginErrorReadLine();
-        string output = process.StandardOutput.ReadToEnd();
         bool exited = process.WaitForExit((int)limit.TotalMilliseconds);
         if (exited) process.WaitForExit();
         else
         {
             try { process.Kill(entireProcessTree: true); } catch (InvalidOperationException) { }
         }
-        lock (errors) return (exited, exited ? process.ExitCode : -1, output, errors.ToString());
+        string o, e2;
+        lock (output) o = output.ToString();
+        lock (errors) e2 = errors.ToString();
+        return (exited, exited ? process.ExitCode : -1, o, e2);
     }
 
     /// <summary>
