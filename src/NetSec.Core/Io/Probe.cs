@@ -35,6 +35,8 @@ namespace NetSec.Io
         public NetSec.Labs.TamperPlan Tamper;
         /// <summary>0 means OsRandom.</summary>
         public int Seed;
+        /// <summary>The learner's keys (modes-design.md section 3.3). Null keeps the training keys. This build reads it on the SSH routes only.</summary>
+        public CredentialSet Credentials;
     }
 
     public sealed class ProbeResult
@@ -56,6 +58,13 @@ namespace NetSec.Io
     /// <summary>One socket and one engine, on both builds. The referee suites reach the glass engines through here (design section 11).</summary>
     public static class Probe
     {
+        /// <summary>The TLS routes still build their keys from the training set. A credential set there would be dropped in silence, so it is refused by name.</summary>
+        static void RefuseCredentialsOnTls(ProbeRequest r)
+        {
+            if (r.Credentials != null)
+                throw new NetSecException(NetSecError.Of(ErrorCodes.FileRowNotBuilt, "The TLS probe does not take a credential set yet. It comes with the certificate file slice."));
+        }
+
         const int DeadlineMs = 20000;
         const string ProbeSession = "probe";
 
@@ -63,6 +72,7 @@ namespace NetSec.Io
         {
             if (r == null) throw new ArgumentNullException("r");
             if (r.Protocol == WireProtocol.Ssh) return SshProbe.Connect(r);
+            RefuseCredentialsOnTls(r);
             return AsyncProxy.Run<ProbeResult>(delegate(Return<ProbeResult> ret) { return ConnectBody(r, ret); });
         }
 
@@ -71,6 +81,7 @@ namespace NetSec.Io
         {
             if (r == null) throw new ArgumentNullException("r");
             if (r.Protocol == WireProtocol.Ssh) return SshProbe.Listen(r);
+            RefuseCredentialsOnTls(r);
             LinkListener listener = new LinkListener(new IPEndPoint(IPAddress.Loopback, r.Port));
             ProbeListener result = new ProbeListener();
             result.Port = listener.Port;
