@@ -9,6 +9,18 @@ import { openApp, hostGet, requireLive, NotRun } from './support';
 test('[A17.ui.every-attack-row-has-a-button] each attack row the Host lists has its button in its lesson', async ({ page }) => {
   test.setTimeout(15 * 60_000);
   requireLive();
+  // Named defect, for the proof that this clause bites: ACC_E2E_DEFECT=attack-button-missing removes one row from the browser's copy of
+  // GET /api/lessons, so the app draws no button for it. The clause reads the Host itself, still expects that row, and must FAIL naming it.
+  if (process.env.ACC_E2E_DEFECT === 'attack-button-missing') {
+    await page.route('**/api/lessons', async route => {
+      const response = await route.fetch();
+      const body = await response.json();
+      const list: any[] = Array.isArray(body) ? body : body?.lessons ?? [];
+      const target = list.find(l => Array.isArray(l.attacks) && l.attacks.length > 0);
+      if (target) target.attacks = target.attacks.slice(1);
+      await route.fulfill({ response, json: body });
+    });
+  }
   await openApp(page);
   const lessons = await hostGet('/api/lessons');
   expect(lessons.status, 'GET /api/lessons').toBe(200);
