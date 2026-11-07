@@ -14,7 +14,7 @@ import ByteInspector from './components/ByteInspector.vue'
 import EventLog from './components/EventLog.vue'
 import LessonRail from './components/LessonRail.vue'
 import SectionRail from './components/SectionRail.vue'
-import { sectionOf } from './sections'
+import { sectionOf, walkStatus } from './sections'
 import SecretsPanel from './components/SecretsPanel.vue'
 import SequenceDiagram from './components/SequenceDiagram.vue'
 import TourPanel from './components/TourPanel.vue'
@@ -31,6 +31,8 @@ import type { TraceEvent } from './types'
 import NeedsBanner from './components/NeedsBanner.vue'
 import SecurityPage from './components/SecurityPage.vue'
 import GlossaryPage from './components/GlossaryPage.vue'
+import AesWalkPanel from './components/AesWalkPanel.vue'
+import { openAesWalk } from './aesWalkState'
 import VaultPage from './components/VaultPage.vue'
 import { closeVault, vault } from './vault'
 import WizardSheet from './components/WizardSheet.vue'
@@ -64,6 +66,10 @@ const tabs = computed(() => {
   return list
 })
 const hasTab = (id: TabId) => tabs.value.some(t => t.id === id)
+// The AES walk tab shows when the run holds aes.key and has sent its text, which is when the engine can build the block (AesWalkFacts reads both).
+// It opens Techniques at the AES walk, on this run's block.
+const hasAesKey = computed(() => !!active.value && shownEvents.value.some(e => e.secrets.some(s => s.name === 'aes.key')) && shownEvents.value.some(e => e.type === 'aes.message.sent'))
+const aesWalkOpen = computed(() => ui.section === 'techniques' && ui.walkItem.techniques === 'aes')
 function tabFor(e: TraceEvent): TabId {
   if (e.message.startsWith('Picture')) return 'picture'
   if (e.type === 'ca.certificate.issued') return 'chain'
@@ -163,14 +169,14 @@ const shortcuts: [string, string][] = [
           <Pane :size="100 - shares.rail" :min-size="60">
             <div class="workspace" data-testid="workspace">
             <!-- The AES walk mounts here and replaces the panels. Its tips and spec cards go to overlay-layer, outside this clip. -->
-            <section v-if="ui.walkOpen" data-testid="walk-root" class="walk-root" />
+            <section v-if="aesWalkOpen" data-testid="walk-root" class="walk-root"><AesWalkPanel /></section>
             <!-- Handshake and Techniques: the walk screens arrive in their slices. Until then the workspace says which slice brings the picked walk. -->
-            <section v-if="ui.section !== 'lessons'" class="section-placeholder" data-testid="section-placeholder">
+            <section v-if="ui.section !== 'lessons' && !aesWalkOpen" class="section-placeholder" data-testid="section-placeholder">
               <h2>{{ sectionOf(ui.section).label }}</h2>
-              <p v-if="placeholderItem">{{ placeholderItem.label }} arrives in slice {{ placeholderItem.slice }}.</p>
-              <p v-else>Pick a walk on the left. Each walk arrives in its own slice.</p>
+              <p v-if="placeholderItem">{{ placeholderItem.label }}: {{ walkStatus(placeholderItem) }}.</p>
+              <p v-else>Pick a walk on the left.</p>
             </section>
-            <Splitpanes v-show="!ui.walkOpen && ui.section === 'lessons'">
+            <Splitpanes v-show="ui.section === 'lessons'">
           <Pane :size="100 - shares.side" :min-size="36">
             <Splitpanes horizontal>
               <Pane :size="100 - bytesPanePercent" :min-size="25">
@@ -203,8 +209,9 @@ const shortcuts: [string, string][] = [
               </Pane>
               <Pane :size="bytesPanePercent" :min-size="18">
                 <div class="panel">
-                  <div v-if="tabs.length > 1" class="tabs-inline" data-testid="inspector-tabs">
+                  <div v-if="tabs.length > 1 || hasAesKey" class="tabs-inline" data-testid="inspector-tabs">
                     <button v-for="t in tabs" :key="t.id" type="button" class="stab" :class="{ on: ui.inspectorTab === t.id }" :data-testid="`inspector-tab-${t.id}`" @click="ui.inspectorTab = t.id">{{ t.label }}</button>
+                    <button v-if="hasAesKey" type="button" class="stab stab-walk" data-testid="aes-walk-tab" @click="openAesWalk(active!.id, ui.lesson)">AES walk</button>
                   </div>
                   <div v-if="tabLabel" class="muted listener-public" data-testid="inspector-public">{{ tabLabel }}</div>
                   <div v-if="listenerNote" class="empty-note" data-testid="inspector-closed">{{ listenerNote }}</div>

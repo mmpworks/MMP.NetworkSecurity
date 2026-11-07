@@ -404,3 +404,22 @@ body { overflow: hidden; }
 .section-placeholder { padding: 24px 28px; }
 .section-placeholder h2 { font: 700 20px/1.2 var(--display); margin: 0 0 8px; }
 .section-placeholder p { color: var(--muted); margin: 0; }
+
+/* The AES walk (slice P2a). The grid follows the approved mock's bench: a large 4 by 4 block, the words beside it, the controls under it. */
+.aes-walk-panel { padding: 16px 20px; display: grid; gap: 12px; align-content: start; }
+.aw-title { display: flex; align-items: baseline; gap: 12px; flex-wrap: wrap; }
+.aw-title h2 { font: 700 20px/1.2 var(--display); margin: 0; }
+.aw-closed, .aw-error { margin: 0; padding: 12px 14px; border: 1px solid var(--line); border-left: 3px solid var(--warn); border-radius: 10px; background: var(--surface); max-width: 80ch; }
+.aw-error { border-left-color: var(--fail); }
+.aw-note { margin: 0; }
+.aes-walk { display: grid; gap: 12px; border: 1px solid var(--line); border-radius: 14px; background: var(--surface); padding: 16px; }
+.aw-head { display: flex; align-items: baseline; gap: 12px; }
+.aw-kind { font: 700 18px var(--display); }
+.aw-bench { display: flex; flex-wrap: wrap; gap: 18px 28px; align-items: flex-start; }
+.aw-grid { display: grid; grid-template-columns: repeat(4, 64px); gap: 6px; }
+.aw-cell { height: 64px; border: 1px solid var(--line); border-radius: 9px; background: var(--surface2); display: grid; place-items: center; font: 600 20px var(--mono); color: var(--text); }
+.aw-words { max-width: 56ch; display: grid; gap: 8px; }
+.aw-words p { margin: 0; }
+.aw-readable { font: 600 16px var(--mono); }
+.aw-controls { display: flex; align-items: center; gap: 10px; }
+.stab-walk { margin-left: auto; }

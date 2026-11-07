@@ -1,0 +1,23 @@
+{
+  "_about": "The AES walk's words (docs/walkthrough-design.md sections 2.2, 2.2c, 2.6). acceptance/checks/docs_checks.py scans this file for the phrases of section 2.6 and for the field definition lines.",
+  "fill": "This is the block: 16 bytes of the text. They go down the columns, 4 bytes to a column. Next adds one byte.",
+  "decryptStart": "Encrypt is done, and this is the locked block. Decrypt now runs the inverse steps, in reverse order, to get the text back.",
+  "end": "The text is back.",
+  "steps": {
+    "AddRoundKey": "Each byte is XORed with the byte in the same place of round key {round}.",
+    "SubBytes": "Each byte is looked up in the S-box table, and the value there takes its place.",
+    "ShiftRows": "Row 0 stays. Row 1 moves 1 place to the left, row 2 moves 2, and row 3 moves 3. Bytes that leave on the left come back on the right.",
+    "MixColumns": "Each column is multiplied by a fixed matrix in the AES field, so every byte of a column now depends on all 4 bytes of that column.",
+    "InvShiftRows": "Each row moves back to the right by the places ShiftRows moved it to the left.",
+    "InvSubBytes": "Each byte is looked up in the inverse S-box table, which undoes the S-box.",
+    "InvMixColumns": "Each column is multiplied by the inverse matrix, which undoes MixColumns."
+  },
+  "closed": "Show keys is off. These steps show the key and the round keys, so they stay closed. Turn Show keys on to walk them. The S-box table, the key size table, the round constants, the field definition, and the modes walk stay open.",
+  "definition": [
+    "A field is a set of values with add, subtract, multiply and divide, where every answer stays in the set. Only divide by zero is not allowed. They follow the usual rules of arithmetic.",
+    "A finite field has a fixed number of values. Another name for it is a Galois field. The field that AES uses has 256 values, one for each byte. Its name is GF(2^8).",
+    "Add is XOR.",
+    "Multiply treats each byte as a polynomial, multiplies without carries, and reduces the result by x^8 + x^4 + x^3 + x + 1 (11b in hex). So the answer always fits in a byte.",
+    "Every value except zero has an inverse. So multiplying by any nonzero value can be undone."
+  ]
+}
