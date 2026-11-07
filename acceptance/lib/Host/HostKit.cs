@@ -192,6 +192,12 @@ namespace Acceptance
             return id != null && id != ownId;
         }
 
+        /// <summary>
+        /// How long a run may send no frame before the suite stops reading. It must outlast the product's own read deadline (30 s,
+        /// lessons-4-5-names.md for L5-flip-record-length), or the suite stops just as that lab ends by name with LINK_DEADLINE.
+        /// </summary>
+        const int SilentFrameSeconds = 45;
+
         static SessionRun Drive(HostProc h, string startJson, bool sendRun)
         {
             SessionRun run = new SessionRun();
@@ -207,7 +213,7 @@ namespace Acceptance
                 {
                     MemoryStream ms = new MemoryStream();
                     WebSocketReceiveResult r;
-                    CancellationTokenSource cts = new CancellationTokenSource(TimeSpan.FromSeconds(30));
+                    CancellationTokenSource cts = new CancellationTokenSource(TimeSpan.FromSeconds(SilentFrameSeconds));
                     try
                     {
                         do { r = ws.ReceiveAsync(new ArraySegment<byte>(buf), cts.Token).Result; ms.Write(buf, 0, r.Count); } while (!r.EndOfMessage);
