@@ -296,5 +296,11 @@ export function onionOf(events: readonly TraceEvent[], upTo: number): Onion {
   }
 }
 
-/** The holders that What each side knows shows, in column order. */
-export const holderColumns = (seen: readonly string[], _lanes: readonly string[]): string[] => [...new Set(seen)]
+/**
+ * The holders that What each side knows shows, in column order. The columns follow the diagram's lanes, so Client stays left of Server.
+ * The order of the key events can change between runs of one seed, so it must not decide the columns. A holder that is not a lane follows, in the order it first appears.
+ */
+export const holderColumns = (seen: readonly string[], lanes: readonly string[]): string[] => {
+  const unique = [...new Set(seen)]
+  return [...lanes.filter(l => unique.includes(l)), ...unique.filter(h => !lanes.includes(h))]
+}
