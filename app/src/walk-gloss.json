@@ -12,7 +12,32 @@
     "InvSubBytes": "Each byte is looked up in the inverse S-box table, which undoes the S-box.",
     "InvMixColumns": "Each column is multiplied by the inverse matrix, which undoes MixColumns."
   },
-  "closed": "Show keys is off. These steps show the key and the round keys, so they stay closed. Turn Show keys on to walk them. The S-box table, the key size table, the round constants, the field definition, and the modes walk stay open.",
+  "keySource": {
+    "run": "This run's key",
+    "practice": "A practice key. It never ran in the lesson"
+  },
+  "keys": {
+    "title": "Key schedule",
+    "start": "The key makes one round key for each AddRoundKey. The first words are the key itself. Next builds each later word from two earlier words.",
+    "eachRound": "Each round gets its own key.",
+    "only128": "Round keys are key material. Anyone who learns one round key can run this table backward and get the key.",
+    "decrypt": "Decryption uses the same round keys, from last to first.",
+    "band192": "The first 6 words are the key, so round key 1 starts with key bytes.",
+    "band256": "The first 8 words are the key, so round key 1 is all key bytes.",
+    "keyNote": "This word is part of the key, so nothing is calculated.",
+    "rcon": "Round constants. Each value is the one before it, doubled in the field. The list starts at 01. No key goes in, so every AES key uses this same list.",
+    "rconUnused": "AES-{bits} uses {used} of these 10."
+  },
+  "sbox": {
+    "pick": "Click a byte in the grid. Its first digit picks the row and its second digit picks the column.",
+    "facts": "8 bits in, 8 bits out, 256 entries. One table for every byte, round, and key. It is public and holds no secret: the key enters only through AddRoundKey.",
+    "inverse": "The inverse table undoes the swap. The S-box is not its own inverse, so decryption needs this second table."
+  },
+  "field": {
+    "pick": "Click a byte in the grid to see the 4 products that made it.",
+    "reduced": "too big for a byte, so it is reduced by 11b"
+  },
+  "closed":"Show keys is off. These steps show the key and the round keys, so they stay closed. Turn Show keys on to walk them. The S-box table, the key size table, the round constants, the field definition, and the modes walk stay open.",
   "definition": [
     "A field is a set of values with add, subtract, multiply and divide, where every answer stays in the set. Only divide by zero is not allowed. They follow the usual rules of arithmetic.",
     "A finite field has a fixed number of values. Another name for it is a Galois field. The field that AES uses has 256 values, one for each byte. Its name is GF(2^8).",

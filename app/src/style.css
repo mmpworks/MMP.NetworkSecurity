@@ -413,13 +413,68 @@ body { overflow: hidden; }
 .aw-error { border-left-color: var(--fail); }
 .aw-note { margin: 0; }
 .aes-walk { display: grid; gap: 12px; border: 1px solid var(--line); border-radius: 14px; background: var(--surface); padding: 16px; }
-.aw-head { display: flex; align-items: baseline; gap: 12px; }
+.aw-head { display: flex; align-items: center; gap: 12px; flex-wrap: wrap; }
 .aw-kind { font: 700 18px var(--display); }
 .aw-bench { display: flex; flex-wrap: wrap; gap: 18px 28px; align-items: flex-start; }
 .aw-grid { display: grid; grid-template-columns: repeat(4, 64px); gap: 6px; }
 .aw-cell { height: 64px; border: 1px solid var(--line); border-radius: 9px; background: var(--surface2); display: grid; place-items: center; font: 600 20px var(--mono); color: var(--text); }
-.aw-words { max-width: 56ch; display: grid; gap: 8px; }
+.aw-right { flex: 1 1 420px; min-width: 0; display: grid; gap: 14px; align-content: start; }
+.aw-words { max-width: 72ch; display: grid; gap: 8px; }
 .aw-words p { margin: 0; }
 .aw-readable { font: 600 16px var(--mono); }
 .aw-controls { display: flex; align-items: center; gap: 10px; }
+.aw-sizes { display: flex; align-items: center; gap: 6px; }
+.aw-key-source { margin: 0; font-weight: 600; }
+.aw-key-source-practice { color: var(--warn); }
+.aw-cell[tabindex] { cursor: pointer; }
+.aw-cell.aw-picked { border-color: var(--accent); box-shadow: 0 0 0 2px var(--accent) inset; }
+/* Key schedule (design section 2.2b): one 4 by 4 grid per round key, cells like block cells with a position mark and a word name. */
+.ks { display: grid; gap: 12px; grid-template-columns: minmax(0, 1fr); }
+.ks-words { grid-column: 1 / -1; }
+/* The stage rows sit beside the table, so they stay in view while Next builds. Below 1200 px they go under it. */
+@media (min-width: 1200px) { .ks { grid-template-columns: minmax(0, 1fr) minmax(280px, 360px); } }
+.ks-words p { margin: 0 0 6px; max-width: 80ch; }
+.ks-band-note { font-weight: 600; }
+.ks-table { display: flex; flex-wrap: wrap; gap: 12px 16px; }
+.ks-grid-wrap { display: grid; gap: 4px; }
+.ks-grid-name { font-size: 12px; }
+.ks-grid { display: grid; grid-template-columns: repeat(4, 44px); gap: 3px; }
+.ks-cell { position: relative; height: 44px; padding: 0; border: 1px solid var(--line); border-radius: 7px; background: var(--surface2); color: var(--text); cursor: pointer; font: 600 14px var(--mono); }
+.ks-cell.ks-key { background: color-mix(in srgb, var(--k-key) 16%, var(--surface2)); }
+.ks-cell.ks-lit { border-color: var(--warn); box-shadow: 0 0 0 2px var(--warn) inset; }
+.ks-cell.ks-shown { border-color: var(--accent); }
+.ks-pos { position: absolute; top: 2px; left: 4px; font: 400 9px var(--mono); color: var(--muted); }
+.ks-word { position: absolute; bottom: 2px; left: 4px; font: 400 9px var(--mono); color: var(--muted); }
+.ks-side { display: grid; gap: 10px; max-width: 80ch; align-content: start; }
+.ks-side p { margin: 0; }
+.ks-stages { display: grid; gap: 4px; margin: 0; }
+.ks-stage { display: grid; grid-template-columns: minmax(16ch, max-content) auto; gap: 12px; align-items: baseline; }
+.ks-stage dt { color: var(--muted); }
+.ks-stage dd { margin: 0; font: 600 15px var(--mono); }
+.ks-stage-word dd { color: var(--accent); }
+.ks-rcon { font: 600 15px var(--mono); display: flex; flex-wrap: wrap; gap: 4px 10px; }
+.ks-rcon-unused { opacity: 0.45; }
+.ks-rcon-lit { color: var(--accent); text-decoration: underline; }
+/* Below 1700 px the key cells shrink, so 3 grids fit beside the stage rows. It sits after the cell rules so it wins. */
+@media (max-width: 1699px) { .ks-grid { grid-template-columns: repeat(4, 36px); } .ks-cell { height: 36px; font-size: 12px; } .ks-pos, .ks-word { font-size: 8px; } }
+/* S-box view (design section 2.3) */
+.sbox { display: flex; flex-wrap: wrap; gap: 12px 28px; align-items: flex-start; }
+.sbox-lookup { flex-basis: 100%; margin: 0; font: 600 16px var(--mono); }
+.sbox-words { max-width: 48ch; display: grid; gap: 8px; }
+.sbox-words p { margin: 0; }
+.sbox-out { color: var(--accent); }
+.sbox-table { border-collapse: collapse; font: 500 12px var(--mono); }
+.sbox-table th, .sbox-table td { width: 26px; height: 22px; text-align: center; padding: 0; }
+.sbox-table th { color: var(--muted); }
+.sbox-table td { border: 1px solid var(--line); }
+.sbox-table th.sbox-hit { color: var(--accent); font-weight: 700; }
+.sbox-table td.sbox-line { background: color-mix(in srgb, var(--accent) 10%, transparent); }
+.sbox-table td.sbox-cross { background: var(--accent); color: var(--accent-fg); font-weight: 700; }
+/* Field panel (design section 2.2c) */
+.field { display: grid; gap: 10px; max-width: 80ch; }
+.field-def { margin: 0; padding-left: 20px; display: grid; gap: 4px; font-size: 15px; line-height: 1.45; }
+.field-mul { display: grid; gap: 4px; }
+.field-mul p { margin: 0; }
+.field-term { font: 500 15px var(--mono); }
+.field-sum { font: 600 15px var(--mono); }
 .stab-walk { margin-left: auto; }
