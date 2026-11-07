@@ -83,7 +83,10 @@ const raceUpTo = computed(() => selectedEvent.value?.seq ?? Infinity)
 const race = computed(() => ({ left: raceStats(shownEvents.value, raceUpTo.value, 'tls11'), right: raceStats(shownEvents.value, raceUpTo.value, 'tls13') }))
 
 // The Message bytes pane keeps at least 360 px: a short message with every row and field in view, also under the 50 px Show keys banner. A narrow window stacks the field list under the grids, so it keeps 480 px. The diagram scrolls, so it gives up the height.
-const bytesPanePercent = Math.min(70, Math.max(46, Math.ceil((window.innerWidth < 1400 ? 480 : 360) / Math.max(1, window.innerHeight - 90) * 100)))
+// The share follows the window live. A share set only when the window opened left the Before grid too short after a resize, and its rows covered the line under it.
+const win = ref({ w: window.innerWidth, h: window.innerHeight })
+const onResize = () => { win.value = { w: window.innerWidth, h: window.innerHeight } }
+const bytesPanePercent = computed(() => Math.min(70, Math.max(46, Math.ceil((win.value.w < 1400 ? 480 : 360) / Math.max(1, win.value.h - 90) * 100))))
 
 function moveSelection(d: number) {
   const list = shownEvents.value
@@ -114,8 +117,8 @@ function onKey(ev: KeyboardEvent) {
 }
 
 watch(hostState, s => { if (s === 'connected') void loadSecurity() })
-onMounted(() => { onTheme(name => { vuetify.theme.global.name.value = name }); connect(); window.addEventListener('keydown', onKey) })
-onBeforeUnmount(() => window.removeEventListener('keydown', onKey))
+onMounted(() => { onTheme(name => { vuetify.theme.global.name.value = name }); connect(); window.addEventListener('keydown', onKey); window.addEventListener('resize', onResize) })
+onBeforeUnmount(() => { window.removeEventListener('keydown', onKey); window.removeEventListener('resize', onResize) })
 const shortcuts: [string, string][] = [
   ['Right or N', 'Next step'], ['Left or B', 'Back'], ['Space', 'Step one event (free play) or replay the step'], ['R', 'Run or pause'],
   ['Up and Down', 'Pick the previous or next event'], ['E', 'Switch endpoints and eavesdropper'], ['T', 'Switch tour and free play'],
