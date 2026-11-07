@@ -120,6 +120,26 @@ export function registers(events: readonly TraceEvent[], upTo: number): { held: 
   return out
 }
 
+// ---- the Eavesdropper view: what each tab may show ----
+
+/** True when every certificate the engine issued also crossed the wire in the clear, as in TLS 1.1. In TLS 1.3 the certificate travels locked. */
+export function certificatesArePublic(events: readonly TraceEvent[]): boolean {
+  const certs = events.filter(e => e.type === 'ca.certificate.issued' && e.plain)
+  const wire = events.map(e => e.wire).join('|').toLowerCase()
+  return certs.length > 0 && certs.every(e => wire.includes(e.plain.toLowerCase()))
+}
+
+/** Why this tab is closed to a listener, or null when it may show. A tab closes when it holds what only an endpoint knows. */
+export function closedToListener(tab: string, events: readonly TraceEvent[]): string | null {
+  switch (tab) {
+    case 'chain': return certificatesArePublic(events) ? null : 'The certificates travel locked in this lesson, so a listener cannot read them.'
+    case 'token': return 'The token and its claims travel locked, so a listener cannot read them.'
+    case 'ladder': return 'Each side makes these keys in its own memory. None of them crosses the wire.'
+    case 'timing': return 'This lab measures code on one machine. Nothing here crosses a wire.'
+    default: return null
+  }
+}
+
 // ---- lesson 7: the race ----
 
 export interface RaceStats { messages: number; bytes: number; roundTrips: number | null }

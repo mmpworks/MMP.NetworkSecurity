@@ -88,7 +88,8 @@ The panel's visible name is **Message bytes** (tab label and panel title). Code,
 5. The field list (right side) shows name, byte range, `gloss` when it says more than the name, and the decoded value from the field's own buffer. A tour highlight `inspector:field=<name>` rings the toggle and lights nothing.
 6. Byte selection plus the `Flip this byte` button starts an attack (section 7).
 7. In Eavesdropper view a field with `visibleToWire` false keeps its row when the event places it on the wire bytes. The row says `locked: the eavesdropper has no key`, and picking it lights its bytes in the sealed colors. The words hold for every mode, because ECB is locked and still shows a picture's shape. A hidden field that describes only the readable bytes has no place on the wire, so those fields stay one note: `locked: the eavesdropper has no key (N bytes)`. An event with no wire bytes shows the eavesdropper no bytes and no rows.
-8. Every row of both grids shares fixed columns: offset, 16 bytes, text. Field boundaries show by color, never by added space. Below 690 px the field list stacks under the grids.
+8. The Eavesdropper view closes a tab that holds what only an endpoint knows, and it says why: Chain (unless every certificate crosses in the clear), Token, Ladder and Timing. The Keys in use strip does not show in that view. A message nothing locks says `Public`. `app/e2e/eavesdropper-sweep.spec.ts` fails on any readable text or key bytes on screen that no wire byte holds.
+9. Every row of both grids shares fixed columns: offset, 16 bytes, text. Field boundaries show by color, never by added space. Below 690 px the field list stacks under the grids.
 
 ### 1.5 Secrets panel
 
