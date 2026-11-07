@@ -1,6 +1,6 @@
 # MMP.NetworkSecurity: the 3-section plan
 
-Owners: Richard (map, engine data, slices) and Nancy (screens). Decision owner: Steve. Reader before Steve: Jared. Date: 2026-11-07. Status: plan, with Steve's answers to Q1 and Q2 recorded on 2026-11-07. Slices build from it. Nancy's screen questions Q3 and Q4 are open.
+Owners: Richard (map, engine data, slices) and Nancy (screens). Decision owner: Steve. Reader before Steve: Jared. Date: 2026-11-07. Status: plan, with Steve's answers to Q1 to Q4 recorded on 2026-11-07. Slices build from it.
 
 ## The two changes I would make
 
@@ -112,7 +112,7 @@ Nancy's screen lines, 2026-11-07, with her update for Steve's answers. Plan only
 5. **Shell changes.** `workspace` and `walk-root` stay. Techniques adds the pinned strip as a sibling above `walk-root` inside `workspace`. `overlay-layer` is unchanged. The rail component takes the section as a prop. The Endpoints / Eavesdropper / Both views stay, unchanged. An attack run from the index opens in the new two-run layout (item 3), not in the Both view.
 6. **Links.** Each lesson links to its walk (section 1.1), and each walk links back to its lessons.
 
-Nancy's 2 screen questions for Steve are in section 8 as Q3 and Q4.
+Nancy's 2 screen questions are in section 8 as Q3 and Q4. Steve answered A to both: the pinned strip, and both runs side by side.
 
 ## 3. What moves and what is new
 
@@ -169,7 +169,7 @@ The attack index needs no engine data: `run-attack` already plays each run, and 
 | P1 section shell | The 3-section switch, with today's rail as Lessons, from Nancy's lines. No engine change | The specs pass with every lesson reachable. 12 of 12 lessons in Lessons | Builds on Nancy's shell (#196). The ux-refresh slices stay as planned |
 | P2 = W1b | The AES walk in section 2, chapter 1, with the long text (R1). Engine half built on `feat/w1b-aes-walk` | W1b's clauses, plus a long-text clause | **W1b becomes the AES walk in section 2.** It takes W2's long text forward. W2 keeps the S-box build, tap-a-byte and the flip spread |
 | Stop: show Steve | Steve steps through section 2 in the app | His reaction in `docs/learnings.md` | Unchanged stop from `walkthrough-design.md` |
-| P3 attack index | `attacks.json`, the list by kind inside Lessons, each entry opening its tour step or its free-play button. If Q4 is A: the two-run layout, built from lesson 7's race (section 2, item 3) | 56 of 56 registered runs reachable, each plays its run and shows its check | None to the tours. If Q4 is A, the race layout becomes shared by lesson 7 and the index |
+| P3 attack index | `attacks.json`, the list by kind inside Lessons, each entry opening its tour step or its free-play button. The two-run layout, built from lesson 7's race (section 2, item 3; Steve, Q4) | 56 of 56 registered runs reachable, each plays its run and shows its check | None to the tours. The race layout becomes shared by lesson 7 and the index |
 | P4 Handshake walk | The TLS 1.3 message walk, the key schedule walk, the chain view | RFC 8448 values, lesson 4 and 5 clauses | Takes **W4** (lesson 5 record walk) and the lesson 4 half of **W3** |
 | P5 W1c | Chapter 2 modes, unchanged | W1c's clauses | Unchanged, now inside section 2 |
 | P6 HMAC and chain | `Sha256Walk`, `HmacWalk`, `SealChainWalk` | FIPS 180-4 and RFC 4231 | Takes lesson 2 from **W5** |
@@ -208,12 +208,12 @@ A progress report states these 5 counts. It does not substitute the fact that bu
 | Q1 | Lessons: list the attack runs a second way? | Lessons also gets an index of the attack runs, grouped by kind. Each entry opens the lesson at the step that plays it | No index. Each run stays only in its tour step | **A.** It answers "how do things break" in one place, and no tour or clause changes. **Steve: A** |
 | Q2 | Key agreement on elliptic curves: is X25519 enough, or do you also want ECDH on P-256? | X25519 carries ECDH. P-256 appears only in the ECDSA walk | Also an ECDH walk on P-256, on the same new P-256 code | **A.** X25519 is ECDH on Curve25519, and the lessons run it today. B adds a walk on code no lesson runs. **Steve: A** |
 
-Nancy's 2 screen questions (section 2), open:
+Nancy's 2 screen questions (section 2), answered by Steve:
 
-| Id | Question | Option A | Option B | Nancy's pick |
+| Id | Question | Option A | Option B | Nancy's pick, and Steve's answer |
 |---|---|---|---|---|
-| Q3 | Where does the long text live in Techniques? | A pinned strip above the walk, one line, scrolling sideways | A side column, wrapped, about 280 px wide | **A.** The walk needs the width at 1280, and one line keeps byte offsets readable |
-| Q4 | When a learner opens an attack run from the index, what shows first? | The normal run and the attacked run side by side. This needs a new two-run layout, built from lesson 7's race layout | The attacked run alone, with a "show the normal run" toggle. This reuses today's one-run screen | **A.** The difference is the lesson. The cost is one new layout in P3, built on a layout the app already has |
+| Q3 | Where does the long text live in Techniques? | A pinned strip above the walk, one line, scrolling sideways | A side column, wrapped, about 280 px wide | **A.** The walk needs the width at 1280, and one line keeps byte offsets readable. **Steve: A** |
+| Q4 | When a learner opens an attack run from the index, what shows first? | The normal run and the attacked run side by side. This needs a new two-run layout, built from lesson 7's race layout | The attacked run alone, with a "show the normal run" toggle. This reuses today's one-run screen | **A.** The difference is the lesson. The cost is one new layout in P3, built on a layout the app already has. **Steve: A** |
 
 **Answered (2026-11-07, Steve, through the lead):**
 1. Elliptic-curve methods mean both key agreement (ECDH, X25519) and signatures (ECDSA, Ed25519). Both go in section 2.
@@ -221,6 +221,8 @@ Nancy's 2 screen questions (section 2), open:
 3. Section 3 is named Lessons ("let's call 'attacks' lessons"). Today's lesson list, with its attack runs, becomes section 3. This answers the old question about lessons 6, 8, 9 and 10: they stay in Lessons with the rest. It also settles lesson numbers: Lessons keeps 0 to 11.
 4. Q1: A. Lessons gets an index of the attack runs by kind. The index lists all 56 registered runs, the live count from `GET /api/lessons`.
 5. Q2: A. X25519 is enough for key agreement. There is no ECDH walk on P-256. ECDSA keeps P-256 (slice P8b).
+6. Q3: A. The long text is a pinned one-line strip above the walk in Techniques. The W1b screens use it.
+7. Q4: A. An attack run from the index opens with the normal run and the attacked run side by side. P3 builds the two-run layout from lesson 7's race.
 
 ## 9. Prior art
 
@@ -230,4 +232,4 @@ Jared read 23df25c (same-vendor fresh read). His anchor: a git grep on origin/ma
 
 ## Disposition
 
-Jared passed this plan (35e95ce). Steve answered Q1 and Q2 in section 8 on 2026-11-07. Nancy's screen questions Q3 and Q4 wait for him. The lead starts P1. Nancy builds the W1b screens after SC lands.
+Jared passed this plan (35e95ce). Steve answered Q1 to Q4 in section 8 on 2026-11-07. The lead starts P1. Nancy builds the W1b screens after SC lands.
