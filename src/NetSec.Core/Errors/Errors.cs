@@ -96,6 +96,14 @@ namespace NetSec.Errors
         public const string KeyFileEncrypted = "KEY_FILE_ENCRYPTED";
         public const string KeySizeNot2048 = "KEY_SIZE_NOT_2048";
         public const string KeyAlgorithmNotInEngine = "KEY_ALGORITHM_NOT_IN_ENGINE";
+        public const string KeyCertMismatch = "KEY_CERT_MISMATCH";
+        public const string CertSignatureAlgUnsupported = "CERT_SIGNATURE_ALG_UNSUPPORTED";
+        public const string CertExpired = "CERT_EXPIRED";
+        public const string CertNotYetValid = "CERT_NOT_YET_VALID";
+        public const string CertNotACa = "CERT_NOT_A_CA";
+        public const string CertNameMissing = "CERT_NAME_MISSING";
+        public const string ChainIncomplete = "CHAIN_INCOMPLETE";
+        public const string AttackNeedsCaKey = "ATTACK_NEEDS_CA_KEY";
         public const string DukptCounterExhausted = "DUKPT_COUNTER_EXHAUSTED";
         public const string DukptKsnReplay = "DUKPT_KSN_REPLAY";
         public const string DukptMacMismatch = "DUKPT_MAC_MISMATCH";
