@@ -1,5 +1,6 @@
 <script setup lang="ts">
 import { computed, nextTick, onMounted, reactive, ref, watch } from 'vue'
+import TextWithSpecs from './TextWithSpecs.vue'
 import raw from '../glossary.json'
 import { closeGlossary, ui } from '../store'
 import { isMethod, matches, sourceLabel, type Claim, type Glossary, type Method, type Side } from '../glossaryData'
@@ -57,7 +58,7 @@ watch(() => ui.glossaryFocus, id => void focusEntry(id))
               :id="`glossary-entry-${m.id}`" class="gl-row" :class="{ open: open.has(m.id), flash: flash === m.id }" :data-testid="`glossary-method-${m.id}`"
               tabindex="0" :aria-expanded="open.has(m.id)" @click="toggle(m.id)" @keydown.enter.prevent="toggle(m.id)" @keydown.space.prevent="toggle(m.id)"
             >
-              <td><b>{{ m.term }}</b><div class="muted">{{ m.short }}</div></td>
+              <td><b>{{ m.term }}</b><div class="muted"><TextWithSpecs :text="m.short" /></div></td>
               <td>{{ m.kind }}</td>
               <td>{{ m.does.join(', ') }}</td>
               <td>{{ m.keySizes ?? 'n/a' }}</td>
@@ -71,7 +72,7 @@ watch(() => ui.glossaryFocus, id => void focusEntry(id))
               <td colspan="6">
                 <p v-if="m.strength"><b>Strength.</b> {{ m.strength }}</p>
                 <p v-if="m.strengthNote">{{ m.strengthNote }}</p>
-                <p v-if="m.statusNote"><b>Status.</b> {{ m.statusNote }}</p>
+                <p v-if="m.statusNote"><b>Status.</b> <TextWithSpecs :text="m.statusNote" /></p>
                 <p v-if="m.reasoning"><span class="gl-mark" title="This follows from how the method works. It cites no source.">reasoning</span> {{ m.reasoning }}</p>
                 <p v-if="m.unsourced"><span class="gl-mark warn" title="This claim cites no primary source yet.">no source yet</span> {{ m.unsourced }}</p>
                 <p v-if="m.namedIn?.length" class="muted">Named, but not run, in lessons {{ m.namedIn.join(', ') }}.</p>
@@ -131,7 +132,7 @@ watch(() => ui.glossaryFocus, id => void focusEntry(id))
     <h2 class="gl-h">Terms</h2>
     <dl class="gl-terms" data-testid="glossary-terms">
       <div v-for="t in terms" :id="`glossary-entry-${t.id}`" :key="t.id" class="gl-term" :class="{ flash: flash === t.id }" :data-testid="`glossary-term-${t.id}`">
-        <dt>{{ t.term }}</dt><dd>{{ t.short }}</dd>
+        <dt>{{ t.term }}</dt><dd><TextWithSpecs :text="t.short" /></dd>
       </div>
       <p v-if="!terms.length" class="muted">No term matches.</p>
     </dl>

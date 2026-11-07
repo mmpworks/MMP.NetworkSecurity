@@ -1,5 +1,6 @@
 <script setup lang="ts">
 import { computed, ref } from 'vue'
+import TextWithSpecs from './TextWithSpecs.vue'
 import { lessons } from '../store'
 import ShowKeysSwitch from './ShowKeysSwitch.vue'
 import { openVault } from '../vault'
@@ -46,7 +47,7 @@ async function runWithMine() {
     </header>
     <p class="sec-line" data-testid="sec-test-keys-line">{{ sec.showKeys ? words('wizard.common.test-keys-only') : words('wizard.common.test-keys-hidden') }}</p>
 
-    <v-alert v-if="sec.fault" type="error" density="compact" class="mb-3" data-testid="sec-fault"><span data-testid="sec-fault-code">{{ sec.fault.code }}</span> {{ sec.fault.message }}</v-alert>
+    <v-alert v-if="sec.fault" type="error" density="compact" class="mb-3" data-testid="sec-fault"><span data-testid="sec-fault-code">{{ sec.fault.code }}</span> <TextWithSpecs :text="sec.fault.message" /></v-alert>
 
     <div class="sec-goal" data-testid="sec-goal-card">
       <b>Run a lesson with my own keys</b>

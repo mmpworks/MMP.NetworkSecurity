@@ -204,7 +204,11 @@
     "rfc7748": { "title": "RFC 7748, Elliptic Curves for Security", "url": "https://www.rfc-editor.org/rfc/rfc7748" },
     "rfc8032": { "title": "RFC 8032, Edwards-Curve Digital Signature Algorithm (EdDSA)", "url": "https://www.rfc-editor.org/rfc/rfc8032" },
     "rfc5869": { "title": "RFC 5869, HMAC-based Extract-and-Expand Key Derivation Function (HKDF)", "url": "https://www.rfc-editor.org/rfc/rfc5869" },
-    "x9-24-3-2017": { "title": "ANSI X9.24-3-2017, Derived Unique Key Per Transaction (AES DUKPT). Sold by ANSI; not read for this draft.", "url": "https://webstore.ansi.org/" }
+    "x9-24-3-2017": { "title": "ANSI X9.24-3-2017, Derived Unique Key Per Transaction (AES DUKPT). Sold by ANSI; not read for this draft.", "url": "https://webstore.ansi.org/" },
+    "rfc8996": { "title": "RFC 8996, Deprecating TLS 1.0 and TLS 1.1 (2021), Abstract", "url": "https://www.rfc-editor.org/rfc/rfc8996" },
+    "rfc9449": { "title": "RFC 9449, OAuth 2.0 Demonstrating Proof of Possession (DPoP) (2023), Abstract", "url": "https://www.rfc-editor.org/rfc/rfc9449" },
+    "rfc8017": { "title": "RFC 8017, PKCS #1: RSA Cryptography Specifications Version 2.2 (November 2016), sections 7.2 and 8.2", "url": "https://www.rfc-editor.org/rfc/rfc8017" },
+    "rfc5958": { "title": "RFC 5958, Asymmetric Key Packages (August 2010), which obsoletes PKCS #8 v1.2 (RFC 5208)", "url": "https://www.rfc-editor.org/rfc/rfc5958" }
   },
   "sourcesRead": "2026-11-07"
 }
