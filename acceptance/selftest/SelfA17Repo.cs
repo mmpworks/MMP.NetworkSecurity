@@ -16,7 +16,7 @@ namespace Acceptance
             return @"import re, subprocess, sys
 ALLOW = {'src/NetSec.Core/Pki/TrainingPki.cs', 'tests/NetSec.Tests/Tls13Tests.cs', 'acceptance/lib/Harness/OpenSshKey.cs'}
 MARK = 'PRIV' + 'ATE KEY'
-PATH = re.compile(r'(^|/)\.security/|\.(pfx|p12|db|key|ndjson)$|(^|/)(master\.key|id_rsa|id_ed25519|known_hosts)$', re.I)
+PATH = re.compile(r'(^|/)\.security/|\.(pfx|p12|db|key|ndjson" + (mode == "no-bin" ? "" : "|bin") + @")$|(^|/)(master\.key|id_rsa|id_ed25519|known_hosts)$', re.I)
 files = [f for f in subprocess.run(['git', 'ls-files'], capture_output=True, text=True).stdout.split('\n') if f]
 bad = []
 for f in files:
@@ -96,11 +96,14 @@ sys.exit(1 if bad else 0)
             Expect(Outcome(On(c, MakeRepo(c, "goldenguard", "no-golden-exempt", true, golden), "goldenguard")), "FAIL", "a guard that flags the golden traces"); bites++;
             Expect(Outcome(On(c, MakeRepo(c, "ndjson", "good", true, d => { File.WriteAllText(Path.Combine(d, "src", "session.ndjson"), "{}\n"); }), "ndjson")), "FAIL", "a tracked .ndjson outside acceptance/golden/"); bites++;
             Expect(Outcome(On(c, MakeRepo(c, "goldenkey", "good", true, d => { golden(d); File.WriteAllText(Path.Combine(d, "acceptance", "golden", "net10", "host.key"), "x"); }), "goldenkey")), "FAIL", "a tracked .key under acceptance/golden/"); bites++;
+            Action<string> bin = d => { File.WriteAllBytes(Path.Combine(d, "src", "ikm.bin"), new byte[] { 1, 2, 3 }); };
+            Expect(Outcome(On(c, MakeRepo(c, "bin", "good", true, bin), "bin")), "FAIL", "a tracked .bin file"); bites++;
+            Expect(Outcome(On(c, MakeRepo(c, "binguard", "no-bin", true, bin), "binguard")), "FAIL", "a guard that lets a tracked .bin through"); bites++;
             Expect(Outcome(On(c, MakeRepo(c, "noguard", "none", true, null), "noguard")), "NOT RUN PRODUCT_MISSING", "no tools/secret_guard.py");
             string nogit = Path.Combine(c.WorkDir, "repo-nogit");
             Directory.CreateDirectory(nogit);
             Expect(Outcome(On(c, nogit, "nogit")), "NOT RUN PRODUCT_MISSING", "a folder that is no git repository");
-            return "a clean repository with a sound guard PASSes; " + bites + " defects (tracked key header, tracked .security/ file, tracked .db, no ignore line, a guard that passes all, a guard that ignores .security/, a guard that flags the golden traces, a tracked .ndjson outside the golden folder, a tracked .key inside it) each FAIL; the golden traces alone PASS; no guard or no git reads NOT RUN PRODUCT_MISSING";
+            return "a clean repository with a sound guard PASSes; " + bites + " defects (tracked key header, tracked .security/ file, tracked .db, no ignore line, a guard that passes all, a guard that ignores .security/, a guard that flags the golden traces, a tracked .ndjson outside the golden folder, a tracked .key inside it, a tracked .bin, a guard that lets a .bin through) each FAIL; the golden traces alone PASS; no guard or no git reads NOT RUN PRODUCT_MISSING";
         }
     }
 }

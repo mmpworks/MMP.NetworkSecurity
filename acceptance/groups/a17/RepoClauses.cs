@@ -20,7 +20,7 @@ namespace Acceptance
             "src/NetSec.Core/Pki/TrainingPki.cs", "tests/NetSec.Tests/Tls13Tests.cs", "acceptance/lib/Harness/OpenSshKey.cs"
         };
 
-        static readonly Regex ForbiddenPath = new Regex(@"(^|/)\.security/|\.(pfx|p12|db|key|ndjson)$|(^|/)(master\.key|id_rsa|id_ed25519|known_hosts)$", RegexOptions.IgnoreCase);
+        static readonly Regex ForbiddenPath = new Regex(@"(^|/)\.security/|\.(pfx|p12|db|key|ndjson|bin)$|(^|/)(master\.key|id_rsa|id_ed25519|known_hosts)$", RegexOptions.IgnoreCase);
 
         /// <summary>
         /// The golden traces (acceptance/golden/**/*.ndjson) are tracked on purpose. They hold only the built-in training keys, which are public by design.
