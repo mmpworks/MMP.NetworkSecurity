@@ -108,7 +108,7 @@
       "status": "legacy", "statusBasis": "final", "statusNote": "Two-key TDES encryption is disallowed. Three-key TDES encryption was deprecated through 2023 and is disallowed after 2023. Decryption with either form is allowed for legacy use. SP 800-67 Rev. 2, its standard, was withdrawn on January 1, 2024.",
       "sources": ["sp800-131a-r2", "sp800-57-p1-r5", "sp800-67-r2"], "lessons": [], "namedIn": [6] },
     { "id": "rc4", "term": "RC4", "short": "An old stream lock. Its output has biases that leak the data.",
-      "kind": "symmetric", "does": ["encrypt"], "keySizes": "Variable. The RFC 6229 test vectors run from 40 to 256 bits. TLS used 128 bits (RC4_128, 16 bytes of key material).", "strength": "n/a, see strengthNote", "strengthNote": "Broken at any key size.",
+      "kind": "symmetric", "does": ["encrypt"], "keySizes": "Variable. The RFC 6229 test vectors run from 40 to 256 bits. TLS 1.2 used 128 bits (RC4_128, 16 bytes of key material).", "strength": "n/a, see strengthNote", "strengthNote": "Broken at any key size.",
       "status": "broken", "statusBasis": "final", "statusNote": "RFC 7465 says TLS clients and servers must never negotiate RC4, in any TLS version.",
       "sources": ["rfc7465", "rfc6229", "rfc5246"], "lessons": [], "namedIn": [7] },
     { "id": "chacha20", "term": "ChaCha20", "short": "A modern stream lock. TLS pairs it with Poly1305 to catch changes.",
