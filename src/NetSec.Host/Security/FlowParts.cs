@@ -22,12 +22,16 @@ public sealed class FlowParts(SecurityStore store, Func<string, string?> env)
     const string ReadOnlyNotAfter = "2049-12-31";
 
     readonly OpenSslTool _openSsl = new(env);
+    readonly SshExeCheck _ssh = new(env);
+
+    static readonly string[] SshTypes = [SecurityTypes.SshHostEd25519, SecurityTypes.SshHostRsa, SecurityTypes.SshKnownHosts, SecurityTypes.SshClient];
 
     static readonly HashSet<string> Built =
     [
         SecurityTypes.RootCa, SecurityTypes.TlsTrust, SecurityTypes.Tls13Server, SecurityTypes.Tls13Client, SecurityTypes.Tls11Server,
         SecurityTypes.TokenIssuer, SecurityTypes.DeviceEnrolment, SecurityTypes.LabAesKey, SecurityTypes.LabSealKey,
         SecurityTypes.DukptBdk, SecurityTypes.DukptPad,
+        SecurityTypes.SshHostEd25519, SecurityTypes.SshHostRsa, SecurityTypes.SshKnownHosts, SecurityTypes.SshClient,
     ];
 
     static readonly HashSet<string> ImportBuilt = [SecurityTypes.TokenIssuer, SecurityTypes.DeviceEnrolment, SecurityTypes.DukptBdk];
@@ -41,12 +45,14 @@ public sealed class FlowParts(SecurityStore store, Func<string, string?> env)
     /// <summary>The engines read an imported token or device key as an Ed25519 seed.</summary>
     public static KeyAlgorithm ImportedAlgorithm(string typeId) => KeyAlgorithm.Ed25519;
 
-    public static string JudgeOf(string typeId) => typeId is SecurityTypes.DeviceEnrolment or SecurityTypes.DukptBdk or SecurityTypes.DukptPad ? JudgeNone : JudgeOpenSsl;
+    public static string JudgeOf(string typeId) => typeId is SecurityTypes.DeviceEnrolment or SecurityTypes.DukptBdk or SecurityTypes.DukptPad ? JudgeNone
+        : Array.IndexOf(SshTypes, typeId) >= 0 ? SshExeCheck.Judge : JudgeOpenSsl;
 
     public static string SaysOf(string typeId) => typeId switch
     {
         SecurityTypes.DeviceEnrolment or SecurityTypes.DukptBdk or SecurityTypes.DukptPad => SaysNoOutsideJudge,
         SecurityTypes.TokenIssuer => SaysSignatureOnly,
+        SecurityTypes.SshHostEd25519 or SecurityTypes.SshHostRsa or SecurityTypes.SshKnownHosts or SecurityTypes.SshClient => SshExeCheck.Says,
         SecurityTypes.LabAesKey or SecurityTypes.LabSealKey => SaysWithOpenSsl,
         _ => SaysAgainstRoot,
     };
@@ -55,8 +61,8 @@ public sealed class FlowParts(SecurityStore store, Func<string, string?> env)
     {
         switch (typeId)
         {
-            case SecurityTypes.TlsTrust or SecurityTypes.DukptPad: store.PlaceDerived(typeId); break;
-            case SecurityTypes.Tls11Server: store.PlaceKey(typeId, NewRsaPem()); break;
+            case SecurityTypes.TlsTrust or SecurityTypes.DukptPad or SecurityTypes.SshKnownHosts: store.PlaceDerived(typeId); break;
+            case SecurityTypes.Tls11Server or SecurityTypes.SshHostRsa: store.PlaceKey(typeId, NewRsaPem()); break;
             case SecurityTypes.LabAesKey or SecurityTypes.LabSealKey or SecurityTypes.DukptBdk: store.PlaceBytes(typeId, NewLessonKey()); break;
             default: store.PlaceKey(typeId, NewEd25519Pem()); break;
         }
@@ -64,7 +70,7 @@ public sealed class FlowParts(SecurityStore store, Func<string, string?> env)
 
     public ReviewFact Review(string typeId)
     {
-        ITrainingKey? key = store.PlacedKey(typeId) ?? store.PlacedKey(typeId == SecurityTypes.DukptPad ? SecurityTypes.DukptBdk : SecurityTypes.RootCa);
+        ITrainingKey? key = store.PlacedKey(typeId) ?? store.PlacedKey(FollowedBy(typeId));
         return new ReviewFact(typeId, NameOf(typeId), ReadOnlyNotAfter, key is null ? "" : AlgorithmOf(key), key is null ? "" : SecurityStore.FingerprintOf(key.CopyPublic()));
     }
 
@@ -78,11 +84,20 @@ public sealed class FlowParts(SecurityStore store, Func<string, string?> env)
             SecurityTypes.LabAesKey => CheckAesKey(proofDirectory),
             SecurityTypes.LabSealKey => CheckSealKey(proofDirectory),
             SecurityTypes.DukptBdk or SecurityTypes.DukptPad => PaymentKeys.Check(typeId, Placed(SecurityTypes.DukptBdk).CopyMaterial()),
+            SecurityTypes.SshHostEd25519 or SecurityTypes.SshHostRsa or SecurityTypes.SshKnownHosts or SecurityTypes.SshClient => _ssh.Check(typeId, store.Credentials(SshTypes, SecurityStore.CallerFlow), proofDirectory),
             SecurityTypes.RootCa => CheckRoot(proofDirectory),
             SecurityTypes.TlsTrust => CheckChain(typeId, SecurityTypes.Tls13Server, proofDirectory),
             _ => CheckChain(typeId, typeId, proofDirectory),
         };
     }
+
+    /// <summary>A type with no key of its own shows the key it follows: a trust list its root, a pad key its base key, a pin its host key.</summary>
+    static string FollowedBy(string typeId) => typeId switch
+    {
+        SecurityTypes.DukptPad => SecurityTypes.DukptBdk,
+        SecurityTypes.SshKnownHosts => SecurityTypes.SshHostEd25519,
+        _ => SecurityTypes.RootCa,
+    };
 
     static string NameOf(string typeId) => typeId switch
     {
