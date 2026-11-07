@@ -4,6 +4,7 @@ using NetSec.Errors;
 using NetSec.Host.Security;
 using NetSec.Labs;
 using NetSec.Platform;
+using static NetSec.Host.WalkReplies;
 
 namespace NetSec.Host;
 
@@ -53,12 +54,6 @@ public static class AesWalkRoutes
         {
             return Refuse(400, e.Error.Code, e.Error.Message);
         }
-    }
-
-    static IResult NoStore(HttpContext http, IResult result)
-    {
-        http.Response.Headers.CacheControl = "no-store";
-        return result;
     }
 
     static IResult Block(bool showKeys, LabSession? session, string id, string? source, string? keyBits)
@@ -119,7 +114,4 @@ public static class AesWalkRoutes
         bool same = frame.Length >= Frame.HeaderSize + BlockSize && frame.AsSpan(Frame.HeaderSize, BlockSize).SequenceEqual(cipher);
         return same ? "match" : "differs";
     }
-
-    static IResult Refuse(int status, string code, string message, bool retryable = false) =>
-        Results.Json(new { code, message, retryable, requestId = Guid.NewGuid().ToString("N") }, statusCode: status);
 }
