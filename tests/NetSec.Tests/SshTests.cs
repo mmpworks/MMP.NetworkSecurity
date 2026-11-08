@@ -343,22 +343,23 @@ namespace NetSec.Tests
         public System.Threading.Tasks.Task The_factory_gives_an_ssh_channel_that_runs_a_command(SshSuite suite) => FactoryExec(suite);
 
         /// <summary>The factory test's body. CoreStarvationTests runs several copies at once on a capped thread pool (issue #308).</summary>
-        internal static System.Threading.Tasks.Task FactoryExec(SshSuite suite)
+        internal static async System.Threading.Tasks.Task FactoryExec(SshSuite suite)
         {
+            TimeSpan limit = TimeSpan.FromSeconds(60);
             MemoryLink[] links = MemoryLink.Pair();
             GlassTransportFactory factory = new GlassTransportFactory(new TrainingKeySource());
             IFuture<ISecureChannel> server = factory.Open(new TransportRequest { Protocol = WireProtocol.Ssh, Role = EngineRole.Server, Suite = suite, Link = links[1], Random = new SeededRandom(1) });
             IFuture<ISecureChannel> client = factory.Open(new TransportRequest { Protocol = WireProtocol.Ssh, Role = EngineRole.Client, Suite = suite, Link = links[0], Random = new SeededRandom(2), PeerName = "h", PeerPort = 22, TrustFirstUse = true });
-            Assert.True(client.Wait(60000), "the client did not open");
+            // Each wait awaits, so no pool thread is held while a pump finishes the future (issue #308).
+            Assert.True(await FutureWaits.Within(client, limit), "the client did not open");
             ISshChannel channel = Assert.IsAssignableFrom<ISshChannel>(client.Result);
             Assert.Equal(suite == SshSuite.Legacy ? "diffie-hellman-group14-sha1" : "curve25519-sha256", channel.Info.Group);
             List<byte> output = new List<byte>();
             IFuture run = AsyncProxy.Run(SshScript.Exec(channel, "whoami", output));
-            Assert.True(run.Wait(60000), "the command did not finish");
+            Assert.True(await FutureWaits.Within(run, limit), "the command did not finish");
             Assert.Equal("training\n", Encoding.UTF8.GetString(output.ToArray()));
-            Assert.True(channel.Close().Wait(60000), "the client did not close");
-            Assert.True(server.Wait(60000), "the server did not open");
-            return System.Threading.Tasks.Task.CompletedTask;
+            Assert.True(await FutureWaits.Within(channel.Close(), limit), "the client did not close");
+            Assert.True(await FutureWaits.Within(server, limit), "the server did not open");
         }
 
         [Fact]
