@@ -32,7 +32,7 @@ Consultation. Gems used: `server-replaces-never-merges`, `fail-soft-must-count`,
 | `app/` | Electron, Vue 3, Vuetify | UI per `ux-design.md`. Tours in `app/src/tours/` |
 | `tests/NetSec.Tests` | net10.0, net48, C# latest | Builder unit suite. net48 uses `HintPath` to CF binaries, as in MMP.AsyncProxy |
 | `acceptance/` | net10.0, net48, pwsh | D11. Separate authors. **Builders never write here.** `run.ps1`, `clauses.json`, pinned skip list, `referees/bcl` (oracle, so net48 reaches `MLKem` with no skip), `referees/go` (`tlspeer`, `sshpeer`, `gogateway`, `tap`, `tokenverify`) |
-| `tools/` | pwsh, python | `gate.ps1`, `layer_check.py`, `tour_lint.py`, `lessons_status.py` |
+| `tools/` | pwsh, python | `gate.ps1`, `layer_check.py`, `tour_lint.py`, `lessons_status.py`, `run_status.py` (section 9.1) |
 
 Root `Directory.Build.props`: `ShouldUnsetParentConfigurationAndPlatform=false`, `Nullable=disable`, `ImplicitUsings=disable`, `TreatWarningsAsErrors=true`, `AsyncProxyRoot` (default `..\MMP.AsyncProxy`). `LangVersion` stays per project. `.gitignore` keeps `bin/`, `obj/`, and CF binaries out (A9). MMP.AsyncProxy stays unchanged.
 
@@ -225,7 +225,7 @@ The CF references have no `BigInteger` and no `Span` (verified above). The net10
 Complexity hotspots: `BigUInt.DivRem`, `ByteEncode`, the SSH channel window, record reassembly. Each gets a small type and a comment on how the logic works.
 ## 5. Host contract
 Bind `127.0.0.1:5180` only (`NETSEC_PORT` overrides). D14: allow-listed `Origin` (`file://`, `http://localhost:4180`, `http://localhost:5173`) and a session token on every request. Electron generates `NETSEC_TOKEN`, passes it to the Host by env and to the renderer by preload. HTTP uses `Authorization: Bearer`. WebSocket uses `/ws?token=`. Failures: `HOST_ORIGIN_REFUSED`, `HOST_TOKEN_REFUSED`.
-D14 amendment (test runs only). The Host also reads `NETSEC_ORIGINS`, a comma list that adds origins to the built-in list and never replaces it. An entry is the exact string `http://localhost:PORT` or `http://127.0.0.1:PORT`, with PORT 1024-65535, no leading zero, no path, no trailing slash, and no wildcard. `localhost` and `127.0.0.1` are separate entries, because a browser sends whichever the page used. The Host drops any other entry and keeps the rest. At start the Host prints one `HOST-ORIGINS accepted=[...] dropped=[...]` line that names each accepted entry and each dropped entry with its reason. The token check still runs on every request from an added origin. Electron blanks `NETSEC_ORIGINS` in the environment of the Host it spawns (an empty value, which the Host reads as unset), so a value in a learner's shell never widens the shipped Host (`e2e/origins-electron.spec.ts` pins this).
+D14 amendment (test runs only). The Host also reads `NETSEC_ORIGINS`, a comma list that adds origins to the built-in list and never replaces it. An entry is the full string `http://localhost:PORT` or `http://127.0.0.1:PORT`, with PORT 1024-65535, no leading zero, no path, no trailing slash, and no wildcard. `localhost` and `127.0.0.1` are separate entries, because a browser sends whichever the page used. The Host drops any other entry and keeps the rest. At start the Host prints one `HOST-ORIGINS accepted=[...] dropped=[...]` line that names each accepted entry and each dropped entry with its reason. The token check still runs on every request from an added origin. Electron blanks `NETSEC_ORIGINS` in the environment of the Host it spawns (an empty value, which the Host reads as unset), so a value in a learner's shell never widens the shipped Host (`e2e/origins-electron.spec.ts` pins this).
 | REST | Returns |
 |---|---|
 | `GET /api/health` | `{ schema, build, referees }` |
@@ -355,6 +355,16 @@ tokenverify -pub issuer.pub -token <jws>                                        
 A10 runs from outside the app, with the steps in section 11. Expected tamper codes: `SSH_PACKET_MAC`, `TLS13_AEAD_TAG`, `DUKPT_MAC_MISMATCH`, each beside a passing control.
 
 Electron spawns the Host detached, handles `EPIPE` as in the MMP.GasPumpSimulator `main.cjs`, and ends the tree with `taskkill /T`. `e2e/start.spec.ts` launches real Electron with `_electron.launch`. Lesson walks run against `vite preview` on 4180 and a live Host on 5180, one worker (or the `NETSEC_PORT_BASE` block, which gives each worktree its own ports).
+### 9.1 Long runs: read the log at the expected end
+
+Read the run's log at its expected end. Do not wait for the finish notice. Finish notices for background runs arrived late or never four times in one day (a gate, a Host test run, an app suite), and each time an agent lost about an hour.
+
+1. When you start a run in the background, write down the log path and the expected end. Typical times on this machine: full `-SkipApp` gate 17 to 25 minutes, full Playwright suite 22 to 25 minutes, full Host test run 40 to 90 seconds, one guard test file about 1 minute.
+2. At the expected end, run `python -I tools/run_status.py <log>`. It prints one line and sets an exit code: `PASSED` (0), `FAILED` (1), `RUNNING` (2, names the current step or the Playwright count), `STUCK` (3, names the step and the quiet time), `NO_LOG` (4).
+3. `RUNNING` past the expected end: check again at half the expected time. `STUCK`: stop only your own processes, keep the log, and report the step it stopped at.
+4. A machine that other agents also load makes runs slower. A slow run that still writes output is `RUNNING`, not stuck. Raise the limit with `--stuck-after <minutes>` (default 10).
+5. Report the result from the log line, with its counts.
+
 ## 10. Open questions, with the default taken
 | # | Question | Default |
 |---|---|---|
