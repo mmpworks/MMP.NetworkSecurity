@@ -489,6 +489,16 @@ export function showAttackIndex(on: boolean) {
 }
 
 /**
+ * Waits until `ok()` holds or `ms` milliseconds pass. It checks after each Host frame and at least every 500 ms. A count of wakes is
+ * no deadline: a busy lesson sends dozens of frames in a second, so a loop of 40 wakes gave up before a fork arrived (L6-replay-sale).
+ */
+async function waitUntil(ok: () => boolean, ms: number): Promise<boolean> {
+  const end = Date.now() + ms
+  while (!ok() && Date.now() < end) await nextActivity(Math.min(500, end - Date.now()))
+  return ok()
+}
+
+/**
  * A row of the attack index: open its lesson in free play, run it, and play the attack. Once the fork exists, the two-run layout
  * shows the normal run beside the attacked run (sections-plan item 3; Steve, Q4 A).
  */
@@ -499,14 +509,14 @@ export async function openAttackRun(lesson: number, attackId: string) {
   ui.lesson = null
   selectLesson(lesson)
   startSession('free')
-  for (let i = 0; i < 40 && !ui.activeId; i++) await nextActivity(500)
+  await waitUntil(() => !!ui.activeId, 30_000)
   const normalId = ui.activeId
   if (!normalId) { fail('ATTACK_RUN_NO_SESSION', `lesson ${lesson} did not start, so ${attackId} did not play`, false); return }
   runEngine()
   attack({ attackId })
   // The fork's session.started arrives first; its session.forked frame then names the parent and the attack (onForked).
   const isFork = (s: SessionRec) => s.parentId === normalId && s.label === `attack: ${attackId}`
-  for (let i = 0; i < 40 && !ui.sessions.some(isFork); i++) await nextActivity(500)
+  await waitUntil(() => ui.sessions.some(isFork), 30_000)
   const fork = ui.sessions.find(isFork)
   if (!fork) { fail('ATTACK_RUN_NO_FORK', `${attackId} did not start its attacked run`, true); return }
   if (ui.attackKept === attackId) ui.twoRun = { normalId, attackedId: fork.id, attackId }
