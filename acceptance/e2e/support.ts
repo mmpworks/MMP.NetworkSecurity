@@ -1,5 +1,15 @@
+import { spawnSync } from 'node:child_process';
 import * as fs from 'node:fs';
 import * as path from 'node:path';
+
+/**
+ * A process's start time (Unix ms) from Windows, or 0 when no process has that pid. A pid and its start time name one process: Windows can
+ * give a pid to a new process once the old one ends, but the new process has a later start time. The setup records it, and the teardown compares.
+ */
+export function createdMsOf(pid: number): number {
+  const r = spawnSync('powershell', ['-NoProfile', '-Command', `$p = Get-CimInstance Win32_Process -Filter "ProcessId=${pid}"; if ($p -and $p.CreationDate) { ([DateTimeOffset]$p.CreationDate).ToUnixTimeMilliseconds() } else { 0 }`], { encoding: 'utf8' });
+  return Number((r.stdout ?? '').trim()) || 0;
+}
 
 export const HOST_PORT = Number(process.env.ACC_HOST_PORT ?? 5180);
 export const PREVIEW_PORT = Number(process.env.ACC_PREVIEW_PORT ?? 4180);   // run.ps1 picks a free port in the acceptance block, 36800 up (4180 or 5173 on a tree from before #225)

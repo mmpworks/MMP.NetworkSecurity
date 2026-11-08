@@ -2,7 +2,7 @@ import { spawn } from 'node:child_process';
 import * as fs from 'node:fs';
 import * as net from 'node:net';
 import * as path from 'node:path';
-import { HOST_PORT, ORIGINS, OUT, PREVIEW_PORT, ROOT, TOKEN, stateFile } from './support';
+import { HOST_PORT, ORIGINS, OUT, PREVIEW_PORT, ROOT, TOKEN, createdMsOf, stateFile } from './support';
 
 function waitPort(port: number, ms: number, host = '127.0.0.1'): Promise<boolean> {
   const end = Date.now() + ms;
@@ -47,7 +47,9 @@ async function childSaid(log: string, words: string, exited: () => boolean, ms: 
 export default async function globalSetup(): Promise<void> {
   fs.mkdirSync(OUT, { recursive: true });
   // startedAt (Unix ms, before anything starts) lets the teardown tell this run's processes from a later run's on a reused port or pid.
-  const state = { hostUp: false, previewUp: false, note: '', reason: 'PRODUCT_MISSING', pids: [] as number[], startedAt: Date.now() };
+  // created maps each kept pid to its start time, read right after the spawn, so the teardown ends that process and no later one with the same pid.
+  const state = { hostUp: false, previewUp: false, note: '', reason: 'PRODUCT_MISSING', pids: [] as number[], startedAt: Date.now(), created: {} as Record<string, number> };
+  const keep = (pid: number | undefined) => { if (pid) { state.pids.push(pid); state.created[String(pid)] = createdMsOf(pid); } };
   const hostDll = process.env.ACC_HOST ?? '';
   const appDir = path.join(ROOT, 'app');
   if (!hostDll || !fs.existsSync(hostDll)) { state.note = `NetSec.Host is not built (ACC_HOST=${hostDll})`; fs.writeFileSync(stateFile(), JSON.stringify(state)); return; }
@@ -83,7 +85,7 @@ export default async function globalSetup(): Promise<void> {
   let hostGone = false;
   host.on('exit', () => { hostGone = true; });
   host.on('error', () => { /* a start failure shows as hostUp false */ });
-  if (host.pid) state.pids.push(host.pid);
+  keep(host.pid);
   state.hostUp = await childSaid(hostLogPath, `HOST-READY port=${HOST_PORT}`, () => hostGone, 60_000);
   if (!state.hostUp && hostGone) { state.reason = 'PORT_BUSY'; state.note = `this run's Host exited before it bound port ${HOST_PORT}. See host.log`; }
 
@@ -100,7 +102,7 @@ export default async function globalSetup(): Promise<void> {
     : spawn('npx', ['vite', ...viteArgs], { cwd: appDir, shell: true, detached: false, stdio: ['ignore', previewLog, previewLog] });
   preview.on('exit', (code, sig) => { previewGone = true; try { fs.appendFileSync(path.join(OUT, 'preview.log'), `\n[preview exited code=${code} signal=${sig} at ${new Date().toISOString()}]\n`); } catch { /* ignore */ } });
   preview.on('error', () => { /* a start failure shows as previewUp false */ });
-  if (preview.pid) state.pids.push(preview.pid);
+  keep(preview.pid);
   state.previewUp = await childSaid(previewLogPath, `localhost:${PREVIEW_PORT}`, () => previewGone, 60_000) && await waitPort(PREVIEW_PORT, 60_000, 'localhost');   // vite preview listens on localhost, which can be ::1 only
   if (!state.previewUp && previewGone) { state.reason = 'PORT_BUSY'; state.note = `this run's preview exited before it bound port ${PREVIEW_PORT}. See preview.log`; }
   if (!state.note) state.note = state.hostUp && state.previewUp ? 'live' : `host up: ${state.hostUp}, preview up: ${state.previewUp}`;
