@@ -85,6 +85,9 @@ body { overflow: hidden; }
 .rail-body { display: flex; flex-direction: column; min-width: 0; }
 .rail-title { font-size: 13px; line-height: 1.3; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
 .rail-status { font-size: 11px; line-height: 1.3; color: var(--muted); }
+/* A short window (Steve's 1280 x 640) cannot hold 12 lessons and the attack entry at 2 lines each, so the rows go to 1 line and each
+   status moves into the row's tooltip and screen-reader label. Nothing is cut from the rail (bytes-fit, "a lesson is cut from the rail"). */
+@media (max-height: 700px) { .rail-status { display: none; } .rail-item { padding-top: 3px; padding-bottom: 3px; } }
 
 /* Diagram */
 .diagrams { flex: 1 1 auto; min-height: 0; display: flex; }

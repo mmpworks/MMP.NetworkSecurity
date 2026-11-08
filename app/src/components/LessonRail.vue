@@ -36,10 +36,11 @@ function pick(n: number) {
     <button
       v-for="l in lessons" :key="l.lesson" type="button" class="rail-item" :class="{ on: ui.lesson === l.lesson && !ui.attackIndex, off: !l.built, hl: isHighlighted('rail', 'lesson', String(l.lesson)) }"
       :data-testid="`lesson-item-${l.lesson}`" :aria-current="ui.lesson === l.lesson && !ui.attackIndex ? 'true' : undefined" @click="pick(l.lesson)"
+      :aria-label="`Lesson ${l.lesson}, ${l.title}, ${status(l.lesson, l.built)}`"
     >
       <span class="rail-num">{{ l.lesson }}</span>
       <span class="rail-body">
-        <span class="rail-title" :title="l.title">{{ l.title }}</span>
+        <span class="rail-title" :title="`${l.title}: ${status(l.lesson, l.built)}`">{{ l.title }}</span>
         <span class="rail-status" :data-testid="`lesson-status-${l.lesson}`">{{ status(l.lesson, l.built) }}</span>
       </span>
       <span
