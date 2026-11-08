@@ -5,7 +5,7 @@ import { Pane, Splitpanes } from 'splitpanes'
 import { vuetify } from './theme'
 import {
   CE_LABEL, active, addr, allEvents, cePanel, clearError, connect, hostState, onTheme, pauseEngine, retryConnect, runEngine, selectEvent, selectedEvent,
-  closeGlossary, setMode, shownEvents, stepEngine, switchSession, tour, tourBack, tourNext, tourReplay, ui,
+  closeGlossary, setMode, showAttackIndex, shownEvents, stepEngine, switchSession, tour, tourBack, tourNext, tourReplay, ui,
 } from './store'
 import TopBar from './components/TopBar.vue'
 import BinaryTip from './components/BinaryTip.vue'
@@ -34,6 +34,7 @@ import GlossaryPage from './components/GlossaryPage.vue'
 import AesWalkPanel from './components/AesWalkPanel.vue'
 import AesLongStrip from './components/AesLongStrip.vue'
 import AesLongLink from './components/AesLongLink.vue'
+import AttackIndex from './components/AttackIndex.vue'
 import { openAesWalk } from './aesWalkState'
 import VaultPage from './components/VaultPage.vue'
 import { closeVault, vault } from './vault'
@@ -181,12 +182,16 @@ const shortcuts: [string, string][] = [
               <p v-if="placeholderItem">{{ placeholderItem.label }}: {{ walkStatus(placeholderItem) }}.</p>
               <p v-else>Pick a walk on the left.</p>
             </section>
-            <Splitpanes v-show="ui.section === 'lessons'">
+            <!-- The attack index replaces the lesson panes while it is open (sections-plan item 3). The panes stay mounted, so a run keeps its state. -->
+            <AttackIndex v-if="ui.section === 'lessons' && ui.attackIndex" />
+            <Splitpanes v-show="ui.section === 'lessons' && !ui.attackIndex">
           <Pane :size="100 - shares.side" :min-size="36">
             <Splitpanes horizontal>
               <Pane :size="100 - bytesPanePercent" :min-size="25">
                 <div class="panel">
-                  <div v-if="sessionTabs.length > 1" class="tabs-row">
+                  <div v-if="sessionTabs.length > 1 || ui.attackKept" class="tabs-row">
+                    <!-- A run opened from the attack index offers the way back to its row, here at the top where it always shows (sections-plan item 3). -->
+                    <button v-if="ui.attackKept" type="button" class="stab stab-back" data-testid="attack-back-to-index" @click="showAttackIndex(true)"><v-icon size="14">mdi-arrow-left</v-icon> Attack runs</button>
                     <button v-for="(s, i) in sessionTabs" :key="s.id" type="button" class="stab" :class="{ on: s.id === ui.activeId }" :data-testid="`session-tab-${i}`" @click="switchSession(s.id)">{{ s.label }}</button>
                   </div>
                   <div v-if="!active" class="empty-note big" data-testid="empty-state">

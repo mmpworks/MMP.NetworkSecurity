@@ -72,6 +72,10 @@ export const ui = reactive({
   glossaryFocus: null as string | null,
   follow: true,
   inspectorTab: 'bytes' as 'bytes' | 'picture' | 'measures' | 'chain' | 'ladder' | 'hostkey' | 'token' | 'timing' | 'onion',
+  /** The attack index shows in Lessons in place of the lesson panes (sections-plan item 3). */
+  attackIndex: false,
+  /** The attack run the learner opened from the index, so Back returns to that row. Empty when the lesson was opened another way. */
+  attackKept: '',
 })
 
 export const tour = reactive({
@@ -466,6 +470,28 @@ function toggleFieldName(name: string) {
 }
 
 export function switchSession(id: string) { ui.activeId = id; ui.viewUpTo = null; ui.selectedSeq = null }
+
+/** Shows or leaves the attack index. Leaving it by a lesson pick forgets the kept row, because that lesson was not opened from the index. */
+export function showAttackIndex(on: boolean) {
+  ui.attackIndex = on
+  if (on) ui.section = 'lessons'
+}
+
+/**
+ * A row of the attack index: open its lesson in free play, run it, and play the attack, so the fork shows with its result
+ * (sections-plan item 3; P3a uses the one-run screen, and P3b adds the two-run layout).
+ */
+export async function openAttackRun(lesson: number, attackId: string) {
+  ui.attackIndex = false
+  ui.attackKept = attackId
+  ui.lesson = null
+  selectLesson(lesson)
+  startSession('free')
+  for (let i = 0; i < 40 && !ui.activeId; i++) await nextActivity(500)
+  if (!ui.activeId) { fail('ATTACK_RUN_NO_SESSION', `lesson ${lesson} did not start, so ${attackId} did not play`, false); return }
+  runEngine()
+  attack({ attackId })
+}
 
 export function setMode(m: AppMode) {
   ui.mode = m

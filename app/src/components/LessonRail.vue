@@ -1,5 +1,7 @@
 <script setup lang="ts">
-import { isHighlighted, lessonDone, lessons, selectLesson, ui } from '../store'
+import { computed } from 'vue'
+import { attackGroups, runCount } from '../attackIndex'
+import { isHighlighted, lessonDone, lessons, selectLesson, showAttackIndex, ui } from '../store'
 import { lessonNeeds, showNeeds } from '../security'
 import { TOURS } from '../tour'
 
@@ -9,13 +11,31 @@ function status(n: number, built: boolean): string {
   return TOURS.has(n) ? 'ready' : 'ready, no tour yet'
 }
 const needTitle = (n: number) => { const c = lessonNeeds(n).length; return `${c} ${c === 1 ? 'key needs' : 'keys need'} setup` }
+const attackTotal = computed(() => runCount(attackGroups(lessons.value)))
+/** A lesson pick leaves the attack index, and forgets the kept row, because this lesson was not opened from the index. */
+function pick(n: number) {
+  showAttackIndex(false)
+  ui.attackKept = ''
+  selectLesson(n)
+}
 </script>
 
 <template>
   <nav class="rail" data-testid="lesson-rail" aria-label="Lessons">
+    <!-- The attack index (sections-plan item 3): every attack run of every lesson, by kind. -->
     <button
-      v-for="l in lessons" :key="l.lesson" type="button" class="rail-item" :class="{ on: ui.lesson === l.lesson, off: !l.built, hl: isHighlighted('rail', 'lesson', String(l.lesson)) }"
-      :data-testid="`lesson-item-${l.lesson}`" :aria-current="ui.lesson === l.lesson ? 'true' : undefined" @click="selectLesson(l.lesson)"
+      type="button" class="rail-item rail-attacks" :class="{ on: ui.attackIndex }" data-testid="attack-index-open"
+      :aria-current="ui.attackIndex ? 'true' : undefined" @click="showAttackIndex(true)"
+    >
+      <span class="rail-num"><v-icon size="16">mdi-shield-alert-outline</v-icon></span>
+      <span class="rail-body">
+        <span class="rail-title">Attack runs</span>
+        <span class="rail-status">{{ attackTotal }} runs, by kind</span>
+      </span>
+    </button>
+    <button
+      v-for="l in lessons" :key="l.lesson" type="button" class="rail-item" :class="{ on: ui.lesson === l.lesson && !ui.attackIndex, off: !l.built, hl: isHighlighted('rail', 'lesson', String(l.lesson)) }"
+      :data-testid="`lesson-item-${l.lesson}`" :aria-current="ui.lesson === l.lesson && !ui.attackIndex ? 'true' : undefined" @click="pick(l.lesson)"
     >
       <span class="rail-num">{{ l.lesson }}</span>
       <span class="rail-body">
