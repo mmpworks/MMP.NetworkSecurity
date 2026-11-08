@@ -747,3 +747,52 @@ test('[A19.ui.key-panel-xor-rcon-replay] the build shows each byte XOR in binary
   for (let k = 1; k < order.length; k++) expect(order[k], `replay of w${nk}: ${Object.keys(want)[k]} after ${Object.keys(want)[k - 1]}`).toBeGreaterThanOrEqual(order[k - 1]);
   expect(order[order.length - 1] - order[0], `the replay of w${nk} runs in steps, not in one frame`).toBeGreaterThanOrEqual(300);
 });
+
+/** True when the element's box lies fully inside the window. */
+const inViewport = (page: Page, testid: string) => page.getByTestId(testid).evaluate(el => {
+  const r = el.getBoundingClientRect();
+  return r.top >= 0 && r.left >= 0 && r.bottom <= window.innerHeight && r.right <= window.innerWidth;
+});
+
+/** True when the element's box lies inside the visible area of the scroll box that holds it. */
+const inBox = (page: Page, testid: string, boxId: string) => page.evaluate(({ testid, boxId }) => {
+  const el = document.querySelector(`[data-testid="${testid}"]`)!.getBoundingClientRect();
+  const box = document.querySelector(`[data-testid="${boxId}"]`)!.getBoundingClientRect();
+  return el.top >= box.top - 1 && el.bottom <= box.bottom + 1;
+}, { testid, boxId });
+
+/*
+ * Steve, 2026-11-08, verbatim: "the left panel grid items need to be in a scrollable container. That way the step buttons on the right do
+ * not scroll off-screen when trying to look at the last rounds." Parts (1) and (2) below are his words. Part (3), that Next building words
+ * down the table keeps the built word in the box and the window still, is the lead's addition.
+ */
+test('[A19.ui.key-table-scrolls-in-its-own-box] on AES-256 the round-key table scrolls in its own box: the window stays put, and Next and the step title stay in view', async ({ page }) => {
+  for (const [w, h, zoomSteps] of [[1280, 640, 0], [1280, 640, 2], [1984, 1086, 0], [1984, 1086, 2]] as const) {
+    await page.setViewportSize({ width: w, height: h });
+    await openWalk(page);
+    const pick = page.getByTestId('aes-walk-key-size-256');
+    if (!(await pick.isVisible().catch(() => false))) throw new NotRun('PRODUCT_MISSING', 'no aes-walk-key-size-256');
+    await Promise.all([page.waitForResponse(WALK_BLOCK, { timeout: 30_000 }), pick.click()]);
+    await toKeySchedule(page);
+    if ((await page.getByTestId('aes-walk-ks-table').count()) === 0) throw new NotRun('UI_CONTROL_MISSING', 'the Key Schedule panel has no aes-walk-ks-table box yet (Steve: a scrollable container)');
+    const where = `${w}x${h}, zoom in x${zoomSteps}`;
+    for (let k = 0; k < zoomSteps; k++) await page.getByTestId('aes-walk-ks-zoom-in').click();
+    const y0 = await page.evaluate(() => window.scrollY);
+    // (1) Steve: look at the last rounds. The table box scrolls to round key 14, and the window does not.
+    await page.getByTestId('aes-walk-table-grid-14').evaluate(el => el.scrollIntoView({ block: 'nearest' }));
+    await page.waitForTimeout(300);
+    expect(await page.evaluate(() => window.scrollY), `${where}: scrolling the table to round key 14 leaves the window where it was`).toBe(y0);
+    expect(await inBox(page, 'aes-walk-table-grid-14', 'aes-walk-ks-table'), `${where}: round key 14 is in the table box`).toBe(true);
+    // (2) Steve: the step buttons on the right do not scroll off-screen.
+    expect(await inViewport(page, 'aes-walk-next'), `${where}: Next stays in view`).toBe(true);
+    await page.getByTestId('aes-walk-next').click();
+    expect(await inViewport(page, 'aes-walk-ks-build-title'), `${where}: the step title stays in view`).toBe(true);
+    // (3) The lead: Next builds words down the table; the word built last is in the table box, and the window did not move.
+    await reduced(page);
+    for (let k = 0; k < 40; k++) await page.getByTestId('aes-walk-next').click();
+    const word = 8 + 41 - 1;
+    expect(await inBox(page, `aes-walk-table-cell-${4 * word}`, 'aes-walk-ks-table'), `${where}: w${word}, built last, is in the table box`).toBe(true);
+    expect(await page.evaluate(() => window.scrollY), `${where}: building down the table leaves the window where it was`).toBe(y0);
+    expect(await inViewport(page, 'aes-walk-next'), `${where}: Next is still in view after 41 words`).toBe(true);
+  }
+});

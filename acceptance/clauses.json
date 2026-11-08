@@ -3081,6 +3081,17 @@
    "counts": true
   },
   {
+   "id": "A19.ui.key-table-scrolls-in-its-own-box",
+   "base": "A19.ui.key-table-scrolls-in-its-own-box",
+   "assertion": "A19",
+   "group": "e2e",
+   "build": "host",
+   "slice": "W1",
+   "referee": "FIPS 197 (2001) data, the suite's RefAes, and the .NET library",
+   "roles": [],
+   "counts": true
+  },
+  {
    "id": "A19.ui.key-word-build-runs-in-steps",
    "base": "A19.ui.key-word-build-runs-in-steps",
    "assertion": "A19",
