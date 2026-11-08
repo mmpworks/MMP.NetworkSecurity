@@ -85,4 +85,23 @@ public class HmacChainWalkTests
             Assert.Equal("WALK_BAD_ARGUMENT", body.GetProperty("code").GetString());
         }
     }
+
+    [Fact]
+    public async Task The_sha256_walk_answers_with_Show_keys_off_with_the_fips_digest()
+    {
+        using SecurityLiveTests.Host host = await SecurityLiveTests.Host.StartAsync();
+        (int off, _) = await host.Put("/api/security/show-keys", "{\"on\":false}");
+        Assert.Equal(200, off);
+        (int status, JsonElement body, string cache) = await Get(host, "/api/walk/sha256?name=two-block");
+        Assert.Equal(200, status);
+        Assert.Contains("no-store", cache);
+        // FIPS 180-4's two-block example.
+        Assert.Equal("248d6a61d20638b8e5c026930c3e6039a33ce45964ff2167f6ecedd419db06c1", body.GetProperty("digest").GetString());
+        Assert.Equal(2, body.GetProperty("blocks").GetArrayLength());
+        Assert.Equal(64, body.GetProperty("blocks")[0].GetProperty("rounds").GetArrayLength());
+        Assert.Equal(8, body.GetProperty("blocks")[1].GetProperty("hOut")[0].GetString()!.Length);
+        (int refused, JsonElement bad, _) = await Get(host, "/api/walk/sha256?name=other");
+        Assert.Equal(400, refused);
+        Assert.Equal("WALK_BAD_ARGUMENT", bad.GetProperty("code").GetString());
+    }
 }

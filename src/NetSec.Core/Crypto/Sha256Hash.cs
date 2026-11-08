@@ -2,9 +2,23 @@ using System;
 
 namespace NetSec.Crypto
 {
+    /// <summary>One compressed block, for the walk: the 64 bytes, the chaining value in, W[0..63], each round's T1, T2 and a..h after it, and the value out.</summary>
+    internal sealed class Sha256BlockTrace
+    {
+        public byte[] Block;
+        public uint[] HIn, W, T1 = new uint[64], T2 = new uint[64], HOut;
+        public uint[][] Rounds = new uint[64][];
+    }
+
     /// <summary>SHA-256, FIPS 180-4 section 6.2. The function names follow the standard.</summary>
     sealed class Sha256Hash : BlockHash
     {
+        /// <summary>When set, each Compress call appends its block's steps. The walk sets it; every other caller leaves it null.</summary>
+        internal System.Collections.Generic.List<Sha256BlockTrace> Trace;
+
+        /// <summary>The 64 round constants, for the walk to show beside each round.</summary>
+        internal static uint[] RoundConstants { get { return (uint[])K.Clone(); } }
+
         static readonly uint[] K =
         {
             0x428a2f98, 0x71374491, 0xb5c0fbcf, 0xe9b5dba5, 0x3956c25b, 0x59f111f1, 0x923f82a4, 0xab1c5ed5,
@@ -60,6 +74,15 @@ namespace NetSec.Crypto
             for (int t = 0; t < 16; t++) w[t] = Endian.LoadBe32(block, off + t * 4);
             for (int t = 16; t < 64; t++) w[t] = SmallSigma1(w[t - 2]) + w[t - 7] + SmallSigma0(w[t - 15]) + w[t - 16];
 
+            Sha256BlockTrace trace = null;
+            if (Trace != null)
+            {
+                trace = new Sha256BlockTrace();
+                trace.Block = new byte[64];
+                Buffer.BlockCopy(block, off, trace.Block, 0, 64);
+                trace.HIn = (uint[])_h.Clone();
+                trace.W = (uint[])w.Clone();
+            }
             uint a = _h[0], b = _h[1], c = _h[2], d = _h[3], e = _h[4], f = _h[5], g = _h[6], h = _h[7];
             for (int t = 0; t < 64; t++)
             {
@@ -67,8 +90,10 @@ namespace NetSec.Crypto
                 uint t2 = BigSigma0(a) + ((a & b) ^ (a & c) ^ (b & c));
                 h = g; g = f; f = e; e = d + t1;
                 d = c; c = b; b = a; a = t1 + t2;
+                if (trace != null) { trace.T1[t] = t1; trace.T2[t] = t2; trace.Rounds[t] = new uint[] { a, b, c, d, e, f, g, h }; }
             }
             _h[0] += a; _h[1] += b; _h[2] += c; _h[3] += d; _h[4] += e; _h[5] += f; _h[6] += g; _h[7] += h;
+            if (trace != null) { trace.HOut = (uint[])_h.Clone(); Trace.Add(trace); }
         }
     }
 }

@@ -16,6 +16,38 @@ public static class HmacWalkRoutes
     {
         app.MapGet("/api/walk/hmac", (HttpContext http, string? @case) => NoStore(http, Hmac(@case)));
         app.MapGet("/api/walk/seal-chain", (HttpContext http, string? edit) => NoStore(http, Chain(edit ?? "none")));
+        app.MapGet("/api/walk/sha256", (HttpContext http, string? name) => NoStore(http, Sha256(name)));
+    }
+
+    static string Word(uint v) => v.ToString("x8");
+
+    static IResult Sha256(string? name)
+    {
+        if (name is null || Array.IndexOf(Sha256Walks.Names, name) < 0) return Refuse(400, ErrorCodes.WalkBadArgument, "name must be abc or two-block.");
+        try
+        {
+            Sha256Walk w = Sha256Walks.Fips180(name);
+            return Results.Json(new
+            {
+                name = w.Name,
+                source = "FIPS 180-4 examples",
+                keySource = "none",
+                message = Hex.Encode(w.Message),
+                digest = Hex.Encode(w.Digest),
+                blocks = w.Blocks.Select(b => new
+                {
+                    bytes = Hex.Encode(b.Bytes),
+                    hIn = b.HIn.Select(Word).ToArray(),
+                    schedule = b.Schedule.Select(Word).ToArray(),
+                    rounds = b.Rounds.Select(r => new { t = r.T, k = Word(r.K), w = Word(r.W), t1 = Word(r.T1), t2 = Word(r.T2), state = r.State.Select(Word).ToArray() }).ToArray(),
+                    hOut = b.HOut.Select(Word).ToArray(),
+                }).ToArray(),
+            });
+        }
+        catch (NetSecException e) when (e.Error.Code == ErrorCodes.Sha256WalkDiverged)
+        {
+            return Refuse(500, ErrorCodes.Sha256WalkDiverged, "The walk differs from the real SHA-256 path, so it shows nothing.");
+        }
     }
 
     static IResult Hmac(string? testCase)
