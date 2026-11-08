@@ -82,6 +82,11 @@ async function createWindow() {
 }
 
 app.whenReady().then(async () => {
+  // Running from the repo (not packaged, no dev server): refuse a dist built from another commit. scripts/dist-stamp.cjs explains and names the fix.
+  if (!app.isPackaged && !process.env.VITE_DEV_SERVER_URL) {
+    const built = require('../scripts/dist-stamp.cjs').check(path.resolve(__dirname, '..', '..'), path.resolve(__dirname, '..', 'dist'))
+    if (!built.ok) { say(process.stderr, `${built.message}\n`); app.exit(1); return }
+  }
   startHost()
   try { await waitForHost() } catch (e) { say(process.stderr, `${e.message}\n`) }
   await createWindow()

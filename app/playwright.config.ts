@@ -53,6 +53,12 @@ process.env.NETSEC_SECURITY_DIR ??= fs.mkdtempSync(path.join(os.tmpdir(), 'ns-e2
 // A name of its own, so NETSEC_HOST_DLL stays as the person set it and start.spec still runs the path fallback in electron/main.cjs.
 process.env.NETSEC_E2E_HOST_DLL = hostDll
 
+// The preview server and the Electron specs serve app/dist. After a checkout dist can hold another branch's build, so a stale or unstamped build
+// stops the run here with a named error (scripts/dist-stamp.cjs; `npm run build` writes the stamp).
+const distStamp = require('./scripts/dist-stamp.cjs') as { check(root: string, dist: string): { ok: boolean; message: string } }
+const distCheck = distStamp.check(path.resolve(__dirname, '..'), path.resolve(__dirname, 'dist'))
+if (!distCheck.ok) throw new Error(distCheck.message)
+
 // The preview server runs from the local vite file, never the package runner: that can run a package of the same name from outside this repo.
 const viteCli = path.resolve(__dirname, 'node_modules', 'vite', 'bin', 'vite.js')
 if (!fs.existsSync(viteCli)) throw new Error(`TOOL_MISSING: ${viteCli} is absent. Run npm ci in app/.`)
