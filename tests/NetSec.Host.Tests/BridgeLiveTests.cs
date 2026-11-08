@@ -166,7 +166,9 @@ namespace NetSec.Host.Tests
             lab.PadTap = new Relay(pad, -1);
             string ce = Under("src", "NetSec.CeDevice", "bin", "Release", "net35", "NetSec.CeDevice.exe");
             lab.Ce = new Child(ce, $"--pinpad {lab.PadTap.Port} --gateway {lab.Relay.Port} --trace-file \"{lab.CeTrace}\" --link external-forward --suite modern --pool 25");
-            await lab.Ce.Line("CE-READY", 10000);
+            // The same 30 s start wait as the other children. A fresh CE build's first start took over 10 s twice under load (#318); a real hang
+            // still fails here.
+            await lab.Ce.Line("CE-READY");
             return lab;
         }
 
@@ -279,7 +281,7 @@ namespace NetSec.Host.Tests
             string ceExe = Under("src", "NetSec.CeDevice", "bin", "Release", "net35", "NetSec.CeDevice.exe");
             Child ce = new Child(ceExe, $"--pinpad {padPort} --gateway {gatewayPort} --trace-file \"{F("ce")}\" --link glass-ssh --suite {suite} --pool 25");
             lab.Ce = ce;
-            await ce.Line("CE-READY", 10000);
+            await ce.Line("CE-READY"); // the same 30 s start wait as the other children (#318)
             return (ce, F("ce"), F("gateway"), bank, pad);
         }
 
