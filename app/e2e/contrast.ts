@@ -66,6 +66,8 @@ export async function settle(page: Page): Promise<void> {
     still = moving === 0 ? still + 1 : 0
     await page.waitForTimeout(moving === 0 ? 150 : 100)
   }
+  // The scan reads anyway. A screen still moving can only read lower, so this line explains a fail; it never hides one (Jared on #325).
+  if (still < 2) console.log('settle: the screen did not settle after 25 checks, so the scan reads it while it moves')
 }
 
 export interface ScanFail { where: string; text: string; ratio: number; fg: string; bg: string }
