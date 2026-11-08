@@ -59,6 +59,19 @@ class TestsWired(unittest.TestCase):
         code, out = self.run_check()
         self.assertEqual(code, 1, out)
 
+    def test_a_skip_line_that_names_the_file_is_not_a_step(self):
+        """Jared's #307 nit: only a Step line runs the file."""
+        self.put("tools/test_a.py")
+        self.put("tools/gate.ps1", "Skip 'tools/test_a.py' 'not run yet'\n")
+        code, out = self.run_check()
+        self.assertEqual(code, 1, out)
+
+    def test_a_step_app_line_counts(self):
+        self.put("tools/test_a.py")
+        self.put("tools/gate.ps1", "Step-App 'a tests' { python -I tools/test_a.py }\n")
+        code, out = self.run_check()
+        self.assertEqual(code, 0, out)
+
     def test_a_file_that_is_not_named_test_is_ignored(self):
         self.put("tools/helper.py")
         self.put("tools/gate.ps1", "# nothing\n")

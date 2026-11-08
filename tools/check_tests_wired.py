@@ -12,9 +12,13 @@ import re
 import sys
 
 
+STEP = re.compile(r"\bStep(?:-App)?\b")
+
+
 def gate_lines(gate):
-    """The lines of gate.ps1 that can hold a step: everything except full-line comments."""
-    return [line for line in gate.read_text(encoding="utf-8", errors="replace").splitlines() if not line.lstrip().startswith("#")]
+    """The lines of gate.ps1 that run something: a Step or Step-App line that is not a full-line comment. A Skip line that names a file does not run it."""
+    return [line for line in gate.read_text(encoding="utf-8", errors="replace").splitlines()
+            if not line.lstrip().startswith("#") and STEP.search(line)]
 
 
 def main(argv):
