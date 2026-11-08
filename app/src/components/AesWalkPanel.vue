@@ -44,7 +44,11 @@ const wireLine = computed(() => {
 })
 const keyLine = computed(() => {
   const s = aesWalk.block?.keySource
-  return s ? (gloss.keySource as Record<string, string>)[s] ?? `Key source: ${s}` : ''
+  if (!s) return ''
+  // With no run on screen there is no "run's key" to compare with, so the practice line leaves those words out (Jared on #270).
+  const words = gloss.keySource as Record<string, string>
+  if (s === 'typed-practice' && !aesWalk.sessionId) return words['typed-practice-no-run']
+  return words[s] ?? `Key source: ${s}`
 })
 const showsWalk = computed(() => !closed.value && !!aesWalk.block)
 </script>

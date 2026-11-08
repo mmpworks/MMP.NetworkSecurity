@@ -1,5 +1,17 @@
 import { expect, test, type Page } from '@playwright/test'
+import fs from 'node:fs'
+import path from 'node:path'
+import gloss from '../src/walk-gloss.json'
 import { open, runFreePlay } from './walk'
+
+// The strip's default text is a copy of lesson 1's text. This pins the copy to the engine's source, so a change to either one fails here (Jared on #270).
+test('the strip\'s lesson text equals the text in Lesson01Aes.cs', () => {
+  const source = fs.readFileSync(path.join(__dirname, '..', '..', 'src', 'NetSec.Core', 'Labs', 'Lesson01Aes.cs'), 'utf8')
+  const found = /static readonly byte\[\] Text = Encoding\.UTF8\.GetBytes\("(?<text>[^"]*)"\)/.exec(source)
+  expect(found?.groups?.text, 'Lesson01Aes.cs still declares Text').toBeDefined()
+  expect(gloss.typed.lessonText).toBe(found!.groups!.text)
+  expect(found!.groups!.text.startsWith(gloss.typed.defaultBlock), 'chapter 1\'s default block is the lesson text\'s first 16 bytes').toBe(true)
+})
 
 // The learner's own text and the practice walk (docs/walkthrough-design.md section 2.2g). The engine cuts the 16 bytes; the box marks
 // what the block does not use. The practice key is public, so its walk stays open with Show keys off.
@@ -23,7 +35,8 @@ test('with no run, Techniques AES shows the practice walk on the default text', 
   await open(page)
   await page.getByTestId('section-techniques').click()
   await page.getByTestId('walk-item-aes').click()
-  await expect(page.getByTestId('aes-walk-key-source')).toHaveText("This is a practice key, not this run's key. It is public, so it stays on screen with Show keys off")
+  // With no run there is no run's key to compare with, so the line leaves those words out.
+  await expect(page.getByTestId('aes-walk-key-source')).toHaveText('This is a practice key. It is public, so it stays on screen with Show keys off')
   await expect(page.getByTestId('aes-walk-wire-label')).toHaveText('Your text. It did not go on the wire.')
   await fillBlock(page)
   const letters: string[] = []
@@ -61,6 +74,7 @@ test('with Show keys off, the run walk closes and its offer opens the practice w
     await expect(page.getByTestId('aes-walk-closed'), 'the practice walk is open').toHaveCount(0)
     await expect(cell(page, 0, 0)).toBeVisible()
     await expect(page.getByTestId('aes-walk-key-differs')).toContainText("This key differs from the run's.")
+    await expect(page.getByTestId('aes-walk-key-source'), 'beside a run, the line names the run').toHaveText("This is a practice key, not this run's key. It is public, so it stays on screen with Show keys off")
   } finally {
     await keysOn(page)
   }

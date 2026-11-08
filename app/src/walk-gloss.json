@@ -20,7 +20,8 @@
   "keySource": {
     "run": "This run's key",
     "practice": "A practice key. It never ran in the lesson",
-    "typed-practice": "This is a practice key, not this run's key. It is public, so it stays on screen with Show keys off"
+    "typed-practice": "This is a practice key, not this run's key. It is public, so it stays on screen with Show keys off",
+    "typed-practice-no-run": "This is a practice key. It is public, so it stays on screen with Show keys off"
   },
   "wireTyped": "Your text. It did not go on the wire.",
   "typed": {
