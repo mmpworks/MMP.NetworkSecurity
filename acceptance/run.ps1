@@ -519,6 +519,16 @@ foreach ($name in @('ACC_E2E_DEFECT', 'ACC_SELF_ONLY')) { $v = [Environment]::Ge
 $slowSec = 600; if ($env:ACC_SLOW_WARN_SEC) { $slowSec = [int]$env:ACC_SLOW_WARN_SEC }
 $slow = @($sel | ForEach-Object { $r = $results[$_.id]; if ($r -and $r.ms -and ([double]$r.ms / 1000) -gt $slowSec) { [pscustomobject]@{ id = $_.id; seconds = [math]::Round([double]$r.ms / 1000) } } })
 
+# Uncommitted changes under a product path mean the commits the report names do not hold all of what ran. The report says so, so no
+# report can pass for a run of a clean commit. The paths are every place a clause runs from: the suite, the engine, the app, the native
+# library and the tools. docs/ stays out, because the runner writes its own reports there. Ignored files (.work, the vector cache,
+# node_modules, dist) do not count. A failed git status reads as unknown, never as clean.
+$dirtyPaths = @('acceptance', 'src', 'app', 'native', 'tools')
+$statusOut = @(git -C $ProductRoot status --porcelain --untracked-files=normal -- @dirtyPaths 2>$null)
+$dirtyKnown = ($LASTEXITCODE -eq 0)
+# @( ) around the whole if: an if expression turns an empty list into $null, and strict mode then has no Count to read.
+$dirty = @(if ($dirtyKnown) { $statusOut | ForEach-Object { "$_".Substring(3) } | Where-Object { $_ } })
+
 $jsonPath = Join-Path $OutDir "acceptance-$stamp.json"
 $mdPath = Join-Path $OutDir "acceptance-$stamp.md"
 $summary = [ordered]@{
@@ -527,6 +537,7 @@ $summary = [ordered]@{
     freshClone = [bool]$FreshChild; productPresent = $productExists
     M = $M; selected = $mSel; pass = $nPass; fail = $nFail; notRun = $nNot; reasons = $reasons
     activeEnv = $activeEnv; slowWarnSeconds = $slowSec; slow = $slow
+    dirtyKnown = $dirtyKnown; dirtyCount = $(if ($dirtyKnown) { $dirty.Count } else { $null }); dirty = @($dirty | Select-Object -First 20)
     selfChecks = [ordered]@{ selected = $selfRows.Count; pass = @($selfRows | Where-Object { $_.status -eq 'PASS' }).Count; fail = @($selfRows | Where-Object { $_.status -eq 'FAIL' }).Count; notRun = @($selfRows | Where-Object { $_.status -eq 'NOT RUN' }).Count }
 }
 ([ordered]@{ summary = $summary; results = $rows } | ConvertTo-Json -Depth 6) | Set-Content -Path $jsonPath -Encoding utf8
@@ -538,6 +549,14 @@ $null = $md.AppendLine(("**{0} of {1} clauses PASS** ({2} FAIL, {3} NOT RUN). M 
 $null = $md.AppendLine()
 $null = $md.AppendLine("Command: ``$($summary.command)``. Product commit: $($summary.productCommit). Acceptance commit: $($summary.acceptanceCommit). Fresh clone: $($summary.freshClone). Product present: $productExists.")
 $null = $md.AppendLine()
+if (-not $dirtyKnown) {
+    $null = $md.AppendLine("Warning: could not read the tree's status (git status failed in $ProductRoot), so this report cannot say the commits above hold all of what ran.")
+    $null = $md.AppendLine()
+}
+elseif ($dirty.Count -gt 0) {
+    $null = $md.AppendLine("Warning: $($dirty.Count) uncommitted paths under " + (($dirtyPaths | ForEach-Object { "$_/" }) -join ', ') + ", for example " + ((@($dirty | Select-Object -First 3) | ForEach-Object { "``$_``" }) -join ', ') + ". The commits above do not hold all of what ran.")
+    $null = $md.AppendLine()
+}
 if ($activeEnv.Count -gt 0) {
     $null = $md.AppendLine("Active test settings: " + (($activeEnv.Keys | ForEach-Object { "``$_=$($activeEnv[$_])``" }) -join ', ') + ". They change what this run proves.")
     $null = $md.AppendLine()
