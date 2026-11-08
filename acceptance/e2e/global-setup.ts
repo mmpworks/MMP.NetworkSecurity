@@ -54,7 +54,7 @@ export default async function globalSetup(): Promise<void> {
   const appDir = path.join(ROOT, 'app');
   if (!hostDll || !fs.existsSync(hostDll)) { state.note = `NetSec.Host is not built (ACC_HOST=${hostDll})`; fs.writeFileSync(stateFile(), JSON.stringify(state)); return; }
   if (!fs.existsSync(path.join(appDir, 'dist', 'index.html'))) { state.note = `app/dist is not built in ${appDir}`; fs.writeFileSync(stateFile(), JSON.stringify(state)); return; }
-  // vite runs from the product's own node_modules under node, never through npx, which can run a package of the same name from elsewhere.
+  // vite runs from the product's own node_modules under node, never through the package runner, which can run a package of the same name from elsewhere.
   const viteBin = path.join(appDir, 'node_modules', 'vite', 'bin', 'vite.js');
   if (!fs.existsSync(viteBin)) { state.reason = 'TOOL_MISSING'; state.note = `no local vite at ${viteBin}. Run npm ci in app`; fs.writeFileSync(stateFile(), JSON.stringify(state)); return; }
 
@@ -96,7 +96,7 @@ export default async function globalSetup(): Promise<void> {
   fs.rmSync(previewLogPath, { force: true });
   let previewGone = false;
   const previewLog = fs.openSync(previewLogPath, 'a');   // vite's own words, kept so a dead preview can be explained
-  // vite runs under node directly, so the pid kept for the teardown is the process that listens. Under npx and a shell, the teardown's
+  // vite runs under node directly, so the pid kept for the teardown is the process that listens. Under the package runner and a shell, the teardown's
   // taskkill /T ended the shell and, on 2026-11-07, left the vite process listening on the preview port.
   const viteArgs = ['preview', '--port', String(PREVIEW_PORT), '--strictPort', '--host', 'localhost'];
   const preview = spawn(process.execPath, [viteBin, ...viteArgs], { cwd: appDir, detached: false, stdio: ['ignore', previewLog, previewLog] });

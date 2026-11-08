@@ -5,8 +5,9 @@ Why: on this machine `npx --no-install tsc` ran a different npm package named "t
 (found by Echo), so npx can execute code that is not ours. A local file (`node node_modules/<pkg>/cli.js`) or an `npm run` script resolves
 local binaries and fails by name when the tool is absent.
 
-Scans tools/, app/scripts/, app/package.json and app/*.config.* (playwright.config.ts starts the preview server for every e2e run). acceptance/ belongs to Echo's suite and is
-checked there. Usage: python -I tools/no_npx.py [--root REPO]. Exit 0 clean, 1 when a call is found.
+Scans tools/, acceptance/, app/scripts/, app/package.json and app/*.config.* (playwright.config.ts starts the preview server for every e2e run).
+In tools/ and acceptance/ it skips node_modules, and in acceptance/ also the run folders (.work, test-results). Comments count too, so the
+scanned files name the tool as "the package runner". Usage: python -I tools/no_npx.py [--root REPO]. Exit 0 clean, 1 when a call is found.
 """
 import argparse
 import pathlib
@@ -16,13 +17,17 @@ import sys
 NPX = re.compile(r"\bnpx(?:\.cmd)?\b")
 SELF = {"no_npx.py", "test_no_npx.py"}
 SUFFIXES = {".ps1", ".py", ".mjs", ".cjs", ".js", ".ts", ".json"}
+# Installed packages and run output are not scripts this repo wrote.
+SKIP_PARTS = {"node_modules", ".work", "test-results"}
 
 
 def files(root):
-    for folder in ("tools", "app/scripts"):
+    for folder in ("tools", "acceptance", "app/scripts"):
         base = root / folder
         if base.is_dir():
             for path in sorted(base.rglob("*")):
+                if SKIP_PARTS.intersection(path.relative_to(base).parts):
+                    continue
                 if path.is_file() and path.suffix in SUFFIXES and path.name not in SELF:
                     yield path
     app = root / "app"
@@ -45,7 +50,7 @@ def main(argv):
         print("\n".join(hits))
         print("npx can run a package from outside this repo. Use the local file (node node_modules/<pkg>/...) or an npm run script.")
         return 1
-    print("no npx in tools/, app/scripts, app/package.json or app/*.config.*")
+    print("no npx in tools/, acceptance/, app/scripts, app/package.json or app/*.config.*")
     return 0
 
 
