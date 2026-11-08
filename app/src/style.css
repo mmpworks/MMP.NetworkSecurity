@@ -422,6 +422,29 @@ body { overflow: hidden; }
 .ai-row-top { display: flex; gap: 12px; align-items: baseline; flex-wrap: wrap; }
 .ai-row-name { font-weight: 600; }
 .ai-row-guard { font-size: 13px; }
+/* The two-run layout (sections-plan item 3): 2 panes on one clock, then the changed message. */
+.two-run { padding: 12px 16px 20px; display: grid; gap: 10px; align-content: start; }
+.tr-head { display: flex; align-items: baseline; gap: 12px; flex-wrap: wrap; }
+.tr-head h2 { font: 700 18px var(--display); margin: 0; }
+.tr-clock { display: flex; align-items: center; gap: 10px; }
+.tr-clock input[type=range] { flex: 1 1 auto; max-width: 480px; }
+.tr-split { margin: 0; padding: 6px 10px; border-left: 3px solid var(--warn); background: var(--surface); border-radius: 6px; }
+.tr-panes { display: grid; grid-template-columns: minmax(0, 1fr) minmax(0, 1fr); gap: 12px; }
+.tr-pane { display: grid; gap: 6px; min-width: 0; border: 1px solid var(--line); border-radius: 10px; background: var(--surface); padding: 8px; }
+.tr-pane h3 { font: 700 14px var(--display); margin: 0; }
+.tr-pane-attacked { border-color: var(--fail); }
+.tr-diagram { height: 42vh; min-height: 220px; display: flex; flex-direction: column; min-width: 0; }
+.tr-diagram > .diagram { flex: 1 1 auto; min-height: 0; }
+.tr-check { margin: 0; }
+.tr-check[data-result=pass] b { color: var(--pass); }
+.tr-check[data-result=fail] b { color: var(--fail); }
+.tr-diff { display: grid; gap: 4px; border: 1px solid var(--line); border-radius: 10px; background: var(--surface); padding: 8px 10px; }
+.tr-diff h3 { font: 700 14px var(--display); margin: 0; }
+.tr-diff p { margin: 0; }
+.tr-bytes { display: flex; flex-wrap: wrap; gap: 2px 4px; font: 13px var(--mono); }
+.tr-row-name { flex: 0 0 64px; }
+.tr-byte { padding: 0 2px; border-radius: 3px; }
+.tr-byte.on { background: var(--fail); color: var(--on-mark); font-weight: 700; }
 .ai-row-id { font: 12px var(--mono); }
 .section-placeholder p { color: var(--muted); margin: 0; }
 

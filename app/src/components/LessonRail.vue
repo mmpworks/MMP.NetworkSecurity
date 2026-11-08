@@ -16,6 +16,7 @@ const attackTotal = computed(() => runCount(attackGroups(lessons.value)))
 function pick(n: number) {
   showAttackIndex(false)
   ui.attackKept = ''
+  ui.twoRun = null
   selectLesson(n)
 }
 </script>

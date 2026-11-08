@@ -65,13 +65,13 @@ test(`${ALL ? 'every row' : 'the first row of each group'} plays its run in its 
   for (const run of runs) {
     if (!(await page.getByTestId('attack-index').isVisible())) await page.getByTestId('attack-index-open').click()
     await page.getByTestId(`attack-row-${run.attackId}`).click()
-    // The fork shows its own result panel, titled "attack: <attackId>" by the Host.
-    const result = page.getByTestId('attack-result')
-    await expect(result, `${run.attackId} plays`).toBeVisible({ timeout: 60_000 })
-    await expect(result, `${run.attackId} is the run that played`).toContainText(`attack: ${run.attackId}`, { timeout: 60_000 })
+    // The run opens in the two-run layout: the normal run beside the attacked run (P3b), titled by its attack id.
+    const view = page.getByTestId('two-run')
+    await expect(view, `${run.attackId} plays`).toBeVisible({ timeout: 60_000 })
+    await expect(view.locator('h2'), `${run.attackId} is the run that played`).toHaveText(run.attackId)
     await expect(page.getByTestId(`lesson-item-${run.lesson}`), `${run.attackId} opens lesson ${run.lesson}`).toHaveAttribute('aria-current', 'true')
     played.push(run.attackId)
-    await page.getByTestId('attack-back-to-index').click()
+    await page.getByTestId('two-run-back').click()
     await expect(page.getByTestId(`attack-row-${run.attackId}`), `Back keeps ${run.attackId}`).toHaveAttribute('data-kept', 'true')
   }
   expect(played.length, ALL ? 'every registered run played' : 'the first run of every group played').toBe(runs.length)

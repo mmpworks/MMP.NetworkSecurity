@@ -30,6 +30,7 @@ export function normalizeEvent(frame: any): TraceEvent {
     seq: Number(frame?.seq ?? e.seq ?? 0),
     eventId: str(e.eventId),
     streamId: str(e.streamId),
+    streamSeq: Number(e.streamSeq ?? 0),
     sessionId: str(frame?.sessionId ?? e.sessionId),
     traceId: str(e.traceId),
     hop: str(e.hop),

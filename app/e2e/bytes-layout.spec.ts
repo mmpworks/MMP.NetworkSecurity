@@ -7,7 +7,7 @@ const { fitWindow } = require('../electron/window-size.cjs') as { fitWindow: (ar
 // Pure checks of the Message bytes layout and the window size. Shapes copied from the lesson 1 trace (TextGcm1, seed 20261105).
 const f = (name: string, offset: number, length: number, kind: TraceField['kind'], visibleToWire = true): TraceField => ({ name, offset, length, kind, visibleToWire, gloss: '' })
 const ev = (p: Partial<TraceEvent>): TraceEvent => ({
-  seq: 1, eventId: '', streamId: 's/client/aes', sessionId: 's', traceId: '', hop: '', actor: 'client', from: 'client', to: 'server', type: 'wire.sent', message: 'm', step: '',
+  seq: 1, eventId: '', streamId: 's/client/aes', streamSeq: 0, sessionId: 's', traceId: '', hop: '', actor: 'client', from: 'client', to: 'server', type: 'wire.sent', message: 'm', step: '',
   typeId: '', version: 0, provider: '', wire: '', plain: '', fields: [], secrets: [], check: null, waiting: '', detail: '', ...p,
 })
 const hexOf = (n: number, b: number) => b.toString(16).padStart(2, '0').repeat(n)

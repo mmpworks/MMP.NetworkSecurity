@@ -78,6 +78,8 @@ export const ui = reactive({
   attackIndex: false,
   /** The attack run the learner opened from the index, so Back returns to that row. Empty when the lesson was opened another way. */
   attackKept: '',
+  /** The two-run layout's 2 sessions: the normal run and its attack fork (sections-plan item 3, P3b). Null when it is closed. */
+  twoRun: null as { normalId: string; attackedId: string; attackId: string } | null,
 })
 
 export const tour = reactive({
@@ -483,23 +485,31 @@ export function switchSession(id: string) { ui.activeId = id; ui.viewUpTo = null
 /** Shows or leaves the attack index. Leaving it by a lesson pick forgets the kept row, because that lesson was not opened from the index. */
 export function showAttackIndex(on: boolean) {
   ui.attackIndex = on
-  if (on) ui.section = 'lessons'
+  if (on) { ui.section = 'lessons'; ui.twoRun = null }
 }
 
 /**
- * A row of the attack index: open its lesson in free play, run it, and play the attack, so the fork shows with its result
- * (sections-plan item 3; P3a uses the one-run screen, and P3b adds the two-run layout).
+ * A row of the attack index: open its lesson in free play, run it, and play the attack. Once the fork exists, the two-run layout
+ * shows the normal run beside the attacked run (sections-plan item 3; Steve, Q4 A).
  */
 export async function openAttackRun(lesson: number, attackId: string) {
   ui.attackIndex = false
   ui.attackKept = attackId
+  ui.twoRun = null
   ui.lesson = null
   selectLesson(lesson)
   startSession('free')
   for (let i = 0; i < 40 && !ui.activeId; i++) await nextActivity(500)
-  if (!ui.activeId) { fail('ATTACK_RUN_NO_SESSION', `lesson ${lesson} did not start, so ${attackId} did not play`, false); return }
+  const normalId = ui.activeId
+  if (!normalId) { fail('ATTACK_RUN_NO_SESSION', `lesson ${lesson} did not start, so ${attackId} did not play`, false); return }
   runEngine()
   attack({ attackId })
+  // The fork's session.started arrives first; its session.forked frame then names the parent and the attack (onForked).
+  const isFork = (s: SessionRec) => s.parentId === normalId && s.label === `attack: ${attackId}`
+  for (let i = 0; i < 40 && !ui.sessions.some(isFork); i++) await nextActivity(500)
+  const fork = ui.sessions.find(isFork)
+  if (!fork) { fail('ATTACK_RUN_NO_FORK', `${attackId} did not start its attacked run`, true); return }
+  if (ui.attackKept === attackId) ui.twoRun = { normalId, attackedId: fork.id, attackId }
 }
 
 export function setMode(m: AppMode) {

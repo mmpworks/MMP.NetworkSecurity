@@ -35,6 +35,7 @@ import AesWalkPanel from './components/AesWalkPanel.vue'
 import AesLongStrip from './components/AesLongStrip.vue'
 import AesLongLink from './components/AesLongLink.vue'
 import AttackIndex from './components/AttackIndex.vue'
+import TwoRunView from './components/TwoRunView.vue'
 import { openAesWalk } from './aesWalkState'
 import VaultPage from './components/VaultPage.vue'
 import { closeVault, vault } from './vault'
@@ -184,7 +185,9 @@ const shortcuts: [string, string][] = [
             </section>
             <!-- The attack index replaces the lesson panes while it is open (sections-plan item 3). The panes stay mounted, so a run keeps its state. -->
             <AttackIndex v-if="ui.section === 'lessons' && ui.attackIndex" />
-            <Splitpanes v-show="ui.section === 'lessons' && !ui.attackIndex">
+            <!-- An attack run from the index: the normal run beside the attacked run (sections-plan item 3; Steve, Q4 A). -->
+            <TwoRunView v-if="ui.section === 'lessons' && !ui.attackIndex && ui.twoRun" v-bind="ui.twoRun" />
+            <Splitpanes v-show="ui.section === 'lessons' && !ui.attackIndex && !ui.twoRun">
           <Pane :size="100 - shares.side" :min-size="36">
             <Splitpanes horizontal>
               <Pane :size="100 - bytesPanePercent" :min-size="25">
