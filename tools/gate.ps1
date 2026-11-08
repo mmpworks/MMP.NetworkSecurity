@@ -79,6 +79,7 @@ switch ($Slice) {
 # ---------------------------------------------------------------- base gate
 Step 'layer_check' { python tools/layer_check.py src/NetSec.Core }
 Step 'secret_guard' { python -I tools/secret_guard.py }
+Step 'pre-push guard tests' { python -I tools/githooks/test_pre_push_guard.py }
 
 # >>> walk-routes-listed
 # A19.repo.walk-routes-listed went red on main after builder PRs added a walk route with no row in Echo's list (checks/walk_routes.json).
