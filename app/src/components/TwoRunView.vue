@@ -1,7 +1,7 @@
 <script setup lang="ts">
 import { computed, ref, watch } from 'vue'
 import { lessons, showAttackIndex, ui } from '../store'
-import { changedBytes, checkResult, firstChange, pairing, splitAt, streamKey } from '../twoRun'
+import { changedBytes, checkResult, firstChange, isWire, pairing, splitAt, streamKey, wireSteps } from '../twoRun'
 import type { TraceEvent } from '../types'
 import SequenceDiagram from './SequenceDiagram.vue'
 
@@ -31,8 +31,22 @@ watch(() => pairs.value.length, n => { if (following.value) step.value = n }, { 
 function move(to: number) { following.value = to >= pairs.value.length; step.value = Math.max(0, Math.min(pairs.value.length, to)) }
 
 const indexOf = computed(() => new Map(pairs.value.map((p, i) => [p.key, i])))
-/** A run's events up to the clock. An event with no stream joins only at the end, because it has no place to pair at. */
-const upTo = (events: readonly TraceEvent[]) => events.filter(e => (e.streamId ? (indexOf.value.get(streamKey(e)) ?? Infinity) < step.value : step.value >= pairs.value.length))
+/**
+ * The step an event shows at. An engine event shows at its own pair. A wire event shows with its side's nearest engine event
+ * (wireSteps): '' is the start of the run, and a wire event with no step, or an event with no stream, shows only at the end.
+ */
+function stepOf(e: TraceEvent, wireAt: Map<TraceEvent, string>): number {
+  if (!e.streamId) return Infinity
+  if (!isWire(e)) return indexOf.value.get(streamKey(e)) ?? Infinity
+  const at = wireAt.get(e)
+  return at === undefined ? Infinity : at === '' ? -1 : (indexOf.value.get(at) ?? Infinity)
+}
+/** A run's events up to the clock. At the last step every event shows. */
+function upTo(events: readonly TraceEvent[]): TraceEvent[] {
+  if (step.value >= pairs.value.length) return [...events]
+  const wireAt = wireSteps(events)
+  return events.filter(e => stepOf(e, wireAt) < step.value)
+}
 const normalShown = computed(() => upTo(normal.value))
 const attackedShown = computed(() => upTo(attacked.value))
 
@@ -44,19 +58,22 @@ const split = computed(() => { const i = readable.value ? splitAt(pairs.value) :
 // A byte change counts only before the runs part: after a scenario attack parts them, every later message differs, and that is not
 // a change the attack made inside one message.
 const change = computed(() => {
-  const i = readable.value ? firstChange(pairs.value) : -1
-  return i >= 0 && (!split.value || i < split.value.index) ? { index: i, pair: pairs.value[i] } : null
+  const i = readable.value ? firstChange(paired.value.wires) : -1
+  if (i < 0) return null
+  const pair = paired.value.wires[i]
+  const index = pair.at === '' ? 0 : (indexOf.value.get(pair.at) ?? pairs.value.length - 1)
+  return !split.value || index < split.value.index ? { index, pair } : null
 })
 const changed = computed(() => (change.value ? new Set(changedBytes(change.value.pair.normal!.wire, change.value.pair.attacked!.wire)) : new Set<number>()))
 
 const bytesOf = (hex: string) => Array.from({ length: hex.length >> 1 }, (_, i) => hex.slice(2 * i, 2 * i + 2))
 const checkWords = (r: 'pass' | 'fail' | 'none') => (r === 'pass' ? 'passes' : r === 'fail' ? 'fails' : 'does not run')
 /**
- * What a run does at a pair, in words: a message it sends, or a check it runs. A run with no event at the pair has no more events on
- * that stream. It can still send on other streams, so the words name the stream and never say the run stopped (Richard on #297).
+ * What a run does at a pair, in words: a message it sends, or a check it runs. A run with no event at the pair has no more events of
+ * that side here. It can still go on on the other side, so the words name the side and never say the run stopped (Richard on #297).
  */
 function doing(e: TraceEvent | null, key: string): string {
-  if (!e) return `has no more events on the ${key.slice(0, key.lastIndexOf('#'))} stream`
+  if (!e) return `has no more ${key.split('/')[0]} events here`
   if (e.check) return `runs the ${e.check.name} check`
   return `sends ${e.message || e.type}`
 }
