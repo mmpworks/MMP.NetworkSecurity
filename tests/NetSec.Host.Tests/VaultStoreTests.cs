@@ -165,4 +165,24 @@ public sealed class VaultStoreTests : IDisposable
         Assert.False(store.ShowKeys, "off fails closed: keys stop showing now");
         Assert.True(Store().ShowKeys, "the file still says on, so the next start would show keys; the message says so");
     }
+
+    [Fact]
+    public void A_refused_show_keys_off_saves_itself_once_the_hold_ends()
+    {
+        SecurityStore store = Store();
+        store.SetShowKeys(true);
+        int healed = 0;
+        store.SaveHealed += () => System.Threading.Interlocked.Increment(ref healed);
+        using (HoldModesOpen())
+        {
+            Assert.Throws<NetSec.Errors.NetSecException>(() => store.SetShowKeys(false));
+            Assert.False(store.Saved, "memory says off and the file says on, so the choice is not saved yet");
+        }
+        System.Diagnostics.Stopwatch waited = System.Diagnostics.Stopwatch.StartNew();
+        while (!store.Saved && waited.Elapsed < TimeSpan.FromSeconds(10)) System.Threading.Thread.Sleep(50);
+        Assert.True(store.Saved, "the background retry saves the choice once the hold ends");
+        Assert.False(Store().ShowKeys, "the file now says off, so a restart keeps keys hidden");
+        while (System.Threading.Volatile.Read(ref healed) == 0 && waited.Elapsed < TimeSpan.FromSeconds(10)) System.Threading.Thread.Sleep(50);
+        Assert.Equal(1, System.Threading.Volatile.Read(ref healed));
+    }
 }

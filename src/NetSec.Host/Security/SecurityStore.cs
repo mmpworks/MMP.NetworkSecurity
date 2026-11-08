@@ -89,6 +89,14 @@ public sealed class SecurityStore
 
     public bool ShowKeys { get { lock (_gate) return _modes.ShowKeys; } }
 
+    /// <summary>Stub for the red tests of issue #292; the fix commit replaces it.</summary>
+    public bool Saved => true;
+
+    /// <summary>Stub for the red tests of issue #292; the fix commit replaces it.</summary>
+#pragma warning disable CS0067
+    public event Action? SaveHealed;
+#pragma warning restore CS0067
+
     /// <summary>
     /// Saves the Show keys choice. Off fails closed (issue #292): when the save is refused, off still takes effect in memory at once, and
     /// the error says only that the choice was not saved for the next start. On fails open: a refused save keeps keys hidden.

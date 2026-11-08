@@ -137,6 +137,35 @@ public sealed class ShowKeysLiveTests
         Assert.False(await ShowKeysNow(host), "keys stop showing although the save failed");
     }
 
+    /// <summary>
+    /// The restart gap (issue #292): after a refused off, memory says off and the file says on. The Host says "not saved" to the page and
+    /// the key route hides keys at once; when the hold ends, a background retry saves the file and tells the sockets.
+    /// </summary>
+    [Fact]
+    public async Task A_refused_show_keys_off_is_marked_not_saved_until_the_retry_saves_it()
+    {
+        using SecurityLiveTests.Host host = await SecurityLiveTests.Host.StartAsync();
+        Assert.Equal(200, (await PutShowKeys(host, true)).Status);
+        using Ws ws = new(host);
+        await ws.Open();
+        Task<JsonElement> flip = ws.Until("security.show-keys");
+        using (SecurityLiveTests.HoldModesOpen(host))
+        {
+            (int status, string body) = await PutShowKeys(host, false);
+            SecurityLiveTests.AssertSaveRefused(status, body);
+            JsonElement frame = await flip;
+            Assert.False(frame.GetProperty("saved").GetBoolean(), "the flip frame says the choice is not saved yet");
+            JsonElement now = JsonDocument.Parse((await host.Get("/api/security/show-keys")).Body).RootElement;
+            Assert.False(now.GetProperty("on").GetBoolean());
+            Assert.False(now.GetProperty("saved").GetBoolean());
+            JsonElement key = JsonDocument.Parse((await host.Get("/api/security/types/tls13.server/key")).Body).RootElement;
+            Assert.Equal("toggle", key.GetProperty("hidden").GetString());
+        }
+        JsonElement healed = await ws.Until("security.saved");
+        Assert.True(healed.GetProperty("saved").GetBoolean());
+        Assert.True(JsonDocument.Parse((await host.Get("/api/security/show-keys")).Body).RootElement.GetProperty("saved").GetBoolean());
+    }
+
     /// <summary>On may fail open (issue #292): with modes.json held, turning Show keys on is refused by name, and keys stay hidden.</summary>
     [Fact]
     public async Task Turning_show_keys_on_while_the_settings_file_is_held_is_refused_and_keys_stay_hidden()
