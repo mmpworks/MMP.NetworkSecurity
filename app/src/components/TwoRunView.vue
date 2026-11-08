@@ -1,7 +1,7 @@
 <script setup lang="ts">
 import { computed, ref, watch } from 'vue'
 import { lessons, showAttackIndex, ui } from '../store'
-import { changedBytes, checkResult, firstChange, isWire, pairing, splitAt, streamKey, wireSteps } from '../twoRun'
+import { changedBytes, checkResult, firstChange, isWire, pairing, splitAt, streamKey, wireSteps, type RunPair } from '../twoRun'
 import type { TraceEvent } from '../types'
 import SequenceDiagram from './SequenceDiagram.vue'
 
@@ -74,10 +74,17 @@ const checkWords = (r: 'pass' | 'fail' | 'none') => (r === 'pass' ? 'passes' : r
  */
 function doing(e: TraceEvent | null, key: string): string {
   if (!e) return `has no more ${key.split('/')[0]} events here`
-  if (e.check) return `runs the ${e.check.name} check, and it ${e.check.result === 'fail' ? 'fails' : 'passes'}`
+  if (e.check) return `runs the ${e.check.name} check, which ${result(e)}`
   return `sends ${e.message || e.type}`
 }
 const label = (e: TraceEvent | null) => (e ? e.message || e.type : '')
+const result = (e: TraceEvent) => (e.check!.result === 'fail' ? 'fails' : 'passes')
+/** The split in words. When both runs ran the same check, one sentence says how it went in each. */
+function splitWords(p: RunPair): string {
+  const n = p.normal, a = p.attacked
+  if (n?.check && a?.check && n.check.name === a.check.name) return `the ${n.check.name} check ${result(n)} in the normal run and ${result(a)} in the attacked run`
+  return `the normal run ${doing(n, p.key)}, and the attacked run ${doing(a, p.key)}`
+}
 </script>
 
 <template>
@@ -98,7 +105,7 @@ const label = (e: TraceEvent | null) => (e ? e.message || e.type : '')
       These runs cannot pair by stream: a run sends 2 events at one place in one stream. The panes show both runs, with no split line.
     </p>
     <p v-else-if="split" class="tr-split" data-testid="two-run-split" :data-at="split.index">
-      The runs part at step {{ split.index + 1 }}: the normal run {{ doing(split.pair.normal, split.pair.key) }}, and the attacked run {{ doing(split.pair.attacked, split.pair.key) }}.
+      The runs part at step {{ split.index + 1 }}: {{ splitWords(split.pair) }}.
     </p>
     <p v-else-if="!done" class="muted tr-wait" data-testid="two-run-running">Both runs are still running. Where they part shows when both have finished.</p>
 
