@@ -427,14 +427,13 @@ body { overflow: hidden; }
 .aw-sizes { display: flex; align-items: center; gap: 6px; }
 .aw-key-source { margin: 0; font-weight: 600; }
 /* R1: the long-text strip. One mono line, 44 px, pinned to the top of the workspace while it scrolls. */
-.aw-strip { position: sticky; top: 0; z-index: 3; box-sizing: border-box; height: 44px; display: flex; align-items: center; gap: 6px; padding: 0 12px; overflow-x: auto; overflow-y: hidden; white-space: nowrap; font-family: var(--mono); font-size: 14px; background: var(--surface); border-bottom: 1px solid var(--line); }
-.aw-strip-label { font-family: var(--display, inherit); font-size: 12px; color: var(--muted); flex: 0 0 auto; margin-right: 4px; }
+.aw-strip { position: sticky; top: 0; z-index: 3; box-sizing: border-box; height: 44px; display: flex; align-items: center; gap: 6px; padding: 0 8px; overflow-x: auto; overflow-y: hidden; white-space: nowrap; font-family: var(--mono); font-size: 14px; background: var(--surface); border-bottom: 1px solid var(--line); }
 .aw-strip-block { flex: 0 0 auto; padding: 3px 8px 3px 4px; border: 1px solid var(--line); border-radius: 6px; background: var(--surface2); white-space: pre; }
 .aw-strip-block.aw-strip-current { border-color: var(--accent); box-shadow: 0 0 0 1px var(--accent) inset; background: var(--accent-soft); }
 .aw-strip-n { font-size: 10px; color: var(--muted); margin-right: 6px; }
 .aw-strip-error { color: var(--fail); font-size: 12px; }
 /* The link line from the current strip block to the state grid. It is a layout mark, so it never takes a click. */
-.aw-link { position: fixed; width: 2px; background: var(--accent); opacity: 0.55; pointer-events: none; z-index: 2; }
+.aw-link { position: fixed; box-sizing: border-box; border-left: 2px solid var(--accent); border-bottom: 2px solid var(--accent); border-bottom-left-radius: 8px; opacity: 0.6; pointer-events: none; z-index: 2; }
 /* Design 2.2g: the typed text box, with what the block does not use marked by a squiggle and a background colour. */
 .aw-typed { display: grid; gap: 4px; max-width: 72ch; }
 .aw-typed-marks { margin: 0; font-family: var(--mono); white-space: pre-wrap; word-break: break-all; }

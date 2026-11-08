@@ -35,7 +35,6 @@ const blockText = (row: AesLongRow) => textOf(row.data)
 
 <template>
   <div class="aw-strip" data-testid="aes-long-strip" role="list" :aria-label="gloss.strip.label">
-    <span class="aw-strip-label">{{ gloss.strip.label }}</span>
     <span v-if="error" class="aw-strip-error">{{ error }}</span>
     <span
       v-for="(row, n) in rows" :key="n" role="listitem" class="aw-strip-block" :class="{ 'aw-strip-current': n === CURRENT_BLOCK }"
