@@ -1,6 +1,6 @@
 # Logical clock on trace events: plan
 
-Status: decisions 1, 2 and 3 ranked by the lead on 2026-11-08; Jared's 3 review items folded in; for Jared's second read before any code. Owner: Richard. Date: 2026-11-08.
+Status: decisions 1 to 5 ranked by the lead on 2026-11-08; amended for "the catch" (decision 5); for Jared's read of the amendment before any code. Owner: Richard. Date: 2026-11-08.
 
 ## The problem
 
@@ -13,6 +13,8 @@ Every engine-stream event carries a logical clock. Two runs of one seed give eve
 ## Kill condition
 
 The work ends when this holds, and a reader can check it with no judgement: a Host test runs one seed 20 times per case, 10 of them with the machine under extra load, and every engine-stream event has the same clock in all 20 runs. The cases are lessons 1, 7, 9, 10 and 11, the lesson 7 recording fork (`L7-decrypt-recording`, the attacker stream), a replay fork (`L6-replay-sale`), an inject fork (`L5-clear-close-notify`) and a drop fork (`L5-flip-record-length`). The count is 20 of 20 for each of the 9 cases, recorded in `docs/_runs/` with its date. The drop case reaches 20 of 20 after #309 (decision 3). The test prints the first differing entry per stream for any run that differs, so a rare race names itself.
+
+Amendment (decision 5, "The catch" below): every caught-attack fork joins the cases, 20 runs each, 10 under load. The 45 stable forks are compared whole. The 8 varying forks are compared on the events before the catch plus the catch, and the `trace.catch` frame must name the same `catchEventId` in all 20 runs. A run with no catch is compared whole. The count is 20 of 20 for each case.
 
 ## Prior art and constraints
 
@@ -39,6 +41,38 @@ The work ends when this holds, and a reader can check it with no judgement: a Ho
 2. Wire events: A, no clock. Ranked by the lead, 2026-11-08. A clock on a varying stream promises a fixed order it cannot keep.
 3. The drop fork's tail race: A, fix the race first, in its own issue and PR (#309). Ranked by the lead, 2026-11-08, and Jared voted A. The kill condition then holds 20 of 20 for the drop fork, with no allowance. #309's diagnosis: both sides wait on the same read deadline, so either can time out first, and the deadline failure writes no trace event.
 4. Saved traces written before this change have no clock. The replay orders them by `seq`, as today. No rewrite of old files.
+5. After a caught attack, the end of a run is compared only up to the catch. Ranked by the lead, 2026-11-08 (option A). The tail is true network behaviour: a side that sends without waiting for replies keeps sending until the catch reaches it. The lesson's point is the catch. Option B, making every sender wait for each reply (lockstep), would fix the tail too, but it changes lesson timing, so it stays a later option for Steve. See "The catch" below.
+
+## The catch (amendment, 2026-11-08)
+
+1. **The catch is the first failed `check.result` of a run whose code names a cause.** A follow-on code does not count: a failed check whose code only follows from a catch on the other side, as `FrameEngine.NamesACause` already defines (`PEER_CLOSED_EARLY` "peer stayed until the end", `LINK_LOST`, and the TLS alert-received and truncated codes). The session's own result picks its catch the same way (`FrameEngine.Result`), so the trace and the result agree. "First" is in (clock, side) order: the lowest clock, and on a tie the side whose name sorts first by ordinal.
+2. **Why follow-on codes are left out (Jared's review):** "peer stayed until the end" is a failed check (`passed: false`), and it appears in the varying tails of 5 of the 8 forks below. A close is not a `.sent` or `.received` event, so that check's clock is its own stream's clock plus 1. It can be lower than the real catch's clock, and the minimum would then move between runs. Follow-on codes never name a cause, so leaving them out removes that case.
+3. **The catch is the same event in every run of a seed: an expectation, measured, not guaranteed.** It holds if no cause-naming failed check sits in a varying, concurrent tail. Today the varying entries are sends, `state.waiting` and "peer stayed until the end", and none of those names a cause. The kill condition measures it: the `trace.catch` frame's `catchEventId` must be the same in 20 of 20 runs. If a cause-naming check ever appears in a varying tail, the rule changes before the clock ships, for example to pick the catch only among failed checks that happen before every other failed check.
+4. **A run with more than one cause-naming failed check** has one catch, the first by item 1. Every other failed check, follow-on or not, is "after the catch" by item 6.
+5. **A run with no cause-naming failed check** has no catch: a control run, or an attack that nothing catches (`AttackOutcome.NoCheck`, such as `L1-flip-cbc`). Such a run is compared whole.
+6. **Before the catch** means happens before it in Lamport's sense, which the Host computes from the trace itself. Start at the catch and walk backwards: the earlier events on the same engine stream, and for each receive among them its matched send, then the events before that send on the sender's stream, and so on. Every event reached is before the catch. Every other event of the run is after the catch, including events concurrent with it.
+7. **Why happens-before and not arrival order:** the survey below shows that the varying tail entries reach the Host before the catch in arrival order. The client sent them before the server's failure reached it. They are concurrent with the catch, not after it, and only the causal walk sorts them correctly.
+8. **What the page receives:** at session end the Host sends one frame and writes it as the last line of the saved trace: `{"type": "trace.catch", "sessionId": ..., "catchEventId": "<streamId>#<streamSeq>", "afterCatch": ["<eventId>", ...]}`. A run with no catch sends `"catchEventId": null` and an empty list. Events keep their own fields; nothing already sent changes. Nancy's page groups the listed events as "after the catch".
+
+### The survey that sizes the rule
+
+All 53 caught attacks (`AttackOutcome.Rejected`), seed 3, 10 runs each, 5 of them under full CPU load, on main plus #312, 2026-11-08. The 53 lines are in `docs/_runs/2026-11-08-caught-attack-tails.txt`; the throwaway test is `Caught_attack_tails` on the local branch `spike/clock-counts`.
+
+1. 45 of 53: every engine stream equals run 1 in 10 of 10 runs. These are compared whole.
+2. 8 of 53 vary, all at a stream's tail only, never a different entry in the middle:
+
+   | Attack | Runs equal to run 1 | First difference |
+   |---|---|---|
+   | `L1-flip-gcm` | 1 of 10 | client/aes entry 6: the client sends PictureCbc and more before the close reaches it |
+   | `L2-flip-hash-message` | 1 of 10 | client/seal entry 7: `state.waiting` present or absent |
+   | `L2-flip-hmac-message` | 5 of 10 | client/seal entry 8: `peer stayed until the end` present or absent |
+   | `L2-flip-hmac-tag` | 6 of 10 | client/seal entry 8: the same |
+   | `L2-extend-hmac` | 7 of 10 | client/seal entry 8: the same |
+   | `L7-downgrade` | 7 of 10 | server/tls11 entry 6: `state.waiting` present or absent |
+   | `L3-swap-server-share` | 9 of 10 | client/kex entry 10: `peer stayed until the end` present or absent |
+   | `L3-flip-mlkem-ciphertext` | 9 of 10 | client/kex entry 17: the same |
+
+3. Measured: in every varying fork the differing entries do not come after the catch in arrival order. Inferred, not yet measured: they are not before it causally either, because each sits on its stream after the last message that the catch's backward walk can reach (for `L1-flip-gcm`, the client's sends after TextGcm1, the message the server rejected). So comparing the events before the catch, plus the catch, should give one answer per seed. The kill-condition test measures this.
 
 ## Non-goals
 
@@ -101,3 +135,6 @@ The kill-condition test is written before the implementation: same seed, 20 runs
 4. A send from the attacker side matches a receive like any other send.
 5. A connection where 3 actors write sends or receives gives one `clock.link-ambiguous` frame and no guessed match.
 6. A clockless event (wire, `keys`) sorts right after its side's last engine event before it, or at clock 0 before any.
+7. The catch is the first failed check whose code names a cause, in (clock, side) order; a tie on clock goes to the side that sorts first; a "peer stayed until the end" check with a lower clock is never the catch.
+8. On a fixed two-side trace, the backward walk from the catch reaches the events on its stream before it, and through each matched receive the sender's events up to that send, and no others; a send after the last reached one is "after the catch".
+9. A run with no failed check sends `trace.catch` with `"catchEventId": null` and an empty `afterCatch`.

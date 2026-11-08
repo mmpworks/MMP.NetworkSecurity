@@ -1,0 +1,53 @@
+L2-flip-cmac-message: equal 10 of 10
+L7-flip-record: equal 10 of 10
+L8-refused-tunnel: equal 10 of 10
+L4-unknown-ca: equal 10 of 10
+L7-modern-server: equal 10 of 10
+L4-flip-cert-verify: equal 10 of 10
+L0-flip-wire-byte: equal 10 of 10
+L10-stolen-token: equal 10 of 10
+L7-decrypt-recording: equal 10 of 10
+L2-extend-hmac: equal 7 of 10; tail only yes; after the catch NO; first client/seal entry 8: run 1 '(end)', run 6 'check.result peer stayed until the end'
+L2-flip-hmac-tag: equal 6 of 10; tail only yes; after the catch NO; first client/seal entry 8: run 1 '(end)', run 6 'check.result peer stayed until the end'
+L8-zero-share: equal 10 of 10
+L10-expired-token: equal 10 of 10
+L10-wrong-client-name: equal 10 of 10
+L9-flip-pin-block: equal 10 of 10
+L6-replay-sale: equal 10 of 10
+L5-flip-record-length: equal 10 of 10
+L8-wrong-user-key: equal 10 of 10
+L5-replace-key-share: equal 10 of 10
+L10-unknown-device: equal 10 of 10
+L5-flip-finished: equal 10 of 10
+L3-swap-server-share: equal 9 of 10; tail only yes; after the catch NO; first client/kex entry 10: run 1 '(end)', run 2 'check.result peer stayed until the end'
+L10-wrong-audience: equal 10 of 10
+L8-flip-packet: equal 10 of 10
+L9-tamper-hop2: equal 10 of 10
+L5-flip-record-byte: equal 10 of 10
+L10-remove-client-cert: equal 10 of 10
+L5-clear-close-notify: equal 10 of 10
+L11-guess-constant-time: equal 10 of 10
+L7-downgrade: equal 7 of 10; tail only yes; after the catch NO; first server/tls11 entry 6: run 1 'state.waiting ', run 2 '(end)'
+L5-flip-mlkem-ciphertext: equal 10 of 10
+L10-corrupt-client-cert: equal 10 of 10
+L10-wrong-role: equal 10 of 10
+L9-tamper-hop1: equal 10 of 10
+L4-expired-cert: equal 10 of 10
+L8-legacy-flip-signature: equal 10 of 10
+L4-wrong-name: equal 10 of 10
+L6-flip-pin-block: equal 10 of 10
+L2-flip-hmac-message: equal 5 of 10; tail only yes; after the catch NO; first client/seal entry 8: run 1 '(end)', run 6 'check.result peer stayed until the end'
+L10-replay-challenge: equal 10 of 10
+L10-change-token-claim: equal 10 of 10
+L6-ask-past-key: equal 10 of 10
+L1-reuse-nonce: equal 10 of 10
+L10-unissued-challenge: equal 10 of 10
+L10-ungranted-capability: equal 10 of 10
+L4-flip-cert-byte: equal 10 of 10
+L3-flip-mlkem-ciphertext: equal 9 of 10; tail only yes; after the catch NO; first client/kex entry 17: run 1 '(end)', run 2 'check.result peer stayed until the end'
+L8-change-host-key: equal 10 of 10
+L2-flip-hash-message: equal 1 of 10; tail only yes; after the catch NO; first client/seal entry 7: run 1 '(end)', run 2 'state.waiting '
+L2-flip-cmac-tag: equal 10 of 10
+L1-flip-gcm: equal 1 of 10; tail only yes; after the catch NO; first client/aes entry 6: run 1 'aes.message.sent PictureCbc', run 2 '(end)'
+L10-replay-proof: equal 10 of 10
+L8-flip-exchange-signature: equal 10 of 10
