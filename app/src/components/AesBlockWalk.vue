@@ -65,6 +65,8 @@ async function play() {
   do {
     await advance()
     await tl.settle()
+    // A stop during the motion (Next, Back, Show keys off) ends the loop here, before it waits again (Jared on #255).
+    if (!tl.playing.value) return
     await tl.delay(tl.reduced() ? 650 : 280)
     if (!tl.playing.value) return
   } while (!isEnd.value && playGroupOf(stop.value, nk.value) === playGroupOf(stops.value[at.value + 1], nk.value))
