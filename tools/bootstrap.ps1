@@ -14,9 +14,8 @@ param(
 $ErrorActionPreference = 'Stop'
 $root = Split-Path -Parent $PSScriptRoot
 # Repo hooks: the pre-push guard refuses a push to a branch whose pull requests are all merged or closed (tools/githooks/pre_push_guard.py).
-# core.hooksPath is repo-level, so every worktree of this clone uses it.
-git -C $root config core.hooksPath tools/githooks
-Write-Host "== git hooks: core.hooksPath = tools/githooks"
+# install.ps1 copies the hook into the shared git folder and sets an absolute core.hooksPath, so every worktree runs it on any branch.
+& (Join-Path $PSScriptRoot 'githooks\install.ps1') -Repo $root
 if (-not (Test-Path (Join-Path $NetCFRefDir 'mscorlib.dll'))) { throw "CF 3.5 reference assemblies missing at $NetCFRefDir" }
 if (-not $AsyncProxyRoot) { $AsyncProxyRoot = Join-Path (Split-Path -Parent $root) 'MMP.AsyncProxy' }
 if (-not (Test-Path (Join-Path $AsyncProxyRoot 'src\MMP.AsyncProxy'))) { throw "MMP.AsyncProxy not found at $AsyncProxyRoot. Pass -AsyncProxyRoot." }

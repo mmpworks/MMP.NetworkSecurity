@@ -22,7 +22,12 @@ def run(args, cwd, env=None, check=True):
     return r
 
 
-class PrePushGuard(unittest.TestCase):
+class RepoFixture(unittest.TestCase):
+    """A throwaway bare remote, a clone with one commit on main and a commit on feat/x, and a fake gh first on PATH. Has no tests."""
+
+    def install_hooks(self):
+        run(["git", "config", "core.hooksPath", str(HOOKS)], self.work)
+
     def setUp(self):
         self.tmp = tempfile.TemporaryDirectory()
         base = pathlib.Path(self.tmp.name)
@@ -32,8 +37,9 @@ class PrePushGuard(unittest.TestCase):
         self.json_file = base / "prs.json"
         run(["git", "init", "-q", "--bare", "-b", "main", str(self.remote)], base)
         run(["git", "clone", "-q", str(self.remote), str(self.work)], base)
-        for k, v in (("user.email", "t@example.com"), ("user.name", "t"), ("core.hooksPath", str(HOOKS))):
+        for k, v in (("user.email", "t@example.com"), ("user.name", "t")):
             run(["git", "config", k, v], self.work)
+        self.install_hooks()
         (self.work / "a.txt").write_text("a", encoding="utf-8")
         run(["git", "add", "a.txt"], self.work)
         run(["git", "commit", "-q", "-m", "init"], self.work)
@@ -62,6 +68,11 @@ class PrePushGuard(unittest.TestCase):
 
     def remote_has(self, branch):
         return bool(run(["git", "ls-remote", "--heads", str(self.remote), branch], self.work).stdout.strip())
+
+
+
+class PrePushGuard(RepoFixture):
+    """The rule, with core.hooksPath pointing straight at this folder."""
 
     def test_merged_pr_refuses_and_names_the_route(self):
         self.prs("MERGED")
@@ -114,6 +125,42 @@ class PrePushGuard(unittest.TestCase):
         run(["git", "commit", "-q", "--allow-empty", "-m", "next"], self.work)
         r = self.push("main", env=dict(self.env, FAKE_GH_EXIT="1"))
         self.assertEqual(r.returncode, 0, r.stderr)
+
+
+class InstalledHook(RepoFixture):
+    """What tools/bootstrap.ps1 sets up: install.ps1 copies the hook into the shared git folder and sets an absolute core.hooksPath, so the
+    hook runs whatever branch a worktree has checked out, including a branch made before the hook files existed."""
+
+    def install_hooks(self):
+        run(["pwsh", "-NoProfile", "-File", str(HOOKS / "install.ps1"), "-Repo", str(self.work)], self.work)
+
+    def test_hooks_path_is_absolute_and_outside_the_working_tree(self):
+        path = run(["git", "config", "core.hooksPath"], self.work).stdout.strip()
+        self.assertTrue(pathlib.Path(path).is_absolute(), path)
+        self.assertTrue((pathlib.Path(path) / "pre-push").is_file())
+        self.assertFalse((self.work / "tools" / "githooks").exists(), "the probe branch must have no hook files of its own")
+
+    def test_a_branch_without_the_hook_files_is_still_guarded(self):
+        self.prs("MERGED")
+        r = self.push("feat/x")
+        self.assertNotEqual(r.returncode, 0)
+        self.assertIn("MERGED", r.stderr)
+        self.assertFalse(self.remote_has("feat/x"))
+
+    def test_a_second_worktree_is_guarded_too(self):
+        wt = pathlib.Path(self.tmp.name) / "wt2"
+        run(["git", "worktree", "add", "-q", "-b", "feat/y", str(wt), "main"], self.work)
+        run(["git", "commit", "-q", "--allow-empty", "-m", "y"], wt)
+        self.prs("CLOSED")
+        r = run(["git", "push", "-q", "origin", "feat/y"], wt, self.env, check=False)
+        self.assertNotEqual(r.returncode, 0)
+        self.assertIn("CLOSED", r.stderr)
+
+    def test_installing_twice_keeps_the_copy_equal_to_the_source(self):
+        run(["pwsh", "-NoProfile", "-File", str(HOOKS / "install.ps1"), "-Repo", str(self.work)], self.work)
+        path = pathlib.Path(run(["git", "config", "core.hooksPath"], self.work).stdout.strip())
+        for name in ("pre-push", "pre_push_guard.py"):
+            self.assertEqual((path / name).read_bytes(), (HOOKS / name).read_bytes(), name)
 
 
 if __name__ == "__main__":
