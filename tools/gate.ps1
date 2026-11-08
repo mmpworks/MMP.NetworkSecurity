@@ -32,6 +32,18 @@ param(
 $ErrorActionPreference = 'Continue'
 $root = Split-Path -Parent $PSScriptRoot
 Set-Location $root
+# A full gate is a heavy run: one at a time on the machine (tools/heavy_lock.py). Re-run this script under the lock, with the same parameters, and pass its
+# exit code through. A run started inside a holder (NETSEC_HEAVY_LOCK_HELD is set) skips this. NETSEC_LOCK_WAIT_MINUTES limits the wait (exit 75).
+if (-not $env:NETSEC_HEAVY_LOCK_HELD) {
+    $again = foreach ($name in $PSBoundParameters.Keys) {
+        $value = $PSBoundParameters[$name]
+        if ($value -is [System.Management.Automation.SwitchParameter]) { if ($value.IsPresent) { "-$name" } }
+        else { "-$name"; ($value -join ',') }
+    }
+    $wait = if ($env:NETSEC_LOCK_WAIT_MINUTES) { @('--wait-minutes', $env:NETSEC_LOCK_WAIT_MINUTES) } else { @() }
+    python -I (Join-Path $PSScriptRoot 'heavy_lock.py') run --label "gate $Slice" @wait -- pwsh -NoProfile -File $PSCommandPath @again
+    exit $LASTEXITCODE
+}
 . (Join-Path $PSScriptRoot 'gate_app.ps1')
 # Every run log names the commit it ran on, first (tools/run_status.py prints it).
 $head = Get-HeadLine $root
@@ -114,6 +126,8 @@ Step 'acceptance scope check tests' { python -I tools/test_check_acceptance_scop
 # A PR that changes acceptance/ bumps acceptance/PIN in the same PR (python -I acceptance/tools/pin.py --write).
 Step 'acceptance PIN current' { python -I acceptance/tools/pin.py --check }
 Step 'acceptance PIN tests' { python -I acceptance/tools/test_pin.py }
+Step 'heavy-run lock tests' { python -I tools/test_heavy_lock.py }
+Step 'gate lock tests' { python -I tools/test_gate_lock.py }
 Step 'pre-push guard tests' { python -I tools/githooks/test_pre_push_guard.py }
 Step 'pre-push hook installed and current' { pwsh -NoProfile -File tools/githooks/check-installed.ps1 }
 

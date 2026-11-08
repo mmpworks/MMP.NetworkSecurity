@@ -9,7 +9,7 @@
     "build": "vue-tsc --noEmit && vite build && node scripts/dist-stamp.cjs write",
     "start": "npm run build && electron .",
     "typecheck": "vue-tsc --noEmit && tsc -p e2e/tsconfig.json",
-    "e2e": "npm run build && playwright test"
+    "e2e": "npm run build && python -I ../tools/heavy_lock.py run --label \"app e2e\" -- node node_modules/@playwright/test/cli.js test"
   },
   "dependencies": {
     "@fontsource/atkinson-hyperlegible": "5.3.0",
