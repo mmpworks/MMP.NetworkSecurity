@@ -54,6 +54,22 @@ test('each tourStep names the step that plays the run, and null means no tour pl
   expect(wrong).toEqual([])
 })
 
+test('each run has a readable name under 50 characters, and no two runs in one lesson share a name', () => {
+  const runs = file.runs as (Row & { name?: string })[]
+  expect(runs.filter(r => !r.name || r.name.trim() === '').map(r => r.attackId), 'runs with no name').toEqual([])
+  expect(runs.filter(r => (r.name ?? '').length >= 50).map(r => `${r.attackId}: ${r.name}`), 'names of 50 characters or more').toEqual([])
+  expect(runs.filter(r => r.name === r.attackId).map(r => r.attackId), 'names that only repeat the id').toEqual([])
+  const lessonOf = (id: string) => id.split('-')[0]
+  const seen = new Map<string, string>()
+  const clashes: string[] = []
+  for (const r of runs) {
+    const key = `${lessonOf(r.attackId)} ${r.name}`
+    if (seen.has(key)) clashes.push(`${seen.get(key)} and ${r.attackId}: ${r.name}`)
+    else seen.set(key, r.attackId)
+  }
+  expect(clashes, 'two runs in one lesson with one name').toEqual([])
+})
+
 test('each guard is one or two short sentences', () => {
   const bad = file.runs.filter(r => {
     const sentences = r.guard.split(/(?<=\.)\s+/).filter(Boolean)

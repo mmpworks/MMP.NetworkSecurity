@@ -39,6 +39,13 @@ test('the index lists every attack run the Host registers, once, in a group, wit
   }
 })
 
+test('each row shows its readable name, with the id as a small second line', async ({ page }) => {
+  await openIndex(page)
+  const row = page.getByTestId('attack-row-L1-flip-gcm')
+  await expect(row.getByTestId('attack-row-name')).toHaveText('Flip a bit in a GCM message')
+  await expect(row.getByTestId('attack-row-id')).toHaveText('L1-flip-gcm')
+})
+
 test('the L7 recording row carries the guard words agreed for it', async ({ page }) => {
   await openIndex(page)
   await expect(page.getByTestId('attack-row-L7-decrypt-recording').getByTestId('attack-row-guard')).toHaveText(

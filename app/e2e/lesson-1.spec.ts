@@ -24,6 +24,8 @@ test('lesson 1 shows the same picture clear and locked, and the ECB leak is a me
 
 test('lesson 1 attack on GCM names the check that caught it', async ({ page }) => {
   await runFreePlay(page, 1)
+  // The button carries the run's readable name from attacks.json, not its id.
+  await expect(page.getByTestId('attack-L1-flip-gcm')).toHaveText('Flip a bit in a GCM message')
   await page.getByTestId('attack-L1-flip-gcm').click()
   await expect(page.getByTestId('attack-result')).toContainText('GCM tag')
 })
