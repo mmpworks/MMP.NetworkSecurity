@@ -161,7 +161,7 @@ These appear later by design, each named in the report: `REFEREE_MISSING`, `REFE
 | `selftest/` | BCL stand-ins and the `SELF.*` clauses |
 | `checks/docs_checks.py`, `tools/gen_clauses.py` | Text clauses and the clause list generator |
 | `vectors/` | `.nsv` vectors, `SOURCES.md`, fetch scripts, extractors (`fetch-x9.ps1` downloads the X9.24-3 PDF to `_cache` with a recorded SHA-256) |
-| `e2e/` | Playwright specs for A13 and the UI half of A16 (`npm ci` then `npx playwright test`; `run.ps1` does both) |
+| `e2e/` | Playwright specs for A13 and the UI half of A16 (`run.ps1` runs `npm ci` when `node_modules` is missing, then `tsc` and Playwright from that folder's own `node_modules` under node, never through npx) |
 | `CONTRACT.md` | What the suite needs from the build. The referees are described in `referees/README.md` |
 
 ## 8. A17: per-type test keys, wizards and the vault (added 2026-11-05)
