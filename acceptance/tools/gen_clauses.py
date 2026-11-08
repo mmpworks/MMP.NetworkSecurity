@@ -100,6 +100,7 @@ REFEREE_BY_PREFIX = [
     ("A19.ui.tls11-", "Playwright, against the Host's reply"),
     ("A19.ui.long-strip-", "Playwright, against the Host's /api/walk/aes/long-text reply"),
     ("A19.app.", "script over the app source and copy files"),
+    # The A19.walk. family is the AES walk's core reference clauses, and only those. A non-AES walk clause takes another id and its own row.
     ("A19.walk.", REFEREE["A19"]),
 ]
 
