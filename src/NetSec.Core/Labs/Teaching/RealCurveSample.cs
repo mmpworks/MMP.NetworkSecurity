@@ -28,6 +28,9 @@ namespace NetSec.Labs.Teaching
         public RealPoint[] Upper, Lower;
         public double XMax;
         public RealLineExample Chord, Tangent;
+
+        /// <summary>More picks for the screen: 3 chords and 1 tangent. Each R' lies inside the drawn range, so the screen can draw every pick.</summary>
+        public RealLineExample[] Samples;
     }
 
     /// <summary>
@@ -58,12 +61,24 @@ namespace NetSec.Labs.Teaching
             }
             s.Chord = Line("chord", OnCurve(-0.5), OnCurve(1));
             s.Tangent = Line("tangent", OnCurve(0), OnCurve(0));
+            s.Samples = new RealLineExample[]
+            {
+                Line("chord", OnCurve(0), OnCurve(2)),
+                Line("chord", OnCurve(-0.5), Lower(1.5)),
+                Line("chord", OnCurve(-0.25), OnCurve(0.75)),
+                Line("tangent", OnCurve(1), OnCurve(1)),
+            };
+            foreach (RealLineExample e in s.Samples)
+                if (e.RPrime.X < s.Root || e.RPrime.X > XMax) throw new InvalidOperationException("a sample's R' falls outside the drawn range");
             return s;
         }
 
         public static double Cubic(double x) { return x * x * x + A * x + B; }
 
         static RealPoint OnCurve(double x) { return new RealPoint(x, Math.Sqrt(Cubic(x))); }
+
+        /// <summary>The point at x on the lower branch.</summary>
+        static RealPoint Lower(double x) { return new RealPoint(x, -Math.Sqrt(Cubic(x))); }
 
         /// <summary>The one real root of x^3 + 2x + 2, by bisection on [-1, 0], where the cubic changes sign.</summary>
         static double Root()

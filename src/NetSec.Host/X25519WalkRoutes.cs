@@ -47,6 +47,7 @@ public static class X25519WalkRoutes
             z3 = Bytes(r.Z3),
             u2 = Bytes(r.U2),
             u3 = Bytes(r.U3),
+            swap = r.Swap,
         }).ToArray(),
     };
 }
