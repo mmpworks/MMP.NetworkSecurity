@@ -87,6 +87,9 @@ namespace NetSec.Ssh
             }
         }
 
+        /// <summary>The SSH client dials the server in every lab, so a pump uses this as its opener role (issue #309).</summary>
+        public bool IsClient { get { return _session.IsClient; } }
+
         /// <summary>The packet reader holds part of a line or a packet (issue #309).</summary>
         public bool HoldsPartialInput { get { return _session.Reader.HoldsPartial; } }
 

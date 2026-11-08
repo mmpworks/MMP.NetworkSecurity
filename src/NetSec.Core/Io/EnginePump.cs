@@ -133,12 +133,15 @@ namespace NetSec.Io
         NetSecError _linkError;
         long _bytesSent, _bytesReceived;
 
-        // Issue #309. A side that holds part of a frame waits the read deadline for the rest. A side that holds nothing waits longer, and the
-        // side whose last link action was a send (so it is owed a reply) waits less than the other. So a stuck run always ends on a fixed side:
-        // the holder of a cut-short frame first; in a mutual wait, the side owed a reply. The gaps are whole read deadlines (30 s at the
+        // Issue #309. A side that holds part of a frame waits the read deadline for the rest. A side that holds nothing waits longer, by role
+        // only: the side that opened the connection waits twice the read deadline, the side that accepted it three times. Neither side can see
+        // the other's view, so a rule built on a view (such as "who sent last") can tie; a role rule cannot. So a stuck run always ends on a
+        // fixed side: the holder of a cut-short frame first; in a mutual wait, the opener. The gap is a whole read deadline (30 s at the
         // default), far above any scheduling jitter. acceptance/CONTRACT.md holds the clause that checks them.
-        const int IdleOwedFactor = 2, IdleOtherFactor = 3;
-        bool _sentLast;
+        const int IdleOpenerFactor = 2, IdleAcceptorFactor = 3;
+
+        /// <summary>True for the pump on the side that dialed the connection. The code that builds both pumps of a pair sets it before Run (issue #309).</summary>
+        public bool OpenedLink { get; set; }
 
         public EnginePump(IProtocolEngine engine, IByteLink link, ITraceSink sink, IStepGate gate, ITamperHook tamper, int deadlineMs)
             : this(engine, link, sink, gate, tamper, deadlineMs, new MonotonicClock())
@@ -260,9 +263,7 @@ namespace NetSec.Io
         int ReadLimitMs()
         {
             if (HoldsPartialInput) return _deadlineMs;
-            bool owed;
-            lock (_lock) owed = _sentLast;
-            return _deadlineMs * (owed ? IdleOwedFactor : IdleOtherFactor);
+            return _deadlineMs * (OpenedLink ? IdleOpenerFactor : IdleAcceptorFactor);
         }
 
         NetSecError ExpiryNow()
@@ -322,7 +323,6 @@ namespace NetSec.Io
             else
             {
                 _bytesReceived += count;
-                lock (_lock) _sentLast = false;
                 byte[] chunk = new byte[count];
                 Buffer.BlockCopy(buffer, 0, chunk, 0, count);
                 TraceEvent arrival = WireEvent("wire.received", _engine.Peer, _engine.Stream.Actor, null, chunk, null, null);
@@ -397,8 +397,6 @@ namespace NetSec.Io
             // Logged before the write. Once the bytes leave, the peer can answer and log its reply, and the session list is one order across both pumps.
             // A write that then fails leaves this event behind, so a wire.write.failed event follows it. The run's result cannot say so on the alert path (see Conclude).
             _sink.Write(sent);
-            // This side spoke last, so it is now owed a reply (issue #309). A tamper that empties the bytes does not change that: the side sent.
-            lock (_lock) _sentLast = true;
             IFuture write = _link.Write(wire, 0, wire.Length);
             foreach (IFuture wait in AwaitWrite(write)) yield return wait;
             if (!write.IsCompleted)

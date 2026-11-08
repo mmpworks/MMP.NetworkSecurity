@@ -201,6 +201,7 @@ namespace NetSec.Labs
             int deadline = c.DeadlineMs > 0 ? c.DeadlineMs : DeadlineMs;
             EnginePump serverPump = new EnginePump(server, accepted.Result, c.Sink, c.Gate, tamper, deadline, c.Clock);
             EnginePump clientPump = new EnginePump(client, connected.Result, c.Sink, c.Gate, tamper, deadline, c.Clock);
+            clientPump.OpenedLink = true;
             if (setup != null) setup(clientPump, serverPump);
             IFuture<PumpResult> serverRun = serverPump.Run();
             IFuture<PumpResult> clientRun = clientPump.Run();

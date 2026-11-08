@@ -255,6 +255,7 @@ namespace NetSec.Tests
             EnginePump server = new EnginePump(EchoEngine.Server(Make.Stream("server"), null), serverLink, p.Sink, gate, null, deadlineMs);
             EnginePump client = new EnginePump(EchoEngine.Client(Make.Hello, Make.Stream("client"), null), clientLink, p.Sink, gate, tamper, clientDeadlineMs < 0 ? deadlineMs : clientDeadlineMs);
             client.OnApp = c => p.Delivered = Encoding.UTF8.GetString(c.Bytes, 0, c.Bytes.Length);
+            client.OpenedLink = true;
             p.Server = server.Run();
             p.Client = client.Run();
             return p;
@@ -346,7 +347,7 @@ namespace NetSec.Tests
             EnginePump client = new EnginePump(EchoEngine.Client(Make.Hello, Make.Stream("client"), null), links[0], null, null, null, 200);
             IFuture<PumpResult> run = client.Run();
             Make.Done(run);
-            // The client holds no part of a frame, only an unanswered hello, so its idle limit ends the wait (issue #309).
+            // The client holds no part of a frame, only an unanswered hello, so its idle limit ends the wait (issue #309). This pump has no pair, so it keeps the acceptor role.
             Assert.Equal(ErrorCodes.LinkIdle, run.Result.Error.Code);
             Assert.Equal("idle limit", run.Result.Error.CheckName);
             Assert.Equal(EngineStatus.Failed, run.Result.Status);
@@ -364,7 +365,7 @@ namespace NetSec.Tests
 
         /// <summary>
         /// The length promises more bytes than ever come. The server holds part of a frame, so it waits its read deadline; the client holds nothing, so it
-        /// waits its idle limit, twice its read deadline as the side owed a reply (issue #309). Whichever limit runs out first ends that side by name and
+        /// waits its idle limit, twice its read deadline as the side that opened the connection (issue #309). Whichever limit runs out first ends that side by name and
         /// closes the link, and the other side then reads the close, so PEER_CLOSED_EARLY is its true outcome. Row 1: the server's 300 ms read deadline
         /// beats the client's 10,000 ms idle limit. Row 2: the client's 600 ms idle limit beats the server's 5,000 ms read deadline.
         /// </summary>
@@ -382,7 +383,7 @@ namespace NetSec.Tests
 
         /// <summary>
         /// With equal deadlines the outcome no longer races (issue #309): the server holds the part of a frame, so its read deadline runs out first, and the
-        /// client, waiting twice as long as the side owed a reply, then reads the close.
+        /// client, waiting twice as long as the opener, then reads the close.
         /// </summary>
         [Fact]
         public void Equal_deadlines_end_on_the_side_that_holds_the_partial_frame()
