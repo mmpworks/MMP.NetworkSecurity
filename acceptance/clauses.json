@@ -2548,7 +2548,7 @@
    "group": "docs",
    "build": "host",
    "slice": "W1",
-   "referee": "FIPS 197 (2001) data, the suite's RefAes, and the .NET library",
+   "referee": "script over the app source and copy files",
    "roles": [],
    "counts": true
   },
@@ -2559,7 +2559,7 @@
    "group": "docs",
    "build": "host",
    "slice": "W1",
-   "referee": "FIPS 197 (2001) data, the suite's RefAes, and the .NET library",
+   "referee": "script over the app source and copy files",
    "roles": [],
    "counts": true
   },
@@ -2570,7 +2570,7 @@
    "group": "docs",
    "build": "host",
    "slice": "W1",
-   "referee": "FIPS 197 (2001) data, the suite's RefAes, and the .NET library",
+   "referee": "script over the app source and copy files",
    "roles": [],
    "counts": true
   },
@@ -2581,7 +2581,7 @@
    "group": "docs",
    "build": "host",
    "slice": "W1",
-   "referee": "FIPS 197 (2001) data, the suite's RefAes, and the .NET library",
+   "referee": "script over the app source and copy files",
    "roles": [],
    "counts": true
   },
@@ -2933,7 +2933,7 @@
    "group": "e2e",
    "build": "host",
    "slice": "W1",
-   "referee": "FIPS 197 (2001) data, the suite's RefAes, and the .NET library",
+   "referee": "the live Host's /api/lessons and /api/lessons/0, and app/src/attacks.json, read through Playwright",
    "roles": [],
    "counts": true
   },
@@ -3032,7 +3032,7 @@
    "group": "e2e",
    "build": "host",
    "slice": "W1",
-   "referee": "FIPS 197 (2001) data, the suite's RefAes, and the .NET library",
+   "referee": "Playwright, against the Host's /api/walk/aes/long-text reply",
    "roles": [],
    "counts": true
   },
@@ -3043,7 +3043,7 @@
    "group": "e2e",
    "build": "host",
    "slice": "W1",
-   "referee": "FIPS 197 (2001) data, the suite's RefAes, and the .NET library",
+   "referee": "Playwright, against the Host's /api/walk/aes/long-text reply",
    "roles": [],
    "counts": true
   },
@@ -3054,7 +3054,7 @@
    "group": "e2e",
    "build": "host",
    "slice": "W1",
-   "referee": "FIPS 197 (2001) data, the suite's RefAes, and the .NET library",
+   "referee": "Playwright, against the Host's /api/walk/aes/long-text reply",
    "roles": [],
    "counts": true
   },

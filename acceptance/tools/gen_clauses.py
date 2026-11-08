@@ -94,13 +94,40 @@ REFEREE_BY_PREFIX = [
     ("A19.ui.toy-curve-", "Playwright, against the Host's reply"),
     ("A19.ui.real-curve-", "Playwright, against the Host's reply"),
     ("A19.ui.x25519-", "Playwright, against the Host's reply and RFC 7748 in the vector file"),
+    ("A19.ui.attack-", "the live Host's /api/lessons and /api/lessons/0, and app/src/attacks.json, read through Playwright"),
+    ("A19.ui.two-run-", "the live Host's registry and its forked runs, read through Playwright"),
+    ("A19.ui.tls13-", "Playwright, against the Host's reply and RFC 8448 in the vector file"),
+    ("A19.ui.tls11-", "Playwright, against the Host's reply"),
+    ("A19.ui.long-strip-", "Playwright, against the Host's /api/walk/aes/long-text reply"),
+    ("A19.app.", "script over the app source and copy files"),
+    ("A19.walk.", REFEREE["A19"]),
 ]
+
+# The AES walk's Host and screen clauses, whose referee is A19's AES default. They have no common prefix, so they are named one by one.
+# An A19 clause that is in neither list stops the generator: a new walk names its own referee (Jared, #295), and a clause never inherits
+# the AES one by accident.
+AES_WALK_IDS = {
+    "A19.host.block-real-run-two-seeds", "A19.host.block-terms-real-run", "A19.host.control-run-says-not-sent", "A19.host.ecb-fork-says-match",
+    "A19.host.errors-carry-a-code", "A19.host.off-holds-no-word-or-term", "A19.host.practice-key-192-256", "A19.host.rcon-steps",
+    "A19.host.replies-carry-no-store", "A19.host.show-keys-off-closes-block-first", "A19.host.tables-carry-maps-rcon-sizes",
+    "A19.host.tables-equal-fips-and-stay-open", "A19.host.typed-routes-follow-key-size", "A19.host.typed-routes-open-with-keys-off",
+    "A19.host.walk-adds-no-trace-event",
+    "A19.ui.end-frames-on-all-key-sizes", "A19.ui.expanded-table-layout", "A19.ui.first-view-fills-by-column", "A19.ui.flip-clears-with-the-frame-dropped",
+    "A19.ui.flip-during-play-stops-the-timeline", "A19.ui.grid-order-on-every-state", "A19.ui.key-band-on-192-and-256", "A19.ui.late-reply-is-dropped",
+    "A19.ui.multiply-shows-the-engine-terms", "A19.ui.next-alone-gives-the-text-back", "A19.ui.off-shows-the-closed-line",
+    "A19.ui.play-stops-at-the-end-of-a-round", "A19.ui.reconnect-reads-the-toggle-first", "A19.ui.reduced-motion-has-no-transition",
+    "A19.ui.sbox-click-matches-next-state", "A19.ui.socket-close-clears-the-walk", "A19.ui.step-order-by-next", "A19.ui.word-build-lights-its-two-words",
+}
 
 
 def referee_of(cid, assertion):
     for prefix, referee in REFEREE_BY_PREFIX:
         if cid.startswith(prefix):
             return referee
+    if assertion == "A19":
+        if cid in AES_WALK_IDS:
+            return REFEREE["A19"]
+        sys.exit("clause %s: an A19 clause needs its referee, as a REFEREE_BY_PREFIX row or an AES_WALK_IDS entry, in gen_clauses.py" % cid)
     return REFEREE[assertion]
 
 

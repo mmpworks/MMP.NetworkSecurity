@@ -55,14 +55,6 @@ async function openIndex(page: Page): Promise<void> {
   await expect(page.getByTestId('attack-index'), 'attack-index-open opens the index').toBeVisible({ timeout: 15_000 });
 }
 
-/** Opens one row's two-run layout. */
-async function openRun(page: Page, id: string): Promise<void> {
-  await page.getByTestId(`attack-row-${id}`).click();
-  await expect(page.getByTestId('two-run'), `${id} opens the two-run layout`).toBeVisible({ timeout: 60_000 });
-  await expect(page.getByTestId('two-run-normal'), `${id}: the normal run`).toBeVisible();
-  await expect(page.getByTestId('two-run-attacked'), `${id}: the attacked run`).toBeVisible();
-}
-
 test('[A19.ui.attack-index-lists-every-run] the index shows every run the Host registers, each in its group, naming its lesson and its check', async ({ page }) => {
   const rows = await registry();
   const { labels, groupOf } = content();
