@@ -366,7 +366,7 @@ namespace NetSec.Tests
             GlassSshSession session = new GlassSshSession(SshEngine.Client(options, new TraceStream("c", "c", "c", null, "client", new FixedClock(1)), null, "server"), links[0], sink, new FreeRunGate(), null, 200, new FixedClock(1), null);
             session.Run();
             Assert.True(session.Finished.Wait(30000), "the deadline did not end the wait");
-            Assert.Equal(NetSec.Errors.ErrorCodes.LinkDeadline, session.Finished.Result.Error.Code);
+            Assert.Equal(NetSec.Errors.ErrorCodes.LinkIdle, session.Finished.Result.Error.Code); // the peer sent nothing, so no part of a frame waits (#309)
             Assert.True(session.Opened.IsFaulted);
         }
 
@@ -392,7 +392,7 @@ namespace NetSec.Tests
             GlassSshSession session = new GlassSshSession(SshEngine.Client(options, new TraceStream("c", "c", "c", null, "client", new FixedClock(1)), null, "server"), links[0], new ListSink(), gate, null, 200, new FixedClock(1), null);
             session.Run();
             Assert.True(session.Finished.Wait(30000), "the deadline did not end the wait");
-            Assert.Equal(NetSec.Errors.ErrorCodes.LinkDeadline, session.Finished.Result.Error.Code);
+            Assert.Equal(NetSec.Errors.ErrorCodes.LinkIdle, session.Finished.Result.Error.Code); // the peer sent nothing, so no part of a frame waits (#309)
         }
 
         /// <summary>An attack's control is the same lab with no attack: the test above. Each row differs from it in one thing.</summary>

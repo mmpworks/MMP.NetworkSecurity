@@ -9,7 +9,7 @@ namespace NetSec.Machine
     /// The toy protocol of S0. A client sends bytes, the server sends them back, and the client compares. It has no lock.
     /// Frame: 1-byte type, 2-byte length, body. It proves the table, the interpreter, and the pump before any cryptography exists.
     /// </summary>
-    public sealed class EchoEngine : IProtocolEngine
+    public sealed class EchoEngine : IProtocolEngine, IPartialInput
     {
         public const int HelloType = 1;
         public const int ReplyType = 2;
@@ -153,8 +153,13 @@ namespace NetSec.Machine
                 _machine.Fail(ErrorCodes.PeerClosedEarly, "peer stayed until the end", "the peer closed in state " + _machine.State, null);
             else if (c.Kind == EngineCommandKind.Close)
                 _machine.CloseCleanly();
+            else if (c.Kind == EngineCommandKind.Expire && !_machine.IsEnded)
+                _machine.Fail(c.Expiry.Code, c.Expiry.CheckName, c.Expiry.Message, null);
             return _machine.TakeOutput();
         }
+
+        /// <summary>Feed dispatches every whole frame, so bytes still waiting here are part of a frame (issue #309).</summary>
+        public bool HoldsPartialInput { get { return _pending.Length > 0; } }
 
         void Append(byte[] b, int off, int n)
         {

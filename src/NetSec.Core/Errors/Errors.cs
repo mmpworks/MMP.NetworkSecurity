@@ -32,6 +32,7 @@ namespace NetSec.Errors
         public const string UnexpectedMessage = "UNEXPECTED_MESSAGE";
         public const string ParseTruncated = "PARSE_TRUNCATED";
         public const string LinkDeadline = "LINK_DEADLINE";
+        public const string LinkIdle = "LINK_IDLE";
         public const string LinkLost = "LINK_LOST";
         public const string PeerClosedEarly = "PEER_CLOSED_EARLY";
         public const string EchoMismatch = "ECHO_MISMATCH";

@@ -195,6 +195,12 @@ namespace NetSec.Ssh
             _pending = joined;
         }
 
+        /// <summary>
+        /// True while this reader holds input it has not turned into a line or a packet: bytes of an identification line with no CRLF yet, bytes
+        /// of a packet whose length is not known yet, or a decrypted first block whose rest has not come (issue #309).
+        /// </summary>
+        public bool HoldsPartial { get { return _pending.Length > 0 || _firstBlock != null; } }
+
         /// <summary>How many packets this reader has taken since the last reset. Strict KEX reads this to prove KexInit came first.</summary>
         public long Sequence { get { return _sequence; } }
 

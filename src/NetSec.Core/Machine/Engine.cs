@@ -5,7 +5,7 @@ using NetSec.Trace;
 namespace NetSec.Machine
 {
     public enum EngineStatus { Handshaking, Open, Closed, Failed }
-    public enum EngineCommandKind { Send, Close, PeerClosed, OpenChannel, Exec, Consumed, Abort }
+    public enum EngineCommandKind { Send, Close, PeerClosed, OpenChannel, Exec, Consumed, Abort, Expire }
 
     public sealed class EngineCommand
     {
@@ -27,6 +27,27 @@ namespace NetSec.Machine
 
         public string AbortCode { get { return Text.Substring(0, Text.IndexOf('|')); } }
         public string AbortDetail { get { return Text.Substring(Text.IndexOf('|') + 1); } }
+
+        /// <summary>
+        /// A pump's deadline ran out (issue #309). The engine fails with this check, so the expiry shows in the trace like any named check. It sends
+        /// no alert: an alert is traffic, and the deadline fired because traffic stopped. The pump closes the link next, and the peer sees that.
+        /// </summary>
+        public static EngineCommand Expire(NetSecError error) { return new EngineCommand(EngineCommandKind.Expire, 0, null, null, error); }
+
+        /// <summary>The expiry an Expire command carries; null for every other kind.</summary>
+        public readonly NetSecError Expiry;
+
+        EngineCommand(EngineCommandKind kind, int channel, byte[] bytes, string text, NetSecError expiry) : this(kind, channel, bytes, text) { Expiry = expiry; }
+    }
+
+    /// <summary>
+    /// An engine that can say whether it holds input it has not consumed yet, at any layer: part of a frame, a record, a handshake message
+    /// split across records, or an SSH line or packet (issue #309). The pump arms its read deadline only then, so the side that waits for
+    /// the rest of a message is the side whose deadline ends the run. An engine without this keeps the read deadline on every read.
+    /// </summary>
+    public interface IPartialInput
+    {
+        bool HoldsPartialInput { get; }
     }
 
     /// <summary>One event, and the bytes to put on the wire right after it, when the event is a send.</summary>

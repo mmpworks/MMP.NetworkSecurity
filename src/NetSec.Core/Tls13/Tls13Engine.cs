@@ -11,7 +11,7 @@ namespace NetSec.Tls13
     /// TLS 1.3, bytes in and bytes out. Feed joins bytes into records, opens them, joins the contents into messages, and hands each message to
     /// the table. It holds no socket and no clock. Data sent before the handshake ends waits here until the state is Open.
     /// </summary>
-    public sealed class Tls13Engine : ITlsEngine
+    public sealed class Tls13Engine : ITlsEngine, IPartialInput
     {
         const int CloseNotify = 0;
 
@@ -80,6 +80,9 @@ namespace NetSec.Tls13
                 case EngineCommandKind.Close: Close(); break;
                 case EngineCommandKind.PeerClosed: PeerClosed(); break;
                 case EngineCommandKind.Abort: if (!_machine.IsEnded) _machine.Fail(c.AbortCode, c.AbortCode, c.AbortDetail, null); break;
+                case EngineCommandKind.Expire:
+                    if (!_machine.IsEnded) { _noAlertOwed = true; _machine.Fail(c.Expiry.Code, c.Expiry.CheckName, c.Expiry.Message, null); }
+                    break;
             }
             return Take();
         }
@@ -95,6 +98,9 @@ namespace NetSec.Tls13
             if (_session.OutboundProtected) SendAlert(1, CloseNotify);
             _machine.CloseCleanly();
         }
+
+        /// <summary>Part of a record, or part of a handshake message split across records, still waits for bytes (issue #309).</summary>
+        public bool HoldsPartialInput { get { return _records.HoldsPartial || !_handshake.IsEmpty; } }
 
         void PeerClosed()
         {

@@ -133,6 +133,13 @@ namespace NetSec.Io
         NetSecError _linkError;
         long _bytesSent, _bytesReceived;
 
+        // Issue #309. A side that holds part of a frame waits the read deadline for the rest. A side that holds nothing waits longer, and the
+        // side whose last link action was a send (so it is owed a reply) waits less than the other. So a stuck run always ends on a fixed side:
+        // the holder of a cut-short frame first; in a mutual wait, the side owed a reply. The gaps are whole read deadlines (30 s at the
+        // default), far above any scheduling jitter. acceptance/CONTRACT.md holds the clause that checks them.
+        const int IdleOwedFactor = 2, IdleOtherFactor = 3;
+        bool _sentLast;
+
         public EnginePump(IProtocolEngine engine, IByteLink link, ITraceSink sink, IStepGate gate, ITamperHook tamper, int deadlineMs)
             : this(engine, link, sink, gate, tamper, deadlineMs, new MonotonicClock())
         {
@@ -197,9 +204,7 @@ namespace NetSec.Io
                 foreach (IFuture wait in AwaitRead(read)) yield return wait;
                 if (!read.IsCompleted)
                 {
-                    NetSecError deadline = NetSecError.Of(ErrorCodes.LinkDeadline, "no bytes for " + _deadlineMs + " ms");
-                    deadline.CheckName = "read deadline";
-                    End(deadline);
+                    Expire(ExpiryNow());
                     yield break;
                 }
                 if (read.IsFaulted || read.IsCanceled)
@@ -232,12 +237,56 @@ namespace NetSec.Io
         {
             if (_deadlineMs <= 0) { yield return Futures.Observe(read); yield break; }
             int waited = 0;
-            while (!read.IsCompleted && waited < _deadlineMs)
+            while (!read.IsCompleted && waited < ReadLimitMs())
             {
-                int slice = Math.Min(DeadlineSliceMs, _deadlineMs - waited);
+                int slice = Math.Min(DeadlineSliceMs, ReadLimitMs() - waited);
                 yield return Futures.WhenAny(read, Futures.Delay(slice));
                 waited = LearnerHolds || OutboxBusy ? 0 : waited + slice;
             }
+        }
+
+        /// <summary>True while the engine holds unconsumed input. An engine that cannot say keeps the read deadline on every read, as before #309.</summary>
+        bool HoldsPartialInput
+        {
+            get
+            {
+                IPartialInput partial = _engine as IPartialInput;
+                if (partial == null) return true;
+                lock (_lock) return partial.HoldsPartialInput;
+            }
+        }
+
+        /// <summary>How long this read may wait now (issue #309): the read deadline while part of a frame waits, else an idle limit by role.</summary>
+        int ReadLimitMs()
+        {
+            if (HoldsPartialInput) return _deadlineMs;
+            bool owed;
+            lock (_lock) owed = _sentLast;
+            return _deadlineMs * (owed ? IdleOwedFactor : IdleOtherFactor);
+        }
+
+        NetSecError ExpiryNow()
+        {
+            int limit = ReadLimitMs();
+            if (HoldsPartialInput)
+            {
+                NetSecError deadline = NetSecError.Of(ErrorCodes.LinkDeadline, "no bytes for " + limit + " ms while part of a message waited");
+                deadline.CheckName = "read deadline";
+                return deadline;
+            }
+            NetSecError idle = NetSecError.Of(ErrorCodes.LinkIdle, "no bytes for " + limit + " ms while waiting for the next message");
+            idle.CheckName = "idle limit";
+            return idle;
+        }
+
+        /// <summary>
+        /// The engine fails with the expiry as a named check, so it shows in the trace, and the outbox then concludes the run as for any engine
+        /// failure. An engine that ignores Expire (a test fake) is ended here, as before #309.
+        /// </summary>
+        void Expire(NetSecError expiry)
+        {
+            Drive(delegate { return _engine.Command(EngineCommand.Expire(expiry)); }, false);
+            if (!EngineEnded) End(expiry);
         }
 
         /// <summary>A peer that stops reading parks a write, and only this ends that wait. The clock restarts only while a learner holds an event.</summary>
@@ -273,6 +322,7 @@ namespace NetSec.Io
             else
             {
                 _bytesReceived += count;
+                lock (_lock) _sentLast = false;
                 byte[] chunk = new byte[count];
                 Buffer.BlockCopy(buffer, 0, chunk, 0, count);
                 TraceEvent arrival = WireEvent("wire.received", _engine.Peer, _engine.Stream.Actor, null, chunk, null, null);
@@ -347,6 +397,8 @@ namespace NetSec.Io
             // Logged before the write. Once the bytes leave, the peer can answer and log its reply, and the session list is one order across both pumps.
             // A write that then fails leaves this event behind, so a wire.write.failed event follows it. The run's result cannot say so on the alert path (see Conclude).
             _sink.Write(sent);
+            // This side spoke last, so it is now owed a reply (issue #309). A tamper that empties the bytes does not change that: the side sent.
+            lock (_lock) _sentLast = true;
             IFuture write = _link.Write(wire, 0, wire.Length);
             foreach (IFuture wait in AwaitWrite(write)) yield return wait;
             if (!write.IsCompleted)
