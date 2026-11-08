@@ -15,7 +15,7 @@
 
 .PARAMETER Fresh
   Clone the product (committed state only) into a temp folder that sits beside the sibling MMP.AsyncProxy folder, run the clone's own
-  acceptance\run.ps1 there, and diff acceptance\ against the commit in acceptance\PIN. A diff is a FAIL of
+  acceptance\run.ps1 there, and check acceptance\PIN with acceptance\tools\pin.py. A stale or old-form PIN is a FAIL of
   A13.fresh-clone.acceptance-unchanged. Use AsyncProxyRoot (parameter or environment variable) to say where the sibling is.
 
 .PARAMETER Contract
@@ -488,15 +488,14 @@ foreach ($c in @($pending | Where-Object { $_.group -eq 'driver' -and -not $resu
     switch ($c.id) {
         'A13.fresh-clone.acceptance-unchanged' {
             if (-not $FreshChild) { Set-Result $c.id 'NOT RUN' 'NOT_A_FRESH_RUN' 'run with -Fresh; the diff of acceptance/ against the pin only means something in a fresh clone'; break }
-            $pinFile = Join-Path $acc 'PIN'
-            $pin = if (Test-Path $pinFile) { (Get-Content $pinFile -Raw).Trim() } else { '' }
-            if (-not $pin) { Set-Result $c.id 'NOT RUN' 'PIN_UNSET' 'acceptance/PIN names no commit'; break }
-            git -C $ProductRoot cat-file -e "$pin^{commit}" 2>$null
-            if ($LASTEXITCODE -ne 0) { Set-Result $c.id 'FAIL' 'PIN_NOT_IN_CLONE' "the pinned commit $pin is not in this clone"; break }
-            $diff = git -C $ProductRoot diff --name-status $pin HEAD -- acceptance ':(exclude)acceptance/PIN'
-            if ($diff) { Set-Result $c.id 'FAIL' 'ACCEPTANCE_CHANGED' ("acceptance/ differs from pinned commit $pin : " + (($diff | Select-Object -First 8) -join '; ')) }
-            elseif (-not $productExists) { Set-Result $c.id "NOT RUN" "PRODUCT_MISSING" "acceptance/ equals pinned commit $pin (clean). The clause waits for a product to clone: src/NetSec.Core is absent." }
-            else { Set-Result $c.id "PASS" "" "acceptance/ in this clone equals pinned commit $pin (PIN file excluded)" }
+            # acceptance/tools/pin.py is the one rule for PIN: the gate runs the same --check on every PR, so a stale PIN stops there first.
+            $pinOut = (python -I (Join-Path $acc 'tools/pin.py') --root $ProductRoot --check 2>&1 | ForEach-Object { "$_" }) -join ' '
+            $pinCode = $LASTEXITCODE
+            $pinReason = if ($pinOut -match '^(?<code>[A-Z_]+):') { $Matches['code'] } else { 'PIN_CHECK_FAILED' }
+            if ($pinCode -ne 0 -and $pinReason -eq 'PIN_UNSET') { Set-Result $c.id 'NOT RUN' 'PIN_UNSET' $pinOut; break }
+            if ($pinCode -ne 0) { Set-Result $c.id 'FAIL' $pinReason $pinOut; break }
+            if (-not $productExists) { Set-Result $c.id "NOT RUN" "PRODUCT_MISSING" "$pinOut. The clause waits for a product to clone: src/NetSec.Core is absent." }
+            else { Set-Result $c.id "PASS" "" "in this clone, $pinOut (PIN file excluded)" }
         }
         'A13.fresh-clone.sibling-layout' {
             $problems = @()
