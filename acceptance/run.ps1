@@ -395,7 +395,7 @@ if ($e2eMine.Count -gt 0) {
         $failedPrep = @($toolRuns | Where-Object { $_.ExitCode -ne 0 -and $_.ExitCode -ne -998 })
         if ($missing.Count -gt 0) { Set-All $e2eMine 'NOT RUN' 'TOOL_MISSING' (Tail $missing[0].Output 300) }
         elseif ($appBuild.ExitCode -ne 0) { Set-All $e2eMine 'FAIL' 'APP_BUILD_FAILED' ("npm run build in app exit $($appBuild.ExitCode): " + (Tail $appBuild.Output 600)) }
-        elseif ($failedPrep.Count -gt 0) { Set-All $e2eMine 'FAIL' 'E2E_PREP_FAILED' ("an npm ci for the e2e run exit $($failedPrep[0].ExitCode): " + (Tail $failedPrep[0].Output 600)) } else {
+        elseif ($failedPrep.Count -gt 0) { Set-All $e2eMine 'FAIL' 'E2E_PREP_FAILED' ("an npm ci before the e2e run exit $($failedPrep[0].ExitCode): " + (Tail $failedPrep[0].Output 600)) } else {
         $env:ACC_ROOT = $ProductRoot; $env:ACC_HOST = $prep.host; $env:ACC_OUT = $out
         # Other sessions on this machine run Hosts and vite previews too. A fixed port that is already taken would connect the tests to
         # somebody else's server, so the run picks free ports.
