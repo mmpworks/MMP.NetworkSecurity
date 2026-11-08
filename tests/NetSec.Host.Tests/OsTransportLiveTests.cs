@@ -72,7 +72,7 @@ public sealed class OsTransportLiveTests
             {
                 // The make step runs openssl synchronously, so it runs on its own thread and holds no pool thread.
                 Peer peer = await ProcessWaits.OnOwnThread(() => new Peer(make, serverFiles));
-                try { peer.Port = await peer._port.Task.WaitAsync(TimeSpan.FromSeconds(20)); }
+                try { peer.Port = await ProcessWaits.Within(peer._port.Task, TimeSpan.FromSeconds(20)); }
                 catch (TimeoutException)
                 {
                     string printed = peer.Printed();

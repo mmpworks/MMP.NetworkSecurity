@@ -38,6 +38,24 @@ internal static class ProcessWaits
     }
 
     /// <summary>
+    /// The result of a ready-line promise, or a TimeoutException when the limit passes first. WaitAsync alone can time out on a promise that is
+    /// already set: under pool starvation its timer callback and the queued completion race, and the timer can win. A ready line that arrived
+    /// means the process did not hang, so a promise that holds its result at the timeout counts as on time.
+    /// </summary>
+    public static async Task<T> Within<T>(Task<T> ready, TimeSpan limit)
+    {
+        try { return await ready.WaitAsync(limit); }
+        catch (TimeoutException) when (ready.IsCompletedSuccessfully) { return ready.Result; }
+    }
+
+    /// <summary>The same as Within&lt;T&gt;, for a promise with no result.</summary>
+    public static async Task Within(Task ready, TimeSpan limit)
+    {
+        try { await ready.WaitAsync(limit); }
+        catch (TimeoutException) when (ready.IsCompletedSuccessfully) { }
+    }
+
+    /// <summary>
     /// True when the process exits within the limit. WaitForExitAsync also waits for the end of redirected output, so every
     /// OutputDataReceived line has arrived when this returns true. Process.WaitForExit(timeout) gives no such promise.
     /// </summary>

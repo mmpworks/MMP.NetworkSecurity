@@ -48,4 +48,22 @@ public class ProcessWaitsTests
         Assert.True(clock.Elapsed < TimeSpan.FromSeconds(3), "Collect took " + clock.Elapsed.TotalSeconds.ToString("0.0") + " s with a 1 s limit");
         Assert.True(p.HasExited || p.WaitForExit(5000), "Collect did not kill the child at its limit");
     }
+
+    [Fact]
+    public async Task Within_returns_a_ready_result_and_still_times_out_on_a_promise_nobody_sets()
+    {
+        TaskCompletionSource<int> set = new(TaskCreationOptions.RunContinuationsAsynchronously);
+        _ = Task.Run(async () => { await Task.Delay(100); set.TrySetResult(7); });
+        Assert.Equal(7, await ProcessWaits.Within(set.Task, TimeSpan.FromSeconds(10)));
+
+        TaskCompletionSource<int> never = new(TaskCreationOptions.RunContinuationsAsynchronously);
+        Stopwatch clock = Stopwatch.StartNew();
+        await Assert.ThrowsAsync<TimeoutException>(() => ProcessWaits.Within(never.Task, TimeSpan.FromMilliseconds(300)));
+        Assert.True(clock.Elapsed < TimeSpan.FromSeconds(5), "Within took " + clock.Elapsed.TotalSeconds.ToString("0.0") + " s with a 0.3 s limit");
+
+        TaskCompletionSource noResult = new(TaskCreationOptions.RunContinuationsAsynchronously);
+        await Assert.ThrowsAsync<TimeoutException>(() => ProcessWaits.Within(noResult.Task, TimeSpan.FromMilliseconds(300)));
+        noResult.SetResult();
+        await ProcessWaits.Within(noResult.Task, TimeSpan.FromMilliseconds(300));
+    }
 }
