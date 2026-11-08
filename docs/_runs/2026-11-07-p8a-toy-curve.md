@@ -31,7 +31,7 @@ Result: 22 of 22 steps passed. Skipped: 1.
 ## layer_check
 
 ```
-layer_check: 132 files, 0 problems
+layer_check: 133 files, 0 problems
 ```
 
 ## secret_guard
@@ -48,7 +48,7 @@ Build succeeded.
     0 Warning(s)
     0 Error(s)
 
-Time Elapsed 00:00:02.22
+Time Elapsed 00:00:02.13
 ```
 
 ## dotnet build src/NetSec.Core.NetCF
@@ -59,7 +59,7 @@ Build succeeded.
     0 Warning(s)
     0 Error(s)
 
-Time Elapsed 00:00:02.03
+Time Elapsed 00:00:01.61
 ```
 
 ## dotnet test net10.0
@@ -68,9 +68,9 @@ Time Elapsed 00:00:02.03
 Test run for E:\dev\ns-p8a\tests\NetSec.Tests\bin\Release\net10.0\NetSec.Tests.dll (.NETCoreApp,Version=v10.0)
 A total of 1 test files matched the specified pattern.
 Data collector 'Blame' message: All tests finished running, Sequence file will not be generated.
-Results File: E:\dev\ns-p8a\docs\_runs\trx\p8a-toy-curve-net10\Steve_BEAST_2026-11-07_20_27_30.trx
+Results File: E:\dev\ns-p8a\docs\_runs\trx\p8a-toy-curve-net10\Steve_BEAST_2026-11-07_20_57_13.trx
 
-Passed!  - Failed:     0, Passed:   797, Skipped:     0, Total:   797, Duration: 2 m - NetSec.Tests.dll (net10.0)
+Passed!  - Failed:     0, Passed:   801, Skipped:     0, Total:   801, Duration: 1 m 53 s - NetSec.Tests.dll (net10.0)
 ```
 
 ## dotnet test net48 (CF binaries)
@@ -79,9 +79,9 @@ Passed!  - Failed:     0, Passed:   797, Skipped:     0, Total:   797, Duration:
 Test run for E:\dev\ns-p8a\tests\NetSec.Tests\bin\Release\net48\NetSec.Tests.dll (.NETFramework,Version=v4.8)
 A total of 1 test files matched the specified pattern.
 Data collector 'Blame' message: All tests finished running, Sequence file will not be generated.
-Results File: E:\dev\ns-p8a\docs\_runs\trx\p8a-toy-curve-cf\Steve_BEAST_2026-11-07_20_29_38.trx
+Results File: E:\dev\ns-p8a\docs\_runs\trx\p8a-toy-curve-cf\Steve_BEAST_2026-11-07_20_59_14.trx
 
-Passed!  - Failed:     0, Passed:   797, Skipped:     0, Total:   797, Duration: 2 m 23 s - NetSec.Tests.dll (net48)
+Passed!  - Failed:     0, Passed:   801, Skipped:     0, Total:   801, Duration: 2 m 39 s - NetSec.Tests.dll (net48)
 ```
 
 ## dotnet test Host (live process)
@@ -90,9 +90,9 @@ Passed!  - Failed:     0, Passed:   797, Skipped:     0, Total:   797, Duration:
 Test run for E:\dev\ns-p8a\tests\NetSec.Host.Tests\bin\Release\net10.0\NetSec.Host.Tests.dll (.NETCoreApp,Version=v10.0)
 A total of 1 test files matched the specified pattern.
 Data collector 'Blame' message: All tests finished running, Sequence file will not be generated.
-Results File: E:\dev\ns-p8a\docs\_runs\trx\p8a-toy-curve-host\Steve_BEAST_2026-11-07_20_32_11.trx
+Results File: E:\dev\ns-p8a\docs\_runs\trx\p8a-toy-curve-host\Steve_BEAST_2026-11-07_21_02_02.trx
 
-Passed!  - Failed:     0, Passed:   219, Skipped:     0, Total:   219, Duration: 1 m 17 s - NetSec.Host.Tests.dll (net10.0)
+Passed!  - Failed:     0, Passed:   222, Skipped:     0, Total:   222, Duration: 1 m 12 s - NetSec.Host.Tests.dll (net10.0)
 ```
 
 ## acceptance A9
@@ -102,8 +102,8 @@ Passed!  - Failed:     0, Passed:   219, Skipped:     0, Total:   219, Duration:
 [acceptance] preparing: MMP.AsyncProxy builds, product builds
 [acceptance] group binproof (net10): 4 clauses
 [acceptance] 4 of 4 clauses PASS (0 FAIL, 0 NOT RUN); M = 385
-[acceptance] report: E:\dev\ns-p8a\docs\_runs\acceptance-20261107-203328.md
-[acceptance] json:   E:\dev\ns-p8a\docs\_runs\acceptance-20261107-203328.json
+[acceptance] report: E:\dev\ns-p8a\docs\_runs\acceptance-20261107-210315.md
+[acceptance] json:   E:\dev\ns-p8a\docs\_runs\acceptance-20261107-210315.json
 ```
 
 ## tour_lint
