@@ -1,5 +1,6 @@
 import { computed, reactive, ref, watchEffect } from 'vue'
 import type { SectionId } from './sections'
+import { attackName } from './attackNames'
 import { hostGet, normalizeError, normalizeEvent, openSocket, resolveHostAddress, type HostSocket } from './host'
 import { evaluateUnlock, findBound, parseHighlight, TOURS, type Unlock } from './tour'
 import type { AppMode, HostError, LessonRow, TourStep, TraceEvent, Transport, ViewMode } from './types'
@@ -167,7 +168,7 @@ async function refreshHostData() {
       if (n === 0) return TOY_LESSON
       return {
         lesson: n, title: r?.title || DEFAULT_TITLES[n - 1], built: !!r?.built, lanes: Array.isArray(r?.lanes) ? r.lanes.map(String) : [],
-        attacks: Array.isArray(r?.attacks) ? r.attacks.map((a: any) => (typeof a === 'string' ? { attackId: a, label: a } : { attackId: String(a.attackId ?? a.id), label: String(a.label ?? a.attackId ?? a.id), expectCheck: a.expectCheck, expectCode: a.expectCode })) : [],
+        attacks: Array.isArray(r?.attacks) ? r.attacks.map((a: any) => (typeof a === 'string' ? { attackId: a, label: attackName(a, a) } : { attackId: String(a.attackId ?? a.id), label: attackName(String(a.attackId ?? a.id), String(a.label ?? a.attackId ?? a.id)), expectCheck: a.expectCheck, expectCode: a.expectCode })) : [],
       }
     })
   } catch (e: any) { fail('HOST_LESSONS_FAILED', String(e?.message ?? e), true) }
