@@ -70,7 +70,7 @@ namespace NetSec.Host.Tests
             _process.BeginOutputReadLine();
             _process.BeginErrorReadLine();
             string line = null;
-            try { line = await ready.Task.WaitAsync(TimeSpan.FromSeconds(60)); }
+            try { line = await ProcessWaits.Within(ready.Task, TimeSpan.FromSeconds(60)); }
             catch (TimeoutException) { }
             if (line == null || !line.StartsWith("HOST-READY port=" + Port))
             {

@@ -38,7 +38,7 @@ public class SecurityLiveTests
             try
             {
                 Host host = new(env);
-                try { await host._ready.Task.WaitAsync(TimeSpan.FromSeconds(60)); }
+                try { await ProcessWaits.Within(host._ready.Task, TimeSpan.FromSeconds(60)); }
                 catch (TimeoutException)
                 {
                     host.Dispose();
