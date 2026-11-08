@@ -1,5 +1,33 @@
 namespace NetSec.Crypto
 {
+    /// <summary>The key schedule's steps, for the walk: PC-1's 56 bits, then C and D after each round's shift, and each 48-bit round key.</summary>
+    internal sealed class DesScheduleTrace
+    {
+        public ulong Chosen;
+        public uint[] C = new uint[16], D = new uint[16];
+    }
+
+    /// <summary>One S-box lookup: the 6 bits in, the row (outer bits) and column (inner 4 bits) they pick, and the 4 bits out.</summary>
+    internal sealed class DesBoxTrace
+    {
+        public int Six, Row, Column, Out;
+    }
+
+    /// <summary>One round of the Feistel network: the halves in, E(R), E(R) xor K, the 8 S-box lookups, their 32 bits, P of those (f), and the halves out.</summary>
+    internal sealed class DesRoundTrace
+    {
+        public uint LeftIn, RightIn, BoxesOut, F, LeftOut, RightOut;
+        public ulong Expanded, Mixed, RoundKey;
+        public DesBoxTrace[] Boxes = new DesBoxTrace[8];
+    }
+
+    /// <summary>A whole block: IP's output, the 16 rounds, the swapped halves R16 L16 before FP, and FP's output.</summary>
+    internal sealed class DesRunTrace
+    {
+        public ulong Permuted, PreOutput, Output;
+        public DesRoundTrace[] Rounds = new DesRoundTrace[16];
+    }
+
     /// <summary>
     /// The DES block cipher, FIPS 46-3, for use inside TdesKey. Table entries number the bits from 1 at the
     /// most significant end, as the standard prints them. A 64-bit block is one ulong.
@@ -115,9 +143,12 @@ namespace NetSec.Crypto
         };
 
         /// <summary>The 16 round keys of one 8-byte DES key. Each round key is 48 bits in a ulong. The parity bits go unused.</summary>
-        public static ulong[] Schedule(byte[] key, int off)
+        public static ulong[] Schedule(byte[] key, int off) { return Schedule(key, off, null); }
+
+        internal static ulong[] Schedule(byte[] key, int off, DesScheduleTrace trace)
         {
             ulong chosen = Permute(Endian.LoadBe64(key, off), 64, KeyChoice1);
+            if (trace != null) trace.Chosen = chosen;
             uint c = (uint)(chosen >> 28) & 0x0fffffff;
             uint d = (uint)chosen & 0x0fffffff;
 
@@ -127,32 +158,41 @@ namespace NetSec.Crypto
                 c = Rotl28(c, KeyShifts[round]);
                 d = Rotl28(d, KeyShifts[round]);
                 roundKeys[round] = Permute(((ulong)c << 28) | d, 56, KeyChoice2);
+                if (trace != null) { trace.C[round] = c; trace.D[round] = d; }
             }
             return roundKeys;
         }
 
-        public static ulong Encrypt(ulong block, ulong[] roundKeys) { return Run(block, roundKeys, false); }
-        public static ulong Decrypt(ulong block, ulong[] roundKeys) { return Run(block, roundKeys, true); }
+        public static ulong Encrypt(ulong block, ulong[] roundKeys) { return Run(block, roundKeys, false, null); }
+        public static ulong Decrypt(ulong block, ulong[] roundKeys) { return Run(block, roundKeys, true, null); }
+        internal static ulong Encrypt(ulong block, ulong[] roundKeys, DesRunTrace trace) { return Run(block, roundKeys, false, trace); }
 
         /// <summary>The Feistel network: 16 rounds of (L, R) to (R, L xor f(R, key)). Decryption is the same with the round keys reversed.</summary>
-        static ulong Run(ulong block, ulong[] roundKeys, bool reverse)
+        static ulong Run(ulong block, ulong[] roundKeys, bool reverse, DesRunTrace trace)
         {
             ulong permuted = Permute(block, 64, InitialPermutation);
             uint left = (uint)(permuted >> 32);
             uint right = (uint)permuted;
             for (int round = 0; round < 16; round++)
             {
-                uint next = left ^ Feistel(right, roundKeys[reverse ? 15 - round : round]);
+                DesRoundTrace r = trace == null ? null : new DesRoundTrace();
+                if (r != null) { r.LeftIn = left; r.RightIn = right; r.RoundKey = roundKeys[reverse ? 15 - round : round]; }
+                uint next = left ^ Feistel(right, roundKeys[reverse ? 15 - round : round], r);
                 left = right;
                 right = next;
+                if (r != null) { r.LeftOut = left; r.RightOut = right; trace.Rounds[round] = r; }
             }
-            return Permute(((ulong)right << 32) | left, 64, FinalPermutation);
+            ulong preOutput = ((ulong)right << 32) | left;
+            ulong output = Permute(preOutput, 64, FinalPermutation);
+            if (trace != null) { trace.Permuted = permuted; trace.PreOutput = preOutput; trace.Output = output; }
+            return output;
         }
 
         /// <summary>f: expand 32 bits to 48, xor the round key, turn each 6 bits into 4 through an S-box, then permute.</summary>
-        static uint Feistel(uint right, ulong roundKey)
+        static uint Feistel(uint right, ulong roundKey, DesRoundTrace trace)
         {
-            ulong mixed = Permute(right, 32, Expansion) ^ roundKey;
+            ulong expanded = Permute(right, 32, Expansion);
+            ulong mixed = expanded ^ roundKey;
             ulong output = 0;
             for (int box = 0; box < 8; box++)
             {
@@ -160,8 +200,16 @@ namespace NetSec.Crypto
                 int row = ((six >> 4) & 2) | (six & 1);
                 int column = (six >> 1) & 15;
                 output = (output << 4) | (uint)Boxes[box][row * 16 + column];
+                if (trace != null)
+                {
+                    DesBoxTrace b = new DesBoxTrace();
+                    b.Six = six; b.Row = row; b.Column = column; b.Out = Boxes[box][row * 16 + column];
+                    trace.Boxes[box] = b;
+                }
             }
-            return (uint)Permute(output, 32, RoundPermutation);
+            uint f = (uint)Permute(output, 32, RoundPermutation);
+            if (trace != null) { trace.Expanded = expanded; trace.Mixed = mixed; trace.BoxesOut = (uint)output; trace.F = f; }
+            return f;
         }
 
         /// <summary>Output bit k is input bit table[k], counted from the top of the inputBits-wide value.</summary>
