@@ -675,8 +675,9 @@ async function textsDuring(page: Page, ids: string[], ms: number): Promise<Recor
         const text = el && el.offsetParent !== null ? (el.textContent ?? '') : '';
         if (text && !out[id].includes(text)) out[id].push(text);
       }
+      // A build can pause between its steps with nothing animating (rows about 950 ms apart at normal speed), so only 3 s of stillness ends it.
       still = document.getAnimations().some(a => a.playState === 'running') ? 0 : still + 1;
-      if (t > ms || (t > 1500 && still > 30)) done(out); else requestAnimationFrame(tick);
+      if (t > ms || (t > 1500 && still > 180)) done(out); else requestAnimationFrame(tick);
     };
     tick();
   }), { ids, ms });
