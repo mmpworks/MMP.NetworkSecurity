@@ -8,7 +8,7 @@ const { fitWindow } = require('../electron/window-size.cjs') as { fitWindow: (ar
 const f = (name: string, offset: number, length: number, kind: TraceField['kind'], visibleToWire = true): TraceField => ({ name, offset, length, kind, visibleToWire, gloss: '' })
 const ev = (p: Partial<TraceEvent>): TraceEvent => ({
   seq: 1, eventId: '', streamId: 's/client/aes', sessionId: 's', traceId: '', hop: '', actor: 'client', from: 'client', to: 'server', type: 'wire.sent', message: 'm', step: '',
-  wire: '', plain: '', fields: [], secrets: [], check: null, waiting: '', detail: '', ...p,
+  typeId: '', version: 0, provider: '', wire: '', plain: '', fields: [], secrets: [], check: null, waiting: '', detail: '', ...p,
 })
 const hexOf = (n: number, b: number) => b.toString(16).padStart(2, '0').repeat(n)
 const gcm = ev({

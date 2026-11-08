@@ -115,6 +115,19 @@ $tours = @(Get-ChildItem 'app/src/tours/lesson-*.json' -ErrorAction SilentlyCont
 if ($tours.Count -eq 0) { Skip 'tic-gate on tours' 'no tour file in this tree yet' }
 foreach ($tour in $tours) { Step "tic-gate $($tour.Name)" { python (Join-Path $HOME '.claude/hooks/tic-gate.py') $tour.FullName } }
 
+# app/e2e had no tsconfig, so "npm run typecheck" checked app/src only and no spec file was ever type-checked. It checks both now.
+if ($appWhy) { Skip 'typecheck (app/src and app/e2e)' $appWhy }
+else {
+    Step 'typecheck (app/src and app/e2e)' {
+        Push-Location app
+        if (-not (Test-Path 'node_modules')) { npm ci --no-audit --no-fund; if ($LASTEXITCODE -ne 0) { Pop-Location; return } }
+        npm run typecheck
+        $code = $LASTEXITCODE
+        Pop-Location
+        $global:LASTEXITCODE = $code
+    }
+}
+
 if ($appWhy) { Skip 'playwright lesson spec' $appWhy }
 elseif (-not $Lesson) { Skip 'playwright lesson spec' 'no -Lesson given' }
 else { Step "playwright lesson $Lesson" { Push-Location app; npx playwright test "e2e/lesson-$Lesson.spec.ts"; Pop-Location } }
