@@ -21,7 +21,8 @@ namespace NetSec.Labs.Teaching
     }
 
     /// <summary>
-    /// One bit of the Montgomery ladder. Every bit does one addition and one doubling, whatever its value, so the work does not show the bit.
+    /// One bit of the Montgomery ladder. Every bit does the same steps, one addition and one doubling, whatever its value. The same steps
+    /// are not the same time: ToyCurve.Add takes shorter branches for O. Constant time is the X25519 walk's and lesson 11's point.
     /// On a 0: R1 = R0 + R1, then R0 = 2·R0. On a 1: R0 = R0 + R1, then R1 = 2·R1. R1 - R0 stays G.
     /// </summary>
     public sealed class ToyLadderRow
