@@ -32,6 +32,8 @@ import NeedsBanner from './components/NeedsBanner.vue'
 import SecurityPage from './components/SecurityPage.vue'
 import GlossaryPage from './components/GlossaryPage.vue'
 import AesWalkPanel from './components/AesWalkPanel.vue'
+import AesLongStrip from './components/AesLongStrip.vue'
+import AesLongLink from './components/AesLongLink.vue'
 import { openAesWalk } from './aesWalkState'
 import VaultPage from './components/VaultPage.vue'
 import { closeVault, vault } from './vault'
@@ -168,8 +170,11 @@ const shortcuts: [string, string][] = [
           <Pane :size="shares.rail" :min-size="11"><LessonRail v-if="ui.section === 'lessons'" /><SectionRail v-else /></Pane>
           <Pane :size="100 - shares.rail" :min-size="60">
             <div class="workspace" data-testid="workspace">
+            <!-- R1: the long text stays pinned above the walk on every Techniques item, as a sibling of walk-root, so the walk's clip cannot cut it. -->
+            <AesLongStrip v-if="ui.section === 'techniques'" />
             <!-- The AES walk mounts here and replaces the panels. Its tips and spec cards go to overlay-layer, outside this clip. -->
             <section v-if="aesWalkOpen" data-testid="walk-root" class="walk-root"><AesWalkPanel /></section>
+            <AesLongLink v-if="aesWalkOpen" />
             <!-- Handshake and Techniques: the walk screens arrive in their slices. Until then the workspace says which slice brings the picked walk. -->
             <section v-if="ui.section !== 'lessons' && !aesWalkOpen" class="section-placeholder" data-testid="section-placeholder">
               <h2>{{ sectionOf(ui.section).label }}</h2>

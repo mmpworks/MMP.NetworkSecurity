@@ -21,6 +21,25 @@ export interface AesKeyWordRow {
   keyBack: string | null
   word: string
 }
+/** How the engine cut the typed text into chapter 1's block (design 2.2g). Byte counts, as UTF-8. */
+export interface AesTypedCut { block: string; usedBytes: number; paddingBytes: number; notIncludedBytes: number; splitCharacterBytesIn: number }
+
+/** One row of the long-text reply: one 16-byte block of the text, as hex. */
+export interface AesLongRow { block: number; data: string }
+
+/**
+ * Splits typed text at a byte count, as UTF-8, for the box's marking: the characters the block uses, a character that crosses
+ * the edge, and the rest. It counts bytes and computes no crypto value. `used` comes from the engine's cut.
+ */
+export function splitAtBytes(text: string, used: number): { inside: string; split: string; outside: string } {
+  const enc = new TextEncoder()
+  let bytes = 0, i = 0
+  const chars = [...text]
+  while (i < chars.length && bytes + enc.encode(chars[i]).length <= used) bytes += enc.encode(chars[i++]).length
+  const split = i < chars.length && bytes < used ? chars[i++] : ''
+  return { inside: chars.slice(0, i - (split ? 1 : 0)).join(''), split, outside: chars.slice(i).join('') }
+}
+
 /** The public tables route: the S-boxes, the round constants, and the size table. It holds no key byte. */
 export interface AesSize { keyBits: number; keyWords: number; rounds: number; roundKeys: number; words: number; rconUsed: number }
 export interface AesTables { sbox: string; inverseSbox: string; shiftRows: number[]; inverseShiftRows: number[]; rcon: string; sizes: AesSize[] }
@@ -66,10 +85,10 @@ export function letterOf(byte: string): string {
   return n >= 0x20 && n < 0x7f ? String.fromCharCode(n) : ''
 }
 
-/** The text a block holds, with a dot for each byte that is not printable. */
-export function textOf(hex: string): string {
+/** The text a block holds, with a mark for each byte that is not printable: '.' by default, '·' where a '.' could pass for text. */
+export function textOf(hex: string, mark = '.'): string {
   let out = ''
-  for (let i = 0; i < hex.length / 2; i++) out += letterOf(byteAt(hex, i)) || '.'
+  for (let i = 0; i < hex.length / 2; i++) out += letterOf(byteAt(hex, i)) || mark
   return out
 }
 
