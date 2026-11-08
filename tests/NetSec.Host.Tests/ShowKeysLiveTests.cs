@@ -186,6 +186,9 @@ public sealed class ShowKeysLiveTests
     /// The same class as PR #140, in session.load: a replay must pick each line by the toggle as it is when the line goes out.
     /// A file of 3,000 padded lines keeps the replay running while the flip lands. 3,000 frames stay under the socket queue
     /// of 4,096, so no frame drops and the order the socket sees is the order the Host sent.
+    /// The flip is a separate HTTP call, so on a busy machine it can land after the replay ends. Then the run proves nothing:
+    /// the test reads until both the flip frame and session.finished arrive, and tries again with longer lines, which make
+    /// the replay slower. It fails, never passes, when no try puts the flip inside the replay.
     /// </summary>
     [Fact]
     public async Task A_replay_sends_no_hex_after_a_flip_to_off_that_lands_while_it_runs()
@@ -194,25 +197,37 @@ public sealed class ShowKeysLiveTests
         string source = StartedFile(await host.Session(1));
         string[] lines = File.ReadAllLines(source).Where(l => l.Length > 0).ToArray();
         Assert.True(WithHex(SecretsOfText(string.Join("\n", lines))) > 0, "control: the ON file holds no hex");
-        string pad = new('a', 16_000);
         string big = Path.Combine(Path.GetDirectoryName(source)!, "replay-race.ndjson");
-        File.WriteAllLines(big, Enumerable.Range(0, 3000).Select(i => lines[i % lines.Length][..^1] + ",\"pad\":\"" + pad + "\"}"));
+        var misses = new List<string>();
 
-        using Ws ws = new(host);
-        await ws.Open();
-        await ws.Send(new { type = "session.load", requestId = "race", file = Path.GetFileName(big) });
-        await ws.Until("session.started");
-        await SetShowKeys(host, false);
-        await ws.Until("session.finished");
+        foreach (int padSize in new[] { 16_000, 32_000, 48_000 })
+        {
+            await SetShowKeys(host, true);
+            string pad = new('a', padSize);
+            File.WriteAllLines(big, Enumerable.Range(0, 3000).Select(i => lines[i % lines.Length][..^1] + ",\"pad\":\"" + pad + "\"}"));
+            using Ws ws = new(host);
+            await ws.Open();
+            await ws.Send(new { type = "session.load", requestId = "race", file = Path.GetFileName(big) });
+            await ws.Until("session.started");
+            await SetShowKeys(host, false);
+            await ws.Until("session.finished");
+            int finished = ws.Frames.Count - 1;
+            int off = ws.Frames.FindIndex(f => f.GetProperty("type").GetString() == "security.show-keys");
+            if (off < 0) { await ws.Until("security.show-keys"); off = ws.Frames.Count - 1; }
 
-        int off = ws.Frames.FindIndex(f => f.GetProperty("type").GetString() == "security.show-keys");
-        Assert.True(off >= 0, "the socket never got the flip frame");
-        int traces = ws.Frames.Count(f => f.GetProperty("type").GetString() == "trace");
-        Assert.True(traces == 3000, "the socket got " + traces + " of 3000 trace frames, so the order check would not hold");
-        int late = WithHex(ws.Frames.Skip(off + 1).SelectMany(SecretsIn));
-        Assert.True(late == 0, late + " secrets with hex reached the socket after the flip to OFF, out of " + ws.Frames.Skip(off + 1).Count(f => f.GetProperty("type").GetString() == "trace") + " trace frames after it");
-        int before = ws.Frames.Take(off).Count(f => f.GetProperty("type").GetString() == "trace");
-        Assert.True(before > 0, "the flip landed before the replay started, so the test proves nothing");
-        Assert.True(before < 3000, "the replay ended before the flip, so the test proves nothing");
+            int before = ws.Frames.Take(off).Count(f => f.GetProperty("type").GetString() == "trace");
+            if (off > finished || before == 0 || before >= 3000)
+            {
+                misses.Add("pad " + padSize + ": the flip landed after " + before + " of 3000 trace frames" + (off > finished ? ", after session.finished" : ""));
+                continue;
+            }
+
+            int traces = ws.Frames.Count(f => f.GetProperty("type").GetString() == "trace");
+            Assert.True(traces == 3000, "the socket got " + traces + " of 3000 trace frames, so the order check would not hold");
+            int late = WithHex(ws.Frames.Skip(off + 1).SelectMany(SecretsIn));
+            Assert.True(late == 0, late + " secrets with hex reached the socket after the flip to OFF, out of " + ws.Frames.Skip(off + 1).Count(f => f.GetProperty("type").GetString() == "trace") + " trace frames after it");
+            return;
+        }
+        Assert.Fail("no try put the flip inside the replay, so the test proves nothing: " + string.Join("; ", misses));
     }
 }
