@@ -82,6 +82,10 @@ namespace Acceptance
                     if (r.Status == 404 && string.IsNullOrEmpty(r.Code)) throw new NotRunException("PRODUCT_MISSING", "the Host has no route " + Path + " yet (slice P7)");
                     Check.True(r.Ok && r.Json != null, "OFF: GET " + Path + "?group=" + group + " got " + r + ". The walk runs on public practice exponents, so it stays open");
                     Check.Equal(group + ": keySource", "practice", MiniJson.Str(r.Json, "keySource"));
+                    // The size of the exponent a real exchange draws (SshKex.DhPrivateSize * 8), which the screen notes beside the short practice
+                    // exponent. At least 2 x 112 bits, the strength NIST SP 800-57 gives group 14, without pinning today's 512.
+                    double realBits = MiniJson.Num(r.Json, "realExponentBits", -1);
+                    Check.True(realBits >= 224, group + ": realExponentBits is " + realBits + ", and a real group 14 exponent needs at least 2 x 112 bits");
                     BigInteger p = Num(r.Json, "prime", group), g = Num(r.Json, "generator", group);
                     if (group == "group14") { Check.True(p == p14, "group14: the prime is not RFC 3526 group 14's"); Check.True(g == g14, "group14: the generator is not RFC 3526 group 14's"); }
                     else Check.True(p > 2 && g > 1 && g < p, "small: the prime and generator do not make a group");

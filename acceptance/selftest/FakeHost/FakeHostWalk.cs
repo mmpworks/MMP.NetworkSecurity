@@ -168,7 +168,7 @@ namespace Acceptance
                 x = DhWalkClauses.FromHex("9b" + new string('3', 62)); y = DhWalkClauses.FromHex("a7" + new string('5', 62));
             }
             System.Numerics.BigInteger cp = System.Numerics.BigInteger.ModPow(g, x, p), sp = System.Numerics.BigInteger.ModPow(g, y, p);
-            WalkWrite(ctx, 200, D("group", group, "keySource", "practice", "prime", DhNum(p), "generator", DhNum(g),
+            WalkWrite(ctx, 200, D("group", group, "keySource", "practice", "realExponentBits", M("dh-real-bits-short") ? 160.0 : 512.0, "prime", DhNum(p), "generator", DhNum(g),
                 "client", D("private", DhNum(x), "public", DhPow(g, x, p), "shared", DhPow(sp, x, p)),
                 "server", D("private", DhNum(y), "public", DhPow(g, y, p), "shared", DhPow(cp, y, p, M("dh-shared-mismatch")))), false);
             return true;
