@@ -80,8 +80,8 @@ public sealed class OsTransportTrustTests
     public async Task Lesson_5_trusts_a_server_only_as_windows_would(string name)
     {
         Case c = Of(name);
-        using Peer peer = new(c.Make, c.ServerFiles);
-        using SecurityLiveTests.Host host = new(new() { ["NETSEC_OS_PEER"] = "127.0.0.1:" + peer.Port, ["SSL_CERT_FILE"] = Path.Combine(peer.Dir, c.Trust) });
+        using Peer peer = await Peer.StartAsync(c.Make, c.ServerFiles);
+        using SecurityLiveTests.Host host = await SecurityLiveTests.Host.StartAsync(new() { ["NETSEC_OS_PEER"] = "127.0.0.1:" + peer.Port, ["SSL_CERT_FILE"] = Path.Combine(peer.Dir, c.Trust) });
         List<JsonElement> frames = await host.Session(5, "os");
         JsonElement finished = frames[^1];
         Assert.Equal("session.finished", finished.GetProperty("type").GetString());
@@ -109,8 +109,8 @@ public sealed class OsTransportTrustTests
         for (int i = 0; i < names.Length; i++)
         {
             Case c = Of(names[i]);
-            using Peer peer = new(c.Make, c.ServerFiles);
-            using SecurityLiveTests.Host host = new(new() { ["NETSEC_OS_PEER"] = "127.0.0.1:" + peer.Port, ["SSL_CERT_FILE"] = Path.Combine(peer.Dir, c.Trust) });
+            using Peer peer = await Peer.StartAsync(c.Make, c.ServerFiles);
+            using SecurityLiveTests.Host host = await SecurityLiveTests.Host.StartAsync(new() { ["NETSEC_OS_PEER"] = "127.0.0.1:" + peer.Port, ["SSL_CERT_FILE"] = Path.Combine(peer.Dir, c.Trust) });
             details[i] = string.Join(" ", (await host.Session(5, "os")).Where(f => f.GetProperty("type").GetString() == "trace")
                 .Select(f => f.GetProperty("event")).Where(e => e.GetProperty("type").GetString() == "os.failed")
                 .Select(e => e.GetProperty("detail").GetString()));

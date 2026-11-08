@@ -29,7 +29,27 @@ public class SecurityLiveTests
         public readonly int Port;
         public string SecurityDir => Path.Combine(Root, "security");
 
-        public Host(Dictionary<string, string>? env = null)
+        readonly TaskCompletionSource<bool> _ready = new(TaskCreationOptions.RunContinuationsAsynchronously);
+
+        /// <summary>Starts a Host and waits for its ready line without holding a pool thread (ProcessWaits).</summary>
+        public static async Task<Host> StartAsync(Dictionary<string, string>? env = null)
+        {
+            await ProcessWaits.StartSlots.WaitAsync();
+            try
+            {
+                Host host = new(env);
+                try { await host._ready.Task.WaitAsync(TimeSpan.FromSeconds(60)); }
+                catch (TimeoutException)
+                {
+                    host.Dispose();
+                    Assert.Fail("the Host gave no ready line in 60 s");
+                }
+                return host;
+            }
+            finally { ProcessWaits.StartSlots.Release(); }
+        }
+
+        Host(Dictionary<string, string>? env)
         {
             Directory.CreateDirectory(Root);
             TcpListener free = new(IPAddress.Loopback, 0);
@@ -42,13 +62,11 @@ public class SecurityLiveTests
             info.Environment["LOCALAPPDATA"] = Root;
             info.Environment["NETSEC_SECURITY_DIR"] = SecurityDir;
             foreach (KeyValuePair<string, string> pair in env ?? []) info.Environment[pair.Key] = pair.Value;
-            TaskCompletionSource<bool> ready = new(TaskCreationOptions.RunContinuationsAsynchronously);
             _process = new Process { StartInfo = info };
-            _process.OutputDataReceived += (_, e) => { if (e.Data != null && e.Data.StartsWith("HOST-READY")) ready.TrySetResult(true); };
+            _process.OutputDataReceived += (_, e) => { if (e.Data != null && e.Data.StartsWith("HOST-READY")) _ready.TrySetResult(true); };
             _process.Start();
             _process.BeginOutputReadLine();
             _process.BeginErrorReadLine();
-            Assert.True(ready.Task.Wait(TimeSpan.FromSeconds(60)), "the Host gave no ready line in 60 s");
             _http.DefaultRequestHeaders.Add("Authorization", "Bearer " + Token);
         }
 
@@ -133,7 +151,7 @@ public class SecurityLiveTests
     [Fact]
     public async Task A_broken_key_stops_only_the_lessons_that_read_it_and_by_name()
     {
-        using Host host = new();
+        using Host host = await Host.StartAsync();
         await host.MakeFlow("my-login");
         // The my-login keys live in the vault (slice V1), so a person with the file breaks one by changing its wrapped row.
         using (Microsoft.Data.Sqlite.SqliteConnection db = new("Data Source=" + Path.Combine(host.SecurityDir, "vault", "vault.db") + ";Pooling=False"))
@@ -156,7 +174,7 @@ public class SecurityLiveTests
     [Fact]
     public async Task A_key_route_on_a_broken_key_answers_by_name()
     {
-        using Host host = new();
+        using Host host = await Host.StartAsync();
         await host.MakeFlow("my-certificates");
         File.WriteAllText(Path.Combine(host.SecurityDir, "files", "tls13.server", "v1", "key.pem"), "this is no key");
         (int status, string body) = await host.Get("/api/security/types/tls13.server/key");
@@ -167,7 +185,7 @@ public class SecurityLiveTests
     [Fact]
     public async Task A_key_broken_after_the_flow_stops_its_own_flow_step_by_name_and_not_with_a_server_error()
     {
-        using Host host = new();
+        using Host host = await Host.StartAsync();
         await host.MakeFlow("my-certificates");
         File.WriteAllText(Path.Combine(host.SecurityDir, "files", "tls13.server", "v1", "key.pem"), "this is no key");
         (int status, string body) = await host.Get("/api/security");
@@ -178,7 +196,7 @@ public class SecurityLiveTests
     [Fact]
     public async Task The_lesson_key_check_shows_no_key_in_its_command()
     {
-        using Host host = new();
+        using Host host = await Host.StartAsync();
         string reply = await host.CheckReply("my-lesson-keys");
         JsonElement[] facts = JsonDocument.Parse(reply).RootElement.GetProperty("step").GetProperty("facts").EnumerateArray().ToArray();
         Assert.Equal(2, facts.Length);

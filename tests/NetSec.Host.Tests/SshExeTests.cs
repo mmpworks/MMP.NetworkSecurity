@@ -22,6 +22,7 @@ namespace NetSec.Host.Tests
     /// Windows ssh.exe against our server, past what A8 asks: the legacy suite, and a tunnel through -W. OpenSSH refuses ssh-rsa unless told, so the
     /// flags turn on each old name. A pinned ssh.exe that has gone fails here. It does not skip, because a skip hides a lost referee.
     /// </summary>
+    [Collection(BlockingProductCalls.Name)]
     public class SshExeTests
     {
         const string SshExe = @"C:\Windows\System32\OpenSSH\ssh.exe";
@@ -54,10 +55,9 @@ namespace NetSec.Host.Tests
             string dir = KeyFolder();
             ProbeListener listener = Probe.Listen(new ProbeRequest { Protocol = WireProtocol.Ssh, Host = "127.0.0.1", SshSuite = suite, Seed = 11 });
             using Process ssh = Ssh(dir, listener.Port, flags, "echo hello", false);
-            string output = ssh.StandardOutput.ReadToEnd();
-            string errors = ssh.StandardError.ReadToEnd();
-            Assert.True(ssh.WaitForExit(30000), "ssh.exe did not finish");
-            Assert.True(ssh.ExitCode == 0, "ssh.exe exited " + ssh.ExitCode + ": " + errors);
+            (bool exited, int code, string output, string errors) = ProcessWaits.ReadAll(ssh, TimeSpan.FromSeconds(30));
+            Assert.True(exited, "ssh.exe did not finish");
+            Assert.True(code == 0, "ssh.exe exited " + code + ": " + errors);
             Assert.Equal("hello\n", output.Replace("\r\n", "\n"));
             Assert.True(listener.Result.Wait(30000), "the server did not finish");
             Assert.True(listener.Result.Result.Completed, listener.Result.Result.Code + " " + listener.Result.Result.CheckName);
@@ -87,10 +87,9 @@ namespace NetSec.Host.Tests
             GlassSshSession server = new GlassSshSession(SshEngine.Server(options, new TraceStream("s", "s", "s", null, "server", new MonotonicClock()), null, "client"), accepted.Result, sink, new FreeRunGate(), null, 30000, null, null);
             server.Run();
 
-            string output = ssh.StandardOutput.ReadToEnd();
-            string errors = ssh.StandardError.ReadToEnd();
-            Assert.True(ssh.WaitForExit(30000), "ssh.exe did not finish");
-            Assert.True(ssh.ExitCode == 0, "ssh.exe exited " + ssh.ExitCode + ": " + errors);
+            (bool exited, int code, string output, string errors) = ProcessWaits.ReadAll(ssh, TimeSpan.FromSeconds(30));
+            Assert.True(exited, "ssh.exe did not finish");
+            Assert.True(code == 0, "ssh.exe exited " + code + ": " + errors);
             Assert.Equal("hello\n", output.Replace("\r\n", "\n"));
             Assert.True(server.Finished.Wait(30000), "the server did not finish");
             Assert.Null(server.Finished.Result.Error);
@@ -130,9 +129,9 @@ namespace NetSec.Host.Tests
             ProbeListener strict = Probe.Listen(new ProbeRequest { Protocol = WireProtocol.Ssh, Host = "127.0.0.1", SshSuite = SshSuite.Modern, Seed = 13 });
             using (Process refused = Ssh(dir, strict.Port, ModernFlags, "-W 127.0.0.1:" + echoPort, true))
             {
-                string errors = refused.StandardError.ReadToEnd();
-                Assert.True(refused.WaitForExit(30000), "ssh.exe did not finish");
-                Assert.NotEqual(0, refused.ExitCode);
+                (bool exited, int code, _, string errors) = ProcessWaits.ReadAll(refused, TimeSpan.FromSeconds(30));
+                Assert.True(exited, "ssh.exe did not finish");
+                Assert.NotEqual(0, code);
                 Assert.Contains("administratively prohibited", errors);
             }
             Assert.True(strict.Result.Wait(30000), "the server did not finish");

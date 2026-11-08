@@ -15,18 +15,27 @@ using Xunit;
 
 namespace NetSec.Host.Tests
 {
-    /// <summary>One Host process for the class, with its own session folder.</summary>
-    public sealed class HostFixture : IDisposable
+    /// <summary>
+    /// One Host process for the class, with its own session folder. It starts in InitializeAsync, which awaits the ready line, so building the
+    /// fixture holds no thread-pool thread (ProcessWaits explains why that matters).
+    /// </summary>
+    public sealed class HostFixture : IAsyncLifetime
     {
-        readonly Process _process;
-        public readonly int Port;
+        Process _process;
+        public readonly int Port = FreePort();
         public readonly string Token = Guid.NewGuid().ToString("N");
         public readonly string AppData = Path.Combine(Path.GetTempPath(), "netsec-host-tests-" + Guid.NewGuid().ToString("N"));
 
-        public HostFixture()
+        public async Task InitializeAsync()
+        {
+            await ProcessWaits.StartSlots.WaitAsync();
+            try { await StartAsync(); }
+            finally { ProcessWaits.StartSlots.Release(); }
+        }
+
+        async Task StartAsync()
         {
             Directory.CreateDirectory(AppData);
-            Port = FreePort();
             ProcessStartInfo info = new ProcessStartInfo("dotnet", "\"" + HostDll() + "\"") { UseShellExecute = false, RedirectStandardOutput = true, RedirectStandardError = true, CreateNoWindow = true };
             info.Environment["NETSEC_PORT"] = Port.ToString();
             info.Environment["NETSEC_TOKEN"] = Token;
@@ -38,7 +47,10 @@ namespace NetSec.Host.Tests
             _process.Start();
             _process.BeginOutputReadLine();
             _process.BeginErrorReadLine();
-            if (!ready.Task.Wait(TimeSpan.FromSeconds(60)) || !ready.Task.Result.StartsWith("HOST-READY port=" + Port))
+            string line = null;
+            try { line = await ready.Task.WaitAsync(TimeSpan.FromSeconds(60)); }
+            catch (TimeoutException) { }
+            if (line == null || !line.StartsWith("HOST-READY port=" + Port))
             {
                 _process.Kill(entireProcessTree: true);
                 throw new InvalidOperationException("the Host gave no ready line in 60 s");
@@ -64,11 +76,14 @@ namespace NetSec.Host.Tests
             return port;
         }
 
-        public void Dispose()
+        public async Task DisposeAsync()
         {
-            _process.Kill(entireProcessTree: true);
-            _process.WaitForExit(5000);
-            _process.Dispose();
+            if (_process != null)
+            {
+                try { _process.Kill(entireProcessTree: true); } catch (InvalidOperationException) { }
+                await ProcessWaits.ExitedWithin(_process, TimeSpan.FromSeconds(5));
+                _process.Dispose();
+            }
             Directory.Delete(AppData, recursive: true);
         }
     }

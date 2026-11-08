@@ -30,7 +30,7 @@ public class Tls13WalkRoutesLiveTests
     [Fact]
     public async Task The_schedule_route_answers_with_Show_keys_off_and_every_step_matches_rfc_8448()
     {
-        using SecurityLiveTests.Host host = new();
+        using SecurityLiveTests.Host host = await SecurityLiveTests.Host.StartAsync();
         (int off, _) = await host.Put("/api/security/show-keys", "{\"on\":false}");
         Assert.Equal(200, off);
 

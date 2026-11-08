@@ -75,7 +75,7 @@ namespace NetSec.Host.Tests
             finally
             {
                 host.Kill(entireProcessTree: true);
-                host.WaitForExit(5000);
+                await ProcessWaits.ExitedWithin(host, TimeSpan.FromSeconds(5));
             }
         }
 
@@ -91,11 +91,13 @@ namespace NetSec.Host.Tests
             {
                 if (e.Data != null && e.Data.StartsWith("HOST_OPTION_REFUSED")) named.TrySetResult(true);
             });
-            bool exited = await Task.Run(() => host.WaitForExit(60000));
+            // ExitedWithin also waits for the end of the redirected output, so the refusal line, if the Host wrote one, has arrived.
+            // The old wait, Task.Run(() => WaitForExit(60000)), held a pool thread and returned before the output drained.
+            bool exited = await ProcessWaits.ExitedWithin(host, TimeSpan.FromSeconds(60));
             if (!exited) host.Kill(entireProcessTree: true);
             Assert.True(exited, "the Host kept running with a bad flag");
             Assert.Equal(2, host.ExitCode);
-            Assert.True(await Task.WhenAny(named.Task, Task.Delay(5000)) == named.Task, "the Host did not name the refusal");
+            Assert.True(named.Task.IsCompleted, "the Host did not name the refusal");
         }
     }
 }

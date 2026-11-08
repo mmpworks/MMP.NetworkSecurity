@@ -319,7 +319,7 @@ namespace NetSec.Host.Tests
         {
             using Child node = new Child("dotnet", $"\"{Under("src", "NetSec.Node", "bin", "Release", "net10.0", "NetSec.Node.dll")}\" --role {role} --listen 0");
             await node.Line("NODE_FLAG_MISSING");
-            Assert.True(await Task.Run(() => node.P.WaitForExit(30000)));
+            Assert.True(await ProcessWaits.ExitedWithin(node.P, TimeSpan.FromSeconds(30)));
             Assert.Equal(2, node.P.ExitCode);
         }
     }
