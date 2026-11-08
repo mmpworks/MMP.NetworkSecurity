@@ -134,5 +134,5 @@ The kill-condition test is written before the implementation: same seed, 20 runs
 5. A connection where 3 actors write sends or receives gives one `clock.link-ambiguous` frame and no guessed match.
 6. A clockless event (wire, `keys`) sorts right after its side's last engine event before it, or at clock 0 before any.
 7. The catch is the first failed check in (clock, side) order; a tie on clock goes to the side that sorts first.
-8. On a fixed two-side trace, the backward walk from the catch reaches exactly the events on its stream before it, and through each matched receive the sender's events up to that send; a send after the last reached one is "after the catch".
+8. On a fixed two-side trace, the backward walk from the catch reaches the events on its stream before it, and through each matched receive the sender's events up to that send, and no others; a send after the last reached one is "after the catch".
 9. A run with no failed check sends `trace.catch` with `"catchEventId": null` and an empty `afterCatch`.
