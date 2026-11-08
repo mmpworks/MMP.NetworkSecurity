@@ -32,6 +32,7 @@ namespace Acceptance
         {
             Dir = dir; _mutation = mutation ?? ""; _openssl = openssl;
             Directory.CreateDirectory(dir);
+            _builtInTls11Key = Tls11KeyFor(vaultScript, M("tls11-key-not-source"));
             VaultInit(vaultScript);
             _showKeys = !M("default-off");
             foreach (string t in A17.AllTypes) _types[t] = new TypeState { TypeId = t };
@@ -266,15 +267,27 @@ namespace Acceptance
             return D("types", types, "showKeys", _showKeys);
         }
 
-        /// <summary>The key bytes a lab holds for a type: the learner's when Mine and bound, else a built-in key fixed by the type name.</summary>
-        /// <summary>The built-in TLS 1.1 server key: a real RSA key as PKCS#8 DER, made once per run, as the real Host's is a real RSA key.</summary>
-        static readonly Lazy<byte[]> BuiltInTls11Key = new Lazy<byte[]>(() => { using (RSA rsa = RSA.Create(2048)) return rsa.ExportPkcs8PrivateKey(); });
+        /// <summary>
+        /// The built-in TLS 1.1 server key as PKCS#8 DER: the key public in src/NetSec.Core/Keys/TrainingRsaKeys.cs, as on the real Host.
+        /// The tls11-key-not-source defect makes a fresh RSA key instead, so the export and the walk agree with each other and not with the source.
+        /// </summary>
+        readonly byte[] _builtInTls11Key;
 
+        static byte[] Tls11KeyFor(string vaultScript, bool notSource)
+        {
+            if (notSource) { using (RSA rsa = RSA.Create(2048)) return rsa.ExportPkcs8PrivateKey(); }
+            // vaultScript is <repo>/acceptance/selftest/FakeHost/fakevault.py, so the repo root is 4 folders up.
+            string root = Path.GetFullPath(vaultScript);
+            for (int i = 0; i < 4; i++) root = Path.GetDirectoryName(root);
+            return Tls11WalkClauses.SourceTls11Key(root);
+        }
+
+        /// <summary>The key bytes a lab holds for a type: the learner's when Mine and bound, else a built-in key fixed by the type name.</summary>
         byte[] KeyBytes(TypeState t)
         {
             if (Active(t) && t.Seed != null) return t.Seed;
             if (t.TypeId == "token.issuer") return _builtinIssuer.Seed;
-            if (t.TypeId == "tls11.server") return BuiltInTls11Key.Value;
+            if (t.TypeId == "tls11.server") return _builtInTls11Key;
             using (SHA256 sha = SHA256.Create())
             {
                 byte[] all = sha.ComputeHash(Encoding.ASCII.GetBytes("builtin:" + t.TypeId));
