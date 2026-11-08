@@ -68,6 +68,7 @@ namespace Acceptance
             new Case("A19.host.real-curve-open-and-on-curve", CurveWalkClauses.RealCurve, "real-off-curve"),
             new Case("A19.host.tls11-schedule-open-and-prf", Tls11WalkClauses.Tls11Schedule, "tls11-closed-off", "tls11-master-wrong", "tls11-other-key", "tls11-key-not-source"),
             new Case("A19.host.dh-walk-open-and-modpow", DhWalkClauses.DhOpenAndModPow, "dh-closed-off", "dh-shared-mismatch", "dh-row-skip-square", "dh-real-bits-short"),
+            new Case("A19.host.ed25519-walk-open-and-rfc8032", Ed25519WalkClauses.WalkOpenAndRfc8032, "ed25519-closed-off", "ed25519-unclamped", "ed25519-wrong-h", "ed25519-bad-test-ok"),
             new Case("A19.host.x25519-walk-open-and-rfc7748", X25519WalkClauses.LadderOpenAndRfc7748, "x25519-closed-off", "x25519-wrong-shared", "x25519-rows-unclamped"),
             new Case("A19.host.x25519-rows-carry-swap", X25519WalkClauses.RowsCarrySwap, "x25519-swap-wrong"),
             new Case("A19.host.toy-curve-pick-route", CurveWalkClauses.ToyPick, "toy-pick-wrong-result", "toy-pick-bad-index-ok", "toy-pick-wrong-kind"),

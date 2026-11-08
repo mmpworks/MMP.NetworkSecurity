@@ -2641,6 +2641,17 @@
    "counts": true
   },
   {
+   "id": "A19.host.ed25519-walk-open-and-rfc8032",
+   "base": "A19.host.ed25519-walk-open-and-rfc8032",
+   "assertion": "A19",
+   "group": "a17",
+   "build": "host",
+   "slice": "W1",
+   "referee": "RFC 8032 section 7.1 in the vector file, .NET SHA-512 and BigInteger",
+   "roles": [],
+   "counts": true
+  },
+  {
    "id": "A19.host.errors-carry-a-code",
    "base": "A19.host.errors-carry-a-code",
    "assertion": "A19",

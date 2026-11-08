@@ -79,6 +79,7 @@ REFEREE = {"A1": "published vectors", "A2": ".NET 10 BCL oracle", "A3": "x9.org 
 REFEREE_BY_PREFIX = [
     ("A19.host.dh-", "BigInteger.ModPow, and RFC 3526's group 14 in the vector file"),
     ("A19.host.x25519-", "RFC 7748 section 6.1 in the vector file, clamped by section 5"),
+    ("A19.host.ed25519-", "RFC 8032 section 7.1 in the vector file, .NET SHA-512 and BigInteger"),
     ("A19.host.toy-curve-", "the suite's own brute force over GF(17)"),
     ("A19.host.real-curve-", "the curve and line algebra, to 1e-9"),
     ("A19.host.tls13-", "RFC 8448 section 3 in the vector file"),
