@@ -89,6 +89,7 @@ namespace NetSec.Errors
         public const string MlKemCiphertextInvalid = "MLKEM_CIPHERTEXT_INVALID";
         public const string TrainingKeyUnknown = "TRAINING_KEY_UNKNOWN";
         public const string SecurityTypeNotReady = "SECURITY_TYPE_NOT_READY";
+        public const string SecurityStoreSaveFailed = "SECURITY_STORE_SAVE_FAILED";
         public const string SecurityTypeNotProven = "SECURITY_TYPE_NOT_PROVEN";
         public const string SecurityTypesDisagree = "SECURITY_TYPES_DISAGREE";
         public const string KeyFileUnreadable = "KEY_FILE_UNREADABLE";

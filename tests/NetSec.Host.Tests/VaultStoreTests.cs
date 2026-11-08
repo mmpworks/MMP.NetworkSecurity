@@ -116,4 +116,36 @@ public sealed class VaultStoreTests : IDisposable
         string copy = JsonDocument.Parse(File.ReadAllText(Path.Combine(dir.FullName, "app", "src", "wizard-copy.json"))).RootElement.GetProperty("wizard.vault.audit.limits").GetString()!;
         Assert.Equal(VaultExercise.ChainLimits, copy);
     }
+
+    /// <summary>
+    /// Opens modes.json the way an antivirus scan or the search indexer can: read and write sharing, but no delete sharing. On Windows, a
+    /// replacing move fails while such a handle is open (issue #292).
+    /// </summary>
+    FileStream HoldModesOpen() => new(Path.Combine(_root, "modes.json"), FileMode.Open, FileAccess.Read, FileShare.ReadWrite);
+
+    [Fact]
+    public async System.Threading.Tasks.Task A_save_waits_out_a_short_hold_on_the_settings_file()
+    {
+        SecurityStore store = Store();
+        store.SetShowKeys(false);
+        FileStream held = HoldModesOpen();
+        System.Threading.Tasks.Task release = System.Threading.Tasks.Task.Run(async () => { await System.Threading.Tasks.Task.Delay(300); held.Dispose(); });
+        try { store.SetShowKeys(true); }
+        finally { await release; held.Dispose(); }
+        Assert.True(store.ShowKeys);
+        Assert.True(Store().ShowKeys, "a new store reads the saved value back from modes.json");
+    }
+
+    [Fact]
+    public void A_save_that_stays_blocked_fails_with_a_named_code()
+    {
+        SecurityStore store = Store();
+        store.SetShowKeys(false);
+        using (HoldModesOpen())
+        {
+            NetSec.Errors.NetSecException e = Assert.Throws<NetSec.Errors.NetSecException>(() => store.SetShowKeys(true));
+            Assert.Equal(NetSec.Errors.ErrorCodes.SecurityStoreSaveFailed, e.Error.Code);
+        }
+        Assert.False(store.ShowKeys, "a failed save leaves the old value in force");
+    }
 }
