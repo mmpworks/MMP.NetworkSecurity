@@ -8,6 +8,7 @@
     { "route": "/api/sessions/{id}/walk/aes/forge", "off": "409 KEYS_HIDDEN", "why": "H is key material, on Jared's recommendation" },
     { "route": "/api/walk/tls13/schedule", "off": "open", "why": "it runs on the public inputs of RFC 8448 section 3, never on a session's key (sections-plan.md section 4). Clause: A19.host.tls13-schedule-open-and-rfc8448" },
     { "route": "/api/walk/toy-curve", "off": "open", "why": "fixed public teaching values on y^2 = x^3 + 2x + 2 over GF(17), no session key (sections-plan.md line 153, slice P8a). Clause: A19.host.toy-curve-open-and-brute-force" },
+    { "route": "/api/walk/toy-curve/add", "off": "open", "why": "the learner's pick of 2 public toy-curve points by index, public values only, no session key (#278, the lead's answer). Clause: A19.host.toy-curve-pick-route" },
     { "route": "/api/walk/real-curve", "off": "open", "why": "fixed public example points on the real curve, no session key (sections-plan.md line 154, slice P8a). Clause: A19.host.real-curve-open-and-on-curve" },
     { "route": "/api/walk/tls11/schedule", "off": "open", "why": "a fixed teaching run on the built-in training key, which is public in the source (sections-plan.md line 159, slice P4b). Clause: A19.host.tls11-schedule-open-and-prf" },
     { "route": "/api/walk/dh", "off": "open", "why": "it runs on public practice exponents, never a session's key (sections-plan.md section 4, slice P7). Clause: A19.host.dh-walk-open-and-modpow" },

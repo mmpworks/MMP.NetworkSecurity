@@ -220,5 +220,107 @@ namespace Acceptance
                 return "with Show keys OFF " + points + " sample points lie on y^2 = x^3 + 2x + 2, and the chord and tangent examples each have the right slope, an R' on the line and the curve, and R as its reflection";
             }
         }
+
+        // ---------------------------------------------------------------- the learner's own pick on the toy curve, and the real curve's offered picks (#278, the lead's answer)
+
+        public const string ToyAddPath = "/api/walk/toy-curve/add";
+
+        /// <summary>The kind the pick route names, from the suite's own rule: O is the identity, P + (-P) is the opposite case, P + P is a double.</summary>
+        static string Kind(Pt p, Pt q)
+        {
+            if (p == null || q == null) return "identity";
+            if (p.X == q.X && Mod(p.Y + q.Y, P) == 0) return "opposite";
+            return Same(p, q) ? "double" : "add";
+        }
+
+        /// <summary>
+        /// GET /api/walk/toy-curve/add?p=i&q=j adds two picks by index (Richard's shape for #278): 0 to 17 are /api/walk/toy-curve's points in
+        /// its order, and 18 is O. The suite asks all 361 pairs and checks each sum, its index and its slope against its own brute force. A pick
+        /// that is missing, not a whole number, or outside 0 to 18 gets 400 WALK_BAD_ARGUMENT. The route holds only public values, so it is open
+        /// with Show keys OFF, and like every walk reply it carries no-store.
+        /// </summary>
+        [Clause("A19.host.toy-curve-pick-route")]
+        public static string ToyPick(Ctx c)
+        {
+            using (HostProc h = A17.Host(c, "walk-toy-pick"))
+            {
+                Reply off = HostHttp.Put(h, "/api/security/show-keys", A17.Obj("on", false));
+                Check.True(off.Ok, "PUT show-keys got " + off);
+                Reply probe = HostHttp.Get(h, ToyAddPath + "?p=0&q=0");
+                if (probe.Status == 404 && string.IsNullOrEmpty(probe.Code)) throw new NotRunException("PRODUCT_MISSING", "the Host has no route " + ToyAddPath + " yet (#278)");
+                // The index list: the toy route's points in its order, which must be the suite's own order (x, then y), then O.
+                List<Pt> list = new List<Pt>();
+                foreach (object o in MiniJson.Arr(GetOpen(h, ToyPath, "slice P8a").Json, "points") ?? new List<object>()) list.Add(ReadPt(o, "points"));
+                List<Pt> want = AllPoints();
+                Check.True(list.Count == want.Count, "the toy route lists " + list.Count + " points, and the curve has " + want.Count);
+                for (int i = 0; i < want.Count; i++) SamePt("index " + i + " (the points in x, then y order)", want[i], list[i]);
+                list.Add(null);
+                int pairs = 0;
+                for (int i = 0; i < list.Count; i++)
+                    for (int j = 0; j < list.Count; j++)
+                    {
+                        string where = "pick p=" + i + "&q=" + j;
+                        Reply r = HostHttp.Get(h, ToyAddPath + "?p=" + i + "&q=" + j);
+                        Check.True(r.Ok && r.Json != null, "OFF: " + where + " got " + r + ". The pick holds only public values, so it stays open");
+                        Check.True((r.CacheControl ?? "").IndexOf("no-store", StringComparison.OrdinalIgnoreCase) >= 0, where + ": Cache-Control is '" + r.CacheControl + "', and a walk reply carries no-store");
+                        Check.True((int)MiniJson.Num(r.Json, "pIndex", -1) == i && (int)MiniJson.Num(r.Json, "qIndex", -1) == j, where + ": the reply names other indexes");
+                        Pt sum = Add(list[i], list[j]);
+                        int at = list.FindIndex(x => Same(x, sum));
+                        Check.True((int)MiniJson.Num(r.Json, "resultIndex", -1) == at, where + ": resultIndex is " + MiniJson.Num(r.Json, "resultIndex", -1) + ", and the sum " + (sum == null ? "O" : sum.ToString()) + " is index " + at);
+                        Dictionary<string, object> s = MiniJson.Obj(r.Json, "step");
+                        Check.True(s != null, where + ": no step");
+                        Check.Equal(where + ": kind", Kind(list[i], list[j]), MiniJson.Str(s, "kind"));
+                        SamePt(where + " p", list[i], ReadPt(s["p"], where + " p"));
+                        SamePt(where + " q", list[j], ReadPt(s["q"], where + " q"));
+                        Step(s, where);
+                        bool sloped = Kind(list[i], list[j]) == "add" || Kind(list[i], list[j]) == "double";
+                        Check.True(sloped == (s.ContainsKey("lambda") && s["lambda"] != null), where + ": lambda should be " + (sloped ? "given" : "null") + " for a " + Kind(list[i], list[j]));
+                        pairs++;
+                    }
+                foreach (string bad in new string[] { "?q=0", "?p=0", "?p=19&q=0", "?p=0&q=19", "?p=-1&q=0", "?p=1.5&q=0", "?p=a&q=0" })
+                {
+                    Reply r = HostHttp.Get(h, ToyAddPath + bad);
+                    Check.True(r.Status == 400 && r.Code == "WALK_BAD_ARGUMENT", ToyAddPath + bad + " should get 400 WALK_BAD_ARGUMENT, and got " + r);
+                }
+                HostHttp.Put(h, "/api/security/show-keys", A17.Obj("on", true));
+                return "with Show keys OFF all " + pairs + " picks give the brute-force sum, its index, the right kind and slope, and no-store; 7 bad picks each get 400 WALK_BAD_ARGUMENT";
+            }
+        }
+
+        /// <summary>
+        /// The real curve's offered picks (Richard's shape for #278): `samples` holds 3 chords and 1 tangent, each shaped like `chord`. Each must
+        /// pass the same line, curve and reflection checks, and each R' must sit inside the drawn range, so the screen can draw it.
+        /// </summary>
+        [Clause("A19.host.real-curve-samples-on-the-curve")]
+        public static string RealSamples(Ctx c)
+        {
+            using (HostProc h = A17.Host(c, "walk-real-samples"))
+            {
+                Reply off = HostHttp.Put(h, "/api/security/show-keys", A17.Obj("on", false));
+                Check.True(off.Ok, "PUT show-keys got " + off);
+                Reply r = GetOpen(h, RealPath, "slice P8a");
+                List<object> samples = MiniJson.Arr(r.Json, "samples");
+                if (samples == null) throw new NotRunException("PRODUCT_MISSING", RealPath + " has no samples field yet (#278)");
+                double lo = double.MaxValue, hi = double.MinValue;
+                foreach (object o in MiniJson.Arr(r.Json, "upper") ?? new List<object>()) { double x = MiniJson.Num(MiniJson.AsObject(o), "x", double.NaN); lo = Math.Min(lo, x); hi = Math.Max(hi, x); }
+                lo = MiniJson.Num(r.Json, "root", lo); hi = MiniJson.Num(r.Json, "xMax", hi);
+                int chords = 0, tangents = 0;
+                for (int i = 0; i < samples.Count; i++)
+                {
+                    Dictionary<string, object> e = MiniJson.AsObject(samples[i]);
+                    string kind = MiniJson.Str(e, "kind");
+                    Check.True(kind == "chord" || kind == "tangent", "sample " + i + ": kind is '" + kind + "'");
+                    bool tangent = kind == "tangent";
+                    double[] p = RealPt(e, "p", "sample " + i), q = RealPt(e, "q", "sample " + i), rp = RealPt(e, "rPrime", "sample " + i);
+                    if (tangent) Check.True(p[0] == q[0] && p[1] == q[1], "sample " + i + ": a tangent's q should equal its p");
+                    LineExample(e, tangent, "sample " + i);
+                    Check.True(rp[0] >= lo - 1e-9 && rp[0] <= hi + 1e-9, "sample " + i + ": R' x = " + rp[0] + " is outside the drawn range " + lo + " to " + hi);
+                    if (tangent) tangents++; else chords++;
+                }
+                Check.True(chords == 3 && tangents == 1, "samples holds " + chords + " chords and " + tangents + " tangents, and the shape is 3 and 1");
+                HostHttp.Put(h, "/api/security/show-keys", A17.Obj("on", true));
+                return "with Show keys OFF the 4 offered picks (3 chords, 1 tangent) each have the right slope, an R' on the line and the curve inside the drawn range, and R as its reflection";
+            }
+        }
     }
 }

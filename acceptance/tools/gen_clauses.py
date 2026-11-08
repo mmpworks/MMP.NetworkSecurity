@@ -74,6 +74,30 @@ REFEREE = {"A1": "published vectors", "A2": ".NET 10 BCL oracle", "A3": "x9.org 
            "A10a": "Go tap", "A11": "Go tokenverify", "A12": "cl.exe and a live run", "A13": "Playwright", "A14": "test over the tour files and a live Host",
            "A18": "script over the tour files; OpenSSL 3.5.7 and Go referees for refusals", "A19": "FIPS 197 (2001) data, the suite's RefAes, and the .NET library", "A15": "script", "A15a": "accuracy reader", "A16": "test, Playwright, OpenSSL key log", "A17": "test over HTTP and WebSocket, OpenSSL, ssh.exe, Go referees; known-answer where no outside referee exists", "SELF": "stand-ins built on the BCL, python cryptography and real OpenSSL runs"}
 
+# A19 started as the AES walk, so its default referee names FIPS 197. The later walks have referees of their own; the first prefix that
+# matches a clause id wins over the assertion's default (Jared, #281: the report's Referee column was wrong for these).
+REFEREE_BY_PREFIX = [
+    ("A19.host.dh-", "BigInteger.ModPow, and RFC 3526's group 14 in the vector file"),
+    ("A19.host.x25519-", "RFC 7748 section 6.1 in the vector file, clamped by section 5"),
+    ("A19.host.toy-curve-", "the suite's own brute force over GF(17)"),
+    ("A19.host.real-curve-", "the curve and line algebra, to 1e-9"),
+    ("A19.host.tls13-", "RFC 8448 section 3 in the vector file"),
+    ("A19.host.tls11-", "OpenSSL pkeyutl, and the suite's TLS 1.1 PRF on .NET MD5 and SHA-1"),
+    ("A19.repo.", "script over the repository files"),
+    ("A19.ui.dh-", "Playwright, against the Host's reply"),
+    ("A19.ui.toy-curve-", "Playwright, against the Host's reply"),
+    ("A19.ui.real-curve-", "Playwright, against the Host's reply"),
+    ("A19.ui.x25519-", "Playwright, against the Host's reply and RFC 7748 in the vector file"),
+]
+
+
+def referee_of(cid, assertion):
+    for prefix, referee in REFEREE_BY_PREFIX:
+        if cid.startswith(prefix):
+            return referee
+    return REFEREE[assertion]
+
+
 # A role is a part of the build that the PRD lets the team cut. A cut role makes these clauses NOT RUN, named (roles.json).
 def roles_of(cid):
     r = []
@@ -146,7 +170,7 @@ def build():
                 slice_ = "S2" if cid.startswith("A16.type") else "S8"
             rows.append({
                 "id": full, "base": cid, "assertion": assertion, "group": group, "build": b or "host",
-                "slice": slice_, "referee": REFEREE[assertion], "roles": roles_of(cid), "counts": assertion != "SELF",
+                "slice": slice_, "referee": referee_of(cid, assertion), "roles": roles_of(cid), "counts": assertion != "SELF",
             })
     rows.sort(key=lambda r: (r["assertion"] == "SELF", r["id"]))
     ids = [r["id"] for r in rows]

@@ -2625,7 +2625,7 @@
    "group": "a17",
    "build": "host",
    "slice": "W1",
-   "referee": "FIPS 197 (2001) data, the suite's RefAes, and the .NET library",
+   "referee": "BigInteger.ModPow, and RFC 3526's group 14 in the vector file",
    "roles": [],
    "counts": true
   },
@@ -2691,7 +2691,18 @@
    "group": "a17",
    "build": "host",
    "slice": "W1",
-   "referee": "FIPS 197 (2001) data, the suite's RefAes, and the .NET library",
+   "referee": "the curve and line algebra, to 1e-9",
+   "roles": [],
+   "counts": true
+  },
+  {
+   "id": "A19.host.real-curve-samples-on-the-curve",
+   "base": "A19.host.real-curve-samples-on-the-curve",
+   "assertion": "A19",
+   "group": "a17",
+   "build": "host",
+   "slice": "W1",
+   "referee": "the curve and line algebra, to 1e-9",
    "roles": [],
    "counts": true
   },
@@ -2746,7 +2757,7 @@
    "group": "a17",
    "build": "host",
    "slice": "W1",
-   "referee": "FIPS 197 (2001) data, the suite's RefAes, and the .NET library",
+   "referee": "OpenSSL pkeyutl, and the suite's TLS 1.1 PRF on .NET MD5 and SHA-1",
    "roles": [],
    "counts": true
   },
@@ -2757,7 +2768,7 @@
    "group": "a17",
    "build": "host",
    "slice": "W1",
-   "referee": "FIPS 197 (2001) data, the suite's RefAes, and the .NET library",
+   "referee": "RFC 8448 section 3 in the vector file",
    "roles": [],
    "counts": true
   },
@@ -2768,7 +2779,18 @@
    "group": "a17",
    "build": "host",
    "slice": "W1",
-   "referee": "FIPS 197 (2001) data, the suite's RefAes, and the .NET library",
+   "referee": "the suite's own brute force over GF(17)",
+   "roles": [],
+   "counts": true
+  },
+  {
+   "id": "A19.host.toy-curve-pick-route",
+   "base": "A19.host.toy-curve-pick-route",
+   "assertion": "A19",
+   "group": "a17",
+   "build": "host",
+   "slice": "W1",
+   "referee": "the suite's own brute force over GF(17)",
    "roles": [],
    "counts": true
   },
@@ -2806,13 +2828,24 @@
    "counts": true
   },
   {
+   "id": "A19.host.x25519-rows-carry-swap",
+   "base": "A19.host.x25519-rows-carry-swap",
+   "assertion": "A19",
+   "group": "a17",
+   "build": "host",
+   "slice": "W1",
+   "referee": "RFC 7748 section 6.1 in the vector file, clamped by section 5",
+   "roles": [],
+   "counts": true
+  },
+  {
    "id": "A19.host.x25519-walk-open-and-rfc7748",
    "base": "A19.host.x25519-walk-open-and-rfc7748",
    "assertion": "A19",
    "group": "a17",
    "build": "host",
    "slice": "W1",
-   "referee": "FIPS 197 (2001) data, the suite's RefAes, and the .NET library",
+   "referee": "RFC 7748 section 6.1 in the vector file, clamped by section 5",
    "roles": [],
    "counts": true
   },
@@ -2823,7 +2856,7 @@
    "group": "docs",
    "build": "host",
    "slice": "W1",
-   "referee": "FIPS 197 (2001) data, the suite's RefAes, and the .NET library",
+   "referee": "script over the repository files",
    "roles": [],
    "counts": true
   },
