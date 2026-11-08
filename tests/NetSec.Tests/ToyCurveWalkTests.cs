@@ -119,17 +119,24 @@ namespace NetSec.Tests
         [Fact]
         public void Ecdsa_signs_and_verifies_and_a_reused_nonce_gives_away_the_private_key()
         {
+            // The video's values: d = 7, Q = 7G = (0, 6), z = 8, nonce k = 3, k^-1 = 13 mod 19.
+            Assert.Equal(7, W.SignerPrivate);
+            Assert.Equal(((int, int)?)(0, 6), Pt(W.SignerPublic));
+            Assert.Equal(RefTimes(7, (5, 1)), Pt(W.SignerPublic));
+            Assert.Equal(8, W.First.Z);
+            Assert.Equal(13, W.First.NonceInverse.Value);
             foreach (ToySignature s in new[] { W.First, W.Second })
             {
-                Assert.Equal(RefTimes(10, (5, 1)), Pt(s.R));
+                Assert.Equal(3, s.Nonce);
+                Assert.Equal(RefTimes(3, (5, 1)), Pt(s.R));
                 Assert.Equal(s.R.X % N, s.SmallR);
-                Assert.Equal(M((BigInteger)Inv(10, N) * (s.Z + s.SmallR * 9), N), s.S);
+                Assert.Equal(M((BigInteger)Inv(3, N) * (s.Z + s.SmallR * 7), N), s.S);
             }
             Assert.True(W.FirstVerify.Valid);
             Assert.True(W.SecondVerify.Valid);
             Assert.Equal(W.First.SmallR, W.Second.SmallR);
-            Assert.Equal(10, W.Recovery.RecoveredNonce);
-            Assert.Equal(9, W.Recovery.RecoveredPrivate);
+            Assert.Equal(3, W.Recovery.RecoveredNonce);
+            Assert.Equal(7, W.Recovery.RecoveredPrivate);
         }
 
         [Fact]

@@ -32,7 +32,7 @@ public class TeachingCurveRoutesLiveTests
         Assert.Equal(19, toy.GetProperty("hops").GetArrayLength());
         Assert.True(toy.GetProperty("hops")[18].GetProperty("point").GetProperty("infinity").GetBoolean());
         Assert.Equal(13, toy.GetProperty("k").GetInt32());
-        Assert.Equal(9, toy.GetProperty("ecdsa").GetProperty("recovery").GetProperty("privateKey").GetInt32());
+        Assert.Equal(7, toy.GetProperty("ecdsa").GetProperty("recovery").GetProperty("privateKey").GetInt32());
 
         (int realStatus, JsonElement real, string realCache) = await Get(host, "/api/walk/real-curve");
         Assert.Equal(200, realStatus);

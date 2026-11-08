@@ -84,7 +84,7 @@ namespace NetSec.Labs.Teaching
     /// </summary>
     public static class ToyCurveWalks
     {
-        public const int K = 13, AlicePrivate = 3, BobPrivate = 7, SignerPrivate = 9, ReusedNonce = 10, FirstHash = 5, SecondHash = 11;
+        public const int K = 13, AlicePrivate = 3, BobPrivate = 7, SignerPrivate = 7, ReusedNonce = 3, FirstHash = 8, SecondHash = 11;
 
         public static ToyCurveWalk Build()
         {
