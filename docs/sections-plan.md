@@ -1,6 +1,6 @@
 # MMP.NetworkSecurity: the 3-section plan
 
-Owners: Richard (map, engine data, slices) and Nancy (screens). Decision owner: Steve. Reader before Steve: Jared. Date: 2026-11-07. Status: plan, with Steve's answers to Q1 to Q4 recorded on 2026-11-07. Slices build from it. Q5 and Q6, from Steve's 2 videos, are open.
+Owners: Richard (map, engine data, slices) and Nancy (screens). Decision owner: Steve. Reader before Steve: Jared. Date: 2026-11-07. Status: plan, with Steve's answers to Q1 to Q6 recorded on 2026-11-07. Slices build from it.
 
 ## The two changes I would make
 
@@ -250,12 +250,12 @@ Nancy's 2 screen questions (section 2), answered by Steve:
 | Q3 | Where does the long text live in Techniques? | A pinned strip above the walk, one line, scrolling sideways | A side column, wrapped, about 280 px wide | **A.** The walk needs the width at 1280, and one line keeps byte offsets readable. **Steve: A** |
 | Q4 | When a learner opens an attack run from the index, what shows first? | The normal run and the attacked run side by side. This needs a new two-run layout, built from lesson 7's race layout | The attacked run alone, with a "show the normal run" toggle. This reuses today's one-run screen | **A.** The difference is the lesson. The cost is one new layout in P3, built on a layout the app already has. **Steve: A** |
 
-Open, from Steve's 2 videos (2026-11-07):
+From Steve's 2 videos (2026-11-07), answered by Steve:
 
 | Id | Question | Option A | Option B | My pick |
 |---|---|---|---|---|
-| Q5 | The toy curve: the video's own curve, or another small curve? | The video's curve, y² = x³ + 2x + 2 mod 17, with 19 points, so a learner can follow the video and the app side by side | Another small curve of our own | **A.** The video is Steve's target, and the curve is a standard textbook example, so matching it costs nothing |
-| Q6 | Record now, decrypt later: a new attack run in lesson 7, or only a walk? | A new attack run, `L7-decrypt-recording`, that a learner plays, beside ECDHE where it fails, plus the key schedule walk | Only the key schedule walk in Handshake, with no new run | **A.** Lesson 7 already says it in words (L7-S05). A run a learner plays shows it, and the tour text stays as it is |
+| Q5 | The toy curve: the video's own curve, or another small curve? | The video's curve, y² = x³ + 2x + 2 mod 17, with 19 points, so a learner can follow the video and the app side by side | Another small curve of our own | **A.** The video is Steve's target, and the curve is a standard textbook example, so matching it costs nothing. **Steve: A** |
+| Q6 | Record now, decrypt later: a new attack run in lesson 7, or only a walk? | A new attack run, `L7-decrypt-recording`, that a learner plays, beside ECDHE where it fails, plus the key schedule walk | Only the key schedule walk in Handshake, with no new run | **A.** Lesson 7 already says it in words (L7-S05). A run a learner plays shows it, and the tour text stays as it is. **Steve: A** |
 
 **Answered (2026-11-07, Steve, through the lead):**
 1. Elliptic-curve methods mean both key agreement (ECDH, X25519) and signatures (ECDSA, Ed25519). Both go in section 2.
@@ -265,6 +265,8 @@ Open, from Steve's 2 videos (2026-11-07):
 5. Q2: A. X25519 is enough for key agreement. There is no ECDH walk on P-256. ECDSA keeps P-256 (slice P8b).
 6. Q3: A. The long text is a pinned one-line strip above the walk in Techniques. The W1b screens use it.
 7. Q4: A. An attack run from the index opens with the normal run and the attacked run side by side. P3 builds the two-run layout from lesson 7's race.
+8. Q5: A. The toy curve is the video's curve, y² = x³ + 2x + 2 mod 17, with 19 points (slice P8a).
+9. Q6: A. Lesson 7 gets a new attack run, `L7-decrypt-recording`, beside ECDHE where it fails, plus the TLS 1.1 key schedule walk (slice P4b). The run count becomes 57.
 
 ## 9. Prior art
 
@@ -274,4 +276,4 @@ Jared read 23df25c (same-vendor fresh read). His anchor: a git grep on origin/ma
 
 ## Disposition
 
-Jared passed this plan (35e95ce). Steve answered Q1 to Q4 in section 8 on 2026-11-07. Q5 and Q6 wait for him. The lead starts P1. Nancy builds the W1b screens after SC lands.
+Jared passed this plan (35e95ce). Steve answered Q1 to Q6 in section 8 on 2026-11-07. The lead starts P1. Nancy builds the W1b screens after SC lands.
