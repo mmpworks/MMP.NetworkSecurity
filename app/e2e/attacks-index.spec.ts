@@ -1,6 +1,7 @@
 import { expect, test } from '@playwright/test'
 import * as fs from 'node:fs'
 import * as path from 'node:path'
+import { PORTS } from './ports'
 import { PORT, TOKEN } from './walk'
 
 // The attack index's content (docs/sections-plan.md, slice P3). The list of runs comes from the live Host's registry, never from grep,
@@ -10,7 +11,7 @@ interface Row { attackId: string; kind: string; tourStep: string | null; guard: 
 const file = JSON.parse(fs.readFileSync(path.join(src, 'attacks.json'), 'utf8')) as { labels: { id: string; text: string }[]; runs: Row[] }
 
 async function registry(request: import('@playwright/test').APIRequestContext): Promise<string[]> {
-  const headers = { Authorization: `Bearer ${TOKEN}`, Origin: 'http://localhost:4180' }
+  const headers = { Authorization: `Bearer ${TOKEN}`, Origin: `http://localhost:${PORTS.preview}` }
   const all = await request.get(`http://127.0.0.1:${PORT}/api/lessons`, { headers })
   const zero = await request.get(`http://127.0.0.1:${PORT}/api/lessons/0`, { headers })
   expect(all.ok() && zero.ok(), 'the Host answers both lesson routes').toBe(true)

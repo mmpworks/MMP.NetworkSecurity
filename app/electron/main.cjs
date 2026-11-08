@@ -26,7 +26,8 @@ function startHost() {
   if (!fs.existsSync(HOST_DLL)) { say(process.stderr, `[host] not built: ${HOST_DLL}\n`); return }
   host = spawn('dotnet', [HOST_DLL], {
     detached: true, stdio: ['ignore', 'pipe', 'pipe'], windowsHide: true,
-    env: { ...process.env, NETSEC_PORT: String(PORT), NETSEC_TOKEN: TOKEN },
+    // NETSEC_ORIGINS is for test runs only: a value exported in a developer's shell must not widen the desktop app's Host.
+    env: { ...process.env, NETSEC_PORT: String(PORT), NETSEC_TOKEN: TOKEN, NETSEC_ORIGINS: '' },
   })
   host.stdout.on('data', d => say(process.stdout, `[host] ${d}`))
   host.stderr.on('data', d => say(process.stderr, `[host] ${d}`))

@@ -3,6 +3,7 @@ import * as fs from 'node:fs'
 import * as os from 'node:os'
 import * as path from 'node:path'
 import { runFreePlay, walkTourUntil } from './walk'
+import { PORTS } from './ports'
 
 // The Message bytes panel at the sizes a 1080p screen gives at 125 percent. A page that fits its window can still cut the panel inside it, so this
 // measures the panel: every field row in view, and no hex row or column cut. L1-S05 tells the learner to find the tag, the last field of TextGcm1.
@@ -65,7 +66,7 @@ test('a view switch turns off a lit field', async ({ page }) => {
 const FIT_TOKEN = 'bytes-fit-token'
 test('real Electron at 1440 x 770 shows all 5 fields and no cut row, in Free play and on the first tour step that shows TextGcm1', async ({}, testInfo) => {
   const dir = fs.mkdtempSync(path.join(os.tmpdir(), 'ns-e2e-fit-'))
-  const app = await electron.launch({ args: ['.'], cwd: path.join(__dirname, '..'), env: { ...process.env, NETSEC_PORT: '5192', NETSEC_TOKEN: FIT_TOKEN, NETSEC_SECURITY_DIR: dir } })
+  const app = await electron.launch({ args: ['.'], cwd: path.join(__dirname, '..'), env: { ...process.env, NETSEC_PORT: String(PORTS.electron), NETSEC_TOKEN: FIT_TOKEN, NETSEC_SECURITY_DIR: dir } })
   try {
     const win = await app.firstWindow()
     await app.evaluate(({ BrowserWindow }) => BrowserWindow.getAllWindows()[0].setContentSize(1440, 770))
@@ -95,7 +96,7 @@ test('real Electron at 1440 x 770 shows all 5 fields and no cut row, in Free pla
       await win.screenshot({ path: testInfo.outputPath('electron-at-failure.png') }).catch(() => {})
       const shown = await win.locator('.statusbar').innerText({ timeout: 2000 }).catch(() => 'no status bar')
       const session = /session (?<id>\S+)/.exec(shown)?.groups?.id ?? ''
-      const host = (p: string) => fetch(`http://127.0.0.1:5192${p}`, { headers: { Authorization: `Bearer ${FIT_TOKEN}` } }).then(r => r.json()).catch(() => null)
+      const host = (p: string) => fetch(`http://127.0.0.1:${PORTS.electron}${p}`, { headers: { Authorization: `Bearer ${FIT_TOKEN}` } }).then(r => r.json()).catch(() => null)
       const body = session ? await host(`/api/sessions/${session}/events`) : null
       const held: any[] = Array.isArray(body) ? body : body?.events ?? []
       const report = {

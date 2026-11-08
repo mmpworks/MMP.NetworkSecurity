@@ -3,6 +3,7 @@ import * as fs from 'node:fs'
 import * as os from 'node:os'
 import * as path from 'node:path'
 import { createRequire } from 'node:module'
+import { PORTS } from './ports'
 
 // The Electron link rule (docs/ux-design.md section 5a): no second window, https only, an exact host from the list, and no navigation away.
 const glossary = JSON.parse(fs.readFileSync(path.join(__dirname, '..', 'src', 'glossary.json'), 'utf8')) as { sources: Record<string, { url: string }> }
@@ -40,7 +41,7 @@ test('the rule takes every glossary source and refuses http, look-alike hosts, u
 // shell.openExternal is replaced in the main process, so this test opens no browser.
 test('real Electron sends only a listed https link outside, opens no second window, and stays on its page', async () => {
   const dir = fs.mkdtempSync(path.join(os.tmpdir(), 'ns-e2e-links-'))
-  const app = await electron.launch({ args: ['.'], cwd: path.join(__dirname, '..'), env: { ...process.env, NETSEC_PORT: '5192', NETSEC_TOKEN: 'links-token', NETSEC_SECURITY_DIR: dir } })
+  const app = await electron.launch({ args: ['.'], cwd: path.join(__dirname, '..'), env: { ...process.env, NETSEC_PORT: String(PORTS.electron), NETSEC_TOKEN: 'links-token', NETSEC_SECURITY_DIR: dir } })
   try {
     const win = await app.firstWindow()
     await expect(win.getByTestId('host-chip')).toContainText(/connected/i, { timeout: 60_000 })

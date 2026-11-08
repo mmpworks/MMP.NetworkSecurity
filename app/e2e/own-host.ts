@@ -3,10 +3,11 @@ import * as fs from 'node:fs'
 import * as os from 'node:os'
 import * as path from 'node:path'
 import type { HostAddress } from './walk'
+import { HOST_ORIGIN_ENV, PORTS } from './ports'
 
 // A Host on its own temp security folder, for a spec that changes key state. No route removes a key once the sign-in flow makes one,
 // so a spec that runs that flow on the shared Host changes what every later spec reads. One test or one spec file uses this Host at a time.
-const OWN: HostAddress = { port: 5193, token: 'own-host-token' }
+const OWN: HostAddress = { port: PORTS.ownHost, token: 'own-host-token' }
 
 export interface OwnHost extends HostAddress { stop(): Promise<void> }
 
@@ -28,7 +29,7 @@ export async function startOwnHost(): Promise<OwnHost> {
   const busy = await fetch(`http://127.0.0.1:${OWN.port}/api/health`).then(() => true, () => false)
   if (busy) throw new Error(`port ${OWN.port} is already in use, so the own Host cannot start`)
   const dir = fs.mkdtempSync(path.join(os.tmpdir(), 'ns-own-host-'))
-  const child = spawn('dotnet', [dll], { stdio: 'ignore', env: { ...process.env, NETSEC_SECURITY_DIR: dir, NETSEC_PORT: String(OWN.port), NETSEC_TOKEN: OWN.token } })
+  const child = spawn('dotnet', [dll], { stdio: 'ignore', env: { ...process.env, NETSEC_SECURITY_DIR: dir, NETSEC_PORT: String(OWN.port), NETSEC_TOKEN: OWN.token, ...HOST_ORIGIN_ENV } })
   await waitForHealth(child)
   return {
     ...OWN,

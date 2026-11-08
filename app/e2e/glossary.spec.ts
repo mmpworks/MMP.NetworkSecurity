@@ -4,6 +4,7 @@ import * as fs from 'node:fs'
 import * as path from 'node:path'
 import { isMethod, matches, type Glossary } from '../src/glossaryData'
 import { startTour, walkTourUntil, open } from './walk'
+import { PORTS } from './ports'
 
 // The glossary page. The link rule itself is tested in links.spec.ts; here a real source on the page goes through it.
 const g = JSON.parse(fs.readFileSync(path.join(__dirname, '..', 'src', 'glossary.json'), 'utf8')) as Glossary
@@ -68,7 +69,7 @@ test('a term in a tour step opens its glossary entry', async ({ page }) => {
 // goes nowhere, and the app never gets a second window or leaves its page.
 test('real Electron opens a glossary source in the outside browser, refuses an unlisted link, and keeps one window', async () => {
   const dir = fs.mkdtempSync(path.join(os.tmpdir(), 'ns-e2e-links-'))
-  const app = await electron.launch({ args: ['.'], cwd: path.join(__dirname, '..'), env: { ...process.env, NETSEC_PORT: '5192', NETSEC_TOKEN: 'links-token', NETSEC_SECURITY_DIR: dir } })
+  const app = await electron.launch({ args: ['.'], cwd: path.join(__dirname, '..'), env: { ...process.env, NETSEC_PORT: String(PORTS.electron), NETSEC_TOKEN: 'links-token', NETSEC_SECURITY_DIR: dir } })
   try {
     const win = await app.firstWindow()
     await expect(win.getByTestId('host-chip')).toContainText(/connected/i, { timeout: 60_000 })

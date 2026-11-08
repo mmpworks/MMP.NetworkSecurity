@@ -19,12 +19,22 @@ namespace NetSec.Host.Tests
     /// One Host process for the class, with its own session folder. It starts in InitializeAsync, which awaits the ready line, so building the
     /// fixture holds no thread-pool thread (ProcessWaits explains why that matters).
     /// </summary>
-    public sealed class HostFixture : IAsyncLifetime
+    public class HostFixture : IAsyncLifetime
     {
         Process _process;
+        readonly IDictionary<string, string> _extraEnv;
         public readonly int Port = FreePort();
         public readonly string Token = Guid.NewGuid().ToString("N");
         public readonly string AppData = Path.Combine(Path.GetTempPath(), "netsec-host-tests-" + Guid.NewGuid().ToString("N"));
+
+        /// <summary>Lines the Host printed up to and including its ready line (the start log). Collecting stops at the ready line, so the list is
+        /// fixed before InitializeAsync returns and a test can read it without a lock.</summary>
+        public readonly List<string> StartLines = new List<string>();
+
+        public HostFixture() : this(null) { }
+
+        /// <summary>For a fixture that starts the Host with extra environment variables (see ExtraOriginsTests).</summary>
+        protected HostFixture(IDictionary<string, string> extraEnv) { _extraEnv = extraEnv; }
 
         public async Task InitializeAsync()
         {
@@ -41,9 +51,21 @@ namespace NetSec.Host.Tests
             info.Environment["NETSEC_TOKEN"] = Token;
             info.Environment["LOCALAPPDATA"] = AppData;
             info.Environment["NETSEC_SECURITY_DIR"] = Path.Combine(AppData, "security");      // Never the learner's own .security/ folder
+            info.Environment.Remove("NETSEC_ORIGINS");      // A value exported in the shell must not widen every live Host, or make "unset" untrue
+            if (_extraEnv != null) foreach (KeyValuePair<string, string> pair in _extraEnv) info.Environment[pair.Key] = pair.Value;
             TaskCompletionSource<string> ready = new TaskCompletionSource<string>(TaskCreationOptions.RunContinuationsAsynchronously);
+            bool collecting = true;
             _process = new Process { StartInfo = info };
-            _process.OutputDataReceived += (_, e) => { if (e.Data != null && e.Data.StartsWith("HOST-READY")) ready.TrySetResult(e.Data); };
+            _process.OutputDataReceived += (_, e) =>
+            {
+                if (e.Data == null) return;
+                lock (StartLines)
+                {
+                    if (collecting) StartLines.Add(e.Data);
+                    if (e.Data.StartsWith("HOST-READY")) collecting = false;
+                }
+                if (e.Data.StartsWith("HOST-READY")) ready.TrySetResult(e.Data);
+            };
             _process.Start();
             _process.BeginOutputReadLine();
             _process.BeginErrorReadLine();
