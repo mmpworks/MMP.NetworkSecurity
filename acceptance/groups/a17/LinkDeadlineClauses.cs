@@ -65,9 +65,11 @@ namespace Acceptance
                     if (client.Contains("peer stayed until the end")) misses.Add("run " + (i + 1) + ": the client wrote \"peer stayed until the end\", and the client is the side that times out");
                     if (server.Contains("peer stayed until the end")) serverPeerStayed++;
                     else misses.Add("run " + (i + 1) + ": the server did not end on \"peer stayed until the end\" (its checks: " + string.Join(", ", server.ToArray()) + ")");
+                    // One side ends the run (Jared, #310): the server writes no timer check of its own, which is the race #309 removes.
+                    if (server.Contains("read deadline") || server.Contains("idle limit")) misses.Add("run " + (i + 1) + ": the server also wrote a timer check (" + string.Join(", ", server.ToArray()) + "), so both sides timed out");
                 }
                 if (misses.Count > 0) throw new FailException(misses.Count + " misses in " + Runs + " runs of " + DropFork + ": " + string.Join("; ", misses.ToArray()));
-                return "in " + Runs + " of " + Runs + " forks of " + DropFork + " the client (holder of the partial record) ends on \"read deadline\" (" + clientDeadline + ") and the server on \"peer stayed until the end\" (" + serverPeerStayed + "), and the client never writes \"peer stayed\"";
+                return "in " + Runs + " of " + Runs + " forks of " + DropFork + " the client (holder of the partial record) ends on \"read deadline\" (" + clientDeadline + ") and the server on \"peer stayed until the end\" (" + serverPeerStayed + "), and the client never writes \"peer stayed\", and the server writes no timer check";
             }
         }
     }
