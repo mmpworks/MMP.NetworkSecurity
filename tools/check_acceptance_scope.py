@@ -6,7 +6,11 @@ code makes the PIN, the review and the revert all harder, so a change that touch
 
 The file set is what git reports for the change: `git diff --name-only --no-renames origin/main...HEAD` plus `git status --porcelain --no-renames`
 (uncommitted and untracked files count). --no-renames lists a rename as a delete of the old path plus an add of the new one, so moving app/x into
-acceptance/x names app/x. When origin/main is unknown the check fails closed. A change with no file under acceptance/ passes whatever it touches.
+acceptance/x names app/x. When origin/main is unknown, or a git call fails (an unborn HEAD, a broken index), the check fails closed with a named
+code. A change with no file under acceptance/ passes whatever it touches.
+
+Note: untracked files count, so a scratch file left at the top of the tree or in tools/ fails the check for an acceptance/ change. That is the safe
+direction, and the message names the path.
 
 Usage: python -I tools/check_acceptance_scope.py [--root REPO]. Exit 0 when in scope, 1 otherwise.
 """
@@ -19,20 +23,32 @@ BASE = "origin/main"
 ALLOWED = ("acceptance/", "docs/")
 
 
+class GitFailed(Exception):
+    pass
+
+
 def git(root, *args):
     r = subprocess.run(["git", "-C", str(root), *args], capture_output=True, text=True)
-    return r.returncode, r.stdout
+    return r.returncode, r.stdout, r.stderr.strip()
+
+
+def git_must(root, *args):
+    """Stdout of a git call that has to work. A failure raises instead of returning an empty list, because an empty file set passes the check."""
+    code, out, err = git(root, *args)
+    if code != 0:
+        raise GitFailed(f"git {' '.join(args)} exited {code}: {err or 'no message'}")
+    return out
 
 
 def changed_files(root):
-    """The set of paths in the change, or None when origin/main is unknown."""
-    code, _ = git(root, "rev-parse", "--verify", "-q", BASE)
+    """The set of paths in the change, or None when origin/main is unknown. Raises GitFailed when a git call fails."""
+    code, _, _ = git(root, "rev-parse", "--verify", "-q", BASE)
     if code != 0:
         return None
     names = set()
-    _, out = git(root, "diff", "--name-only", "--no-renames", f"{BASE}...HEAD")
+    out = git_must(root, "diff", "--name-only", "--no-renames", f"{BASE}...HEAD")
     names.update(line.strip() for line in out.splitlines() if line.strip())
-    _, out = git(root, "status", "--porcelain", "--no-renames", "--untracked-files=all")   # all: name the file, not its untracked folder
+    out = git_must(root, "status", "--porcelain", "--no-renames", "--untracked-files=all")   # all: name the file, not its untracked folder
     for line in out.splitlines():
         if len(line) > 3:
             names.add(line[3:].strip().strip('"'))
@@ -43,7 +59,11 @@ def main(argv):
     ap = argparse.ArgumentParser()
     ap.add_argument("--root", default=str(pathlib.Path(__file__).resolve().parent.parent))
     args = ap.parse_args(argv)
-    files = changed_files(args.root)
+    try:
+        files = changed_files(args.root)
+    except GitFailed as e:
+        print(f"ACCEPTANCE_SCOPE_GIT_FAILED: {e}. The change cannot be judged, so the check fails closed.")
+        return 1
     if files is None:
         print(f"ACCEPTANCE_SCOPE: {BASE} is unknown here, so the change cannot be judged and the check fails closed. Run: git fetch origin")
         return 1

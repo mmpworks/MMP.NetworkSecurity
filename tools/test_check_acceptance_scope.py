@@ -116,6 +116,22 @@ class AcceptanceScope(unittest.TestCase):
         self.assertEqual(code, 1, out)
         self.assertIn("origin/main", out)
 
+    # Jared's #319 nit: a failing git call must not come back as an empty file set (which would pass).
+    def test_a_failing_git_diff_fails_closed_with_a_named_code(self):
+        git("checkout", "-q", "--orphan", "unborn", cwd=self.repo)         # HEAD names no commit: `git diff origin/main...HEAD` exits 128
+        git("rm", "-rq", "--cached", ".", cwd=self.repo)
+        code, out = self.check()
+        self.assertEqual(code, 1, out)
+        self.assertIn("ACCEPTANCE_SCOPE_GIT_FAILED", out)
+        self.assertIn("diff", out)
+
+    def test_a_failing_git_status_fails_closed_with_a_named_code(self):
+        self.commit("acceptance/run.ps1")
+        (self.repo / ".git" / "index").write_bytes(b"not an index")        # a broken index: `git status` exits 128
+        code, out = self.check()
+        self.assertEqual(code, 1, out)
+        self.assertIn("ACCEPTANCE_SCOPE_GIT_FAILED", out)
+
     def test_no_change_at_all_passes(self):
         code, out = self.check()
         self.assertEqual(code, 0, out)
