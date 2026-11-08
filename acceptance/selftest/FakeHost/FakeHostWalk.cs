@@ -279,7 +279,7 @@ namespace Acceptance
             byte[] enc, spki;
             using (System.Security.Cryptography.RSA rsa = System.Security.Cryptography.RSA.Create())
             {
-                if (M("tls11-other-key")) rsa.KeySize = 2048; else rsa.ImportPkcs8PrivateKey(BuiltInTls11Key.Value, out _);
+                if (M("tls11-other-key")) rsa.KeySize = 2048; else rsa.ImportPkcs8PrivateKey(_builtInTls11Key, out _);
                 enc = rsa.Encrypt(pre, System.Security.Cryptography.RSAEncryptionPadding.Pkcs1);
                 spki = rsa.ExportSubjectPublicKeyInfo();
             }

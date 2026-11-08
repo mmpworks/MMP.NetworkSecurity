@@ -58,6 +58,25 @@ namespace Acceptance
 
         static string Hx(byte[] b) { return Hex.Encode(b).ToLowerInvariant(); }
 
+        public const string SourceFile = "src/NetSec.Core/Keys/TrainingRsaKeys.cs";
+
+        /// <summary>
+        /// The tls11.server training key as the source states it: the hex string literals of ServerTls11Private in TrainingRsaKeys.cs, read as
+        /// text. This reads the key from outside the Host, so the claim "public in the source" is tested, and not only "the key the Host calls built-in".
+        /// </summary>
+        public static byte[] SourceTls11Key(string repoRoot)
+        {
+            string file = System.IO.Path.Combine(repoRoot, SourceFile);
+            Check.True(File.Exists(file), SourceFile + " does not exist, so the built-in tls11.server key cannot be read from the source");
+            System.Text.RegularExpressions.Match m = System.Text.RegularExpressions.Regex.Match(File.ReadAllText(file), "ServerTls11Private\\s*=(?<body>[^;]*);");
+            Check.True(m.Success, SourceFile + " has no ServerTls11Private constant");
+            StringBuilder hex = new StringBuilder();
+            foreach (System.Text.RegularExpressions.Match part in System.Text.RegularExpressions.Regex.Matches(m.Groups["body"].Value, "\"(?<hex>[0-9a-fA-F]*)\""))
+                hex.Append(part.Groups["hex"].Value);
+            Check.True(hex.Length > 0, SourceFile + ": ServerTls11Private holds no hex literal");
+            return Hex.Decode(hex.ToString());
+        }
+
         [Clause("A19.host.tls11-schedule-open-and-prf")]
         public static string Tls11Schedule(Ctx c)
         {
@@ -67,6 +86,8 @@ namespace Acceptance
                 Reply key = A17.Key(h, "tls11.server");
                 Check.True(key.Ok && !string.IsNullOrEmpty(MiniJson.Str(key.Json, "hex")), "the Host shows no built-in tls11.server key with Show keys ON: " + key);
                 byte[] pkcs8 = Hex.Decode(MiniJson.Str(key.Json, "hex"));
+                // The route may stay open because the key is public in the source. So the Host's built-in key must be the source's key.
+                Check.Equal("the Host's built-in tls11.server key is ServerTls11Private in " + SourceFile, Hx(SourceTls11Key(c.RepoRoot)), Hx(pkcs8));
                 byte[] spki;
                 using (RSA rsa = RSA.Create()) { rsa.ImportPkcs8PrivateKey(pkcs8, out _); spki = rsa.ExportSubjectPublicKeyInfo(); }
 
