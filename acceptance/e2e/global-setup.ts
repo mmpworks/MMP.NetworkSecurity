@@ -46,7 +46,8 @@ async function childSaid(log: string, words: string, exited: () => boolean, ms: 
  */
 export default async function globalSetup(): Promise<void> {
   fs.mkdirSync(OUT, { recursive: true });
-  const state = { hostUp: false, previewUp: false, note: '', reason: 'PRODUCT_MISSING', pids: [] as number[] };
+  // startedAt (Unix ms, before anything starts) lets the teardown tell this run's processes from a later run's on a reused port or pid.
+  const state = { hostUp: false, previewUp: false, note: '', reason: 'PRODUCT_MISSING', pids: [] as number[], startedAt: Date.now() };
   const hostDll = process.env.ACC_HOST ?? '';
   const appDir = path.join(ROOT, 'app');
   if (!hostDll || !fs.existsSync(hostDll)) { state.note = `NetSec.Host is not built (ACC_HOST=${hostDll})`; fs.writeFileSync(stateFile(), JSON.stringify(state)); return; }
