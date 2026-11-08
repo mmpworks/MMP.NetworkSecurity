@@ -112,6 +112,9 @@ namespace NetSec.Labs
     {
         public static CredentialSet Of(LabContext c) { return c.Credentials ?? CredentialSet.BuiltIn(new TrainingKeySource()); }
 
+        /// <summary>The built-in training keys only, never a learner's. For a walk that must run on public keys so it can stay open with Show keys off.</summary>
+        public static ITrainingKeySource BuiltInOnly() { return new TrainingKeySource(); }
+
         /// <summary>The bytes of a key lessons 1 and 2 use. All are this long, so a flow can make them.</summary>
         public const int LessonKeyBytes = 16;
 
