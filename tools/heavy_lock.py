@@ -142,8 +142,42 @@ def open_lock(directory):
         raise LockError(f"cannot open the lock file in {directory}: {e}") from e
 
 
+def tie_children_to_this_process():
+    """Windows: put this process in a job object that kills every member when this process ends. The command (and anything it starts) joins the job by
+    inheritance, so a runner that dies (TaskStop, a crash) takes its heavy work with it. Without this the lock frees while the work keeps running,
+    and a second heavy run starts on top of it. Fails closed: a job that cannot be made stops the run (LockError), never runs unprotected.
+    POSIX: not covered here. A runner killed with SIGKILL leaves its command running (untested on this machine, noted in the PR)."""
+    if os.name != "nt":
+        return
+    from ctypes import wintypes
+    kernel32 = ctypes.WinDLL("kernel32", use_last_error=True)
+
+    class BasicLimits(ctypes.Structure):
+        _fields_ = [("PerProcessUserTimeLimit", ctypes.c_longlong), ("PerJobUserTimeLimit", ctypes.c_longlong), ("LimitFlags", wintypes.DWORD),
+                    ("MinimumWorkingSetSize", ctypes.c_size_t), ("MaximumWorkingSetSize", ctypes.c_size_t), ("ActiveProcessLimit", wintypes.DWORD),
+                    ("Affinity", ctypes.c_size_t), ("PriorityClass", wintypes.DWORD), ("SchedulingClass", wintypes.DWORD)]
+
+    class ExtendedLimits(ctypes.Structure):
+        _fields_ = [("BasicLimitInformation", BasicLimits), ("IoInfo", ctypes.c_ulonglong * 6), ("ProcessMemoryLimit", ctypes.c_size_t),
+                    ("JobMemoryLimit", ctypes.c_size_t), ("PeakProcessMemoryUsed", ctypes.c_size_t), ("PeakJobMemoryUsed", ctypes.c_size_t)]
+
+    kernel32.CreateJobObjectW.restype = wintypes.HANDLE
+    kernel32.GetCurrentProcess.restype = wintypes.HANDLE
+    kernel32.SetInformationJobObject.argtypes = [wintypes.HANDLE, ctypes.c_int, ctypes.c_void_p, wintypes.DWORD]
+    kernel32.AssignProcessToJobObject.argtypes = [wintypes.HANDLE, wintypes.HANDLE]
+    job = kernel32.CreateJobObjectW(None, None)
+    limits = ExtendedLimits()
+    limits.BasicLimitInformation.LimitFlags = 0x2000                       # JOB_OBJECT_LIMIT_KILL_ON_JOB_CLOSE
+    ok = job and kernel32.SetInformationJobObject(job, 9, ctypes.byref(limits), ctypes.sizeof(limits)) and \
+        kernel32.AssignProcessToJobObject(job, kernel32.GetCurrentProcess())
+    if not ok:
+        raise LockError(f"cannot tie the command to this runner with a job object: WinError {ctypes.get_last_error()}")
+    # The job handle stays open until this process ends; closing it (at exit or by a kill) is what kills the members.
+
+
 def run(directory, label, wait_minutes, command):
     fd = open_lock(directory)
+    tie_children_to_this_process()
     deadline = None if wait_minutes is None else time.time() + wait_minutes * 60
     last_print = 0.0
     env = dict(os.environ)

@@ -187,6 +187,32 @@ class HeavyLock(unittest.TestCase):
             self.assertEqual(r.returncode, 75, f"info={partial!r}: {r.stdout + r.stderr}")
             self.assertNotIn("must not run", r.stdout)
 
+    def alive(self, pid):
+        out = subprocess.run(["tasklist", "/FI", f"PID eq {pid}", "/NH"], capture_output=True, text=True).stdout
+        return str(pid) in out
+
+    def test_a_dead_runner_leaves_no_heavy_work_behind(self):
+        """Jared's finding: the lock lives on the runner. If the runner dies (TaskStop, a crash) and its child lives on, the lock frees while heavy work still runs.
+        The child must die with the runner, so a second run never starts on top of it."""
+        pidfile = pathlib.Path(self.tmp.name) / "child.pid"
+        child = f"import os, time; open(r'{pidfile}', 'w').write(str(os.getpid())); time.sleep(300)"
+        runner = self.start_run("orphan check", *PY, child)
+        self.wait_until_held()
+        for _ in range(100):
+            if pidfile.exists() and pidfile.read_text(encoding="utf-8"):
+                break
+            time.sleep(0.1)
+        child_pid = int(pidfile.read_text(encoding="utf-8"))
+        try:
+            subprocess.run(["taskkill", "/PID", str(runner.pid), "/F"], capture_output=True)          # the runner only: no /T, like a killed task
+            runner.wait(timeout=30)
+            deadline = time.time() + 15                                    # a deadline, not a count: each tasklist call takes about a second
+            while time.time() < deadline and self.alive(child_pid):
+                time.sleep(0.2)
+            self.assertFalse(self.alive(child_pid), "the heavy command is still running after its runner died")
+        finally:
+            subprocess.run(["taskkill", "/PID", str(child_pid), "/F"], capture_output=True)
+
     # The gem probe-what-you-bind: the acquisition is the probe, and an unexpected lock error is never read as "free".
     def test_a_lock_folder_that_cannot_be_made_fails_closed_with_a_named_code(self):
         blocker = pathlib.Path(self.tmp.name) / "a-file-not-a-folder"
