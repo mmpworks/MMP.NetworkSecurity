@@ -141,6 +141,13 @@ test('the round-constant strip lights the constant a rotating word uses, and non
   await toStop(page, KEYS + 1)
   await expect(page.getByTestId('aes-walk-rcon-0')).toHaveAttribute('data-lit', 'true')
   await expect(page.locator('[data-testid^="aes-walk-rcon-"][data-lit="true"]')).toHaveCount(1)
+  // FIPS 197 numbers the round constants from 1: w4 uses Rcon[1] = 01, so its label reads 1, while the chip list counts from 0 (Richard on #326).
+  await expect(page.getByTestId('aes-walk-build-rcon')).toContainText('Round constant 1')
+  await expect(page.getByTestId('aes-walk-build-rcon').locator('code')).toHaveText(/01\s*00\s*00\s*00/)
+  await toStop(page, 4)
+  await expect(page.getByTestId('aes-walk-ks-build-title')).toHaveText('How w8 is made')
+  await expect(page.getByTestId('aes-walk-build-rcon')).toContainText('Round constant 2')
+  await expect(page.getByTestId('aes-walk-rcon-1')).toHaveAttribute('data-lit', 'true')
   await toStop(page, 1)
   await expect(page.locator('[data-testid^="aes-walk-rcon-"][data-lit="true"]')).toHaveCount(0)
 })
