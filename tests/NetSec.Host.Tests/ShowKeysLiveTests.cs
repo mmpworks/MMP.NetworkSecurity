@@ -112,6 +112,43 @@ public sealed class ShowKeysLiveTests
         Assert.False(frame.GetProperty("on").GetBoolean());
     }
 
+    static Task<(int Status, string Body)> PutShowKeys(SecurityLiveTests.Host host, bool on) =>
+        host.Put("/api/security/show-keys", on ? "{\"on\":true}" : "{\"on\":false}");
+
+    static async Task<bool> ShowKeysNow(SecurityLiveTests.Host host) =>
+        JsonDocument.Parse((await host.Get("/api/security/show-keys")).Body).RootElement.GetProperty("on").GetBoolean();
+
+    /// <summary>
+    /// Off fails closed (issue #292): with modes.json held, turning Show keys off still hides keys at once and tells every socket. The
+    /// named refusal says only that the choice was not saved for the next start.
+    /// </summary>
+    [Fact]
+    public async Task Turning_show_keys_off_while_the_settings_file_is_held_still_hides_keys_and_tells_the_sockets()
+    {
+        using SecurityLiveTests.Host host = await SecurityLiveTests.Host.StartAsync();
+        Assert.Equal(200, (await PutShowKeys(host, true)).Status);
+        using Ws ws = new(host);
+        await ws.Open();
+        Task<JsonElement> seen = ws.Until("security.show-keys");
+        (int Status, string Body) refused;
+        using (SecurityLiveTests.HoldModesOpen(host)) refused = await PutShowKeys(host, false);
+        SecurityLiveTests.AssertSaveRefused(refused.Status, refused.Body);
+        Assert.False((await seen).GetProperty("on").GetBoolean(), "the sockets hear off");
+        Assert.False(await ShowKeysNow(host), "keys stop showing although the save failed");
+    }
+
+    /// <summary>On may fail open (issue #292): with modes.json held, turning Show keys on is refused by name, and keys stay hidden.</summary>
+    [Fact]
+    public async Task Turning_show_keys_on_while_the_settings_file_is_held_is_refused_and_keys_stay_hidden()
+    {
+        using SecurityLiveTests.Host host = await SecurityLiveTests.Host.StartAsync();
+        Assert.Equal(200, (await PutShowKeys(host, false)).Status);
+        (int Status, string Body) refused;
+        using (SecurityLiveTests.HoldModesOpen(host)) refused = await PutShowKeys(host, true);
+        SecurityLiveTests.AssertSaveRefused(refused.Status, refused.Body);
+        Assert.False(await ShowKeysNow(host));
+    }
+
     [Fact]
     public async Task The_key_log_is_refused_while_off()
     {

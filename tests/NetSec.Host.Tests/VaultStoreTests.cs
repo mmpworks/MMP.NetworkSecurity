@@ -116,4 +116,53 @@ public sealed class VaultStoreTests : IDisposable
         string copy = JsonDocument.Parse(File.ReadAllText(Path.Combine(dir.FullName, "app", "src", "wizard-copy.json"))).RootElement.GetProperty("wizard.vault.audit.limits").GetString()!;
         Assert.Equal(VaultExercise.ChainLimits, copy);
     }
+
+    /// <summary>
+    /// Opens modes.json the way an antivirus scan or the search indexer can: read and write sharing, but no delete sharing. On Windows, a
+    /// replacing move fails while such a handle is open (issue #292).
+    /// </summary>
+    FileStream HoldModesOpen() => new(Path.Combine(_root, "modes.json"), FileMode.Open, FileAccess.Read, FileShare.ReadWrite);
+
+    [Fact]
+    public void A_save_waits_out_a_short_hold_on_the_settings_file()
+    {
+        SecurityStore store = Store();
+        store.SetShowKeys(false);
+        FileStream held = HoldModesOpen();
+        // The release runs on its own thread, not the pool: the save sleeps on a pool thread while it retries, and a busy pool can delay a
+        // pool-thread release past the retry budget (the gate saw that once).
+        System.Threading.Thread release = new(() => { System.Threading.Thread.Sleep(150); held.Dispose(); }) { IsBackground = true };
+        release.Start();
+        try { store.SetShowKeys(true); }
+        finally { release.Join(5000); held.Dispose(); }
+        Assert.True(store.ShowKeys);
+        Assert.True(Store().ShowKeys, "a new store reads the saved value back from modes.json");
+    }
+
+    [Fact]
+    public void A_save_that_stays_blocked_fails_with_a_named_code()
+    {
+        SecurityStore store = Store();
+        store.SetShowKeys(false);
+        using (HoldModesOpen())
+        {
+            NetSec.Errors.NetSecException e = Assert.Throws<NetSec.Errors.NetSecException>(() => store.SetShowKeys(true));
+            Assert.Equal(NetSec.Errors.ErrorCodes.SecurityStoreSaveFailed, e.Error.Code);
+        }
+        Assert.False(store.ShowKeys, "a failed save leaves the old value in force");
+    }
+
+    [Fact]
+    public void Show_keys_off_takes_effect_at_once_when_the_save_fails()
+    {
+        SecurityStore store = Store();
+        store.SetShowKeys(true);
+        using (HoldModesOpen())
+        {
+            NetSec.Errors.NetSecException e = Assert.Throws<NetSec.Errors.NetSecException>(() => store.SetShowKeys(false));
+            Assert.Equal(NetSec.Errors.ErrorCodes.SecurityStoreSaveFailed, e.Error.Code);
+        }
+        Assert.False(store.ShowKeys, "off fails closed: keys stop showing now");
+        Assert.True(Store().ShowKeys, "the file still says on, so the next start would show keys; the message says so");
+    }
 }

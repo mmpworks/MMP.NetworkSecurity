@@ -1,3 +1,4 @@
+using System.Threading;
 using System.Security.Cryptography;
 using System.Text.Json;
 using NetSec.Keys;
@@ -88,9 +89,23 @@ public sealed class SecurityStore
 
     public bool ShowKeys { get { lock (_gate) return _modes.ShowKeys; } }
 
+    /// <summary>
+    /// Saves the Show keys choice. Off fails closed (issue #292): when the save is refused, off still takes effect in memory at once, and
+    /// the error says only that the choice was not saved for the next start. On fails open: a refused save keeps keys hidden.
+    /// </summary>
     public void SetShowKeys(bool on)
     {
-        lock (_gate) Save(_modes with { ShowKeys = on });
+        lock (_gate)
+        {
+            ModesFile next = _modes with { ShowKeys = on };
+            try { Save(next); }
+            catch (NetSec.Errors.NetSecException x) when (!on && x.Error.Code == NetSec.Errors.ErrorCodes.SecurityStoreSaveFailed)
+            {
+                _modes = next;
+                throw new NetSec.Errors.NetSecException(NetSec.Errors.NetSecError.Of(x.Error.Code,
+                    $"Show keys is off now. The choice could not be saved, so the next start may show keys again. {x.Error.Message}"));
+            }
+        }
     }
 
     public string FlowOf(string typeId) => _flowOf[typeId];
@@ -295,7 +310,29 @@ public sealed class SecurityStore
         if (!File.Exists(readme)) File.WriteAllText(readme, "This folder holds your test keys for MMP.NetworkSecurity. Git ignores it. Use test keys only: this course shows your keys on screen and in saved files.\n");
         string temp = _modesPath + ".tmp";
         File.WriteAllText(temp, JsonSerializer.Serialize(next, Json));
-        File.Move(temp, _modesPath, overwrite: true);
+        ReplaceModes(temp);
         _modes = next;
+    }
+
+    // On Windows a replacing move fails while another handle holds the target open without delete sharing. An antivirus scan or the search
+    // indexer often opens a file that was just written, so the move waits out a short hold (issue #292).
+    // The wait happens inside _gate, and every reader of ShowKeys and the modes takes _gate. So during a hold those readers wait too, for
+    // up to about 1 s. A hold is rare and short, so this is accepted.
+    const int ReplaceTries = 20, ReplaceWaitMs = 50;
+
+    /// <summary>Moves the temp file over modes.json, trying up to ReplaceTries times. After that it fails with SECURITY_STORE_SAVE_FAILED, and the old file stays.</summary>
+    void ReplaceModes(string temp)
+    {
+        for (int attempt = 1; ; attempt++)
+        {
+            try { File.Move(temp, _modesPath, overwrite: true); return; }
+            catch (Exception e) when (e is IOException or UnauthorizedAccessException)
+            {
+                if (attempt >= ReplaceTries)
+                    throw new NetSec.Errors.NetSecException(NetSec.Errors.NetSecError.Of(NetSec.Errors.ErrorCodes.SecurityStoreSaveFailed,
+                        $"{_modesPath} could not be saved, possibly because another program held it open, after {ReplaceTries} tries over {ReplaceTries * ReplaceWaitMs} ms ({e.Message}) Close any program that has the file open, then try again."));
+                Thread.Sleep(ReplaceWaitMs);
+            }
+        }
     }
 }
