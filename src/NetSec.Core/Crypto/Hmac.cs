@@ -2,6 +2,13 @@ using System;
 
 namespace NetSec.Crypto
 {
+    /// <summary>The steps of one HMAC, for the walk: the key as used (hashed first when longer than a block), padded to a block, then each pass.</summary>
+    internal sealed class HmacTrace
+    {
+        public bool KeyHashed;
+        public byte[] KeyUsed, PaddedKey, InnerPad, InnerDigest, OuterPad, Mac;
+    }
+
     /// <summary>HMAC, RFC 2104: H((key xor opad) + H((key xor ipad) + data)).</summary>
     public static class Hmac
     {
@@ -16,7 +23,9 @@ namespace NetSec.Crypto
             return tag.Length == expected.Length && ConstantTime.Equal(expected, 0, tag, 0, expected.Length);
         }
 
-        public static byte[] Compute(Func<IHash> h, byte[] key, byte[] data)
+        public static byte[] Compute(Func<IHash> h, byte[] key, byte[] data) { return Compute(h, key, data, null); }
+
+        internal static byte[] Compute(Func<IHash> h, byte[] key, byte[] data, HmacTrace trace)
         {
             Arg.NotNull(h, "h");
             Arg.NotNull(key, "key");
@@ -37,7 +46,18 @@ namespace NetSec.Crypto
             IHash outer = h();
             outer.Update(outerPad, 0, outerPad.Length);
             outer.Update(innerDigest, 0, innerDigest.Length);
-            return outer.Finish();
+            byte[] mac = outer.Finish();
+            if (trace != null)
+            {
+                trace.KeyHashed = key.Length > blockSize;
+                trace.KeyUsed = (byte[])shortKey.Clone();
+                trace.PaddedKey = paddedKey;
+                trace.InnerPad = innerPad;
+                trace.InnerDigest = innerDigest;
+                trace.OuterPad = outerPad;
+                trace.Mac = (byte[])mac.Clone();
+            }
+            return mac;
         }
 
         static byte[] HashOf(Func<IHash> h, byte[] data)
