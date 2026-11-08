@@ -26,7 +26,7 @@ function Get-AppDiffCount([string]$Repo, [string]$Base = 'origin/main') {
 
 function Get-AppProofPlan([bool]$HasApp, [bool]$SkipApp, [string]$SkipAppReason, [string]$Lesson, [int]$AppDiffCount) {
     # Mode: none (no app folder), skip (named), refuse (app changed, skipped with no reason), suite, narrowed (suite cut to one lesson),
-    # lesson (no app change, one lesson spec), check (no app change: typecheck only).
+    # lesson (no app change, one lesson spec, typecheck and build first), check (no app change: typecheck only).
     $plan = [ordered]@{ Mode = ''; Typecheck = $false; Build = $false; Suite = $false; Lesson = ''; Label = ''; Why = '' }
     if (-not $HasApp) {
         $plan.Mode = 'none'; $plan.Why = 'app/package.json is absent; Nancy owns app/ and her PR has not landed'
@@ -43,7 +43,8 @@ function Get-AppProofPlan([bool]$HasApp, [bool]$SkipApp, [string]$SkipAppReason,
         $plan.Mode = 'suite'; $plan.Typecheck = $true; $plan.Build = $true; $plan.Suite = $true
         $plan.Label = "playwright full suite (app/ changed in $AppDiffCount files)"
     } elseif ($Lesson) {
-        $plan.Mode = 'lesson'; $plan.Typecheck = $true; $plan.Lesson = $Lesson; $plan.Label = "playwright lesson $Lesson"
+        # Build too: the preview serves app/dist, so a stale dist could otherwise pass a lesson spec.
+        $plan.Mode = 'lesson'; $plan.Typecheck = $true; $plan.Build = $true; $plan.Lesson = $Lesson; $plan.Label = "playwright lesson $Lesson"
     } else {
         $plan.Mode = 'check'; $plan.Typecheck = $true; $plan.Why = 'no -Lesson given'
     }
@@ -63,9 +64,11 @@ function Test-AppTools([string]$AppDir) {
 }
 
 function Test-ElectronBinary([string]$AppDir) {
-    # The real-Electron specs need the Electron binary, which npm ci can skip. Probe it the way the app loads it.
+    # The real-Electron specs need the Electron binary, which npm ci can skip. require('electron') only RETURNS a path (from path.txt, or from
+    # ELECTRON_OVERRIDE_DIST_PATH); it never checks the file exists, so the probe checks that too.
     Push-Location $AppDir
-    try { node -e "require('electron')" 2>$null *> $null; $code = $LASTEXITCODE } finally { Pop-Location }
+    # With the override and no path.txt, index.js returns <dist>/electron with no extension and Windows starts <dist>/electron.exe, so both count.
+    try { node -e "const p = require('electron'); const fs = require('fs'); if (typeof p !== 'string' || !(fs.existsSync(p) || fs.existsSync(p + '.exe'))) process.exit(3)" 2>$null *> $null; $code = $LASTEXITCODE } finally { Pop-Location }
     if ($code -eq 0) { return @() }
     return @('TOOL_MISSING: the Electron binary is missing or broken in app/node_modules/electron. Set ELECTRON_OVERRIDE_DIST_PATH to another checkout''s node_modules/electron/dist, or run this yourself: cd app; node node_modules/electron/install.js')
 }

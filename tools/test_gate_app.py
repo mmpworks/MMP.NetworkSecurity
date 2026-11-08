@@ -70,7 +70,7 @@ class Plan(unittest.TestCase):
         p = plan(diff=0, lesson="2")
         self.assertEqual(p["Mode"], "lesson")
         self.assertTrue(p["Typecheck"])
-        self.assertFalse(p["Build"])
+        self.assertTrue(p["Build"], "the preview serves app/dist, so a stale dist must not pass a lesson spec")
         self.assertEqual(p["Lesson"], "2")
 
     def test_no_app_diff_and_no_lesson_runs_typecheck_only(self):
@@ -187,8 +187,59 @@ class Tools(unittest.TestCase):
 
     def test_a_working_electron_install_reports_nothing(self):
         self.tree("node_modules/electron/index.js")
-        (self.app / "node_modules" / "electron" / "index.js").write_text("module.exports = 'electron.exe'", encoding="utf-8")
+        (self.app / "node_modules" / "electron" / "index.js").write_text("module.exports = __filename", encoding="utf-8")  # a path that exists
         self.assertEqual(ps(f"@(Test-ElectronBinary -AppDir '{self.app}')"), [])
+
+    # Jared's #277 review: electron/index.js only RETURNS a path (path.txt, or ELECTRON_OVERRIDE_DIST_PATH); it never checks the file exists.
+    FAKE_INDEX = ("const path = require('path'); module.exports = path.join(process.env.ELECTRON_OVERRIDE_DIST_PATH || "
+                  "path.join(__dirname, 'dist'), 'electron.exe')")
+
+    def test_an_electron_path_with_no_file_behind_it_is_missing(self):
+        self.tree("node_modules/electron/index.js")
+        (self.app / "node_modules" / "electron" / "index.js").write_text(self.FAKE_INDEX, encoding="utf-8")
+        out = ps(f"@(Test-ElectronBinary -AppDir '{self.app}')")
+        self.assertTrue(any("TOOL_MISSING" in m and "ELECTRON_OVERRIDE_DIST_PATH" in m for m in out), out)
+
+    def test_an_override_folder_that_is_empty_is_missing(self):
+        self.tree("node_modules/electron/index.js")
+        (self.app / "node_modules" / "electron" / "index.js").write_text(self.FAKE_INDEX, encoding="utf-8")
+        empty = pathlib.Path(self.tmp.name) / "empty-dist"
+        empty.mkdir()
+        os.environ["ELECTRON_OVERRIDE_DIST_PATH"] = str(empty)
+        try:
+            out = ps(f"@(Test-ElectronBinary -AppDir '{self.app}')")
+        finally:
+            del os.environ["ELECTRON_OVERRIDE_DIST_PATH"]
+        self.assertTrue(any("TOOL_MISSING" in m for m in out), out)
+
+    def test_an_override_path_with_no_extension_is_ready_when_the_exe_exists(self):
+        """With ELECTRON_OVERRIDE_DIST_PATH and no path.txt, electron/index.js returns <dist>/electron with no extension, and Windows starts
+        <dist>/electron.exe. A probe that needs the exact name would fail the gate on a working setup (the real override on this machine)."""
+        self.tree("node_modules/electron/index.js")
+        (self.app / "node_modules" / "electron" / "index.js").write_text(
+            "const path = require('path'); module.exports = path.join(process.env.ELECTRON_OVERRIDE_DIST_PATH, 'electron')", encoding="utf-8")
+        dist = pathlib.Path(self.tmp.name) / "dist2"
+        dist.mkdir()
+        (dist / "electron.exe").write_text("MZ", encoding="utf-8")
+        os.environ["ELECTRON_OVERRIDE_DIST_PATH"] = str(dist)
+        try:
+            out = ps(f"@(Test-ElectronBinary -AppDir '{self.app}')")
+        finally:
+            del os.environ["ELECTRON_OVERRIDE_DIST_PATH"]
+        self.assertEqual(out, [])
+
+    def test_an_electron_path_with_a_file_behind_it_is_ready(self):
+        self.tree("node_modules/electron/index.js")
+        (self.app / "node_modules" / "electron" / "index.js").write_text(self.FAKE_INDEX, encoding="utf-8")
+        dist = pathlib.Path(self.tmp.name) / "dist"
+        dist.mkdir()
+        (dist / "electron.exe").write_text("MZ", encoding="utf-8")
+        os.environ["ELECTRON_OVERRIDE_DIST_PATH"] = str(dist)
+        try:
+            out = ps(f"@(Test-ElectronBinary -AppDir '{self.app}')")
+        finally:
+            del os.environ["ELECTRON_OVERRIDE_DIST_PATH"]
+        self.assertEqual(out, [])
 
 
 if __name__ == "__main__":
