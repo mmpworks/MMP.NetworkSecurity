@@ -6,8 +6,9 @@ namespace Acceptance
     /// <summary>
     /// Slice P8a's teaching curves (docs/sections-plan.md lines 153 and 154, R7, Q5 answer A). The anchor is the plan, not the engine: the toy curve
     /// is y^2 = x^3 + 2x + 2 over GF(17) with 19 points, and the real curve is the same equation over the reals. The suite brute-forces every toy
-    /// value with its own small arithmetic, and checks the real-curve lines by their formulas. ECDSA is checked by its relations on the reply's own
-    /// d, z and nonce, so a change of those example values keeps the clause valid. Both routes are open with Show keys OFF.
+    /// value with its own small arithmetic, and checks the real-curve lines by their formulas. Q5 chose the video's curve so a learner can follow
+    /// the video and the app side by side, so the video's own numbers are pinned too: G = (5, 1), k = 13 with 13G = (16, 4), and the ECDSA
+    /// example d = 7, Q = (0, 6), z = 8, k = 3, r = 10, s = 7 (video 4Tfmwxr0I34; Jared checked them in Python). Both routes are open with Show keys OFF.
     /// </summary>
     public static class CurveWalkClauses
     {
@@ -88,6 +89,7 @@ namespace Acceptance
                 Check.True(curve != null && (int)MiniJson.Num(curve, "p", 0) == P && (int)MiniJson.Num(curve, "a", 0) == A && (int)MiniJson.Num(curve, "b", 0) == B && (int)MiniJson.Num(curve, "order", 0) == N,
                     "the curve is not y^2 = x^3 + 2x + 2 over GF(17) with order 19 (sections-plan.md Q5)");
                 Pt g = ReadPt(curve["g"], "G");
+                SamePt("G is the video's generator", new Pt(5, 1), g);
 
                 // Every point, by trying each x and y.
                 List<Pt> want = AllPoints();
@@ -110,6 +112,8 @@ namespace Acceptance
                 }
 
                 int kk = (int)MiniJson.Num(r.Json, "k", -1);
+                Check.True(kk == 13, "double-and-add runs on k = " + kk + ", and the video uses k = 13");
+                SamePt("13G on the video's curve", new Pt(16, 4), Mul(13, g));
                 List<object> dad = MiniJson.Arr(r.Json, "doubleAndAdd"), ladder = MiniJson.Arr(r.Json, "ladder");
                 Check.True(dad != null && dad.Count > 0 && ladder != null && ladder.Count > 0, "the walk has no double-and-add or ladder rows");
                 SamePt("double-and-add ends on k.G", Mul(kk, g), ReadPt(MiniJson.AsObject(dad[dad.Count - 1])["after"], "double-and-add"));
@@ -125,8 +129,10 @@ namespace Acceptance
                 // ECDSA by its relations on the reply's own values, so new example values keep this clause valid.
                 Dictionary<string, object> ec = MiniJson.Obj(r.Json, "ecdsa");
                 int d = (int)MiniJson.Num(ec, "signerPrivate", 0);
+                Check.True(d == 7, "the ECDSA example signs with d = " + d + ", and the video uses d = 7");
                 Pt qpub = Mul(d, g);
                 SamePt("ECDSA public key", qpub, ReadPt(ec["signerPublic"], "ecdsa"));
+                SamePt("the video's public key Q", new Pt(0, 6), qpub);
                 int[] nonces = new int[2], zs = new int[2], rs = new int[2], ss = new int[2];
                 string[] names = { "first", "second" };
                 for (int i = 0; i < 2; i++)
@@ -146,13 +152,15 @@ namespace Acceptance
                     Check.True(MiniJson.Bool(v, "valid", false) && x != null && Mod(x.X, N) == rs[i], names[i] + " verify: the signature should be valid");
                 }
                 Check.True(nonces[0] == nonces[1], "the 2 signatures should reuse one nonce, for the recovery");
+                Check.True(zs[0] == 8 && nonces[0] == 3 && rs[0] == 10 && ss[0] == 7, "the first signature is z " + zs[0] + ", k " + nonces[0] + ", r " + rs[0] + ", s " + ss[0] + ", and the video's is z 8, k 3, r 10, s 7");
                 Dictionary<string, object> rec = MiniJson.Obj(ec, "recovery");
                 int nonce = Mod((long)(zs[0] - zs[1]) * Inv(Mod(ss[0] - ss[1], N), N), N);
                 Check.True((int)MiniJson.Num(rec, "nonce", -1) == nonce && nonce == Mod(nonces[0], N), "the recovered nonce is not (z1 - z2) / (s1 - s2) mod 19");
                 int priv = Mod((long)(Mod((long)ss[0] * nonce, N) - zs[0]) * Inv(rs[0], N), N);
                 Check.True((int)MiniJson.Num(rec, "privateKey", -1) == priv && priv == Mod(d, N), "the recovered private key is not (s1 k - z1) / r mod 19, or is not the signer's key");
+                Check.True(priv == 7, "the recovery gives d = " + priv + ", and the video's key is 7");
                 HostHttp.Put(h, "/api/security/show-keys", A17.Obj("on", true));
-                return "with Show keys OFF the toy curve is y^2 = x^3 + 2x + 2 over GF(17): its " + want.Count + " points, 19 hops of k.G, double-and-add, the ladder, ECDH and 2 ECDSA signatures all match the suite's own arithmetic, and the reused nonce gives back the private key";
+                return "with Show keys OFF the toy curve is y^2 = x^3 + 2x + 2 over GF(17): its " + want.Count + " points, 19 hops of k.G, double-and-add, the ladder, ECDH and 2 ECDSA signatures all match the suite's own arithmetic, and the reused nonce gives back the private key. The video's numbers hold: 13G = (16, 4), and d 7, Q (0, 6), z 8, k 3, r 10, s 7";
             }
         }
 
