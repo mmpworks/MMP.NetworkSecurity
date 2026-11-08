@@ -1,5 +1,5 @@
 <script setup lang="ts">
-import { computed, inject, nextTick, reactive, ref, watch } from 'vue'
+import { computed, inject, nextTick, onBeforeUnmount, onMounted, reactive, ref, watch } from 'vue'
 import gloss from '../walk-gloss.json'
 import type { useWalkTimeline } from '../useWalkTimeline'
 import { byteAt, expandedHex, wordTest, type AesBlockReply, type AesKeyWordRow, type AesTables } from '../walk'
@@ -45,8 +45,70 @@ function endFrame() { token++; anim.word = null; anim.rows = 0; anim.filled = 4;
  */
 async function reveal(run: number, selector: string) {
   await nextTick()
-  if (run === token) root.value?.querySelector(selector)?.scrollIntoView({ block: 'nearest' })
+  const el = run === token ? root.value?.querySelector(selector) : null
+  if (!el) return
+  if (scrolls(buildEl.value)) scrollWithin(buildEl.value!, el)
+  else el.scrollIntoView({ block: 'nearest' })
 }
+
+// ---- The scroll boxes (Steve on #326): the round keys and the build panel each scroll in their own box, sized to the window, so the
+// walk's header (Stop n of N, the speeds, Back, Play, Next word) and the panel stay on screen while the learner looks at the last round
+// keys. Nothing here scrolls the page, apart from bringing the header to the top once when the key schedule opens.
+const tableEl = ref<HTMLElement | null>(null)
+const buildEl = ref<HTMLElement | null>(null)
+const area = reactive({ table: 0, panel: 0 })
+const FLOOR = 200
+
+function frame() {
+  const ws = root.value?.closest<HTMLElement>('[data-testid="workspace"]') ?? null
+  const head = root.value?.closest('.aes-walk')?.querySelector<HTMLElement>('.aw-head') ?? null
+  const strip = ws?.querySelector<HTMLElement>('.aw-strip') ?? null
+  return { ws, head, stripH: strip?.offsetHeight ?? 0 }
+}
+
+/** Each box gets the height from its top to the bottom of the workspace, measured as if the header sat just under the strip. */
+function measure() {
+  const { ws, head, stripH } = frame()
+  if (!ws || !head || !tableEl.value) return
+  const headTop = head.getBoundingClientRect().top
+  const room = (el: HTMLElement | null) => (el ? Math.max(FLOOR, Math.floor(ws.clientHeight - stripH - (el.getBoundingClientRect().top - headTop) - 12)) : 0)
+  area.table = room(tableEl.value)
+  area.panel = room(buildEl.value)
+}
+
+/** Brings the header just under the strip, so the boxes have the window's height to work with. */
+function headerToTop() {
+  const { ws, head, stripH } = frame()
+  if (!ws || !head) return
+  const gap = head.getBoundingClientRect().top - ws.getBoundingClientRect().top - stripH
+  if (Math.abs(gap) > 2) ws.scrollTop += gap
+}
+
+/** Scrolls one box, and only that box, so the element is in view inside it. */
+function scrollWithin(box: HTMLElement, el: Element, margin = 8) {
+  const b = box.getBoundingClientRect(), r = el.getBoundingClientRect()
+  if (r.top < b.top) box.scrollTop -= b.top - r.top + margin
+  else if (r.bottom > b.bottom) box.scrollTop += r.bottom - b.bottom + margin
+  if (r.left < b.left) box.scrollLeft -= b.left - r.left + margin
+  else if (r.right > b.right) box.scrollLeft += r.right - b.right + margin
+}
+const scrolls = (el: HTMLElement | null) => !!el && el.scrollHeight > el.clientHeight + 1 && /auto|scroll/.test(getComputedStyle(el).overflowY)
+
+/** Brings a word's 4 cells into view inside the round-key box. */
+async function showWord(word: number | null) {
+  await nextTick()
+  if (word == null || !tableEl.value) return
+  for (const j of [3, 0]) { const el = cellEl(word, j); if (el) scrollWithin(tableEl.value, el) }
+}
+
+onMounted(async () => {
+  await nextTick()
+  headerToTop()
+  measure()
+  void showWord(current.value)
+  window.addEventListener('resize', measure)
+})
+onBeforeUnmount(() => window.removeEventListener('resize', measure))
 
 /** The finished byte flies from the XOR line into its cell, as in the mock. It lands, and then the cell pulses. */
 async function fly(run: number, r: AesKeyWordRow, j: number) {
@@ -124,6 +186,7 @@ watch(() => [props.built, props.block] as const, ([b, blk], [ob, oblk]) => {
   const r = current.value != null ? rowOf(current.value) : null
   if (blk === oblk && b === ob + 1 && r) play(r, true)
   else endFrame()
+  void showWord(current.value)
 })
 
 /** A tap on a built word shows how it was made, and replays its rows. */
@@ -211,7 +274,10 @@ function onWheel(e: WheelEvent) {
   e.preventDefault()
   zoomBy(e.deltaY < 0 ? 1 : -1)
 }
-const tableStyle = computed(() => ({ '--ks-zoom': String(ZOOMS[zoomAt.value]) }))
+const tableStyle = computed(() => ({ '--ks-zoom': String(ZOOMS[zoomAt.value]), ...(area.table ? { maxHeight: `${area.table}px` } : {}) }))
+const buildStyle = computed(() => (area.panel ? { '--ks-panel-area': `${area.panel}px` } : {}))
+// A zoom changes where the shown word sits, so the box follows it.
+watch(zoomAt, () => { void showWord(shown.value) })
 
 const cellIdOf = (g: number, r: number, c: number) => 16 * (g - 1) + r + 4 * c
 const wordOf = (g: number, c: number) => 4 * (g - 1) + c
@@ -233,7 +299,7 @@ const wordOf = (g: number, c: number) => 4 * (g - 1) + c
           <v-btn size="small" variant="outlined" :disabled="zoomAt === ZOOMS.length - 1" icon="mdi-magnify-plus-outline" aria-label="Zoom in" data-testid="aes-walk-ks-zoom-in" @click="zoomBy(1)" />
           <v-btn size="small" variant="text" class="ml-4" :disabled="built === 0" data-testid="aes-walk-ks-start-over" @click="emit('startOver')">Start over</v-btn>
         </div>
-        <div class="aw-ks-table" role="list" aria-label="The expanded key, one grid per round key" :style="tableStyle" data-testid="aes-walk-ks-table" @wheel="onWheel">
+        <div ref="tableEl" class="aw-ks-table" role="list" aria-label="The expanded key, one grid per round key" :style="tableStyle" data-testid="aes-walk-ks-table" tabindex="0" @wheel="onWheel">
           <div v-for="g in grids" :key="g" class="aw-ks-grid-wrap" role="listitem">
             <span class="aw-ks-grid-name muted">Round key {{ g - 1 }}</span>
             <div class="aw-ks-grid" :data-testid="`aes-walk-table-grid-${g - 1}`">
@@ -267,7 +333,7 @@ const wordOf = (g: number, c: number) => 4 * (g - 1) + c
         </div>
         <p class="muted aw-ks-tap">{{ gloss.keys.tapHint }}</p>
       </div>
-      <div class="aw-ks-build" data-testid="aes-walk-ks-build">
+      <div ref="buildEl" class="aw-ks-build" :style="buildStyle" data-testid="aes-walk-ks-build">
         <h3 class="aw-ks-title" data-testid="aes-walk-ks-build-title">{{ title }}</h3>
         <p v-if="keyNote" class="aw-ks-key-note" data-testid="aes-walk-build-key-note">w{{ shown }}: {{ gloss.keys.keyNote }}</p>
         <template v-else-if="shownRow">
