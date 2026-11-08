@@ -72,8 +72,10 @@ export function wireSteps(events: readonly TraceEvent[]): Map<TraceEvent, string
  * is not the same from one run to the next, and the screen must never take an order from it. Within a stream the order is stable. So
  * one attack run gives the same steps up to the split, and the same split, every time (the lead and Richard on #297). After a caught
  * attack, the other side's extra sends before the abort depend on timing, so the attacked run's tail can vary. The total stays the
- * same only while that tail stays inside the normal run's steps, which holds today because the attacked run stops early. The engine
- * clock in #306 makes the tail stable (Jared on #297). Events with no stream id stay out: they belong to no stream, so they cannot pair.
+ * same only while that tail stays inside the normal run's steps, which holds today because the attacked run stops early. A varying
+ * tail is an engine-side race, outside #306's clock, which orders events and does not change which events happen. The same-run-twice
+ * spec flags it if the tail grows past the normal run (Jared on #297). Events with no stream id stay out: they belong to no stream, so
+ * they cannot pair.
  */
 export function pairRuns(normal: readonly TraceEvent[], attacked: readonly TraceEvent[]): RunPair[] {
   return pairing(normal, attacked).pairs
