@@ -151,4 +151,18 @@ public sealed class VaultStoreTests : IDisposable
         }
         Assert.False(store.ShowKeys, "a failed save leaves the old value in force");
     }
+
+    [Fact]
+    public void Show_keys_off_takes_effect_at_once_when_the_save_fails()
+    {
+        SecurityStore store = Store();
+        store.SetShowKeys(true);
+        using (HoldModesOpen())
+        {
+            NetSec.Errors.NetSecException e = Assert.Throws<NetSec.Errors.NetSecException>(() => store.SetShowKeys(false));
+            Assert.Equal(NetSec.Errors.ErrorCodes.SecurityStoreSaveFailed, e.Error.Code);
+        }
+        Assert.False(store.ShowKeys, "off fails closed: keys stop showing now");
+        Assert.True(Store().ShowKeys, "the file still says on, so the next start would show keys; the message says so");
+    }
 }
