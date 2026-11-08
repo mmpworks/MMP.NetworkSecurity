@@ -392,6 +392,76 @@ namespace NetSec.Tests
 
         static AttackDefinition Attack(string id) => AttackCatalog.All.Single(a => a.AttackId == id);
 
+        // Issue #309. The read deadline and the idle limits must end a stuck run on a fixed side, so one seed shows one trace. Half the runs
+        // run beside a CPU burner, because load is what moved the outcome before.
+        const int ShortDeadlineMs = 1000, SideRuns = 20;
+
+        static void BurnWhile(Action work)
+        {
+            using System.Threading.CancellationTokenSource stop = new();
+            System.Threading.Tasks.Task[] burners = Enumerable.Range(0, Environment.ProcessorCount).Select(_ => System.Threading.Tasks.Task.Factory.StartNew(() =>
+            {
+                double x = 1;
+                while (!stop.IsCancellationRequested) x = Math.Sqrt(x + 1.5);
+            }, System.Threading.Tasks.TaskCreationOptions.LongRunning)).ToArray();
+            try { work(); }
+            finally { stop.Cancel(); System.Threading.Tasks.Task.WaitAll(burners); }
+        }
+
+        /// <summary>The checks one side wrote, in its stream order, named by check.</summary>
+        static string[] ChecksOf(TraceEvent[] events, string actor) =>
+            events.Where(e => e.Actor == actor && e.Type == "check.result" && !e.StreamId.EndsWith("/wire")).OrderBy(e => e.StreamSeq).Select(e => e.Message).ToArray();
+
+        /// <summary>Runs one attack SideRuns times, the second half under load, and returns a line per run naming each side's checks.</summary>
+        static List<string> SideOutcomes(AttackDefinition attack, Func<string[], string[], string> judge)
+        {
+            List<string> bad = new();
+            for (int run = 0; run < SideRuns; run++)
+            {
+                LabContext c = Context(7, attack, null, ShortDeadlineMs);
+                LabResult result = null!;
+                if (run < SideRuns / 2) result = Run(5, c);
+                else BurnWhile(() => result = Run(5, c));
+                TraceEvent[] events = ((ListSink)c.Sink).Events;
+                string verdict = judge(ChecksOf(events, "client"), ChecksOf(events, "server"));
+                if (verdict != null)
+                    bad.Add($"run {run + 1} ({(run < SideRuns / 2 ? "idle" : "load")}): {verdict}; client [{string.Join(", ", ChecksOf(events, "client"))}], server [{string.Join(", ", ChecksOf(events, "server"))}], result {result.FailedCode} ({result.FailedCheck})");
+            }
+            return bad;
+        }
+
+        [Fact]
+        public void A_record_length_too_long_is_caught_by_the_receivers_read_deadline_in_every_run()
+        {
+            // The server's Finished claims more bytes than it holds, so the client holds part of a record. The guard says the receiver's read
+            // deadline ends the wait. The server then sees its peer close mid-handshake.
+            List<string> bad = SideOutcomes(Attack("L5-flip-record-length"), (client, server) =>
+                !client.Contains("read deadline") ? "the client shows no read deadline"
+                : client.Contains("peer stayed until the end") ? "the client shows peer stayed until the end"
+                : server.LastOrDefault() != "peer stayed until the end" ? "the server does not end with peer stayed until the end"
+                : null);
+            Assert.True(bad.Count == 0, $"{bad.Count} of {SideRuns} runs differ:\n" + string.Join("\n", bad));
+        }
+
+        [Fact]
+        public void A_whole_dropped_message_ends_on_the_side_owed_a_reply_in_every_run()
+        {
+            // No catalog attack drops a whole message, so this one is built here: the server's Finished is replaced by nothing. Neither side
+            // holds part of a frame. The server sent last and is owed a reply, so its shorter idle limit ends the run; the client then sees
+            // its peer close.
+            AttackDefinition drop = new AttackDefinition
+            {
+                AttackId = "test-drop-finished", Lesson = 5, Kind = "drop", Options = new LabOption[0],
+                Plan = new TamperPlan { Message = "Finished", Replacement = new byte[0] },
+            };
+            List<string> bad = SideOutcomes(drop, (client, server) =>
+                !server.Contains("idle limit") ? "the server shows no idle limit"
+                : client.Contains("idle limit") ? "the client shows an idle limit"
+                : client.LastOrDefault() != "peer stayed until the end" ? "the client does not end with peer stayed until the end"
+                : null);
+            Assert.True(bad.Count == 0, $"{bad.Count} of {SideRuns} runs differ:\n" + string.Join("\n", bad));
+        }
+
         [Theory]
         [InlineData(4)]
         [InlineData(5)]
