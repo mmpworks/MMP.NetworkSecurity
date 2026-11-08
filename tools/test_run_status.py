@@ -90,6 +90,48 @@ class RunStatus(unittest.TestCase):
         self.assertEqual(code, 1)
         self.assertIn("247 of 248", out)
 
+    # Jared's #265 review: three logs that read PASSED while the run was still going, or after a framework failed.
+    def test_a_gate_log_holding_an_inner_dotnet_result_is_still_running(self):
+        text = ("== layer_check\n== dotnet test net10.0\nTest run for E:\\x\\NetSec.Tests.dll (.NETCoreApp,Version=v10.0)\n"
+                "Passed!  - Failed:     0, Passed:   782, Skipped:     0, Total:   782, Duration: 9 s - NetSec.Tests.dll (net10.0)\n"
+                "== dotnet test net48 (CF binaries)\n")
+        code, out = self.status(text, age_minutes=1)
+        self.assertEqual(code, 2, out)
+        self.assertTrue(out.startswith("RUNNING"), out)
+        self.assertIn("dotnet test net48", out)
+
+    def test_a_gate_log_with_an_exit_line_and_no_summary_follows_the_exit_code(self):
+        code, out = self.status("== layer_check\ngate exit 1\n")
+        self.assertEqual(code, 1, out)
+
+    def test_two_frameworks_one_failed_reads_failed_with_summed_counts(self):
+        text = ("Test run for E:\\x\\net10.0\\NetSec.Tests.dll (.NETCoreApp,Version=v10.0)\n"
+                "Passed!  - Failed:     0, Passed:    35, Skipped:     0, Total:    35, Duration: 1 s - NetSec.Tests.dll (net10.0)\n"
+                "Test run for E:\\x\\net48\\NetSec.Tests.dll (.NETFramework,Version=v4.8)\n"
+                "Failed!  - Failed:     2, Passed:    33, Skipped:     0, Total:    35, Duration: 1 s - NetSec.Tests.dll (net48)\n")
+        code, out = self.status(text)
+        self.assertEqual(code, 1, out)
+        self.assertTrue(out.startswith("FAILED"), out)
+        self.assertIn("68 of 70", out)
+        self.assertIn("2 failed", out)
+
+    def test_two_frameworks_announced_and_one_result_is_still_running(self):
+        text = ("Test run for E:\\x\\net10.0\\NetSec.Tests.dll (.NETCoreApp,Version=v10.0)\n"
+                "Passed!  - Failed:     0, Passed:    35, Skipped:     0, Total:    35, Duration: 1 s - NetSec.Tests.dll (net10.0)\n"
+                "Test run for E:\\x\\net48\\NetSec.Tests.dll (.NETFramework,Version=v4.8)\n")
+        code, out = self.status(text, age_minutes=1)
+        self.assertEqual(code, 2, out)
+        self.assertIn("1 of 2", out)
+
+    def test_two_frameworks_both_passed_sums_the_counts(self):
+        text = ("Test run for E:\\x\\net10.0\\a.dll (.NETCoreApp,Version=v10.0)\n"
+                "Passed!  - Failed:     0, Passed:    35, Skipped:     0, Total:    35, Duration: 1 s - a.dll (net10.0)\n"
+                "Test run for E:\\x\\net48\\a.dll (.NETFramework,Version=v4.8)\n"
+                "Passed!  - Failed:     0, Passed:    35, Skipped:     0, Total:    35, Duration: 1 s - a.dll (net48)\n")
+        code, out = self.status(text)
+        self.assertEqual(code, 0, out)
+        self.assertIn("70 of 70", out)
+
     def test_a_missing_log_is_its_own_answer(self):
         r = subprocess.run([sys.executable, "-I", str(SCRIPT), str(pathlib.Path(self.tmp.name) / "nope.log")], capture_output=True, text=True)
         self.assertEqual(r.returncode, 4)

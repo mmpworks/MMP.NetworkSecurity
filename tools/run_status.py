@@ -32,20 +32,33 @@ PW_NOT_RUN = re.compile(r"^\s*(?P<n>\d+) did not run\s*$", re.M)
 PW_DONE_TESTS = re.compile(r"^\s*(?:ok|x)\s+(?P<i>\d+) ", re.M)
 PW_TOTAL = re.compile(r"^Running (?P<n>\d+) tests", re.M)
 DOTNET_FINAL = re.compile(r"^(?P<verdict>Passed|Failed)!\s+- Failed:\s+(?P<failed>\d+), Passed:\s+(?P<passed>\d+), Skipped:\s+\d+, Total:\s+(?P<total>\d+)", re.M)
+DOTNET_ANNOUNCED = re.compile(r"^Test run for ", re.M)
 
 
 def final_line(text):
-    """(verdict, summary) when the log holds a final line, else None. verdict is PASSED or FAILED."""
-    gate = GATE_FINAL.search(text)
-    if gate:
-        n, m = int(gate["n"]), int(gate["m"])
+    """(verdict, summary) when the log holds a final line, else None. verdict is PASSED or FAILED.
+
+    A log with any `== step` line is a gate log, and only the gate's own summary or exit line can end it: the dotnet test results inside
+    it arrive long before the gate is done (Jared, #265). A dotnet test log counts every `Test run for` line as one run (one per target
+    framework) and is final only when each announced run has a result line, whose counts are summed."""
+    if GATE_STEP.search(text):
+        gate = GATE_FINAL.search(text)
         code = GATE_EXIT.search(text)
-        ok = n == m and (code is None or code["code"] == "0")
-        return ("PASSED" if ok else "FAILED", f"gate {gate['slice']}: {n} of {m} steps passed" + (f", exit {code['code']}" if code else ""))
-    dotnet = DOTNET_FINAL.search(text)
-    if dotnet:
-        ok = dotnet["verdict"] == "Passed" and dotnet["failed"] == "0"
-        return ("PASSED" if ok else "FAILED", f"dotnet test: {dotnet['passed']} of {dotnet['total']} passed, {dotnet['failed']} failed")
+        if gate:
+            n, m = int(gate["n"]), int(gate["m"])
+            ok = n == m and (code is None or code["code"] == "0")
+            return ("PASSED" if ok else "FAILED", f"gate {gate['slice']}: {n} of {m} steps passed" + (f", exit {code['code']}" if code else ""))
+        if code:
+            return ("PASSED" if code["code"] == "0" else "FAILED", f"gate exit {code['code']}")
+        return None
+    results = list(DOTNET_FINAL.finditer(text))
+    announced = len(DOTNET_ANNOUNCED.findall(text))
+    if results and len(results) >= announced:
+        passed = sum(int(r["passed"]) for r in results)
+        total = sum(int(r["total"]) for r in results)
+        failed = sum(int(r["failed"]) for r in results)
+        ok = failed == 0 and all(r["verdict"] == "Passed" for r in results)
+        return ("PASSED" if ok else "FAILED", f"dotnet test: {passed} of {total} passed, {failed} failed")
     passed = PW_PASSED.search(text)
     failed = PW_FAILED.search(text)
     if passed or failed:
@@ -63,6 +76,9 @@ def where(text):
     steps = GATE_STEP.findall(text)
     if steps:
         return steps[-1]
+    announced = len(DOTNET_ANNOUNCED.findall(text))
+    if announced:
+        return f"dotnet test run {len(DOTNET_FINAL.findall(text))} of {announced} finished"
     done = PW_DONE_TESTS.findall(text)
     total = PW_TOTAL.search(text)
     if done or total:
