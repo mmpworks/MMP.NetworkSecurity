@@ -86,6 +86,7 @@ SecurityRoutes.Map(app, security, flowRuns, on => sessions.Broadcast(JsonSeriali
 AesWalkRoutes.Map(app, security, sessions);
 Tls13WalkRoutes.Map(app);
 DhWalkRoutes.Map(app);
+X25519WalkRoutes.Map(app);
 VaultRoutes.Map(app, security.Vault, new VaultExercise(security.Vault, new OpenSslTool(Environment.GetEnvironmentVariable), Path.Combine(security.Root, "proof")));
 
 app.Map("/ws", async ctx =>
