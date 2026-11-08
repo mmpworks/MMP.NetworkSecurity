@@ -1,3 +1,4 @@
+using System.Threading;
 using System.Security.Cryptography;
 using System.Text.Json;
 using NetSec.Keys;
@@ -295,7 +296,27 @@ public sealed class SecurityStore
         if (!File.Exists(readme)) File.WriteAllText(readme, "This folder holds your test keys for MMP.NetworkSecurity. Git ignores it. Use test keys only: this course shows your keys on screen and in saved files.\n");
         string temp = _modesPath + ".tmp";
         File.WriteAllText(temp, JsonSerializer.Serialize(next, Json));
-        File.Move(temp, _modesPath, overwrite: true);
+        ReplaceModes(temp);
         _modes = next;
+    }
+
+    // On Windows a replacing move fails while another handle holds the target open without delete sharing. An antivirus scan or the search
+    // indexer often opens a file that was just written, so the move waits out a short hold (issue #292).
+    const int ReplaceTries = 10, ReplaceWaitMs = 50;
+
+    /// <summary>Moves the temp file over modes.json, trying up to ReplaceTries times. After that it fails with SECURITY_STORE_SAVE_FAILED, and the old file stays.</summary>
+    void ReplaceModes(string temp)
+    {
+        for (int attempt = 1; ; attempt++)
+        {
+            try { File.Move(temp, _modesPath, overwrite: true); return; }
+            catch (Exception e) when (e is IOException or UnauthorizedAccessException)
+            {
+                if (attempt >= ReplaceTries)
+                    throw new NetSec.Errors.NetSecException(NetSec.Errors.NetSecError.Of(NetSec.Errors.ErrorCodes.SecurityStoreSaveFailed,
+                        $"{_modesPath} could not be saved: another program held it open for {ReplaceTries * ReplaceWaitMs} ms ({e.Message}) Close that program, then try again."));
+                Thread.Sleep(ReplaceWaitMs);
+            }
+        }
     }
 }
