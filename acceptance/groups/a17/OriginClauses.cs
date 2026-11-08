@@ -7,8 +7,8 @@ namespace Acceptance
     /// <summary>
     /// NETSEC_ORIGINS, docs/program-design.md D14 amendment (#225): extra browser origins for test runs. The list adds to the built-in origins and
     /// never replaces them. An entry is the string http://localhost:PORT or http://127.0.0.1:PORT, PORT 1024 to 65535, no leading zero, no path,
-    /// no trailing slash. The Host drops any other entry and keeps the rest, and prints one HOST-ORIGINS accepted=[...] dropped=[...] start line
-    /// that names each dropped entry with its reason. The token check still runs on every request from an added origin.
+    /// no trailing slash. The Host drops any other entry and keeps the rest. When the variable holds an entry, the Host prints one
+    /// HOST-ORIGINS accepted=[...] dropped=[...] start line that names each dropped entry with its reason; unset or empty, it prints none. The token check still runs on every request from an added origin.
     /// Each clause asks GET /api/health from outside the Host, with the Origin header it names.
     /// </summary>
     public static class OriginClauses
@@ -59,7 +59,10 @@ namespace Acceptance
                 Allowed(h, "http://localhost:4180", "control: a built-in origin");
                 Refused(h, "http://localhost:4181", "NETSEC_ORIGINS unset");
                 Refused(h, "http://127.0.0.1:4180", "NETSEC_ORIGINS unset, and 127.0.0.1 is a separate entry from localhost");
-                return "with NETSEC_ORIGINS unset, the 2 built-in origins reach the Host, and http://localhost:4181 and http://127.0.0.1:4180 get 403 HOST_ORIGIN_REFUSED";
+                // The Host prints HOST-ORIGINS only when the variable holds an entry (the lead's ruling, 2026-11-07; the design wording follows).
+                // The Host has answered requests, so its start lines are out.
+                Check.True(h.P == null || !h.P.AllOutput.Contains("HOST-ORIGINS"), "with NETSEC_ORIGINS unset the Host should print no HOST-ORIGINS line: " + (h.P == null ? "" : h.P.AllOutput));
+                return "with NETSEC_ORIGINS unset, the 2 built-in origins reach the Host, http://localhost:4181 and http://127.0.0.1:4180 get 403 HOST_ORIGIN_REFUSED, and no HOST-ORIGINS line is printed";
             }
         }
 
