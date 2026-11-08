@@ -2575,6 +2575,17 @@
    "counts": true
   },
   {
+   "id": "A19.host.dh-walk-open-and-modpow",
+   "base": "A19.host.dh-walk-open-and-modpow",
+   "assertion": "A19",
+   "group": "a17",
+   "build": "host",
+   "slice": "W1",
+   "referee": "FIPS 197 (2001) data, the suite's RefAes, and the .NET library",
+   "roles": [],
+   "counts": true
+  },
+  {
    "id": "A19.host.ecb-fork-says-match",
    "base": "A19.host.ecb-fork-says-match",
    "assertion": "A19",
@@ -2709,6 +2720,17 @@
   {
    "id": "A19.host.walk-adds-no-trace-event",
    "base": "A19.host.walk-adds-no-trace-event",
+   "assertion": "A19",
+   "group": "a17",
+   "build": "host",
+   "slice": "W1",
+   "referee": "FIPS 197 (2001) data, the suite's RefAes, and the .NET library",
+   "roles": [],
+   "counts": true
+  },
+  {
+   "id": "A19.host.x25519-walk-open-and-rfc7748",
+   "base": "A19.host.x25519-walk-open-and-rfc7748",
    "assertion": "A19",
    "group": "a17",
    "build": "host",
