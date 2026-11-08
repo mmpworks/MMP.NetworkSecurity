@@ -29,7 +29,8 @@ public static class SecurityRoutes
         {
             if (Array.IndexOf(SecurityTypes.All, typeId) < 0) return Refuse(404, "SECURITY_TYPE_UNKNOWN", $"No security type has the id {typeId}.");
             if (body.Mode is not (SecurityStore.ModeBuiltIn or SecurityStore.ModeMine)) return Refuse(400, "SECURITY_MODE_UNKNOWN", $"The mode must be {SecurityStore.ModeBuiltIn} or {SecurityStore.ModeMine}.");
-            store.SetMode(typeId, body.Mode);
+            try { store.SetMode(typeId, body.Mode); }
+            catch (NetSecException x) when (x.Error.Code == ErrorCodes.SecurityStoreSaveFailed) { return SaveRefused(x); }
             return Results.Json(TypeRow(store, typeId));
         });
         app.MapGet("/api/security/types/{typeId}/key", (string typeId) => KeyReply(store, typeId));
@@ -41,7 +42,10 @@ public static class SecurityRoutes
         app.MapGet("/api/security/show-keys", () => Results.Json(new { on = store.ShowKeys }));
         app.MapPut("/api/security/show-keys", (ShowKeysBody body) =>
         {
-            store.SetShowKeys(body.On);
+            // A failed save keeps the old value, so a learner who turns Show keys off and is refused still has keys on screen. The named
+            // refusal tells the page so (issue #292).
+            try { store.SetShowKeys(body.On); }
+            catch (NetSecException x) when (x.Error.Code == ErrorCodes.SecurityStoreSaveFailed) { return SaveRefused(x); }
             showKeysChanged(store.ShowKeys);
             return Results.Json(new { on = store.ShowKeys });
         });
@@ -127,7 +131,10 @@ public static class SecurityRoutes
 
     static object Message(StepMessage m) => new { code = m.Code, message = m.Message, typeId = m.TypeId };
 
-    static IResult Refuse(int status, string code, string message) => Results.Json(
-        new { code, message, retryable = false, requestId = Guid.NewGuid().ToString("N") },
+    static IResult Refuse(int status, string code, string message, bool retryable = false) => Results.Json(
+        new { code, message, retryable, requestId = Guid.NewGuid().ToString("N") },
         statusCode: status);
+
+    /// <summary>The settings file was held by another program through every try. The hold goes away by itself, so the client may try again.</summary>
+    static IResult SaveRefused(NetSecException x) => Refuse(503, x.Error.Code, x.Error.Message, retryable: true);
 }

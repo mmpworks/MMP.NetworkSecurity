@@ -302,6 +302,8 @@ public sealed class SecurityStore
 
     // On Windows a replacing move fails while another handle holds the target open without delete sharing. An antivirus scan or the search
     // indexer often opens a file that was just written, so the move waits out a short hold (issue #292).
+    // The wait happens inside _gate, and every reader of ShowKeys and the modes takes _gate. So during a hold those readers wait too, for
+    // up to about 1 s. A hold is rare and short, so this is accepted.
     const int ReplaceTries = 20, ReplaceWaitMs = 50;
 
     /// <summary>Moves the temp file over modes.json, trying up to ReplaceTries times. After that it fails with SECURITY_STORE_SAVE_FAILED, and the old file stays.</summary>
@@ -314,7 +316,7 @@ public sealed class SecurityStore
             {
                 if (attempt >= ReplaceTries)
                     throw new NetSec.Errors.NetSecException(NetSec.Errors.NetSecError.Of(NetSec.Errors.ErrorCodes.SecurityStoreSaveFailed,
-                        $"{_modesPath} could not be saved: another program held it open for {ReplaceTries * ReplaceWaitMs} ms ({e.Message}) Close that program, then try again."));
+                        $"{_modesPath} could not be saved, possibly because another program held it open, after {ReplaceTries} tries over {ReplaceTries * ReplaceWaitMs} ms ({e.Message}) Close any program that has the file open, then try again."));
                 Thread.Sleep(ReplaceWaitMs);
             }
         }
