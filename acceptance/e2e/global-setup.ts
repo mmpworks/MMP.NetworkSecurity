@@ -2,7 +2,7 @@ import { spawn } from 'node:child_process';
 import * as fs from 'node:fs';
 import * as net from 'node:net';
 import * as path from 'node:path';
-import { HOST_PORT, OUT, PREVIEW_PORT, ROOT, TOKEN, stateFile } from './support';
+import { HOST_PORT, ORIGINS, OUT, PREVIEW_PORT, ROOT, TOKEN, stateFile } from './support';
 
 function waitPort(port: number, ms: number, host = '127.0.0.1'): Promise<boolean> {
   const end = Date.now() + ms;
@@ -73,9 +73,12 @@ export default async function globalSetup(): Promise<void> {
   const hostLogPath = path.join(OUT, 'host.log');
   fs.rmSync(hostLogPath, { force: true });
   const hostLog = fs.openSync(hostLogPath, 'a');
+  // NETSEC_ORIGINS (design D14 amendment) makes the Host trust this run's preview port. It is always written, empty when unset, so a value
+  // in the shell that runs the suite cannot leak in.
+  const hostEnv = { ...process.env, NETSEC_PORT: String(HOST_PORT), NETSEC_TOKEN: TOKEN, LOCALAPPDATA: localAppData, NETSEC_SECURITY_DIR: securityDir, NETSEC_ORIGINS: ORIGINS };
   const host = hostDll.toLowerCase().endsWith('.dll')
-    ? spawn('dotnet', [hostDll, ...hostArgs], { cwd: path.dirname(hostDll), detached: false, stdio: ['ignore', hostLog, hostLog], env: { ...process.env, NETSEC_PORT: String(HOST_PORT), NETSEC_TOKEN: TOKEN, LOCALAPPDATA: localAppData, NETSEC_SECURITY_DIR: securityDir } })
-    : spawn(hostDll, hostArgs, { cwd: path.dirname(hostDll), detached: false, stdio: ['ignore', hostLog, hostLog], env: { ...process.env, NETSEC_PORT: String(HOST_PORT), NETSEC_TOKEN: TOKEN, LOCALAPPDATA: localAppData, NETSEC_SECURITY_DIR: securityDir } });
+    ? spawn('dotnet', [hostDll, ...hostArgs], { cwd: path.dirname(hostDll), detached: false, stdio: ['ignore', hostLog, hostLog], env: hostEnv })
+    : spawn(hostDll, hostArgs, { cwd: path.dirname(hostDll), detached: false, stdio: ['ignore', hostLog, hostLog], env: hostEnv });
   let hostGone = false;
   host.on('exit', () => { hostGone = true; });
   host.on('error', () => { /* a start failure shows as hostUp false */ });
@@ -87,7 +90,13 @@ export default async function globalSetup(): Promise<void> {
   fs.rmSync(previewLogPath, { force: true });
   let previewGone = false;
   const previewLog = fs.openSync(previewLogPath, 'a');   // vite's own words, kept so a dead preview can be explained
-  const preview = spawn('npx', ['vite', 'preview', '--port', String(PREVIEW_PORT), '--strictPort', '--host', 'localhost'], { cwd: appDir, shell: true, detached: false, stdio: ['ignore', previewLog, previewLog] });
+  // vite runs under node directly, so the pid kept for the teardown is the process that listens. Under npx and a shell, the teardown's
+  // taskkill /T ended the shell and, on 2026-11-07, left the vite process listening on the preview port.
+  const viteBin = path.join(appDir, 'node_modules', 'vite', 'bin', 'vite.js');
+  const viteArgs = ['preview', '--port', String(PREVIEW_PORT), '--strictPort', '--host', 'localhost'];
+  const preview = fs.existsSync(viteBin)
+    ? spawn(process.execPath, [viteBin, ...viteArgs], { cwd: appDir, detached: false, stdio: ['ignore', previewLog, previewLog] })
+    : spawn('npx', ['vite', ...viteArgs], { cwd: appDir, shell: true, detached: false, stdio: ['ignore', previewLog, previewLog] });
   preview.on('exit', (code, sig) => { previewGone = true; try { fs.appendFileSync(path.join(OUT, 'preview.log'), `\n[preview exited code=${code} signal=${sig} at ${new Date().toISOString()}]\n`); } catch { /* ignore */ } });
   preview.on('error', () => { /* a start failure shows as previewUp false */ });
   if (preview.pid) state.pids.push(preview.pid);

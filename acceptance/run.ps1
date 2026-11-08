@@ -392,16 +392,28 @@ if ($e2eMine.Count -gt 0) {
         if ($missing.Count -gt 0) { Set-All $e2eMine 'NOT RUN' 'TOOL_MISSING' (Tail $missing[0].Output 300) } else {
         $env:ACC_ROOT = $ProductRoot; $env:ACC_HOST = $prep.host; $env:ACC_OUT = $out
         # Other sessions on this machine run Hosts and vite previews too. A fixed port that is already taken would connect the tests to
-        # somebody else's server, so the run picks free ports: any free port for the Host, and a free one of the two origins the Host allows
-        # (design section 5: localhost:4180 and localhost:5173) for the preview.
+        # somebody else's server, so the run picks free ports.
         $listening = @([System.Net.NetworkInformation.IPGlobalProperties]::GetIPGlobalProperties().GetActiveTcpListeners() | ForEach-Object { $_.Port })
-        $previewPort = @(4180, 5173) | Where-Object { $listening -notcontains $_ } | Select-Object -First 1
-        $hostPort = 5180; while ($listening -contains $hostPort) { $hostPort++ }
+        if (Test-Path (Join-Path $ProductRoot 'src/NetSec.Host/ExtraOrigins.cs')) {
+            # The Host reads NETSEC_ORIGINS (design D14 amendment, #225), so the preview may use any port the Host is told to trust.
+            # Acceptance takes its own block, 36800 to 36899 (ACC_PORT_BASE moves it), and leaves 4180 and 5173 to the builders' suites.
+            $portBase = if ($env:ACC_PORT_BASE) { [int]$env:ACC_PORT_BASE } else { 36800 }
+            $previewPort = $portBase..($portBase + 98) | Where-Object { $listening -notcontains $_ } | Select-Object -First 1
+            $hostPort = if ($previewPort) { ($previewPort + 1)..($portBase + 99) | Where-Object { $listening -notcontains $_ } | Select-Object -First 1 }
+            if (-not $hostPort) { $previewPort = $null }
+            $env:ACC_ORIGINS = if ($previewPort) { "http://localhost:$previewPort" } else { '' }
+        }
+        else {
+            # A product tree from before #225: the Host trusts only its built-in origins (design section 5: localhost:4180 and localhost:5173).
+            $previewPort = @(4180, 5173) | Where-Object { $listening -notcontains $_ } | Select-Object -First 1
+            $hostPort = 5180; while ($listening -contains $hostPort) { $hostPort++ }
+            $env:ACC_ORIGINS = ''
+        }
         $env:ACC_HOST_PORT = [string]$hostPort
         # Run only the selected clauses. Before this, every spec ran, and a failure outside the selection never reached the report.
         $env:ACC_E2E_GREP = if ($Clauses -contains 'All') { '' } else { (@($e2eMine | ForEach-Object { '\[' + [regex]::Escape($_.id) + '\]' }) -join '|') }
         if ($previewPort) { $env:ACC_PREVIEW_PORT = [string]$previewPort }
-        else { Set-All $e2eMine 'NOT RUN' 'PORT_BUSY' 'ports 4180 and 5173 are both in use by another process. The Host allows only these two origins, so the UI cannot be served here without testing against a stranger.' }
+        else { Set-All $e2eMine 'NOT RUN' 'PORT_BUSY' 'no free preview port: the acceptance block (36800 to 36899, or ACC_PORT_BASE) is full, or, on a tree from before #225, ports 4180 and 5173 are both in use. The UI cannot be served here without testing against a stranger.' }
         $r = if ($previewPort) { Invoke-Tool 'npx' @('playwright', 'test') $e2e -TimeoutSec 1800 } else { [pscustomobject]@{ ExitCode = -997; Output = '' } }
         $json = Join-Path $out 'playwright.json'
         if ($r.ExitCode -eq -997) { }      # PORT_BUSY was recorded above

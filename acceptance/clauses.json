@@ -1706,6 +1706,50 @@
    "counts": true
   },
   {
+   "id": "A17.origins.bad-entry-dropped-alone",
+   "base": "A17.origins.bad-entry-dropped-alone",
+   "assertion": "A17",
+   "group": "a17",
+   "build": "host",
+   "slice": "V0",
+   "referee": "test over HTTP and WebSocket, OpenSSL, ssh.exe, Go referees; known-answer where no outside referee exists",
+   "roles": [],
+   "counts": true
+  },
+  {
+   "id": "A17.origins.extra-refused-when-unset",
+   "base": "A17.origins.extra-refused-when-unset",
+   "assertion": "A17",
+   "group": "a17",
+   "build": "host",
+   "slice": "V0",
+   "referee": "test over HTTP and WebSocket, OpenSSL, ssh.exe, Go referees; known-answer where no outside referee exists",
+   "roles": [],
+   "counts": true
+  },
+  {
+   "id": "A17.origins.set-list-adds-to-default",
+   "base": "A17.origins.set-list-adds-to-default",
+   "assertion": "A17",
+   "group": "a17",
+   "build": "host",
+   "slice": "V0",
+   "referee": "test over HTTP and WebSocket, OpenSSL, ssh.exe, Go referees; known-answer where no outside referee exists",
+   "roles": [],
+   "counts": true
+  },
+  {
+   "id": "A17.origins.token-still-required",
+   "base": "A17.origins.token-still-required",
+   "assertion": "A17",
+   "group": "a17",
+   "build": "host",
+   "slice": "V0",
+   "referee": "test over HTTP and WebSocket, OpenSSL, ssh.exe, Go referees; known-answer where no outside referee exists",
+   "roles": [],
+   "counts": true
+  },
+  {
    "id": "A17.payment.known-answer-vectors-through-flow-code",
    "base": "A17.payment.known-answer-vectors-through-flow-code",
    "assertion": "A17",

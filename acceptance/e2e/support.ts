@@ -2,7 +2,9 @@ import * as fs from 'node:fs';
 import * as path from 'node:path';
 
 export const HOST_PORT = Number(process.env.ACC_HOST_PORT ?? 5180);
-export const PREVIEW_PORT = Number(process.env.ACC_PREVIEW_PORT ?? 4180);   // run.ps1 picks a free one of the two origins the Host allows: 4180 or 5173
+export const PREVIEW_PORT = Number(process.env.ACC_PREVIEW_PORT ?? 4180);   // run.ps1 picks a free port in the acceptance block, 36800 up (4180 or 5173 on a tree from before #225)
+/** NETSEC_ORIGINS for this run's Host: the preview's origin when it is not a built-in one. Empty means unset, as Electron writes it. */
+export const ORIGINS = process.env.ACC_ORIGINS ?? '';
 export const TOKEN = process.env.ACC_TOKEN ?? 'acceptance-token';
 export const ROOT = process.env.ACC_ROOT ?? '';
 export const OUT = process.env.ACC_OUT ?? path.join(__dirname, 'test-results');
