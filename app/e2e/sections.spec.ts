@@ -83,3 +83,19 @@ test('the AES walk shows only in Techniques, and another section never shows it 
   await page.getByTestId('section-techniques').click()
   await expect(page.getByTestId('aes-walk-panel'), 'the walk comes back in Techniques').toBeVisible()
 })
+
+// Design section 2.7: at 128 bits the walk shows the run's key, at 192 and 256 a practice key. The line reads keySource from the reply (Jared, P2b).
+test('the AES walk names its key from the reply: the run key at 128 bits, a practice key at 192 and 256', async ({ page }) => {
+  await runFreePlay(page, 1)
+  const source = page.getByTestId('aes-walk-key-source')
+  const [first] = await Promise.all([page.waitForResponse(/\/walk\/aes\/block/), page.getByTestId('aes-walk-tab').click()])
+  expect((await first.json()).keySource).toBe('run')
+  await expect(source).toHaveText("This run's key")
+  for (const bits of [192, 256]) {
+    const [r] = await Promise.all([page.waitForResponse(/\/walk\/aes\/block/), page.getByTestId(`aes-walk-key-size-${bits}`).click()])
+    expect((await r.json()).keySource, `${bits} bits`).toBe('practice')
+    await expect(source, `${bits} bits`).toHaveText('A practice key. It never ran in the lesson')
+  }
+  await page.getByTestId('aes-walk-key-size-128').click()
+  await expect(source, 'back at 128 bits').toHaveText("This run's key")
+})

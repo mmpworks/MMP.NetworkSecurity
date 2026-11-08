@@ -1,9 +1,29 @@
 // The AES walk's pure functions (docs/walkthrough-design.md sections 2.2, 2.2a, 3.7). No Vue and no store, so a spec can call each one.
 // Every state and every byte comes from the engine's block reply. Nothing here computes AES.
 
-export interface AesStepRow { kind: string; round: number; state: string; roundKey?: string; terms?: unknown[] | null }
+/** One product in a MixColumns byte: factor times input, as the engine worked it (design section 2.2c). */
+export interface AesTerm { factor: number; input: string; reduced: boolean; result: string }
+/** One output byte of a MixColumns step: its 4 products, and their XOR. */
+export interface AesMixedByte { result: string; parts: AesTerm[] }
+export interface AesStepRow { kind: string; round: number; state: string; roundKey?: string; terms?: AesMixedByte[] | null }
 export interface AesRun { input: string; output: string; steps: AesStepRow[] }
-export interface AesKeyWordRow { i: number; previous: string; rotated: string; substituted: string; rcon: string; afterRcon: string; keyBack: string; word: string }
+/** One word of the key schedule (design section 2.2b). A key word holds only `word`; a stage the engine did not run is null. */
+export interface AesKeyWordRow {
+  i: number
+  divisor?: number
+  quotient?: number
+  remainder?: number
+  previous: string | null
+  rotated: string | null
+  substituted: string | null
+  rcon: string | null
+  afterRcon: string | null
+  keyBack: string | null
+  word: string
+}
+/** The public tables route: the S-boxes, the round constants, and the size table. It holds no key byte. */
+export interface AesSize { keyBits: number; keyWords: number; rounds: number; roundKeys: number; words: number; rconUsed: number }
+export interface AesTables { sbox: string; inverseSbox: string; rcon: string; sizes: AesSize[] }
 export interface AesBlockReply {
   source?: string
   keySource?: string
@@ -13,13 +33,27 @@ export interface AesBlockReply {
   keyWords: AesKeyWordRow[]
   forward: AesRun
   inverse: AesRun | null
+  /** Whether this run sent the block in ECB (design sections 2.2g and 2.4). */
+  wire?: { status: 'notSent' | 'match' | 'differs' | string; message: string }
 }
 
-/** One stop of the walk, in Next order: the first view fills the block one byte at a time, then the encrypt steps, the decrypt Start view, and the decrypt steps. */
+/**
+ * One stop of the walk, in Next order: the first view fills the block one byte at a time, then the key schedule builds one word at a time,
+ * then the encrypt steps, the decrypt Start view, and the decrypt steps. On a key schedule stop the grid still shows the block.
+ * `prev` is the state the stop before showed, so a lookup on a SubBytes step can name the byte that went in.
+ */
 export type Stop =
   | { kind: 'fill'; filled: number; state: string }
-  | { kind: 'step'; run: 'encrypt' | 'decrypt'; step: AesStepRow; state: string }
+  | { kind: 'keys'; built: number; state: string }
+  | { kind: 'step'; run: 'encrypt' | 'decrypt'; step: AesStepRow; state: string; prev: string }
   | { kind: 'decrypt-start'; state: string }
+
+/** Nk, the number of key words, from the tables route's size table. */
+export function keyWordsOf(tables: AesTables, keyBits: number): number {
+  const size = tables.sizes.find(s => s.keyBits === keyBits)
+  if (!size) throw new Error(`the size table has no ${keyBits}-bit row`)
+  return size.keyWords
+}
 
 /** FIPS 197 section 3.4: row r, column c holds byte r + 4c. */
 export const cellIndex = (r: number, c: number): number => r + 4 * c
@@ -39,15 +73,33 @@ export function textOf(hex: string): string {
   return out
 }
 
-export function stopsOf(b: AesBlockReply): Stop[] {
+/** The walk's stops. `nk` is the number of key words: the key schedule starts with them filled, and Next builds each later word. */
+export function stopsOf(b: AesBlockReply, nk: number): Stop[] {
   const stops: Stop[] = []
   for (let filled = 0; filled <= 16; filled++) stops.push({ kind: 'fill', filled, state: b.inputHex })
-  for (const step of b.forward.steps) stops.push({ kind: 'step', run: 'encrypt', step, state: step.state })
+  for (let built = 0; built <= b.keyWords.length - nk; built++) stops.push({ kind: 'keys', built, state: b.inputHex })
+  let prev = b.inputHex
+  for (const step of b.forward.steps) { stops.push({ kind: 'step', run: 'encrypt', step, state: step.state, prev }); prev = step.state }
   if (b.inverse) {
     stops.push({ kind: 'decrypt-start', state: b.forward.output })
-    for (const step of b.inverse.steps) stops.push({ kind: 'step', run: 'decrypt', step, state: step.state })
+    prev = b.forward.output
+    for (const step of b.inverse.steps) { stops.push({ kind: 'step', run: 'decrypt', step, state: step.state, prev }); prev = step.state }
   }
   return stops
+}
+
+/** The expanded key as one hex string, word after word, from the reply's rows. */
+export function expandedHex(rows: AesKeyWordRow[]): string {
+  return rows.slice().sort((a, b) => a.i - b.i).map(r => r.word.toLowerCase()).join('')
+}
+
+/** The sentence that states the word test of FIPS 197 section 5.2 (design section 2.2b). It names only the stages the row holds. */
+export function wordTest(row: AesKeyWordRow, nk: number): string {
+  const w = `w${row.i}`
+  if (row.i < nk || row.divisor == null) return `${w} is part of the key, so nothing is calculated.`
+  if (row.rotated) return `${row.i} ÷ ${row.divisor} = ${row.quotient}, no remainder, so ${w} rotates. It is rotation ${row.quotient}, so it takes round constant ${row.quotient}: ${byteAt(row.rcon ?? '', 0)}.`
+  if (row.substituted) return `${row.i} ÷ ${row.divisor} leaves ${row.remainder}, so ${w} gets the S-box step only. AES-256 adds this rule.`
+  return `${row.i} ÷ ${row.divisor} leaves ${row.remainder}, so ${w} is plain: no rotation.`
 }
 
 /** What a cell shows at a stop: its 2 hex digits, or nothing while the first view has not reached it. */
