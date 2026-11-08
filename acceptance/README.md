@@ -11,7 +11,7 @@ Disposition: merge this branch. Send the open items in section 7 and in `CONTRAC
 ```
 pwsh acceptance/run.ps1 -Clauses All                 # build what exists, run, write docs/_runs/acceptance-<timestamp>.json and .md
 pwsh acceptance/run.ps1 -Clauses A1,A2               # ids, assertions, slices (S3), groups (tls13live) or prefixes (A5.client)
-pwsh acceptance/run.ps1 -Clauses All -Fresh          # clone HEAD beside MMP.AsyncProxy, run the clone's own script, diff acceptance/ against PIN
+pwsh acceptance/run.ps1 -Clauses All -Fresh          # clone HEAD beside MMP.AsyncProxy, run the clone's own script, check PIN with tools/pin.py
 pwsh acceptance/run.ps1 -Contract                    # compile every group against the contract stub; run nothing
 pwsh acceptance/run.ps1 -Clauses All -SelfTest       # add the checks the suite runs on itself (not part of M)
 pwsh acceptance/run.ps1 -Clauses A17.mock -RecordGolden # record the golden traces into acceptance/golden/ (section 8)
@@ -111,7 +111,7 @@ A cut role is listed in `roles.json`. Its clauses report NOT RUN `ROLE_CUT:<role
 | A10, A10a | Run from outside: processes with `READY port=` and `RESULT`, two `tap` relays, `CE-READY` required. `wire.sent` events, joined by direction, equal the tap log bytes. The privacy scan needs a positive control: the bank trace must show the PIN key it derived, and the CE trace must show hop keys |
 | A11 | Each attack row runs beside its control, differs by one field, and matches `ExpectCode` and `ExpectCheck`. A token goes to the Go verifier `TOKEN_OK`, with a one-character change and an attacker-signed token as controls (`TOKEN_BAD_SIGNATURE`) |
 | A12 | The suite builds `native/netsec_ct.c` itself (C++ and C, `/W4 /WX`), P/Invokes it, and computes Welch t with a common 99th percentile crop. Threshold: leaky \|t\| > 4.5 and above 3 x constant-time \|t\| |
-| A13 | A fresh clone beside the sibling. The walk compares the step ids shown with the tour file. `acceptance/` is diffed against `PIN` |
+| A13 | A fresh clone beside the sibling. The walk compares the step ids shown with the tour file. `PIN` must match the clone's `acceptance/` tree (`tools/pin.py --check`) |
 | A14, A15, A15a | The grade script and the concept cap are the suite's own. Dangling bindings are tested against a live Host. Accuracy rules 1 to 8 must appear in the named lessons. Reader verdicts must come from a reader who did not write the tour |
 | A16 | Compile-time negative tests against the built `NetSec.Core.dll` (control compiles, four attacks fail with named compiler errors). The OS transport is scanned for the secrets that an OpenSSL peer logs |
 
@@ -132,7 +132,7 @@ A cut role is listed in `roles.json`. Its clauses report NOT RUN `ROLE_CUT:<role
 | 11 | Ed25519 SSH keys are written as OpenSSH private key files | ssh.exe 9.5 rejects PKCS#8 |
 | 12 | Welch t uses a common 99th percentile crop | Raw t is dominated by scheduler outliers. Uncropped t is printed beside it |
 | 13 | `-Fresh` clones `HEAD` and runs the clone's own `run.ps1` | The third agent must run the code under review, not the code that launches it |
-| 14 | `PIN` holds the commit of the last sanctioned `acceptance/` state, and the diff skips `PIN` itself | A commit cannot name itself |
+| 14 | `PIN` holds `acceptance-tree <hash>`: the git tree hash of `acceptance/` with `PIN` left out. Every PR that changes `acceptance/` runs `python -I acceptance/tools/pin.py --write` and commits `PIN` in the same PR. The gate runs `pin.py --check` on every PR and names a stale `PIN` (`PIN_STALE`). A second gate check in `tools/` refuses a PR that changes `acceptance/` together with any path outside `acceptance/` and `docs/`, so only an acceptance PR moves `PIN` | A PR cannot know the commit it merges as, and a commit cannot name itself. A tree hash is known before the merge. The commit form went stale across many PRs, because only a `-Fresh` run looked |
 | 15 | `A15a` reads `claims [{text, source}]` at the top of each tour file (section 11), and also from a step, and verdict files by lesson | Section 11 names the shape, not the place |
 | 16 | `skiplist.json` is empty | No skip is justified yet |
 
@@ -147,14 +147,14 @@ These appear later by design, each named in the report: `REFEREE_MISSING`, `REFE
 1. **Referees.** Jared's `acceptance/referees/go` and `bcl` are merged. The suite reads their JSON events, the first-line port, the tap log format and the BCL oracle protocol from `acceptance/referees/README.md`. `SELF.referee-protocols` runs the real programs. The old `referee-contract.md` is deleted.
 2. **Contract.** `CONTRACT.md` lists the ASSUMED members, the process contract and the UI test ids. Send it to Richard and Nancy. A change goes back to the acceptance author.
 3. **Not run against real code.** The live protocol groups (A5 to A8), the bridge (A10), the Host (A16) and the Playwright specs have compiled and have run only in the no-product state. They could not meet a real engine, Go referee or UI. Expect a first red run to show a contract mismatch, not a bug in the product.
-4. **PIN.** Set after the last commit of this branch (see `git log -- acceptance/PIN`).
+4. **PIN.** After the last `acceptance/` commit of a branch, run `python -I acceptance/tools/pin.py --write` and commit `acceptance/PIN`.
 5. **Dave.** Ask if the X9 vector file may be committed. Until then it is made at run time.
 
 ## 8. Layout
 
 | Path | Holds |
 |---|---|
-| `run.ps1`, `clauses.json`, `roles.json`, `skiplist.json`, `PIN` | The runner, the clause list that fixes M, cut roles, pinned skips, the pinned commit |
+| `run.ps1`, `clauses.json`, `roles.json`, `skiplist.json`, `PIN` | The runner, the clause list that fixes M, cut roles, pinned skips, the pinned `acceptance/` tree |
 | `lib/Harness`, `lib/Live` | Clause runner, vector reader, process control, parsers, OpenSSL and Go referee wrappers (`Harness` links no product code; `Live` does) |
 | `groups/<name>` | One console program per clause group, so an unbuilt slice cannot break a built one |
 | `contract/` | The stub that holds the public signatures |
