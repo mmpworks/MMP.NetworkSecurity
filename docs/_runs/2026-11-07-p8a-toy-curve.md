@@ -1,6 +1,6 @@
 # Gate p8a-toy-curve, 2026-11-07
 
-Result: 21 of 22 steps passed. Skipped: 1.
+Result: 22 of 22 steps passed. Skipped: 1.
 
 | Step | Status | Exit |
 |---|---|---|
@@ -10,7 +10,7 @@ Result: 21 of 22 steps passed. Skipped: 1.
 | dotnet build src/NetSec.Core.NetCF | PASS | 0 |
 | dotnet test net10.0 | PASS | 0 |
 | dotnet test net48 (CF binaries) | PASS | 0 |
-| dotnet test Host (live process) | FAIL | 1 |
+| dotnet test Host (live process) | PASS | 0 |
 | acceptance A9 | PASS | 0 |
 | tour_lint | PASS | 0 |
 | tic-gate lesson-00.json | PASS | 0 |
@@ -48,7 +48,7 @@ Build succeeded.
     0 Warning(s)
     0 Error(s)
 
-Time Elapsed 00:00:01.59
+Time Elapsed 00:00:02.22
 ```
 
 ## dotnet build src/NetSec.Core.NetCF
@@ -59,7 +59,7 @@ Build succeeded.
     0 Warning(s)
     0 Error(s)
 
-Time Elapsed 00:00:01.46
+Time Elapsed 00:00:02.03
 ```
 
 ## dotnet test net10.0
@@ -68,9 +68,9 @@ Time Elapsed 00:00:01.46
 Test run for E:\dev\ns-p8a\tests\NetSec.Tests\bin\Release\net10.0\NetSec.Tests.dll (.NETCoreApp,Version=v10.0)
 A total of 1 test files matched the specified pattern.
 Data collector 'Blame' message: All tests finished running, Sequence file will not be generated.
-Results File: E:\dev\ns-p8a\docs\_runs\trx\p8a-toy-curve-net10\Steve_BEAST_2026-11-07_19_44_15.trx
+Results File: E:\dev\ns-p8a\docs\_runs\trx\p8a-toy-curve-net10\Steve_BEAST_2026-11-07_20_27_30.trx
 
-Passed!  - Failed:     0, Passed:   797, Skipped:     0, Total:   797, Duration: 1 m 53 s - NetSec.Tests.dll (net10.0)
+Passed!  - Failed:     0, Passed:   797, Skipped:     0, Total:   797, Duration: 2 m - NetSec.Tests.dll (net10.0)
 ```
 
 ## dotnet test net48 (CF binaries)
@@ -79,31 +79,31 @@ Passed!  - Failed:     0, Passed:   797, Skipped:     0, Total:   797, Duration:
 Test run for E:\dev\ns-p8a\tests\NetSec.Tests\bin\Release\net48\NetSec.Tests.dll (.NETFramework,Version=v4.8)
 A total of 1 test files matched the specified pattern.
 Data collector 'Blame' message: All tests finished running, Sequence file will not be generated.
-Results File: E:\dev\ns-p8a\docs\_runs\trx\p8a-toy-curve-cf\Steve_BEAST_2026-11-07_19_46_17.trx
+Results File: E:\dev\ns-p8a\docs\_runs\trx\p8a-toy-curve-cf\Steve_BEAST_2026-11-07_20_29_38.trx
 
-Passed!  - Failed:     0, Passed:   797, Skipped:     0, Total:   797, Duration: 2 m 48 s - NetSec.Tests.dll (net48)
+Passed!  - Failed:     0, Passed:   797, Skipped:     0, Total:   797, Duration: 2 m 23 s - NetSec.Tests.dll (net48)
 ```
 
 ## dotnet test Host (live process)
 
 ```
-     at NetSec.Host.Tests.ShowKeysLiveTests.A_replay_sends_no_hex_after_a_flip_to_off_that_lands_while_it_runs() in E:\dev\ns-p8a\tests\NetSec.Host.Tests\ShowKeysLiveTests.cs:line 209
---- End of stack trace from previous location ---
+Test run for E:\dev\ns-p8a\tests\NetSec.Host.Tests\bin\Release\net10.0\NetSec.Host.Tests.dll (.NETCoreApp,Version=v10.0)
+A total of 1 test files matched the specified pattern.
 Data collector 'Blame' message: All tests finished running, Sequence file will not be generated.
-Results File: E:\dev\ns-p8a\docs\_runs\trx\p8a-toy-curve-host\Steve_BEAST_2026-11-07_19_49_13.trx
+Results File: E:\dev\ns-p8a\docs\_runs\trx\p8a-toy-curve-host\Steve_BEAST_2026-11-07_20_32_11.trx
 
-Failed!  - Failed:     1, Passed:   218, Skipped:     0, Total:   219, Duration: 1 m 17 s - NetSec.Host.Tests.dll (net10.0)
+Passed!  - Failed:     0, Passed:   219, Skipped:     0, Total:   219, Duration: 1 m 17 s - NetSec.Host.Tests.dll (net10.0)
 ```
 
 ## acceptance A9
 
 ```
-[acceptance] 4 clauses selected of M = 383 (+ 44 self-checks in the file)
+[acceptance] 4 clauses selected of M = 385 (+ 44 self-checks in the file)
 [acceptance] preparing: MMP.AsyncProxy builds, product builds
 [acceptance] group binproof (net10): 4 clauses
-[acceptance] 4 of 4 clauses PASS (0 FAIL, 0 NOT RUN); M = 383
-[acceptance] report: E:\dev\ns-p8a\docs\_runs\acceptance-20261107-195031.md
-[acceptance] json:   E:\dev\ns-p8a\docs\_runs\acceptance-20261107-195031.json
+[acceptance] 4 of 4 clauses PASS (0 FAIL, 0 NOT RUN); M = 385
+[acceptance] report: E:\dev\ns-p8a\docs\_runs\acceptance-20261107-203328.md
+[acceptance] json:   E:\dev\ns-p8a\docs\_runs\acceptance-20261107-203328.json
 ```
 
 ## tour_lint
