@@ -796,3 +796,139 @@ test('[A19.ui.key-table-scrolls-in-its-own-box] on AES-256 the round-key table s
     expect(await inViewport(page, 'aes-walk-next'), `${where}: Next is still in view after 41 words`).toBe(true);
   }
 });
+
+/*
+ * Steve's block-walk items (2026-11-08), matching the mock's "The block" tab (template.html: #mixcard, renderMix, renderDetail):
+ * 1. the MixColumns matrix panel: the fixed matrix times the column gives the state after, the pair lit, the "2 × 21 = 42" line,
+ *    Play this column, and Fill all;
+ * 2. AddRoundKey shows a "ROUND KEY n" grid with its number, and the XOR is animated;
+ * 3. the bit lines for the selected byte: state XOR key = result, in bits, in color.
+ * Every value comes from the Host's reply: step.terms[r + 4c].parts[k] (factor, input, result) and step.roundKey.
+ */
+
+/** The fixed MixColumns matrix, FIPS 197 section 5.1.3. Written out here; no value comes from the app. */
+const MIX = [[2, 3, 1, 1], [1, 2, 3, 1], [1, 1, 2, 3], [3, 1, 1, 2]];
+
+/** Next until the first step of the given kind in the encrypt run. Returns its index in reply.forward.steps. */
+async function toStep(page: Page, reply: any, kind: string, round: number): Promise<number> {
+  const idx = reply.forward.steps.findIndex((s: any) => s.kind === kind && s.round === round);
+  await toFirstStep(page);
+  for (let n = 0; n < idx; n++) await page.getByTestId('aes-walk-next').click();
+  expect(await kindNow(page), `at ${kind} round ${round}`).toBe(kind);
+  return idx;
+}
+
+const dataHex = async (page: Page, testid: string) => ((await page.getByTestId(testid).getAttribute('data-hex')) ?? '').toLowerCase();
+
+/** Per frame while motion runs: the lit matrix cell, the lit state-before cell, and the line, as one string. Ends after 3 s of stillness. */
+async function pairFrames(page: Page, ms: number): Promise<string[]> {
+  return await page.evaluate(ms => new Promise<string[]>(done => {
+    const out: string[] = [];
+    const t0 = performance.now();
+    let still = 0;
+    const tick = () => {
+      const t = performance.now() - t0;
+      const m = document.querySelector('[data-testid^="aes-walk-mix-matrix-"][data-pair="true"]')?.getAttribute('data-testid') ?? '';
+      const b = document.querySelector('[data-testid^="aes-walk-mix-before-"][data-pair="true"]')?.getAttribute('data-testid') ?? '';
+      const line = (document.querySelector('[data-testid="aes-walk-mix-line"]')?.textContent ?? '').replace(/\s+/g, ' ').trim();
+      const f = `${m}|${b}|${line}`;
+      if (m && out[out.length - 1] !== f) out.push(f);
+      still = document.getAnimations().some(a => a.playState === 'running') ? 0 : still + 1;
+      if (t > ms || (t > 1500 && still > 180)) done(out); else requestAnimationFrame(tick);
+    };
+    tick();
+  }), ms);
+}
+
+test('[A19.ui.mix-matrix-pairs-and-line] on MixColumns the panel shows the fixed matrix, the state before, and Play this column lights each pair with its "2 × 21 = 42" line and fills that column', async ({ page }) => {
+  const reply = await openWalk(page);
+  const idx = await toStep(page, reply, 'MixColumns', 1);
+  if ((await page.getByTestId('aes-walk-mix-panel').count()) === 0) throw new NotRun('UI_CONTROL_MISSING', 'MixColumns has no aes-walk-mix-panel yet (Steve: the matrix panel)');
+  const step = reply.forward.steps[idx];
+  const before = bytesOf(reply.forward.steps[idx - 1].state);
+  for (let r = 0; r < 4; r++) for (let c = 0; c < 4; c++) {
+    const f = ((await page.getByTestId(`aes-walk-mix-matrix-${r}-${c}`).textContent()) ?? '').trim();
+    expect(parseInt(f, 16), `matrix row ${r}, column ${c}`).toBe(MIX[r][c]);
+    expect(await dataHex(page, `aes-walk-mix-before-${r}-${c}`), `state before, row ${r}, column ${c}`).toBe(before[r + 4 * c]);
+  }
+  // A picked byte picks its column. Column 2 here, so a panel stuck on column 0 fails.
+  const col = 2;
+  await cell(page, 1, col).click();
+  await page.emulateMedia({ reducedMotion: 'no-preference' });
+  const [frames] = await Promise.all([pairFrames(page, 90_000), page.getByTestId('aes-walk-mix-play').click()]);
+  expect(frames.length, 'Play this column lights pairs').toBeGreaterThan(0);
+  for (let r = 0; r < 4; r++) for (let k = 0; k < 4; k++) {
+    const p = step.terms[r + 4 * col].parts[k];
+    const line = new RegExp(`\\b${p.factor}\\s*[×x]\\s*${p.input}\\s*=\\s*${p.result}\\b`, 'i');
+    const hit = frames.some(fr => { const [m, b, l] = fr.split('|'); return m === `aes-walk-mix-matrix-${r}-${k}` && b === `aes-walk-mix-before-${k}-${col}` && line.test(l); });
+    expect(hit, `row ${r}, pair ${k}: the matrix cell and byte ${k} of column ${col} are lit together, with the line "${p.factor} × ${p.input} = ${p.result}"`).toBe(true);
+  }
+  for (let r = 0; r < 4; r++) for (let c = 0; c < 4; c++)
+    expect(await dataHex(page, `aes-walk-mix-after-${r}-${c}`), `after Play, row ${r}, column ${c}`).toBe(c === col ? step.terms[r + 4 * c].result.toLowerCase() : '');
+});
+
+test('[A19.ui.mix-fill-all] on MixColumns, Fill all fills every byte of the state after with the engine state', async ({ page }) => {
+  const reply = await openWalk(page);
+  const idx = await toStep(page, reply, 'MixColumns', 1);
+  if ((await page.getByTestId('aes-walk-mix-fill').count()) === 0) throw new NotRun('UI_CONTROL_MISSING', 'MixColumns has no aes-walk-mix-fill yet (Steve: Fill all)');
+  const after = bytesOf(reply.forward.steps[idx].state);
+  await page.getByTestId('aes-walk-mix-fill').click();
+  await expect.poll(() => running(page), { timeout: 30_000 }).toBe(0);
+  for (let r = 0; r < 4; r++) for (let c = 0; c < 4; c++)
+    expect(await dataHex(page, `aes-walk-mix-after-${r}-${c}`), `after Fill all, row ${r}, column ${c}`).toBe(after[r + 4 * c]);
+});
+
+test('[A19.ui.add-round-key-grid] AddRoundKey shows a "ROUND KEY n" grid with its number and the engine round key, and the XOR moves with motion on', async ({ page }) => {
+  const reply = await openWalk(page);
+  await toFirstStep(page);
+  if ((await page.getByTestId('aes-walk-round-key-grid').count()) === 0) throw new NotRun('UI_CONTROL_MISSING', 'AddRoundKey has no aes-walk-round-key-grid yet (Steve: the ROUND KEY n grid)');
+  const check = async (idx: number) => {
+    const s = reply.forward.steps[idx];
+    await expect(page.getByTestId('aes-walk-round-key-label'), `round ${s.round}: the grid names its number`).toHaveText(new RegExp(`round key\\s*${s.round}\\b`, 'i'));
+    const key = bytesOf(s.roundKey);
+    for (let r = 0; r < 4; r++) for (let c = 0; c < 4; c++)
+      expect(await dataHex(page, `aes-walk-round-key-cell-${r}-${c}`), `round key ${s.round}, row ${r}, column ${c}`).toBe(key[r + 4 * c]);
+  };
+  await check(0);
+  // Round 1's AddRoundKey, reached with motion on: the XOR moves on screen, and the end frame is the engine state.
+  const idx1 = reply.forward.steps.findIndex((s: any) => s.kind === 'AddRoundKey' && s.round === 1);
+  for (let n = 0; n < idx1 - 1; n++) await page.getByTestId('aes-walk-next').click();
+  await page.emulateMedia({ reducedMotion: 'no-preference' });
+  const [moved] = await Promise.all([
+    page.evaluate(() => new Promise<boolean>(done => {
+      const t0 = performance.now();
+      const tick = () => {
+        const block = document.querySelector('[data-testid="aes-walk-block"]');
+        const hit = document.getAnimations().some(a => a.playState === 'running' && block?.contains((a.effect as KeyframeEffect | null)?.target as Node));
+        if (hit) done(true); else if (performance.now() - t0 > 3000) done(false); else requestAnimationFrame(tick);
+      };
+      tick();
+    })),
+    page.getByTestId('aes-walk-next').click(),
+  ]);
+  expect(await kindNow(page), 'at AddRoundKey round 1').toBe('AddRoundKey');
+  expect(moved, 'the XOR moves on screen with motion on').toBe(true);
+  await expect.poll(() => running(page), { timeout: 30_000 }).toBe(0);
+  await check(idx1);
+  expect(await grid(page), 'the end frame is the engine state').toBe(reply.forward.steps[idx1].state.toLowerCase());
+});
+
+test('[A19.ui.bit-lines-for-picked-byte] on AddRoundKey a picked byte shows state XOR key = result in bits, with the key and result lines in their own colors', async ({ page }) => {
+  const reply = await openWalk(page);
+  await toFirstStep(page);
+  const s = reply.forward.steps[0];
+  const prev = bytesOf(reply.inputHex), key = bytesOf(s.roundKey), out = bytesOf(s.state);
+  await cell(page, 0, 0).click();
+  if ((await page.getByTestId('aes-walk-bits-state').count()) === 0) throw new NotRun('UI_CONTROL_MISSING', 'AddRoundKey has no aes-walk-bits-state yet (Steve: the bit lines)');
+  for (const [r, c] of [[0, 0], [2, 3]]) {
+    await cell(page, r, c).click();
+    const i = r + 4 * c;
+    for (const [id, h] of [['state', prev[i]], ['key', key[i]], ['result', out[i]]] as const)
+      await expect(page.getByTestId(`aes-walk-bits-${id}`), `byte ${i}: the ${id} line in bits`).toHaveText(new RegExp(bitsRe(h)));
+  }
+  const color = (id: string) => page.getByTestId(`aes-walk-bits-${id}`).evaluate(e => getComputedStyle(e).color);
+  const [cs, ck, cr] = [await color('state'), await color('key'), await color('result')];
+  expect(ck, 'the key line has its own color').not.toBe(cs);
+  expect(cr, 'the result line has its own color').not.toBe(cs);
+  expect(cr, 'the key and result lines differ').not.toBe(ck);
+});
