@@ -1,3 +1,4 @@
+using System;
 using System.Collections.Generic;
 using NetSec.Errors;
 
@@ -61,6 +62,13 @@ namespace NetSec.Labs.Teaching
     {
         public ToyInverse SDifferenceInverse, RInverse;
         public int RecoveredNonce, RecoveredPrivate;
+    }
+
+    /// <summary>One learner pick: two indexes into the 19-point list (ToyCurveWalks.PickList) and the addition the engine did for them.</summary>
+    public sealed class ToyPick
+    {
+        public int PIndex, QIndex, ResultIndex;
+        public ToyStep Step;
     }
 
     public sealed class ToyCurveWalk
@@ -232,6 +240,35 @@ namespace NetSec.Labs.Teaching
             r.RInverse = ToyCurve.Inverse(first.SmallR, ToyCurve.Order);
             r.RecoveredPrivate = N((first.S * r.RecoveredNonce - first.Z) * r.RInverse.Value);
             return r;
+        }
+
+        /// <summary>The 19 points a learner can pick: the 18 affine points in ToyCurve.Points order (indexes 0 to 17), then O (index 18).</summary>
+        public static ToyPoint[] PickList()
+        {
+            ToyPoint[] affine = ToyCurve.Points();
+            ToyPoint[] all = new ToyPoint[affine.Length + 1];
+            Array.Copy(affine, all, affine.Length);
+            all[affine.Length] = ToyPoint.Infinity;
+            return all;
+        }
+
+        /// <summary>
+        /// Adds the two picked points with ToyCurve.Add, which shows the slope, the inverse and the result. The same index twice is a double.
+        /// The set is finite and public, so any pair is safe. An index outside 0 to 18 throws ArgumentOutOfRangeException, which the route refuses by name.
+        /// </summary>
+        public static ToyPick Pick(int pIndex, int qIndex)
+        {
+            ToyPoint[] all = PickList();
+            if (pIndex < 0 || pIndex >= all.Length) throw new ArgumentOutOfRangeException("pIndex");
+            if (qIndex < 0 || qIndex >= all.Length) throw new ArgumentOutOfRangeException("qIndex");
+            ToyPick pick = new ToyPick();
+            pick.PIndex = pIndex;
+            pick.QIndex = qIndex;
+            pick.Step = ToyCurve.Add(all[pIndex], all[qIndex]);
+            pick.ResultIndex = -1;
+            for (int i = 0; i < all.Length; i++) if (all[i].SameAs(pick.Step.Result)) pick.ResultIndex = i;
+            Require(pick.ResultIndex >= 0);
+            return pick;
         }
 
         internal static void Require(bool holds)

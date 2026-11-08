@@ -144,6 +144,41 @@ namespace NetSec.Tests
         }
 
         [Fact]
+        public void Every_one_of_the_361_picks_matches_the_reference_and_names_its_result()
+        {
+            ToyPoint[] list = ToyCurveWalks.PickList();
+            Assert.Equal(N, list.Length);
+            Assert.True(list[18].IsInfinity);
+            for (int i = 0; i < N; i++)
+                for (int j = 0; j < N; j++)
+                {
+                    ToyPick pick = ToyCurveWalks.Pick(i, j);
+                    var expected = RefAdd(Pt(list[i]), Pt(list[j]));
+                    Assert.Equal(expected, Pt(pick.Step.Result));
+                    Assert.Equal(expected, Pt(list[pick.ResultIndex]));
+                    if (i == j && i < 18) Assert.Equal("double", pick.Step.Kind);
+                    if (i == 18 || j == 18) Assert.Equal("identity", pick.Step.Kind);
+                }
+            Assert.Throws<ArgumentOutOfRangeException>(() => ToyCurveWalks.Pick(19, 0));
+            Assert.Throws<ArgumentOutOfRangeException>(() => ToyCurveWalks.Pick(0, -1));
+        }
+
+        [Fact]
+        public void The_real_curve_samples_lie_on_their_lines_and_on_the_curve_inside_the_drawn_range()
+        {
+            RealCurveSample s = RealCurveSamples.Build();
+            Assert.Equal(new[] { "chord", "chord", "chord", "tangent" }, s.Samples.Select(e => e.Kind));
+            foreach (RealLineExample e in s.Samples)
+            {
+                Assert.True(Math.Abs(e.RPrime.Y * e.RPrime.Y - RealCurveSamples.Cubic(e.RPrime.X)) < 1e-9, e.Kind + ": R' is on the curve");
+                Assert.True(Math.Abs(e.RPrime.Y - (e.P.Y + e.Lambda * (e.RPrime.X - e.P.X))) < 1e-9, e.Kind + ": R' is on the line");
+                Assert.True(Math.Abs(e.Q.Y - (e.P.Y + e.Lambda * (e.Q.X - e.P.X))) < 1e-9, e.Kind + ": Q is on the line");
+                Assert.InRange(e.RPrime.X, s.Root, s.XMax);
+                Assert.Equal(-e.RPrime.Y, e.R.Y);
+            }
+        }
+
+        [Fact]
         public void The_guard_names_its_code()
         {
             NetSecException e = Assert.Throws<NetSecException>(() => ToyCurveWalks.Require(false));

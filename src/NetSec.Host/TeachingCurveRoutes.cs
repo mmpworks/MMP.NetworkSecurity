@@ -15,7 +15,31 @@ public static class TeachingCurveRoutes
     {
         app.MapGet("/api/walk/toy-curve", (HttpContext http) => NoStore(http, Toy()));
         app.MapGet("/api/walk/real-curve", (HttpContext http) => NoStore(http, Results.Json(Json(RealCurveSamples.Build()))));
+        app.MapGet("/api/walk/toy-curve/add", (HttpContext http, string? p, string? q) => NoStore(http, Pick(p, q)));
     }
+
+    /// <summary>
+    /// A learner's pick of two points, by index into the 19-point list (0 to 17 are the walk's `points`, 18 is O). The same index twice is a
+    /// double. The engine does the addition, and the page computes nothing (R5).
+    /// </summary>
+    static IResult Pick(string? p, string? q)
+    {
+        int count = ToyCurveWalks.PickList().Length;
+        if (!Index(p, count, out int pIndex)) return Refuse(400, ErrorCodes.WalkBadArgument, $"p must be a whole number from 0 to {count - 1}.");
+        if (!Index(q, count, out int qIndex)) return Refuse(400, ErrorCodes.WalkBadArgument, $"q must be a whole number from 0 to {count - 1}.");
+        try
+        {
+            ToyPick pick = ToyCurveWalks.Pick(pIndex, qIndex);
+            return Results.Json(new { pIndex = pick.PIndex, qIndex = pick.QIndex, resultIndex = pick.ResultIndex, step = Step(pick.Step) });
+        }
+        catch (NetSecException e) when (e.Error.Code == ErrorCodes.ToyCurveWalkDiverged)
+        {
+            return Refuse(500, ErrorCodes.ToyCurveWalkDiverged, "The toy-curve walk disagrees with itself, so it shows nothing.");
+        }
+    }
+
+    static bool Index(string? text, int count, out int index) =>
+        int.TryParse(text, System.Globalization.NumberStyles.None, System.Globalization.CultureInfo.InvariantCulture, out index) && index < count;
 
     static IResult Toy()
     {
@@ -106,5 +130,6 @@ public static class TeachingCurveRoutes
         lower = s.Lower.Select(Real).ToArray(),
         chord = Line(s.Chord),
         tangent = Line(s.Tangent),
+        samples = s.Samples.Select(Line).ToArray(),
     };
 }

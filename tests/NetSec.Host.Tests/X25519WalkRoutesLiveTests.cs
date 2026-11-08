@@ -37,6 +37,8 @@ public class X25519WalkRoutesLiveTests
         Assert.Equal(254, rows[0].GetProperty("bit").GetInt32());
         Assert.True(rows[0].GetProperty("isOne").GetBoolean());
         Assert.Equal(body.GetProperty("result").GetString(), rows[254].GetProperty("u2").GetString());
+        Assert.True(rows[0].GetProperty("swap").GetBoolean());
+        foreach (JsonElement row in rows.EnumerateArray()) Assert.Equal(row.GetProperty("isOne").GetBoolean(), row.GetProperty("swap").GetBoolean());
     }
 
     [Theory]

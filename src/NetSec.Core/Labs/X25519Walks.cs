@@ -21,6 +21,12 @@ namespace NetSec.Labs
 
         /// <summary>The affine u-coordinates x2/z2 and x3/z3. Null when z is 0, which is the point at infinity.</summary>
         public byte[] U2, U3;
+
+        /// <summary>
+        /// The conditional-swap argument of this step. This engine uses TweetNaCl's order: it swaps the pair by the bit before the step's work
+        /// and swaps it back after, so Swap equals IsOne. RFC 7748 section 5 shows an equivalent form with one swap per step (swap ^= k_t).
+        /// </summary>
+        public bool Swap;
     }
 
     public sealed class X25519Walk
@@ -71,6 +77,7 @@ namespace NetSec.Labs
                 X25519LadderRow row = new X25519LadderRow();
                 row.Bit = bit;
                 row.IsOne = value == 1;
+                row.Swap = value == 1;
                 row.X2 = Pack(sx2);
                 row.Z2 = Pack(sz2);
                 row.X3 = Pack(sx3);

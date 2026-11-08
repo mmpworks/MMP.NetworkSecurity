@@ -102,6 +102,19 @@ namespace NetSec.Tests
             CheckAgainstReference(shared);
         }
 
+        /// <summary>The engine swaps by the bit itself (TweetNaCl order), so each row's swap is its clamped scalar bit, read here from the clamped bytes.</summary>
+        [Fact]
+        public void Each_rows_swap_is_the_clamped_bit_the_step_read()
+        {
+            foreach (string step in X25519Walks.Steps)
+            {
+                X25519Walk w = X25519Walks.Rfc7748(step);
+                Assert.All(w.Rows, r => Assert.Equal(((Le(w.Clamped) >> r.Bit) & 1) == 1, r.Swap));
+                Assert.True(w.Rows[0].Swap, "bit 254 is set by the clamp");
+                Assert.Contains(w.Rows, r => !r.Swap);
+            }
+        }
+
         [Fact]
         public void The_clamp_clears_the_low_3_bits_and_bit_255_and_sets_bit_254()
         {
