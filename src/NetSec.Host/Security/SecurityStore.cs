@@ -103,7 +103,7 @@ public sealed class SecurityStore
 
     /// <summary>
     /// Saves the Show keys choice. Off fails closed (issue #292): when the save is refused, off still takes effect in memory at once, and
-    /// the error says only that the choice was not saved for the next start. On fails open: a refused save keeps keys hidden.
+    /// the error says only that the choice was not saved for the next start. On also fails closed: a refused save keeps keys hidden.
     /// </summary>
     public void SetShowKeys(bool on)
     {
@@ -131,6 +131,8 @@ public sealed class SecurityStore
         lock (_gate)
         {
             if (_retry is null) return;
+            // A deleted security folder stops the retry and leaves Saved false, so the page keeps saying "not saved yet". That is true:
+            // nothing on disk holds the choice. The next save recreates the folder and the file. Test teardown deletes the folder too.
             if (!Directory.Exists(Root)) { StopRetry(); return; }
             if (_unsaved)
             {

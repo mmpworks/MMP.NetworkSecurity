@@ -138,6 +138,30 @@ public sealed class ShowKeysLiveTests
     }
 
     /// <summary>
+    /// Every Show keys reader sees off right after a refused save (issue #292, Jared's check 4): the key route, the session's key log and
+    /// the AES walk route. They all ask the store live, so this pins that no reader keeps its own copy.
+    /// </summary>
+    [Fact]
+    public async Task Every_show_keys_reader_sees_off_right_after_a_refused_save()
+    {
+        using SecurityLiveTests.Host host = await SecurityLiveTests.Host.StartAsync();
+        Assert.Equal(200, (await PutShowKeys(host, true)).Status);
+        string id = StartedId(await host.Session(1));
+        Assert.Equal(200, (await host.Get("/api/sessions/" + id + "/keylog")).Status);
+        using (SecurityLiveTests.HoldModesOpen(host))
+        {
+            (int status, string body) = await PutShowKeys(host, false);
+            SecurityLiveTests.AssertSaveRefused(status, body);
+            JsonElement key = JsonDocument.Parse((await host.Get("/api/security/types/tls13.server/key")).Body).RootElement;
+            Assert.Equal("toggle", key.GetProperty("hidden").GetString());
+            Assert.Equal("KEYS_HIDDEN", JsonDocument.Parse((await host.Get("/api/sessions/" + id + "/keylog")).Body).RootElement.GetProperty("code").GetString());
+            (int walkStatus, string walk) = await host.Get("/api/sessions/" + id + "/walk/aes/block?source=text&keyBits=128");
+            Assert.Equal(409, walkStatus);
+            Assert.Equal("KEYS_HIDDEN", JsonDocument.Parse(walk).RootElement.GetProperty("code").GetString());
+        }
+    }
+
+    /// <summary>
     /// The restart gap (issue #292): after a refused off, memory says off and the file says on. The Host says "not saved" to the page and
     /// the key route hides keys at once; when the hold ends, a background retry saves the file and tells the sockets.
     /// </summary>

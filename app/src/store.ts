@@ -216,6 +216,10 @@ let showKeysFrames = 0
 export const showKeysFrameCount = () => showKeysFrames
 let showKeysHandler: ((on: boolean) => void) | null = null
 export function onShowKeys(h: (on: boolean) => void) { showKeysHandler = h }
+// Issue #292: the Host says whether its Show keys choice is saved to disk. A refused save of off is in force but not saved yet, and
+// security.saved comes when the Host's background retry has saved it.
+let showKeysSavedHandler: ((saved: boolean) => void) | null = null
+export function onShowKeysSaved(h: (saved: boolean) => void) { showKeysSavedHandler = h }
 // The Host sends every frame to every open socket. This client owns only the sessions it asked for: a session.started whose
 // requestId it sent. A trace or finished frame can arrive ahead of its session.started, so frames of unknown sessions wait by id.
 const myRequests = new Set<string>()
@@ -246,7 +250,11 @@ function onFrame(f: any) {
     case 'security.show-keys':
       showKeysFrames++
       showKeysHandler?.(f.on !== false)
+      showKeysSavedHandler?.(f.saved !== false)
       void replaceOpenSessions(f.on !== false)
+      return
+    case 'security.saved':
+      showKeysSavedHandler?.(f.saved !== false)
       return
     case 'error':
       if (f.requestId && !myRequests.has(String(f.requestId))) return

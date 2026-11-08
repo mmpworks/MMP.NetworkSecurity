@@ -23,7 +23,7 @@ public static class SecurityRoutes
             root = store.Root,
             showKeys = store.ShowKeys,
             showKeysSaved = store.Saved,
-            flows =runs.Table.Flows.Select(f => new { flowId = f.FlowId, types = f.Types, openRunId = runs.OpenRunOf(f.FlowId) }),
+            flows = runs.Table.Flows.Select(f => new { flowId = f.FlowId, types = f.Types, openRunId = runs.OpenRunOf(f.FlowId) }),
             types = SecurityTypes.All.Select(id => TypeRow(store, id)),
         }));
         app.MapPut("/api/security/types/{typeId}/mode", (string typeId, ModeBody body) =>
