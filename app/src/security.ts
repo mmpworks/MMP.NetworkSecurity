@@ -240,4 +240,8 @@ export const lessonsBuilt = computed(() => lessons.value.filter(l => l.built))
 
 // The Host broadcasts security.show-keys when any client flips the switch. The store replaces each open session, and this keeps the switch in step.
 onShowKeys(on => { sec.showKeys = on })
-onShowKeysSaved(saved => { sec.showKeysSaved = saved })
+// Once the Host has saved the choice, the save-failed warning ("a restart may show keys again") is false, so it goes too.
+onShowKeysSaved(saved => {
+  sec.showKeysSaved = saved
+  if (saved && sec.fault?.code === 'SECURITY_STORE_SAVE_FAILED') sec.fault = null
+})
