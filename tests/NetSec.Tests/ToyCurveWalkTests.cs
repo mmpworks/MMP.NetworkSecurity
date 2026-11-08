@@ -94,6 +94,7 @@ namespace NetSec.Tests
         {
             Assert.Equal(13, W.K);
             var target = RefTimes(13, (5, 1));
+            Assert.Equal(((int, int)?)(16, 4), target);
             Assert.Equal(new[] { true, true, false, true }, W.DoubleAndAdd.Select(r => r.IsOne));
             Assert.All(W.DoubleAndAdd, r => Assert.Equal(r.IsOne, r.AddStep != null));
             Assert.Equal(target, Pt(W.DoubleAndAdd.Last().After));
@@ -125,6 +126,9 @@ namespace NetSec.Tests
             Assert.Equal(RefTimes(7, (5, 1)), Pt(W.SignerPublic));
             Assert.Equal(8, W.First.Z);
             Assert.Equal(13, W.First.NonceInverse.Value);
+            Assert.Equal(10, W.First.SmallR);
+            Assert.Equal(7, W.First.S);
+            Assert.NotEqual(8 % N, W.Second.Z % N);
             foreach (ToySignature s in new[] { W.First, W.Second })
             {
                 Assert.Equal(3, s.Nonce);
