@@ -223,6 +223,7 @@ namespace NetSec.Labs
             WithOption("L7-downgrade", 7, Lesson07Tls11.OptionScenario, Lesson07Tls11.ScenarioDowngrade, AttackOutcome.Rejected, Tls13Codes.DowngradeSentinel, Tls13Codes.CheckName(Tls13Codes.DowngradeSentinel)),
             WithOption("L7-modern-server", 7, Lesson07Tls11.OptionScenario, Lesson07Tls11.ScenarioModernServer, AttackOutcome.Rejected, NetSec.Tls11.Tls11Codes.AlertProtocolVersion, NetSec.Tls11.Tls11Checks.ProtocolVersionAlert),
             Flip("L7-flip-record", 7, Lesson07Tls11.ApplicationData, Lesson07Tls11.CipherOffset, NetSec.Tls11.Tls11Codes.RecordMac, NetSec.Tls11.Tls11Checks.RecordHmac),
+            WithOption("L7-decrypt-recording", 7, Lesson07Tls11.OptionScenario, Lesson07Tls11.ScenarioDecryptRecording, AttackOutcome.Rejected, NetSec.Tls11.Tls11Codes.NoStoredKey, Lesson07Tls11.ForwardSecrecyCheck),
 
             WithOption("L8-change-host-key", 8, Lesson08Ssh.OptionHostKey, "attacker", AttackOutcome.Rejected, SshCodes.HostKeyChanged, SshChecks.KnownHosts),
             Flip("L8-flip-exchange-signature", 8, SshNames.KexEcdhReply, SshEd25519SignatureOffset, SshCodes.ExchangeSignature, SshChecks.ExchangeSignature),

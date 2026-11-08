@@ -22,6 +22,9 @@ namespace NetSec.Tls11
         public const string CcsBody = "TLS11_CCS_BODY";
         public const string RenegotiationInfo = "TLS11_RENEGOTIATION_INFO";
 
+        /// <summary>Lesson 7's decrypt-a-recording run: on ECDHE, a stolen server key opens no recorded session, because no stored key made its keys.</summary>
+        public const string NoStoredKey = "TLS11_NO_STORED_KEY";
+
         /// <summary>The alert a failure owes the peer (RFC 4346 section 7.2.2). Internal_error (80) covers a code with no row.</summary>
         public static int AlertFor(string code)
         {

@@ -71,7 +71,7 @@ namespace NetSec.Labs
             w.Suite = Tls11CipherSuite.RsaAes128CbcSha.Name;
             w.ServerKeyId = KeyIds.ServerTls11Rsa;
             w.ServerPublicKey = serverKey.CopyPublic();
-            byte[][] clientMessages = HandshakeMessages(toServer.ToArray()), serverMessages = HandshakeMessages(toClient.ToArray());
+            byte[][] clientMessages = Tls11Recording.HandshakeMessages(toServer.ToArray()), serverMessages = Tls11Recording.HandshakeMessages(toClient.ToArray());
             w.ClientRandom = Tls11Messages.ReadClientHello(Reader(Find(clientMessages, Tls11Messages.ClientHello))).Random;
             w.ServerRandom = Tls11Messages.ReadServerHello(Reader(Find(serverMessages, Tls11Messages.ServerHello))).Random;
             w.EncryptedPremaster = Tls11Messages.ReadClientKeyExchange(Reader(Find(clientMessages, Tls11Messages.ClientKeyExchange)), Tls11CipherSuite.RsaAes128CbcSha);
@@ -138,29 +138,14 @@ namespace NetSec.Labs
             Require(client.ReachedOpen && server.ReachedOpen);
         }
 
-        /// <summary>The clear handshake messages in one direction: the handshake records before the first ChangeCipherSpec.</summary>
-        static byte[][] HandshakeMessages(byte[] wire)
-        {
-            Tls11RecordReader records = new Tls11RecordReader();
-            records.Append(wire, 0, wire.Length);
-            Tls11HandshakeReader handshakes = new Tls11HandshakeReader();
-            List<byte[]> messages = new List<byte[]>();
-            for (Tls11RawRecord r = records.Next(); r != null && r.Type != Tls11Content.ChangeCipherSpec; r = records.Next())
-            {
-                if (r.Type != Tls11Content.Handshake) continue;
-                handshakes.Append(r.Payload);
-                for (byte[] m = handshakes.Next(); m != null; m = handshakes.Next()) messages.Add(m);
-            }
-            return messages.ToArray();
-        }
-
         static byte[] Find(byte[][] messages, int type)
         {
-            foreach (byte[] m in messages) if (m[0] == type) return m;
-            throw Diverged("the run has no handshake message of type " + type);
+            byte[] found = Tls11Recording.Find(messages, type);
+            if (found == null) throw Diverged("the run has no handshake message of type " + type);
+            return found;
         }
 
-        static ByteReader Reader(byte[] message) { return new ByteReader(message, 0, message.Length, true); }
+        static ByteReader Reader(byte[] message) { return Tls11Recording.Reader(message); }
 
         static bool Same(string[] a, string[] b)
         {
