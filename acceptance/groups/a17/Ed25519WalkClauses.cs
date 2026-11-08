@@ -56,12 +56,12 @@ namespace Acceptance
             return Hex.Decode(s);
         }
 
-        /// <summary>r and h may come as the 64-byte hash or as the 32-byte value mod L. Either must match the suite's own hash.</summary>
+        /// <summary>r and h come as the 32-byte little-endian value mod L, as RFC 8032 encodes scalars (Richard's shape), not the 64-byte hash.</summary>
         static void SameModL(string where, byte[] hash64, byte[] shown)
         {
             BigInteger want = FromLittleEndian(hash64) % L;
-            if (shown.Length == 64) Check.Equal(where + " (the 64-byte hash)", Hx(hash64), Hx(shown));
-            else Check.True(shown.Length == 32 && FromLittleEndian(shown) == want, where + ": the value is not the hash mod L (" + shown.Length + " bytes)");
+            Check.True(shown.Length == 32, where + ": the value is " + shown.Length + " bytes, and the contract gives 32 (the hash mod L)");
+            Check.Equal(where, Hx(ToLittleEndian32(want)), Hx(shown));
         }
 
         [Clause("A19.host.ed25519-walk-open-and-rfc8032")]
