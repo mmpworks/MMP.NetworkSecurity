@@ -7,6 +7,7 @@ the push went through. The fake gh prints the JSON in FAKE_GH_JSON, or exits wit
 import json
 import os
 import pathlib
+import shutil
 import subprocess
 import sys
 import tempfile
@@ -161,6 +162,52 @@ class InstalledHook(RepoFixture):
         path = pathlib.Path(run(["git", "config", "core.hooksPath"], self.work).stdout.strip())
         for name in ("pre-push", "pre_push_guard.py"):
             self.assertEqual((path / name).read_bytes(), (HOOKS / name).read_bytes(), name)
+
+
+class DriftCheck(RepoFixture):
+    """check-installed.ps1, the gate step that fails when the installed hook is missing or differs from tools/githooks (Jared, #257).
+    The source folder is a private copy, so a test can change a source file without touching the real ones."""
+
+    def install_hooks(self):
+        self.src = pathlib.Path(self.tmp.name) / "src"
+        self.src.mkdir()
+        for name in ("pre-push", "pre_push_guard.py", "install.ps1", "check-installed.ps1"):
+            if (HOOKS / name).is_file():
+                shutil.copy(HOOKS / name, self.src / name)
+        self.installed = False
+
+    def install(self):
+        run(["pwsh", "-NoProfile", "-File", str(self.src / "install.ps1"), "-Repo", str(self.work)], self.work)
+
+    def check(self):
+        return run(["pwsh", "-NoProfile", "-File", str(HOOKS / "check-installed.ps1"), "-Repo", str(self.work), "-Source", str(self.src)],
+                   self.work, check=False)
+
+    def test_current_install_passes(self):
+        self.install()
+        r = self.check()
+        self.assertEqual(r.returncode, 0, r.stdout + r.stderr)
+
+    def test_a_changed_source_file_fails_and_names_install(self):
+        self.install()
+        with open(self.src / "pre_push_guard.py", "a", encoding="utf-8") as f:
+            f.write("# a newer guard\n")
+        r = self.check()
+        self.assertNotEqual(r.returncode, 0)
+        self.assertIn("pre_push_guard.py", r.stdout + r.stderr)
+        self.assertIn("install.ps1", r.stdout + r.stderr)
+
+    def test_a_clone_that_never_installed_fails(self):
+        r = self.check()
+        self.assertNotEqual(r.returncode, 0)
+        self.assertIn("install.ps1", r.stdout + r.stderr)
+
+    def test_a_relative_hooks_path_is_not_the_installed_copy(self):
+        self.install()
+        run(["git", "config", "core.hooksPath", "tools/githooks"], self.work)
+        r = self.check()
+        self.assertNotEqual(r.returncode, 0)
+        self.assertIn("install.ps1", r.stdout + r.stderr)
 
 
 if __name__ == "__main__":
