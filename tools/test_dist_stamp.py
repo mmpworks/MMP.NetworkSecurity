@@ -110,10 +110,47 @@ class DistStamp(unittest.TestCase):
             self.assertEqual(r.returncode, 0, r.stdout + r.stderr)
             self.assertIn("unchecked", r.stdout + r.stderr)
 
-    def test_the_stamp_file_records_the_commit_and_lives_in_dist(self):
+    def test_the_stamp_file_records_the_commit_and_the_app_tree_and_lives_in_dist(self):
         self.stamp("write")
         data = json.loads((self.repo / "app" / "dist" / ".build-commit.json").read_text(encoding="utf-8"))
         self.assertEqual(data["commit"], git("rev-parse", "HEAD", cwd=self.repo))
+        self.assertEqual(data["tree"], git("rev-parse", "HEAD:app", cwd=self.repo))
+
+    # Jared's #307 review: the build's inputs are all under app/, so the stamp keys on the app/ tree id. A commit that leaves app/ alone
+    # (a run log, a Host fix, a doc) must not make dist stale, or agents hit a steady false stop.
+    def test_a_commit_that_leaves_app_alone_does_not_make_dist_stale(self):
+        self.stamp("write")
+        self.commit("top.txt", "a run log or a doc changed")
+        r = self.stamp("check")
+        self.assertEqual(r.returncode, 0, r.stdout + r.stderr)
+
+    def test_a_commit_that_adds_a_file_outside_app_does_not_make_dist_stale(self):
+        self.stamp("write")
+        (self.repo / "docs").mkdir()
+        self.commit("docs/_run.md", "run log")
+        self.assertEqual(self.stamp("check").returncode, 0)
+
+    def test_another_branch_with_the_same_app_tree_passes(self):
+        self.stamp("write")
+        git("switch", "-q", "-c", "docs-only", cwd=self.repo)
+        self.commit("top.txt", "docs-only branch")
+        self.assertEqual(self.stamp("check").returncode, 0)
+
+    def test_the_stale_message_prints_commits_for_people_to_read(self):
+        self.stamp("write")
+        built = git("rev-parse", "--short", "HEAD", cwd=self.repo)
+        self.commit("app/src/a.ts", "app changed")
+        now = git("rev-parse", "--short", "HEAD", cwd=self.repo)
+        r = self.stamp("check")
+        self.assertIn(built, r.stdout + r.stderr)
+        self.assertIn(now, r.stdout + r.stderr)
+
+    def test_a_stamp_from_before_the_tree_key_existed_is_unstamped_not_trusted(self):
+        (self.repo / "app" / "dist" / ".build-commit.json").write_text(
+            json.dumps({"commit": git("rev-parse", "HEAD", cwd=self.repo), "diff": ""}), encoding="utf-8")
+        r = self.stamp("check")
+        self.assertEqual(r.returncode, 1)
+        self.assertIn("DIST_UNSTAMPED", r.stdout + r.stderr)
 
 
 class WiredIn(unittest.TestCase):

@@ -17,15 +17,20 @@ function git(root, args) {
   } catch { return null }
 }
 
-/** The commit this tree is on, plus a hash of its uncommitted edits to tracked files under app/ ('' when there are none). */
+/**
+ * What the build was made from. Every input of `npm run build` sits under app/ (index.html, src/, vite.config.ts, tsconfig, package files: nothing
+ * imports from outside it), so the key is the id of the app/ tree in HEAD plus a hash of uncommitted edits to tracked files under app/. A commit that
+ * leaves app/ alone (a run log, a Host fix, a doc) keeps the same tree id and does not make dist stale. The commit is kept for people to read.
+ */
 function current(root) {
   const commit = git(root, ['rev-parse', 'HEAD'])
-  if (!commit) return { commit: 'unknown', diff: '' }
+  if (!commit) return { commit: 'unknown', tree: 'unknown', diff: '' }
+  const tree = git(root, ['rev-parse', 'HEAD:app']) ?? 'unknown'
   const diff = git(root, ['diff', 'HEAD', '--no-renames', '--', 'app']) ?? ''
-  return { commit, diff: diff ? crypto.createHash('sha1').update(diff).digest('hex') : '' }
+  return { commit, tree, diff: diff ? crypto.createHash('sha1').update(diff).digest('hex') : '' }
 }
 
-const label = s => `${s.commit === 'unknown' ? 'unknown' : s.commit.slice(0, 7)}${s.diff ? ` + edits ${s.diff.slice(0, 8)}` : ''}`
+const label = s => `${s.commit === 'unknown' ? 'unknown' : s.commit.slice(0, 7)} (app tree ${String(s.tree).slice(0, 7)})${s.diff ? ` + edits ${s.diff.slice(0, 8)}` : ''}`
 
 function write(root, dist) {
   fs.mkdirSync(dist, { recursive: true })
@@ -37,17 +42,19 @@ function check(root, dist) {
   const fix = 'Run: cd app; npm run build'
   if (!fs.existsSync(dist)) return { ok: false, message: `DIST_MISSING: ${dist} does not exist. ${fix}` }
   let stamped
-  try { stamped = JSON.parse(fs.readFileSync(path.join(dist, STAMP_FILE), 'utf8')) } catch {
-    return { ok: false, message: `DIST_UNSTAMPED: ${dist} has no build stamp, so it may come from another branch. ${fix}` }
+  try { stamped = JSON.parse(fs.readFileSync(path.join(dist, STAMP_FILE), 'utf8')) } catch { stamped = null }
+  // A stamp from before the tree key existed (or an unreadable one) cannot be trusted: it may have come from another branch.
+  if (!stamped || typeof stamped.commit !== 'string' || typeof stamped.tree !== 'string') {
+    return { ok: false, message: `DIST_UNSTAMPED: ${dist} has no usable build stamp, so it may come from another branch. ${fix}` }
   }
   const now = current(root)
-  if (stamped.commit === 'unknown' || now.commit === 'unknown') {
-    return { ok: true, message: 'dist build unchecked: git cannot say which commit this tree or the build is on' }
+  if (stamped.tree === 'unknown' || now.tree === 'unknown') {
+    return { ok: true, message: 'dist build unchecked: git cannot say which app/ tree this tree or the build is on' }
   }
-  if (stamped.commit !== now.commit || (stamped.diff || '') !== now.diff) {
+  if (stamped.tree !== now.tree || (stamped.diff || '') !== now.diff) {
     return { ok: false, message: `DIST_STALE: ${dist} was built from ${label(stamped)} and this tree is ${label(now)}. ${fix}` }
   }
-  return { ok: true, message: `dist build matches ${label(now)}` }
+  return { ok: true, message: `dist build matches app tree ${now.tree.slice(0, 7)} (${now.commit.slice(0, 7)})` }
 }
 
 module.exports = { check, write, current, STAMP_FILE }
