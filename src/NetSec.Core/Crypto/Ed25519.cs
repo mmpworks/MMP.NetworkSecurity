@@ -2,10 +2,6 @@ using System;
 
 namespace NetSec.Crypto
 {
-    /// <summary>
-    /// Ed25519 (RFC 8032 section 5.1). A signature is R (a point, 32 bytes) then S (a scalar, 32 bytes).
-    /// Built to show the parts. Do not copy: managed code gives no constant-time guarantee.
-    /// </summary>
     /// <summary>The steps of one Ed25519 sign and verify, for the walk. Each field is a copy, filled by the engine as it runs.</summary>
     internal sealed class Ed25519Trace
     {
@@ -19,6 +15,10 @@ namespace NetSec.Crypto
         public byte[] VerifyH, SB, MinusHA, RPrime;
     }
 
+    /// <summary>
+    /// Ed25519 (RFC 8032 section 5.1). A signature is R (a point, 32 bytes) then S (a scalar, 32 bytes).
+    /// Built to show the parts. Do not copy: managed code gives no constant-time guarantee.
+    /// </summary>
     public static class Ed25519
     {
         const int SeedLength = 32;

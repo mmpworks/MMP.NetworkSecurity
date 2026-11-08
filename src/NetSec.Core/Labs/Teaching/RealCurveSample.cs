@@ -66,7 +66,7 @@ namespace NetSec.Labs.Teaching
                 Line("chord", OnCurve(0), OnCurve(2)),
                 Line("chord", OnCurve(-0.5), Lower(1.5)),
                 Line("chord", OnCurve(-0.25), OnCurve(0.75)),
-                Line("tangent", OnCurve(1.2), OnCurve(1.2)),
+                Line("tangent", OnCurve(0.5), OnCurve(0.5)),
             };
             foreach (RealLineExample e in s.Samples)
                 if (e.RPrime.X < s.Root || e.RPrime.X > XMax) throw new InvalidOperationException("a sample's R' falls outside the drawn range");

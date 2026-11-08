@@ -2,14 +2,14 @@ using System;
 
 namespace NetSec.Crypto
 {
+    /// <summary>Called after each ladder step with the step's bit and the pair (x2:z2, x3:z3), for the walk. The arrays are the ladder's own: copy them.</summary>
+    internal delegate void X25519LadderStep(int bit, int value, long[] x2, long[] z2, long[] x3, long[] z3);
+
     /// <summary>
     /// X25519 (RFC 7748). The Montgomery ladder works on u-coordinates only. The caller checks for an all-zero result where
     /// the protocol asks for that check.
     /// Built to show the parts. Do not copy: managed code gives no constant-time guarantee.
     /// </summary>
-    /// <summary>Called after each ladder step with the step's bit and the pair (x2:z2, x3:z3), for the walk. The arrays are the ladder's own: copy them.</summary>
-    internal delegate void X25519LadderStep(int bit, int value, long[] x2, long[] z2, long[] x3, long[] z3);
-
     public static class X25519
     {
         const int Length = 32;
