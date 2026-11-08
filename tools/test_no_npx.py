@@ -73,6 +73,13 @@ class NoNpx(unittest.TestCase):
         self.assertEqual(code, 1, out)
         self.assertIn("acceptance/e2e/global-setup.ts:1", out)
 
+    def test_npx_in_acceptance_csharp_fails(self):
+        """acceptance/ clause code is C# and can start a process (Jared, #275)."""
+        self.put_deep("acceptance/lib/Harness/Tools.cs", 'Proc.Start("npx", "playwright test");\n')
+        code, out = self.run_check()
+        self.assertEqual(code, 1, out)
+        self.assertIn("acceptance/lib/Harness/Tools.cs:1", out)
+
     def test_installed_packages_and_run_folders_are_skipped(self):
         self.put_deep("acceptance/e2e/node_modules/pkg/cli.js", "spawn('npx')\n")
         self.put_deep("acceptance/.work/run-1/e2e/state.json", '{"note": "npx"}\n')
