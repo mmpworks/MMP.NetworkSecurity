@@ -5,7 +5,7 @@ namespace Acceptance
 {
     /// <summary>
     /// prd.md line 93: "Every lesson has attack buttons. Each attack names the check that caught it." The count comes from the live Host's
-    /// GET /api/lessons and GET /api/lessons/0, which list AttackCatalog, so the suite never counts the registry by text search. Each available row is forked
+    /// GET /api/lessons (lessons 0 to 11), which lists AttackCatalog, so the suite never counts the registry by text search. Each available row is forked
     /// through session.attack, and the fork must end with the row's code and name the row's check. The button half is the e2e clause
     /// A17.ui.every-attack-row-has-a-button.
     /// </summary>
@@ -18,12 +18,9 @@ namespace Acceptance
             {
                 Reply lessons = HostHttp.Get(h, "/api/lessons");
                 Check.True(lessons.Ok && lessons.Array != null, "GET /api/lessons got " + lessons);
-                // The list holds lessons 1 to 11. Lesson 0 has its own route, and it has an attack row too.
-                List<object> all = new List<object>();
-                Reply zero = HostHttp.Get(h, "/api/lessons/0");
-                Check.True(zero.Ok && zero.Json != null, "GET /api/lessons/0 got " + zero);
-                all.Add(zero.Json);
-                all.AddRange(lessons.Array);
+                // The list holds lessons 0 to 11, so lesson 0's attack row comes from the same list as the rest (no second route, no hand copy).
+                List<object> all = new List<object>(lessons.Array);
+                Check.True(all.Exists(o => (int)MiniJson.Num(MiniJson.AsObject(o), "lesson", -1) == 0), "GET /api/lessons does not list lesson 0");
                 int rows = 0, caught = 0, noCheck = 0;
                 List<string> unavailable = new List<string>(), notBuilt = new List<string>(), misses = new List<string>();
                 foreach (object lo in all)

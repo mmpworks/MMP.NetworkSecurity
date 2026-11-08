@@ -113,7 +113,8 @@ namespace Acceptance
 
         List<object> LessonsJson()
         {
-            List<object> rows = new List<object>();
+            // As the real Host since Richard's contract change: the list holds lessons 0 to 11. Lesson 0's row matches GET /api/lessons/0.
+            List<object> rows = new List<object> { D("lesson", 0.0, "title", "Lesson 0", "built", true, "attacks", new List<object>()) };
             for (int n = 1; n <= 11; n++)
             {
                 List<object> attacks = new List<object>();

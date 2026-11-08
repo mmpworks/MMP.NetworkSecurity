@@ -9,7 +9,7 @@ import { NotRun, hostGet, openApp, requireLive } from './support';
  * A click opens the normal run beside the attacked run: the changed message diffed in Message bytes with the changed bytes lit, and the
  * catching check under both, pass on the left and fail on the right. A scenario attack's pairs end where the runs part, and the screen marks
  * that point. Back returns to the index with the row kept.
- * The registry is the live Host's (GET /api/lessons and /api/lessons/0, which list AttackCatalog), never a text count. The group of a run is its
+ * The registry is the live Host's (GET /api/lessons, lessons 0 to 11, which lists AttackCatalog), never a text count. The group of a run is its
  * kind in app/src/attacks.json (the content half of P3).
  * Test ids (Nancy's P3 plan, 2026-11-08): attack-index-open in the Lessons rail; attack-index; attack-group-{labelId}; attack-row-{attackId}
  * with data-kind and data-lesson, holding attack-row-name, attack-row-check and attack-row-guard; two-run with two-run-normal and
@@ -23,15 +23,14 @@ test.use({ actionTimeout: 15_000 });
 
 type Row = { attackId: string; kind: string; lesson: number; expectCode: string | null; expectCheck: string | null; whyNot: string | null };
 
-/** Every registered attack run, from the live Host. Lesson 0 has its own route. */
+/** Every registered attack run, from the live Host. GET /api/lessons lists lessons 0 to 11, so one list holds them all. */
 async function registry(): Promise<Row[]> {
   const lessons = await hostGet('/api/lessons');
   expect(lessons.status, 'GET /api/lessons').toBe(200);
-  const zero = await hostGet('/api/lessons/0');
-  expect(zero.status, 'GET /api/lessons/0').toBe(200);
   const listed: any[] = Array.isArray(lessons.body) ? lessons.body : lessons.body?.lessons ?? [];
+  expect(listed.some(l => Number(l.lesson) === 0), 'GET /api/lessons lists lesson 0').toBe(true);
   const rows: Row[] = [];
-  for (const l of [zero.body, ...listed]) for (const a of l.attacks ?? []) rows.push({ attackId: a.attackId, kind: a.kind, lesson: Number(l.lesson), expectCode: a.expectCode ?? null, expectCheck: a.expectCheck ?? null, whyNot: a.whyNot ?? null });
+  for (const l of listed) for (const a of l.attacks ?? []) rows.push({ attackId: a.attackId, kind: a.kind, lesson: Number(l.lesson), expectCode: a.expectCode ?? null, expectCheck: a.expectCheck ?? null, whyNot: a.whyNot ?? null });
   return rows;
 }
 
