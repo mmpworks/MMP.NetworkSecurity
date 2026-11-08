@@ -2,24 +2,16 @@
 import { computed, reactive } from 'vue'
 import { isHighlighted, isOsTransport, lessonRow, selectedEvent, shownEvents, ui, upToSeq } from '../store'
 import { holderColumns } from '../lab'
+import { heldAt, type HeldRow } from '../secrets'
 import KeysInUse from './KeysInUse.vue'
 
-// With Show keys OFF a row holds no hex. It shows its fingerprint and its length, and two rows are the same key when their fingerprints match.
-interface Row { holder: string; name: string; hex: string; fingerprint: string; length: number; hidden: string; derivedFrom: string[]; fresh: boolean }
+type Row = HeldRow
 const valueOf = (r: Row) => r.hex || r.fingerprint
 // A row with no hex and no fingerprint holds no value to compare, so it never counts as a match.
 const sameKey = (a: Row, b: Row) => !!valueOf(a) && valueOf(a) === valueOf(b)
 
 const upTo = upToSeq
-// A row exists only when the holder gained the value at or before the selected event.
-const rows = computed<Row[]>(() => {
-  const m = new Map<string, Row>()
-  for (const e of shownEvents.value) {
-    if (e.seq > upTo.value) break
-    for (const s of e.secrets) m.set(`${s.holder.toLowerCase()}.${s.name}`, { holder: s.holder.toLowerCase(), name: s.name, hex: s.hex, fingerprint: s.fingerprint, length: s.length, hidden: s.hidden, derivedFrom: s.derivedFrom, fresh: e.seq === upTo.value })
-  }
-  return [...m.values()]
-})
+const rows = computed<Row[]>(() => heldAt(shownEvents.value, upTo.value))
 const eve = computed(() => ui.view === 'eavesdropper')
 const holders = computed(() => holderColumns(rows.value.map(r => r.holder), lessonRow.value?.lanes ?? []))
 const colsFor = (h: string) => rows.value.filter(r => r.holder === h)
