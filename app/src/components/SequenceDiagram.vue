@@ -25,6 +25,15 @@ onMounted(() => { if (!box.value || typeof ResizeObserver !== 'function') return
 onBeforeUnmount(() => sizer?.disconnect())
 const viewW = computed(() => Math.max(layout.value.width, boxW.value / zoom.value))
 const reduced = typeof matchMedia === 'function' && matchMedia('(prefers-reduced-motion: reduce)').matches
+// The drawing scales with the zoom, and so does its text. These floors hold the text's size on screen, in SVG units: a label is at
+// least 10 px and a byte count at least 9 px once scaled. At 100% they are the base sizes of style.css.
+const MIN_LABEL_PX = 10
+const MIN_SUB_PX = 9
+const textSizes = computed(() => ({
+  '--lbl': `${Math.max(12, MIN_LABEL_PX / zoom.value)}px`,
+  '--lane': `${Math.max(13, MIN_LABEL_PX / zoom.value)}px`,
+  '--sub': `${Math.max(11, MIN_SUB_PX / zoom.value)}px`,
+}))
 
 const clamp = (z: number) => Math.min(4, Math.max(0.25, z))
 const fitZoom = () => clamp(Math.min(1, (boxW.value || layout.value.width) / Math.max(1, layout.value.width)))
@@ -98,7 +107,8 @@ const pulse = computed(() => replayTick.value)
     </div>
     <div ref="box" class="diagram-scroll" @wheel="onWheel" @scroll="onScroll">
       <!-- The width rounds down: at a fitted zoom such as 0.982, viewW * zoom lands a fraction past the pane, and the browser draws a scrollbar for it. -->
-      <svg :width="Math.floor(viewW * zoom)" :height="layout.height * zoom" :viewBox="`0 0 ${viewW} ${layout.height}`" xmlns="http://www.w3.org/2000/svg">
+      <!-- --lbl and --sub keep the text readable at a fitted zoom: labels never under 10 px on screen, byte counts never under 9 px (Steve via the lead, #286). -->
+      <svg :width="Math.floor(viewW * zoom)" :height="layout.height * zoom" :viewBox="`0 0 ${viewW} ${layout.height}`" :style="textSizes" xmlns="http://www.w3.org/2000/svg">
         <defs>
           <pattern id="hatch" width="6" height="6" patternUnits="userSpaceOnUse" patternTransform="rotate(45)"><line x1="0" y1="0" x2="0" y2="6" class="hatch-line" /></pattern>
           <marker id="arr" viewBox="0 0 10 10" refX="9" refY="5" markerWidth="7" markerHeight="7" orient="auto-start-reverse"><path d="M0,0 L10,5 L0,10 z" fill="context-stroke" /></marker>
