@@ -7,17 +7,20 @@ export interface HeldRow { holder: string; name: string; hex: string; fingerprin
 const isWire = (e: TraceEvent) => e.type === 'wire.sent' || e.type === 'wire.received'
 
 /**
- * The seqs of setup events: an event whose side has not yet sent or received a message. The engine runs client and server on 2
- * threads, so the order of events across the 2 sides changes from run to run, and a slow side can load its key after the other side
- * has sent. Within one side the order is stable. A key a side learns before its first wire event depends on no message, so it counts
- * as held from the start of the run (the lead on #297's bytes-grid red). A logical clock from the Host replaces this rule later.
+ * The seqs of setup events: an event that comes before its side's first wire event. The engine runs client and server on 2 threads, so
+ * the order of events across the 2 sides changes from run to run, and a slow side can load its key after the other side has sent.
+ * Within one side the order is stable. A key a side learns before its first wire event depends on no message, so it counts as held
+ * from the start of the run (the lead on #297's bytes-grid red). A logical clock from the Host replaces this rule later (#304).
+ * A side with no wire event in the run gets no setup events. Lesson 7's attacker opens a recording after both runs end and never
+ * touches the wire, so its secrets show only from their own events (Jared on #305).
  */
 function setupSeqs(events: readonly TraceEvent[]): Set<number> {
-  const wired = new Set<string>()
+  const firstWire = new Map<string, number>()
+  for (const e of events) if (isWire(e) && !firstWire.has(e.actor)) firstWire.set(e.actor, e.seq)
   const out = new Set<number>()
   for (const e of events) {
-    if (isWire(e)) wired.add(e.actor)
-    else if (!wired.has(e.actor)) out.add(e.seq)
+    const first = firstWire.get(e.actor)
+    if (first !== undefined && e.seq < first) out.add(e.seq)
   }
   return out
 }
