@@ -405,14 +405,18 @@ namespace NetSec.Host.Tests
         }
 
         [Fact]
-        public async Task Lessons_list_holds_1_to_11_and_the_toy_sits_outside_it()
+        public async Task Lessons_list_holds_0_to_11_with_the_toy_first_as_Start_here()
         {
             JsonElement rows = await GetJson("/api/lessons");
-            Assert.Equal(Enumerable.Range(1, 11), rows.EnumerateArray().Select(r => r.GetProperty("lesson").GetInt32()));
+            Assert.Equal(Enumerable.Range(0, 12), rows.EnumerateArray().Select(r => r.GetProperty("lesson").GetInt32()));
             int[] built = rows.EnumerateArray().Where(r => r.GetProperty("built").GetBoolean()).Select(r => r.GetProperty("lesson").GetInt32()).ToArray();
-            foreach (int lesson in new[] { 1, 2, 3, 4, 5, 10, 11 }) Assert.Contains(lesson, built);
+            foreach (int lesson in new[] { 0, 1, 2, 3, 4, 5, 10, 11 }) Assert.Contains(lesson, built);
+            JsonElement first = rows[0];
+            Assert.Equal("Start here", first.GetProperty("title").GetString());
+            Assert.Equal("L0-flip-wire-byte", first.GetProperty("attacks")[0].GetProperty("attackId").GetString());
             JsonElement toy = await GetJson("/api/lessons/0");
             Assert.True(toy.GetProperty("built").GetBoolean());
+            Assert.Equal("Start here", toy.GetProperty("title").GetString());
             Assert.Equal("L0-flip-wire-byte", toy.GetProperty("attacks")[0].GetProperty("attackId").GetString());
         }
 
