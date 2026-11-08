@@ -2927,6 +2927,17 @@
    "counts": true
   },
   {
+   "id": "A19.ui.attack-index-lists-every-run",
+   "base": "A19.ui.attack-index-lists-every-run",
+   "assertion": "A19",
+   "group": "e2e",
+   "build": "host",
+   "slice": "W1",
+   "referee": "FIPS 197 (2001) data, the suite's RefAes, and the .NET library",
+   "roles": [],
+   "counts": true
+  },
+  {
    "id": "A19.ui.end-frames-on-all-key-sizes",
    "base": "A19.ui.end-frames-on-all-key-sizes",
    "assertion": "A19",
