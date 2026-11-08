@@ -116,5 +116,6 @@ namespace NetSec.Errors
         public const string WalkTextEmpty = "WALK_TEXT_EMPTY";
         public const string WalkTextTooLong = "WALK_TEXT_TOO_LONG";
         public const string WalkTextInvalid = "WALK_TEXT_INVALID";
+        public const string ToyCurveWalkDiverged = "TOY_CURVE_WALK_DIVERGED";
     }
 }
