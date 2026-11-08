@@ -34,15 +34,13 @@ function flip(animate: Animate, el: HTMLElement, old: string, delay: number, dur
 }
 
 /**
- * The ShiftRows roll as keyframes, in columns travelled (multiply by the column pitch). Each byte starts at its old column. A byte that
- * wraps rolls out past one edge and comes back in at the other, so the row moves like a ticker tape with no empty slot.
+ * The ShiftRows roll, like a ticker tape (design 2.2a). The whole row slides `by` columns, so every cell starts `by` columns away and
+ * rolls into place: a byte that wraps starts past the far edge and rolls in. The old bytes that roll out past the near edge ride on
+ * their cell's old-byte layer at a fixed offset of `-by` columns, so they leave while the new bytes arrive. One element per byte cannot
+ * both leave on one side and arrive on the other, so the leaving copy is the layer (Richard on #255). No slot is ever empty.
  */
-export function rollFrames(c: number, by: number, wrapped: boolean): { offset: number; x: number }[] {
-  if (!wrapped) return [{ offset: 0, x: by }, { offset: 1, x: 0 }]
-  const x0 = by > 0 ? by - 4 : by + 4
-  const edge = by > 0 ? -(c + 1) : 4 - c
-  const f = (x0 - edge) / by
-  return [{ offset: 0, x: x0 }, { offset: f, x: edge }, { offset: f, x: edge + (by > 0 ? 4 : -4) }, { offset: 1, x: 0 }]
+export function rollLeaves(c: number, by: number): boolean {
+  return c - by < 0 || c - by > 3
 }
 
 export interface MotionInput { root: HTMLElement; to: Stop; tables: AesTables; nk: number; animate: Animate }
@@ -90,7 +88,7 @@ export function startMotion({ root, to, tables, nk, animate }: MotionInput) {
     return
   }
   if (kind === 'ShiftRows' || kind === 'InvShiftRows') {
-    // A roll, one row at a time, like a ticker tape. Each cell starts where its byte stood, so the row slides into place.
+    // A roll, one row at a time, like a ticker tape. See rollLeaves for how the row stays full.
     const inverse = kind === 'InvShiftRows'
     const map = inverse ? tables.inverseShiftRows : tables.shiftRows
     const a = cellOf(root, 0, 0), b = cellOf(root, 0, 1)
@@ -98,9 +96,15 @@ export function startMotion({ root, to, tables, nk, animate }: MotionInput) {
     for (const r of [1, 2, 3]) for (const c of ROWS) {
       const el = cellOf(root, r, c)
       if (!el) continue
-      const { by, wrapped } = shiftOf(map, cellIndex(r, c), inverse)
-      const frames = rollFrames(c, by, wrapped).map(k => ({ offset: k.offset, transform: `translateX(${k.x * pitch}px)` }))
-      animate(el, frames, { duration: 160 * Math.abs(by) + 360, delay: 300 * (r - 1), easing: 'linear' })
+      const { by } = shiftOf(map, cellIndex(r, c), inverse)
+      const timing = { duration: 160 * Math.abs(by) + 360, delay: 300 * (r - 1), easing: 'linear' }
+      animate(el, [{ transform: `translateX(${by * pitch}px)` }, { transform: 'translateX(0)' }], timing)
+      if (rollLeaves(c, by)) {
+        // The old byte of this column rolls out: it holds still against the moving cell, so it travels from column c to c - by.
+        el.dataset.old = old(cellIndex(r, c))
+        const away = `translateX(${-by * pitch}px)`
+        animate(el, [{ transform: away, opacity: 1 }, { transform: away, opacity: 1, offset: 0.999 }, { transform: away, opacity: 0 }], { ...timing, pseudo: '::after' })
+      }
     }
   }
 }
