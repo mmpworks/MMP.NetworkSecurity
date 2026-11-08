@@ -511,7 +511,9 @@ body { overflow: hidden; }
 .aw-ks-words p { margin: 0 0 6px; max-width: 80ch; }
 .aw-ks-band-note { font-weight: 600; }
 .aw-ks-bench { display: grid; grid-template-columns: minmax(0, 1fr); gap: 16px 24px; align-items: start; }
-@media (min-width: 1280px) { .aw-ks-bench { grid-template-columns: minmax(0, 1.7fr) minmax(300px, 1fr); } .aw-ks-build { position: sticky; top: 8px; } }
+/* The panel stays in view beside the round keys, and scrolls itself, so the step in play stays visible on a short window. */
+@media (min-width: 1280px) { .aw-ks-bench { grid-template-columns: minmax(0, 1.7fr) minmax(300px, 1fr); } .aw-ks-build { position: sticky; top: 8px; max-height: calc(100vh - 140px); overflow-y: auto; } }
+.overlay-layer > .aw-ks-flyer { position: fixed; z-index: 30; pointer-events: none; font: 600 22px var(--mono); color: var(--pass); }
 .aw-ks-left { display: grid; gap: 8px; min-width: 0; }
 .aw-ks-tools { display: flex; align-items: center; gap: 6px; flex-wrap: wrap; }
 .aw-ks-table { --ks-cell: calc(40px * var(--ks-zoom, 1)); display: flex; flex-wrap: wrap; gap: 12px 16px; min-width: 0; max-width: calc(3 * (4 * var(--ks-cell) + 9px) + 34px); }

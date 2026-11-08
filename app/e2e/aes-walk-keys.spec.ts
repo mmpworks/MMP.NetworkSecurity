@@ -81,6 +81,45 @@ test('with motion on, Next onto a word shows the build rows one after another, t
   expect(frame, 'one frame shows byte 0 of w0, the value it meets, and byte 0 of w4, in bits').toBeTruthy()
 })
 
+// The lead on #326: each finished byte flies from the XOR line into its cell, as the mock does, and on a short window the step in play
+// stays in view.
+test('each finished byte flies from the XOR line into its cell, and at 1280 x 640 the rows and the XOR line stay in view', async ({ page }) => {
+  await page.setViewportSize({ width: 1280, height: 640 })
+  await openPractice(page)
+  await toStop(page, KEYS)
+  await page.emulateMedia({ reducedMotion: 'no-preference' })
+  // The page records every frame, so a 520 ms flight gives many samples. A row or the XOR line counts once it has been on screen 400 ms,
+  // the time a scroll into view takes to settle.
+  await page.evaluate(() => {
+    const w = window as any
+    w.__flights = []; w.__out = []
+    const since = new Map<Element, number>()
+    const tick = () => {
+      const f = document.querySelector('[data-testid="aes-walk-ks-flyer"]')
+      if (f) { const b = f.getBoundingClientRect(); w.__flights.push({ text: (f.textContent ?? '').trim(), x: b.x, y: b.y }) }
+      const rows = document.querySelectorAll('.aw-ks-stage')
+      for (const el of [rows[rows.length - 1], document.querySelector('[data-testid="aes-walk-build-xor"]')]) {
+        if (!el) continue
+        if (!since.has(el)) since.set(el, performance.now())
+        const b = el.getBoundingClientRect()
+        if (performance.now() - since.get(el)! > 400 && (b.top < 0 || b.bottom > innerHeight)) w.__out.push(`${el.getAttribute('data-testid')} at ${Math.round(b.top)} to ${Math.round(b.bottom)}`)
+      }
+      if (!w.__stop) requestAnimationFrame(tick)
+    }
+    requestAnimationFrame(tick)
+  })
+  await page.getByTestId('aes-walk-next').click()
+  await expect(page.getByTestId('aes-walk-table-cell-19')).not.toHaveAttribute('data-hex', '', { timeout: 20_000 })
+  await expect(page.getByTestId('aes-walk-build-xor')).toHaveCount(0, { timeout: 5_000 })
+  const { flights, outOfView } = await page.evaluate(() => { const w = window as any; w.__stop = true; return { flights: w.__flights as { text: string; x: number; y: number }[], outOfView: [...new Set(w.__out as string[])] } })
+  const word = ((await page.getByTestId('aes-walk-build-word').locator('code').textContent()) ?? '').replace(/\s+/g, '')
+  const first = flights.filter(f => f.text === word.slice(0, 2))
+  expect(first.length, `byte 0 (${word.slice(0, 2)}) flies`).toBeGreaterThan(1)
+  expect(Math.hypot(first[first.length - 1].x - first[0].x, first[first.length - 1].y - first[0].y), 'the byte moves toward its cell').toBeGreaterThan(20)
+  expect(new Set(flights.map(f => f.text)).size, 'all 4 bytes fly').toBe(4)
+  expect(outOfView, 'the newest row and the XOR line stay inside the window').toEqual([])
+})
+
 test('the word built, the word before and the word Nk back each carry their role and their own color, in the grid and in the rows', async ({ page }) => {
   await openPractice(page)
   await toStop(page, KEYS + 1)

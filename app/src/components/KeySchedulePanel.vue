@@ -34,7 +34,32 @@ const phantom = ref<{ word: number; values: string[] } | null>(null)
 const root = ref<HTMLElement | null>(null)
 let token = 0
 
-function endFrame() { token++; anim.word = null; anim.rows = 0; anim.filled = 4; anim.xor = null; phantom.value = null }
+/** The byte in flight from the XOR line to its cell, at its start point on screen. */
+const flyer = ref<{ text: string; left: number; top: number } | null>(null)
+
+function endFrame() { token++; anim.word = null; anim.rows = 0; anim.filled = 4; anim.xor = null; phantom.value = null; flyer.value = null }
+
+/** Keeps the step in play in view: the panel scrolls itself, so the round keys stay where they are (the lead on #326). */
+async function reveal(run: number, selector: string) {
+  await nextTick()
+  if (run === token) root.value?.querySelector(selector)?.scrollIntoView({ block: 'nearest' })
+}
+
+/** The finished byte flies from the XOR line into its cell, as in the mock. It lands, and then the cell pulses. */
+async function fly(run: number, r: AesKeyWordRow, j: number) {
+  await nextTick()
+  const from = root.value?.querySelector('.aw-ks-xor-out')
+  const to = cellEl(r.i, j)
+  if (!from || !to || !tl || run !== token) return
+  const a = from.getBoundingClientRect(), b = to.getBoundingClientRect()
+  flyer.value = { text: byteAt(r.word, j), left: a.left, top: a.top }
+  await nextTick()
+  const el = document.querySelector('[data-testid="aes-walk-ks-flyer"]')
+  const move = el ? tl.animate(el, [{ transform: 'none' }, { transform: `translate(${b.left + b.width / 2 - a.left - 14}px, ${b.top + b.height / 2 - a.top - 12}px)` }], { duration: 520, easing: 'ease-in-out', fill: 'both' }) : null
+  if (move) await move.finished.catch(() => null)
+  if (run === token) flyer.value = null
+}
+const cellEl = (word: number, j: number) => root.value?.querySelector(`[data-testid="aes-walk-table-cell-${16 * Math.floor(word / 4) + j + 4 * (word % 4)}"]`) ?? null
 
 /** One beat at `at` ms on the clock (the clock scales it by speed). Under reduced motion, or when the clock finishes or cancels it, it runs now. */
 function beat(run: number, at: number, fn: () => void) {
@@ -54,7 +79,7 @@ function play(r: AesKeyWordRow, fill: boolean) {
   if (!tl || tl.reduced()) return
   const run = token, gap = gapOf(r), n = stageCount(r)
   anim.word = r.i; anim.rows = 0; anim.filled = fill ? 0 : 4; anim.xor = null
-  for (let k = 0; k < n; k++) beat(run, k * gap, () => { anim.rows = k + 1 })
+  for (let k = 0; k < n; k++) beat(run, k * gap, () => { anim.rows = k + 1; void reveal(run, '.aw-ks-stage:last-child') })
   if (r.rotated || r.substituted) {
     beat(run, 0, () => { phantom.value = { word: r.i - 1, values: bytes(r.previous) } })
     if (r.rotated) {
@@ -67,7 +92,8 @@ function play(r: AesKeyWordRow, fill: boolean) {
   if (!fill) { beat(run, rowsDone + 400, () => { phantom.value = null; anim.word = null }); return }
   const BYTE = 1640
   for (let j = 0; j < 4; j++) {
-    beat(run, rowsDone + j * BYTE, () => { anim.xor = j })
+    beat(run, rowsDone + j * BYTE, () => { anim.xor = j; void reveal(run, '.aw-ks-xor') })
+    beat(run, rowsDone + j * BYTE + 800, () => { void fly(run, r, j) })
     beat(run, rowsDone + j * BYTE + 1320, () => { anim.filled = j + 1; void pulse(r.i, j) })
   }
   beat(run, rowsDone + 4 * BYTE, () => { endFrame() })
@@ -85,7 +111,7 @@ async function rotatePhantom(run: number, r: AesKeyWordRow) {
 
 async function pulse(word: number, j: number) {
   await nextTick()
-  const el = root.value?.querySelector(`[data-testid="aes-walk-table-cell-${16 * Math.floor(word / 4) + j + 4 * (word % 4)}"]`)
+  const el = cellEl(word, j)
   if (el && tl) tl.animate(el, [{ transform: 'scale(1.16)' }, { transform: 'none' }], { duration: 260, fill: 'none' })
 }
 
@@ -266,5 +292,9 @@ const wordOf = (g: number, c: number) => 4 * (g - 1) + c
         </div>
       </div>
     </div>
+    <!-- The flying byte rides in the overlay layer, outside the walk's clip. -->
+    <Teleport to=".overlay-layer">
+      <div v-if="flyer" class="aw-ks-flyer" data-testid="aes-walk-ks-flyer" :style="{ left: `${flyer.left}px`, top: `${flyer.top}px` }" aria-hidden="true">{{ flyer.text }}</div>
+    </Teleport>
   </div>
 </template>
