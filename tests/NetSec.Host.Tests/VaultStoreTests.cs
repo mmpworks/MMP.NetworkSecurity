@@ -124,14 +124,17 @@ public sealed class VaultStoreTests : IDisposable
     FileStream HoldModesOpen() => new(Path.Combine(_root, "modes.json"), FileMode.Open, FileAccess.Read, FileShare.ReadWrite);
 
     [Fact]
-    public async System.Threading.Tasks.Task A_save_waits_out_a_short_hold_on_the_settings_file()
+    public void A_save_waits_out_a_short_hold_on_the_settings_file()
     {
         SecurityStore store = Store();
         store.SetShowKeys(false);
         FileStream held = HoldModesOpen();
-        System.Threading.Tasks.Task release = System.Threading.Tasks.Task.Run(async () => { await System.Threading.Tasks.Task.Delay(300); held.Dispose(); });
+        // The release runs on its own thread, not the pool: the save sleeps on a pool thread while it retries, and a busy pool can delay a
+        // pool-thread release past the retry budget (the gate saw that once).
+        System.Threading.Thread release = new(() => { System.Threading.Thread.Sleep(150); held.Dispose(); }) { IsBackground = true };
+        release.Start();
         try { store.SetShowKeys(true); }
-        finally { await release; held.Dispose(); }
+        finally { release.Join(5000); held.Dispose(); }
         Assert.True(store.ShowKeys);
         Assert.True(Store().ShowKeys, "a new store reads the saved value back from modes.json");
     }

@@ -302,7 +302,7 @@ public sealed class SecurityStore
 
     // On Windows a replacing move fails while another handle holds the target open without delete sharing. An antivirus scan or the search
     // indexer often opens a file that was just written, so the move waits out a short hold (issue #292).
-    const int ReplaceTries = 10, ReplaceWaitMs = 50;
+    const int ReplaceTries = 20, ReplaceWaitMs = 50;
 
     /// <summary>Moves the temp file over modes.json, trying up to ReplaceTries times. After that it fails with SECURITY_STORE_SAVE_FAILED, and the old file stays.</summary>
     void ReplaceModes(string temp)
