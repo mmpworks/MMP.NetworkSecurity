@@ -60,7 +60,7 @@ test('typed text longer than 16 bytes walks its first 16 bytes and marks the res
   // Typed text is the learner's own, and it never went on the wire.
   await expect(page.getByTestId('aes-walk-subtitle')).toHaveText('Your own text, under the practice key')
   await expect(page.getByTestId('aes-walk-wire-label')).toHaveText('Your text. It did not go on the wire.')
-  await expect(page.getByTestId('aes-long-legend'), 'the strip says what · means').toContainText('· is a byte that is not a letter')
+  await expect(page.getByTestId('aes-long-legend'), 'the strip says what · means').toContainText('· is a byte that is not a printable character, such as padding.')
   await fillBlock(page)
   const top: string[] = []
   for (let c = 0; c < 4; c++) for (let r = 0; r < 4; r++) top.push((await cell(page, r, c).getAttribute('data-letter')) ?? '')

@@ -65,6 +65,19 @@ const scan = (page: Page) => page.evaluate((freeText: string) => {
     if (insp.getBoundingClientRect().width < 700) continue
     for (const v of insp.querySelectorAll('.field-row .fval')) if (v.getBoundingClientRect().height === 0) faults.push({ kind: 'value hidden', where: name(v.closest('[data-testid]') ?? v), text: '' })
   }
+  // 8. A line marked data-show-whole is never cut: not by its own box, and not by any box around it that clips or scrolls.
+  // A scrolling box would let it scroll out of sight, which cuts it as surely as a clip (the AES strip's legend, #270).
+  for (const el of root.querySelectorAll('[data-show-whole]')) {
+    const b = el.getBoundingClientRect()
+    if (b.width === 0) continue
+    if (el.scrollWidth > el.clientWidth + 1 || el.scrollHeight > el.clientHeight + 1) { faults.push({ kind: 'cut', where: name(el), text: (el.textContent ?? '').trim().slice(0, 30) }); continue }
+    for (let a = el.parentElement; a && a !== root; a = a.parentElement) {
+      const s = getComputedStyle(a)
+      if (s.overflowX === 'visible' && s.overflowY === 'visible') continue
+      const c = a.getBoundingClientRect()
+      if (b.right > c.right + 1 || b.left < c.left - 1 || b.bottom > c.bottom + 1 || b.top < c.top - 1) { faults.push({ kind: 'cut', where: `${name(el)} in ${name(a)}`, text: (el.textContent ?? '').trim().slice(0, 30) }); break }
+    }
+  }
   // 4. A field name shows whole.
   for (const f of root.querySelectorAll('.field-row .fname, .secret-row > .sname')) if (f.scrollWidth > f.clientWidth + 1) faults.push({ kind: 'name cut', where: name(f.closest('[data-testid]') ?? f), text: (f.textContent ?? '').trim() })
   return faults
@@ -96,5 +109,18 @@ for (const size of SIZES) {
       await page.getByTestId('view-endpoints').click()
     }
     expect([...new Set(all)], `layout faults at ${size.width} x ${size.height}`).toEqual([])
+  })
+
+  // Techniques: the AES walk with its long-text strip, which holds the lesson text's 5 blocks, the widest default row.
+  test(`at ${size.width} x ${size.height}, Techniques AES with the long-text strip: no broken word, nothing cut`, async ({ page }) => {
+    await page.setViewportSize(size)
+    await page.emulateMedia({ reducedMotion: 'reduce' })
+    await runFreePlay(page, 1)
+    await page.getByTestId('section-techniques').click()
+    await page.getByTestId('walk-item-aes').click()
+    await expect(page.getByTestId('aes-long-block-4'), 'the strip holds the lesson text\'s 5 blocks').toBeVisible({ timeout: 30_000 })
+    await expect(page.getByTestId('aes-walk-step-kind')).toBeVisible({ timeout: 30_000 })
+    const faults = unique(await scan(page))
+    expect(faults, `layout faults in Techniques at ${size.width} x ${size.height}`).toEqual([])
   })
 }

@@ -42,7 +42,7 @@
   },
   "strip": {
     "label": "The long text",
-    "legend": "AES's long text, in 16-byte blocks. · is a byte that is not a letter, such as padding.",
+    "legend": "AES's long text, in 16-byte blocks. · is a byte that is not a printable character, such as padding.",
     "current": "Block {n} is the one the walk shows."
   },
   "keys": {
