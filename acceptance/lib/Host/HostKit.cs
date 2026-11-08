@@ -53,6 +53,8 @@ namespace Acceptance
             // Design section 11 gives the flags --port and --token. Design section 5 gives the environment variables NETSEC_PORT and NETSEC_TOKEN.
             // The two sections differ, so the suite passes both and a Host that reads either one starts.
             env["NETSEC_PORT"] = h.Port.ToString(); env["NETSEC_TOKEN"] = h.Token;
+            // Empty, as Electron writes it, so a NETSEC_ORIGINS in the shell that runs the suite cannot widen the Host. A clause may set it.
+            env["NETSEC_ORIGINS"] = "";
             string openssl = c.Prop("openssl", @"C:\Program Files\Git\mingw64\bin\openssl.exe");
             if (File.Exists(openssl)) env["NETSEC_OPENSSL"] = openssl;
             string ssh = c.Prop("ssh", @"C:\Windows\System32\OpenSSH\ssh.exe");
