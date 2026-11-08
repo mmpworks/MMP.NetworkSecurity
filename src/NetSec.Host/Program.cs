@@ -84,6 +84,7 @@ app.MapPost("/api/ce/start", async () => Results.Json(await ce.StartAsync()));
 app.MapPost("/api/ce/stop", () => { ce.Stop(); return Results.Json(ce.Status()); });
 SecurityRoutes.Map(app, security, flowRuns, on => sessions.Broadcast(JsonSerializer.Serialize(new { type = "security.show-keys", on })));
 AesWalkRoutes.Map(app, security, sessions);
+Tls11WalkRoutes.Map(app);
 Tls13WalkRoutes.Map(app);
 TeachingCurveRoutes.Map(app);
 DhWalkRoutes.Map(app);
