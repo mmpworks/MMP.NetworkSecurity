@@ -268,6 +268,35 @@ namespace Acceptance
             return D("source", "video 4Tfmwxr0I34", "a", 2.0, "b", 2.0, "root", -0.7709, "xMax", 3.0, "upper", upper, "lower", lower, "chord", line(0.0, 1.0, false), "tangent", line(1.0, 1.0, true));
         }
 
+        /// <summary>The TLS 1.1 key schedule walk on the built-in training key, open with Show keys OFF (sections-plan.md line 159).</summary>
+        bool Tls11ScheduleRoute(HttpListenerContext ctx, string path)
+        {
+            if (path != Tls11WalkClauses.Path || M("walk-routes-missing")) return false;
+            if (!_showKeys && M("tls11-closed-off")) { WalkFail(ctx, 409, "KEYS_HIDDEN", "closed"); return true; }
+            byte[] cr = new byte[32], sr = new byte[32], pre = new byte[48];
+            for (int i = 0; i < 32; i++) { cr[i] = (byte)(i + 1); sr[i] = (byte)(0xa0 + i); }
+            pre[0] = 3; pre[1] = 2; for (int i = 2; i < 48; i++) pre[i] = (byte)(i * 7);
+            byte[] enc, spki;
+            using (System.Security.Cryptography.RSA rsa = System.Security.Cryptography.RSA.Create())
+            {
+                if (M("tls11-other-key")) rsa.KeySize = 2048; else rsa.ImportPkcs8PrivateKey(BuiltInTls11Key.Value, out _);
+                enc = rsa.Encrypt(pre, System.Security.Cryptography.RSAEncryptionPadding.Pkcs1);
+                spki = rsa.ExportSubjectPublicKeyInfo();
+            }
+            byte[] crsr = new byte[64], srcr = new byte[64];
+            Array.Copy(cr, crsr, 32); Array.Copy(sr, 0, crsr, 32, 32); Array.Copy(sr, srcr, 32); Array.Copy(cr, 0, srcr, 32, 32);
+            byte[] master = Tls11WalkClauses.Prf(pre, "master secret", crsr, 48);
+            if (M("tls11-master-wrong")) master[0] ^= 1;
+            byte[] block = Tls11WalkClauses.Prf(master, "key expansion", srcr, 72);
+            Func<int, int, string> part = (o, n) => Hex.Encode(Hex.Slice(block, o, n));
+            WalkWrite(ctx, 200, D("keySource", "training", "serverKeyId", "server-tls11-rsa", "suite", "TLS_RSA_WITH_AES_128_CBC_SHA", "serverPublicKey", Hex.Encode(spki),
+                "clientRandom", Hex.Encode(cr), "serverRandom", Hex.Encode(sr), "encryptedPremaster", Hex.Encode(enc), "premaster", Hex.Encode(pre), "premasterVersion", 770.0,
+                "masterSecret", D("label", "master secret", "seed", Hex.Encode(crsr), "value", Hex.Encode(master)),
+                "keyBlock", D("label", "key expansion", "seed", Hex.Encode(srcr), "value", Hex.Encode(block), "clientMacKey", part(0, 20), "serverMacKey", part(20, 20), "clientKey", part(40, 16), "serverKey", part(56, 16)),
+                "keyLogLine", "CLIENT_RANDOM " + Hex.Encode(cr) + " " + Hex.Encode(master)), false);
+            return true;
+        }
+
         /// <summary>True when the path is a walk route. The route has answered by then.</summary>
         bool WalkRoute(HttpListenerContext ctx, string path)
         {

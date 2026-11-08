@@ -197,6 +197,7 @@ namespace Acceptance
             if (ScheduleRoute(ctx, path)) return;
             if (X25519Route(ctx, path)) return;
             if (DhRoute(ctx, path)) return;
+            if (Tls11ScheduleRoute(ctx, path)) return;
             if (CurveRoute(ctx, path)) return;
             if (WalkRoute(ctx, path)) return;
             if (path == "/api/health")
@@ -266,10 +267,14 @@ namespace Acceptance
         }
 
         /// <summary>The key bytes a lab holds for a type: the learner's when Mine and bound, else a built-in key fixed by the type name.</summary>
+        /// <summary>The built-in TLS 1.1 server key: a real RSA key as PKCS#8 DER, made once per run, as the real Host's is a real RSA key.</summary>
+        static readonly Lazy<byte[]> BuiltInTls11Key = new Lazy<byte[]>(() => { using (RSA rsa = RSA.Create(2048)) return rsa.ExportPkcs8PrivateKey(); });
+
         byte[] KeyBytes(TypeState t)
         {
             if (Active(t) && t.Seed != null) return t.Seed;
             if (t.TypeId == "token.issuer") return _builtinIssuer.Seed;
+            if (t.TypeId == "tls11.server") return BuiltInTls11Key.Value;
             using (SHA256 sha = SHA256.Create())
             {
                 byte[] all = sha.ComputeHash(Encoding.ASCII.GetBytes("builtin:" + t.TypeId));
