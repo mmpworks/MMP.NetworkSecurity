@@ -2,13 +2,17 @@
 import { computed, nextTick, onBeforeUnmount, onMounted, ref, watch } from 'vue'
 import { HEAD_H, ROW_H, layoutDiagram, protocolOf } from '../layout'
 import { isHighlighted, lessonRow, replayTick, selectEvent, selectedEvent, shownEvents, ui } from '../store'
-import type { ViewMode } from '../types'
+import type { TraceEvent, ViewMode } from '../types'
 
-const props = defineProps<{ view: Exclude<ViewMode, 'both'>; inLightbox?: boolean; protocol?: string }>()
+// `runEvents` draws a given run's events in place of the active session's (the two-run layout, sections-plan item 3). Without it, as before.
+const props = defineProps<{ view: Exclude<ViewMode, 'both'>; inLightbox?: boolean; protocol?: string; runEvents?: readonly TraceEvent[] }>()
 const emit = defineEmits<{ (e: 'lightbox'): void }>()
 
 // `protocol` keeps only the events of one stream family (lesson 7 draws TLS 1.1 and TLS 1.3 side by side).
-const events = computed(() => (props.protocol ? shownEvents.value.filter(e => protocolOf(e) === props.protocol) : shownEvents.value))
+const events = computed(() => {
+  const source = props.runEvents ?? shownEvents.value
+  return props.protocol ? source.filter(e => protocolOf(e) === props.protocol) : source
+})
 // The pane's width goes in, so a narrow pane draws its lanes closer (layout.ts laneSpacing).
 const layout = computed(() => layoutDiagram(events.value, lessonRow.value?.lanes ?? [], props.view, boxW.value || undefined))
 const zoom = ref(1)
@@ -82,7 +86,8 @@ function follow() { ui.follow = true; if (box.value) box.value.scrollTop = box.v
 const last = computed(() => layout.value.rows[layout.value.rows.length - 1] ?? null)
 const dur = computed(() => `${(0.6 / ui.speed).toFixed(2)}s`)
 const waitingLane = computed(() => {
-  const e = shownEvents.value[shownEvents.value.length - 1]
+  const source = props.runEvents ?? shownEvents.value
+  const e = source[source.length - 1]
   return e?.waiting ? layout.value.lanes.find(l => l.name === e.waiting.toLowerCase()) ?? null : null
 })
 const announce = computed(() => {

@@ -20,6 +20,8 @@ export interface TraceEvent {
   seq: number
   eventId: string
   streamId: string
+  /** The event's place in its stream. With streamId it pairs an attack run's events with its parent's (sections-plan item 3, P3b). */
+  streamSeq: number
   sessionId: string
   traceId: string
   hop: string
