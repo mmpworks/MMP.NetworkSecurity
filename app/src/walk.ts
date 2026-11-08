@@ -85,10 +85,10 @@ export function letterOf(byte: string): string {
   return n >= 0x20 && n < 0x7f ? String.fromCharCode(n) : ''
 }
 
-/** The text a block holds, with a dot for each byte that is not printable. */
-export function textOf(hex: string): string {
+/** The text a block holds, with a mark for each byte that is not printable: '.' by default, '·' where a '.' could pass for text. */
+export function textOf(hex: string, mark = '.'): string {
   let out = ''
-  for (let i = 0; i < hex.length / 2; i++) out += letterOf(byteAt(hex, i)) || '.'
+  for (let i = 0; i < hex.length / 2; i++) out += letterOf(byteAt(hex, i)) || mark
   return out
 }
 

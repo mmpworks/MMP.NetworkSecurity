@@ -39,7 +39,8 @@ const marks = computed(() => (aesWalk.cut && aesWalk.typed ? splitAtBytes(aesWal
 const wireLine = computed(() => {
   const b = aesWalk.block
   if (!b?.wire) return ''
-  if (b.source === 'typed') return gloss.wireTyped
+  // With the box empty, the practice block is lesson 1's own text, which the run did send, so "did not go on the wire" would be false (Richard on #270).
+  if (b.source === 'typed') return aesWalk.typed ? gloss.wireTyped : ''
   return (gloss.wire as Record<string, string>)[b.wire.status] ?? ''
 })
 const keyLine = computed(() => {
@@ -58,7 +59,7 @@ const showsWalk = computed(() => !closed.value && !!aesWalk.block)
     <header class="aw-title">
       <h2>AES: inside one block</h2>
       <span v-if="aesWalk.lesson != null && !practice" class="muted">The block from lesson {{ aesWalk.lesson }}'s run</span>
-      <span v-else class="muted">Your own text, under the practice key</span>
+      <span v-else class="muted" data-testid="aes-walk-subtitle">{{ aesWalk.typed ? gloss.typed.subtitleTyped : gloss.typed.subtitleLesson }}</span>
       <v-spacer />
       <div v-if="!closed && (aesWalk.sessionId || practice)" class="aw-sizes" role="radiogroup" aria-label="Key size">
         <span class="muted">Key size</span>

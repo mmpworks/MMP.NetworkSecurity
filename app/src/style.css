@@ -432,13 +432,19 @@ body { overflow: hidden; }
 .aw-strip-block.aw-strip-current { border-color: var(--accent); box-shadow: 0 0 0 1px var(--accent) inset; background: var(--accent-soft); }
 .aw-strip-n { font-size: 10px; color: var(--muted); margin-right: 6px; }
 .aw-strip-error { color: var(--fail); font-size: 12px; }
+/* The strip still scrolls sideways (wheel, trackpad, or arrow keys once focused); its bar is hidden so it cannot squeeze the 44 px line. */
+.aw-strip { scrollbar-width: none; }
+.aw-strip::-webkit-scrollbar { display: none; }
+.aw-strip:focus-visible { outline: 2px solid var(--focus); outline-offset: -2px; }
+.aw-strip-legend { flex: 0 0 auto; margin-left: 6px; font-family: var(--display, inherit); font-size: 12px; color: var(--muted); }
 /* The link line from the current strip block to the state grid. It is a layout mark, so it never takes a click. */
 .aw-link { position: fixed; box-sizing: border-box; border-left: 2px solid var(--accent); border-bottom: 2px solid var(--accent); border-bottom-left-radius: 8px; opacity: 0.6; pointer-events: none; z-index: 2; }
 /* Design 2.2g: the typed text box, with what the block does not use marked by a squiggle and a background colour. */
 .aw-typed { display: grid; gap: 4px; max-width: 72ch; }
 .aw-typed-marks { margin: 0; font-family: var(--mono); white-space: pre-wrap; word-break: break-all; }
 .aw-typed-split { text-decoration: underline wavy var(--warn); background: color-mix(in srgb, var(--warn) 18%, transparent); }
-.aw-typed-out { text-decoration: underline wavy var(--fail); background: color-mix(in srgb, var(--fail) 14%, transparent); color: var(--muted); }
+/* Left out, not wrong: the squiggle Steve asked for (design 2.2g) in a muted colour, never the error red (Richard on #270). */
+.aw-typed-out { text-decoration: underline wavy var(--muted); background: color-mix(in srgb, var(--muted) 16%, transparent); color: var(--muted); }
 .aw-typed-tag { font-family: var(--display, inherit); font-size: 12px; color: var(--muted); margin-left: 8px; }
 .aw-offer { justify-self: start; }
 .aw-key-source-practice { color: var(--warn); }

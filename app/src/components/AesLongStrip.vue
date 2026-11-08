@@ -29,17 +29,19 @@ async function load() {
 // The box's text is already debounced in the walk state, so the strip asks once per settled text.
 watch([text, () => aesWalk.keyBits, hostState], ([, , s]) => { if (s === 'connected') void load() }, { immediate: true })
 
-/** The 16 characters a block holds, with a dot for a byte that is not a printable character, such as padding. */
-const blockText = (row: AesLongRow) => textOf(row.data)
+/** The 16 characters a block holds. A byte that is not a letter, such as padding, shows as '·', so it cannot pass for a '.' in the text (Richard on #270). */
+const blockText = (row: AesLongRow) => textOf(row.data, '·')
 </script>
 
 <template>
-  <div class="aw-strip" data-testid="aes-long-strip" role="list" :aria-label="gloss.strip.label">
+  <div class="aw-strip" data-testid="aes-long-strip" role="list" :aria-label="gloss.strip.label" tabindex="0">
     <span v-if="error" class="aw-strip-error">{{ error }}</span>
     <span
       v-for="(row, n) in rows" :key="n" role="listitem" class="aw-strip-block" :class="{ 'aw-strip-current': n === CURRENT_BLOCK }"
       :data-testid="`aes-long-block-${n}`" :data-current="n === CURRENT_BLOCK ? 'true' : undefined"
       :title="n === CURRENT_BLOCK ? gloss.strip.current.replace('{n}', String(n + 1)) : `Block ${n + 1}`"
     ><span class="aw-strip-n">{{ n + 1 }}</span>{{ blockText(row) }}</span>
+    <!-- After the blocks, so block 1 stays at the left edge where the link line starts. It also names the strip on items that are not AES. -->
+    <span class="aw-strip-legend" data-testid="aes-long-legend">{{ gloss.strip.legend }}</span>
   </div>
 </template>

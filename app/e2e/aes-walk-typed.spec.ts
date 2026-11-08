@@ -37,7 +37,9 @@ test('with no run, Techniques AES shows the practice walk on the default text', 
   await page.getByTestId('walk-item-aes').click()
   // With no run there is no run's key to compare with, so the line leaves those words out.
   await expect(page.getByTestId('aes-walk-key-source')).toHaveText('This is a practice key. It is public, so it stays on screen with Show keys off')
-  await expect(page.getByTestId('aes-walk-wire-label')).toHaveText('Your text. It did not go on the wire.')
+  // With the box empty, the block is lesson 1's own text, which a run does send, so the screen says so and claims no "did not go on the wire".
+  await expect(page.getByTestId('aes-walk-subtitle')).toHaveText("Lesson 1's text, under the practice key")
+  await expect(page.getByTestId('aes-walk-wire-label')).toHaveCount(0)
   await fillBlock(page)
   const letters: string[] = []
   for (let r = 0; r < 4; r++) letters.push((await cell(page, r, 0).getAttribute('data-letter')) ?? '')
@@ -55,6 +57,10 @@ test('typed text longer than 16 bytes walks its first 16 bytes and marks the res
   expect(reply.ok()).toBe(true)
   // "Valve two is ope" is 16 bytes, so "n now." is the part the block does not use.
   await expect(page.getByTestId('aes-walk-text-not-included')).toHaveText('n now.')
+  // Typed text is the learner's own, and it never went on the wire.
+  await expect(page.getByTestId('aes-walk-subtitle')).toHaveText('Your own text, under the practice key')
+  await expect(page.getByTestId('aes-walk-wire-label')).toHaveText('Your text. It did not go on the wire.')
+  await expect(page.getByTestId('aes-long-legend'), 'the strip says what · means').toContainText('· is a byte that is not a letter')
   await fillBlock(page)
   const top: string[] = []
   for (let c = 0; c < 4; c++) for (let r = 0; r < 4; r++) top.push((await cell(page, r, c).getAttribute('data-letter')) ?? '')
