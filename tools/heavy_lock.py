@@ -15,10 +15,12 @@ it never decides who holds the lock. The lock folder is %LOCALAPPDATA%\\mmp-nets
 A waiter prints "HEAVY_LOCK waiting on '<label>' (pid N, started HH:MM, M min ago)" at once and every 30 seconds.
 `run` sets NETSEC_HEAVY_LOCK_HELD=<holder pid> for its command; a run started inside a holder (the gate's own app suite) proceeds without waiting,
 but only when that pid is the live holder named in the info file and the lock is really held.
-Exit codes: the command's own code from `run`; 75 LOCK_TIMEOUT; 2 from `status` when held.
+Exit codes: the command's own code from `run`; 75 LOCK_TIMEOUT; 76 LOCK_ERROR (an unexpected lock failure: the run stops, fail closed, and `status`
+exits 1 with the same text); 2 from `status` when held.
 """
 import argparse
 import ctypes
+import errno
 import json
 import os
 import pathlib
@@ -33,6 +35,7 @@ else:
     import fcntl
 
 EXIT_TIMEOUT = 75
+EXIT_LOCK_ERROR = 76
 POLL_SECONDS = 1.0
 PRINT_EVERY_SECONDS = 30.0
 ENV_HELD = "NETSEC_HEAVY_LOCK_HELD"
@@ -73,8 +76,17 @@ def lock_dir(arg):
     return pathlib.Path(base) / "mmp-netsec" / "locks"
 
 
+class LockError(Exception):
+    """An unexpected lock failure. It is never read as "free" and never as "held": the run stops with LOCK_ERROR (fail closed)."""
+
+
+# What the OS says when ANOTHER process holds the byte: EACCES (a Windows lock violation reaches Python as this), EAGAIN (flock), EDEADLK and 36 (Windows).
+CONTENDED = {errno.EACCES, errno.EAGAIN, errno.EDEADLK, 36}
+
+
 def try_os_lock(fd):
-    """True when this process now holds the exclusive lock on the file (one byte at offset 0). Never blocks."""
+    """True when this process now holds the exclusive lock (one byte at offset 0), False when another process holds it. Never blocks.
+    Any other error raises LockError: the acquisition is the probe (gem probe-what-you-bind), and an unexpected error is not a verdict on availability."""
     try:
         if os.name == "nt":
             os.lseek(fd, 0, os.SEEK_SET)
@@ -82,8 +94,10 @@ def try_os_lock(fd):
         else:
             fcntl.flock(fd, fcntl.LOCK_EX | fcntl.LOCK_NB)
         return True
-    except OSError:
-        return False
+    except OSError as e:
+        if e.errno in CONTENDED:
+            return False
+        raise LockError(f"the lock call failed unexpectedly: {e}") from e
 
 
 def unlock(fd):
@@ -118,11 +132,14 @@ def describe(info):
 
 
 def open_lock(directory):
-    directory.mkdir(parents=True, exist_ok=True)
-    fd = os.open(directory / LOCK_NAME, os.O_RDWR | os.O_CREAT)
-    if os.fstat(fd).st_size == 0:
-        os.write(fd, b"\0")                                              # the locked byte must exist
-    return fd
+    try:
+        directory.mkdir(parents=True, exist_ok=True)
+        fd = os.open(directory / LOCK_NAME, os.O_RDWR | os.O_CREAT)
+        if os.fstat(fd).st_size == 0:
+            os.write(fd, b"\0")                                          # the locked byte must exist
+        return fd
+    except OSError as e:
+        raise LockError(f"cannot open the lock file in {directory}: {e}") from e
 
 
 def run(directory, label, wait_minutes, command):
@@ -162,19 +179,31 @@ def run(directory, label, wait_minutes, command):
 
 
 def status(directory):
-    fd = open_lock(directory)
     try:
-        if try_os_lock(fd):
-            unlock(fd)
-            print("heavy-run lock: free")
-            return 0
-        print(f"heavy-run lock: held by {describe(read_info(directory))}")
-        return 2
-    finally:
-        os.close(fd)
+        fd = open_lock(directory)
+        try:
+            if try_os_lock(fd):
+                unlock(fd)
+                print("heavy-run lock: free")
+                return 0
+            print(f"heavy-run lock: held by {describe(read_info(directory))}")
+            return 2
+        finally:
+            os.close(fd)
+    except LockError as e:
+        print(f"LOCK_ERROR: {e}. The lock cannot be judged, so it is not reported as free.")
+        return 1
 
 
 def main(argv):
+    try:
+        return dispatch(argv)
+    except LockError as e:
+        print(f"LOCK_ERROR: {e}. The run stops here (fail closed): a lock that cannot be judged is neither free nor held.")
+        return EXIT_LOCK_ERROR
+
+
+def dispatch(argv):
     ap = argparse.ArgumentParser(description=__doc__.split("\n")[0])
     ap.add_argument("action", choices=["status", "run"])
     ap.add_argument("--label", default="heavy run")

@@ -12,7 +12,7 @@ import tempfile
 import time
 import unittest
 
-TOOL = pathlib.Path(__file__).resolve().parent / "heavy_lock.py"
+TOOL = pathlib.Path(os.environ.get("HEAVY_LOCK_TOOL") or pathlib.Path(__file__).resolve().parent / "heavy_lock.py")   # the override lets a test run against an older copy
 spec = importlib.util.spec_from_file_location("heavy_lock", TOOL)
 heavy_lock = importlib.util.module_from_spec(spec)
 spec.loader.exec_module(heavy_lock)
@@ -157,6 +157,67 @@ class HeavyLock(unittest.TestCase):
         self.assertEqual(r.returncode, 75, r.stdout + r.stderr)
         self.assertIn("details are not written yet", r.stdout)
         self.assertIsNone(p.poll())
+
+    # The two races Jared found in the pid-file version, as tests that hold for any correct lock.
+    def test_two_waiters_behind_a_crashed_holder_never_overlap(self):
+        """Race 1 (stale replace): a holder crashed and left its files; two runs start at once. Exactly one may run at a time."""
+        crashed = self.start_run("crashed holder", *SLEEP_60)
+        self.wait_until_held()
+        subprocess.run(["taskkill", "/PID", str(crashed.pid), "/T", "/F"], capture_output=True)
+        crashed.wait(timeout=30)
+        marks = pathlib.Path(self.tmp.name) / "marks2.txt"
+        script = ("import os, sys, time\n"
+                  "with open(sys.argv[1], 'a') as f: f.write('in %d %f\\n' % (os.getpid(), time.time()))\n"
+                  "time.sleep(1.5)\n"
+                  "with open(sys.argv[1], 'a') as f: f.write('out %d %f\\n' % (os.getpid(), time.time()))\n")
+        pair = [self.start_run(f"waiter {i}", sys.executable, "-I", "-c", script, str(marks), wait=3) for i in range(2)]
+        for p in pair:
+            p.communicate(timeout=120)
+            self.assertEqual(p.returncode, 0)
+        events = sorted((line.split() for line in marks.read_text(encoding="utf-8").splitlines()), key=lambda e: float(e[2]))
+        self.assertEqual([e[0] for e in events], ["in", "out", "in", "out"], f"the two waiters overlapped: {events}")
+
+    def test_a_reader_in_the_gap_between_creating_the_lock_and_writing_who_holds_it_still_waits(self):
+        """Race 2 (empty-file window): the holder's details are missing or half written. A waiter that reads them must wait, not take the lock."""
+        self.start_run("holder", *SLEEP_60)
+        self.wait_until_held()
+        for partial in ("", '{"pid": 12', "not json at all", "[]"):
+            (self.dir / "heavy-run.info").write_text(partial, encoding="utf-8")
+            r = self.tool("run", "--label", "reader", "--wait-minutes", "0.03", "--", *PY, "print('must not run')")
+            self.assertEqual(r.returncode, 75, f"info={partial!r}: {r.stdout + r.stderr}")
+            self.assertNotIn("must not run", r.stdout)
+
+    # The gem probe-what-you-bind: the acquisition is the probe, and an unexpected lock error is never read as "free".
+    def test_a_lock_folder_that_cannot_be_made_fails_closed_with_a_named_code(self):
+        blocker = pathlib.Path(self.tmp.name) / "a-file-not-a-folder"
+        blocker.write_text("x", encoding="utf-8")
+        self.dir = blocker / "locks"
+        r = self.tool("run", "--label", "x", "--wait-minutes", "0.05", "--", *PY, "print('must not run')")
+        self.assertEqual(r.returncode, 76, r.stdout + r.stderr)
+        self.assertIn("LOCK_ERROR", r.stdout)
+        self.assertNotIn("must not run", r.stdout)
+
+    def test_status_reports_an_error_as_an_error_not_as_free(self):
+        blocker = pathlib.Path(self.tmp.name) / "a-file-not-a-folder"
+        blocker.write_text("x", encoding="utf-8")
+        self.dir = blocker / "locks"
+        r = self.tool("status")
+        self.assertEqual(r.returncode, 1, r.stdout + r.stderr)
+        self.assertIn("LOCK_ERROR", r.stdout)
+        self.assertNotIn("heavy-run lock: free", r.stdout)
+
+    def test_a_lock_file_that_cannot_be_opened_fails_closed(self):
+        self.dir.mkdir(parents=True)
+        lock = self.dir / "heavy-run.lock"
+        lock.write_bytes(b"\0")
+        os.chmod(lock, 0o444)                                           # read-only: opening it for locking is refused
+        try:
+            r = self.tool("run", "--label", "x", "--wait-minutes", "0.05", "--", *PY, "print('must not run')")
+        finally:
+            os.chmod(lock, 0o666)
+        self.assertEqual(r.returncode, 76, r.stdout + r.stderr)
+        self.assertIn("LOCK_ERROR", r.stdout)
+        self.assertNotIn("must not run", r.stdout)
 
     def test_a_planted_info_file_for_a_dead_process_does_not_block_a_free_lock(self):
         self.dir.mkdir(parents=True)
