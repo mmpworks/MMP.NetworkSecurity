@@ -24,8 +24,15 @@ namespace NetSec.Labs
             TamperResult result = _inner == null ? TamperResult.Unchanged : _inner.Apply(point, streamId, streamSeq, message, bytes);
             if (point != TamperPoint.Wire) return result;
             byte[] sent = result != null && result.Bytes != null ? result.Bytes : bytes;
-            lock (_gate) (streamId.IndexOf("/client/") >= 0 ? _toServer : _toClient).AddRange(sent);
+            lock (_gate) (IsClient(streamId) ? _toServer : _toClient).AddRange(sent);
             return result;
+        }
+
+        /// <summary>LabPair.Stream ids read "session/actor/protocol". The actor is the segment before the protocol, so a slash in the session id changes nothing.</summary>
+        static bool IsClient(string streamId)
+        {
+            string[] parts = streamId.Split('/');
+            return parts.Length >= 3 && parts[parts.Length - 2] == "client";
         }
 
         public byte[] ClientToServer { get { lock (_gate) return _toServer.ToArray(); } }

@@ -84,8 +84,10 @@ namespace NetSec.Tests
             tap.Apply(Machine.TamperPoint.Wire, "s/client/tls11", 1, "ClientHello", new byte[] { 1, 2 });
             tap.Apply(Machine.TamperPoint.Wire, "s/server/tls11", 1, "ServerHello", new byte[] { 3 });
             tap.Apply(Machine.TamperPoint.Plain, "s/client/tls11", 2, "Finished", new byte[] { 9 });
+            // A session id that holds "/client/" must not turn a server stream into a client one.
+            tap.Apply(Machine.TamperPoint.Wire, "x/client/y/server/tls11", 2, "ServerHelloDone", new byte[] { 4 });
             Assert.Equal(new byte[] { 1, 2 }, tap.ClientToServer);
-            Assert.Equal(new byte[] { 3 }, tap.ServerToClient);
+            Assert.Equal(new byte[] { 3, 4 }, tap.ServerToClient);
         }
     }
 }
