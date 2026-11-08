@@ -69,9 +69,11 @@ export function wireSteps(events: readonly TraceEvent[]): Map<TraceEvent, string
 /**
  * The 2 runs, paired by key, one step per engine-stream key that either run holds. The order of the steps comes from the streams alone:
  * by place in stream, then by stream name. The engine runs client and server on 2 threads, so the order of events across the 2 sides
- * is not the same from one run to the next, and the screen must never take an order from it. Within a stream the order is stable, and
- * the engine streams hold the same events on every run. So one attack run gives the same steps, the same split, and the same count
- * every time (the lead and Richard on #297). Events with no stream id stay out: they belong to no stream, so they cannot pair.
+ * is not the same from one run to the next, and the screen must never take an order from it. Within a stream the order is stable. So
+ * one attack run gives the same steps up to the split, and the same split, every time (the lead and Richard on #297). After a caught
+ * attack, the other side's extra sends before the abort depend on timing, so the attacked run's tail can vary. The total stays the
+ * same only while that tail stays inside the normal run's steps, which holds today because the attacked run stops early. The engine
+ * clock in #306 makes the tail stable (Jared on #297). Events with no stream id stay out: they belong to no stream, so they cannot pair.
  */
 export function pairRuns(normal: readonly TraceEvent[], attacked: readonly TraceEvent[]): RunPair[] {
   return pairing(normal, attacked).pairs
