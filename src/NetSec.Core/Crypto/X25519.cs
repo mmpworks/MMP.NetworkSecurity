@@ -7,6 +7,9 @@ namespace NetSec.Crypto
     /// the protocol asks for that check.
     /// Built to show the parts. Do not copy: managed code gives no constant-time guarantee.
     /// </summary>
+    /// <summary>Called after each ladder step with the step's bit and the pair (x2:z2, x3:z3), for the walk. The arrays are the ladder's own: copy them.</summary>
+    internal delegate void X25519LadderStep(int bit, int value, long[] x2, long[] z2, long[] x3, long[] z3);
+
     public static class X25519
     {
         const int Length = 32;
@@ -31,7 +34,7 @@ namespace NetSec.Crypto
             Fe25519.Unpack(u, point, 0);
 
             long[] x2, z2;
-            Ladder(k, u, out x2, out z2);
+            Ladder(k, u, out x2, out z2, null);
 
             long[] zInverse = Fe25519.New();
             Fe25519.Invert(zInverse, z2);
@@ -42,7 +45,7 @@ namespace NetSec.Crypto
         }
 
         /// <summary>RFC 7748 section 5: clear the low 3 bits and the top bit, and set bit 254.</summary>
-        static byte[] Clamp(byte[] scalar)
+        internal static byte[] Clamp(byte[] scalar)
         {
             byte[] k = new byte[Length];
             Array.Copy(scalar, k, Length);
@@ -56,7 +59,7 @@ namespace NetSec.Crypto
         /// One ladder step per scalar bit, top down. The step does one doubling and one addition on the pair
         /// (x2:z2, x3:z3), and the pair always differs by the input point u. The order of operations follows TweetNaCl (public domain).
         /// </summary>
-        static void Ladder(byte[] k, long[] u, out long[] x2Out, out long[] z2Out)
+        internal static void Ladder(byte[] k, long[] u, out long[] x2Out, out long[] z2Out, X25519LadderStep observe)
         {
             long[] x2 = Fe25519.One(), z2 = Fe25519.New(), x3 = Fe25519.New(), z3 = Fe25519.One();
             Fe25519.Copy(x3, u);
@@ -89,6 +92,7 @@ namespace NetSec.Crypto
                 Fe25519.Square(x3, e);
                 Fe25519.Swap(x2, x3, bit);
                 Fe25519.Swap(z2, z3, bit);
+                if (observe != null) observe(i, bit, x2, z2, x3, z3);
             }
             x2Out = x2;
             z2Out = z2;
