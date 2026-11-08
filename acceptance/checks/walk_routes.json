@@ -9,6 +9,7 @@
     { "route": "/api/walk/tls13/schedule", "off": "open", "why": "it runs on the public inputs of RFC 8448 section 3, never on a session's key (sections-plan.md section 4). Clause: A19.host.tls13-schedule-open-and-rfc8448" },
     { "route": "/api/walk/toy-curve", "off": "open", "why": "fixed public teaching values on y^2 = x^3 + 2x + 2 over GF(17), no session key (sections-plan.md line 153, slice P8a). Clause: A19.host.toy-curve-open-and-brute-force" },
     { "route": "/api/walk/real-curve", "off": "open", "why": "fixed public example points on the real curve, no session key (sections-plan.md line 154, slice P8a). Clause: A19.host.real-curve-open-and-on-curve" },
+    { "route": "/api/walk/tls11/schedule", "off": "open", "why": "a fixed teaching run on the built-in training key, which is public in the source (sections-plan.md line 159, slice P4b). Clause: A19.host.tls11-schedule-open-and-prf" },
     { "route": "/api/walk/dh", "off": "open", "why": "it runs on public practice exponents, never a session's key (sections-plan.md section 4, slice P7). Clause: A19.host.dh-walk-open-and-modpow" },
     { "route": "/api/walk/x25519", "off": "open", "why": "it runs on RFC 7748 section 6.1's public test scalars, never a session's key (sections-plan.md section 4, slice P8). Clause: A19.host.x25519-walk-open-and-rfc7748" },
     { "route": "/api/walk/aes/typed-block", "off": "open", "why": "it runs only on the public practice key, and reads no run's key (section 2.2g). Clause: A19.host.typed-routes-open-with-keys-off" },
