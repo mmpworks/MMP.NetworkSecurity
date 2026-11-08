@@ -22,7 +22,7 @@
       "guard": "The GCM tag covers every locked byte, so the receiver refuses the message when one bit changes." },
     { "attackId": "L1-reuse-nonce", "name": "Use one GCM nonce twice", "kind": "misuse", "tourStep": "L1-S11",
       "guard": "Never use one GCM nonce twice under one key. A counter or a fresh random nonce per message keeps each one unique." },
-    { "attackId": "L1-use-ecb", "name": "Lock the picture with ECB", "kind": "misuse", "tourStep": "L1-S08",
+    { "attackId": "L1-use-ecb", "name": "Lock the text with ECB", "kind": "misuse", "tourStep": "L1-S08",
       "guard": "Nothing catches this: ECB locks equal blocks to equal cipher blocks, so patterns leak. Use a mode with an IV or nonce, such as GCM." },
     { "attackId": "L2-extend-hmac", "name": "Extend an HMAC-sealed message", "kind": "length-extension", "tourStep": "L2-S06",
       "guard": "HMAC hashes the inner digest again under the key, so an attacker cannot extend the message and keep a valid seal." },
