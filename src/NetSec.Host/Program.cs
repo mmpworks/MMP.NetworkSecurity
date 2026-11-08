@@ -88,7 +88,9 @@ app.MapGet("/api/sessions/{id}/keylog", (string id) => sessions.Find(id) switch
 app.MapGet("/api/ce", () => Results.Json(ce.Status()));
 app.MapPost("/api/ce/start", async () => Results.Json(await ce.StartAsync()));
 app.MapPost("/api/ce/stop", () => { ce.Stop(); return Results.Json(ce.Status()); });
-SecurityRoutes.Map(app, security, flowRuns, on => sessions.Broadcast(JsonSerializer.Serialize(new { type = "security.show-keys", on })));
+SecurityRoutes.Map(app, security, flowRuns, on => sessions.Broadcast(JsonSerializer.Serialize(new { type = "security.show-keys", on, saved = security.Saved })));
+// The restart gap (issue #292): when the background retry saves a refused Show keys off, the page drops its "not saved yet" note.
+security.SaveHealed += () => sessions.Broadcast(JsonSerializer.Serialize(new { type = "security.saved", saved = true }));
 AesWalkRoutes.Map(app, security, sessions);
 Tls11WalkRoutes.Map(app);
 Tls13WalkRoutes.Map(app);
