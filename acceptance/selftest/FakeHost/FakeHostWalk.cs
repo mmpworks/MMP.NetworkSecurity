@@ -199,6 +199,75 @@ namespace Acceptance
             return D("base", DhNum(bb), "exponent", DhNum(e), "result", DhNum(result), "rows", rows);
         }
 
+        /// <summary>Slice P8a's teaching curves: the toy curve over GF(17) and the real-curve picture, open with Show keys OFF.</summary>
+        bool CurveRoute(HttpListenerContext ctx, string path)
+        {
+            if ((path != CurveWalkClauses.ToyPath && path != CurveWalkClauses.RealPath) || M("walk-routes-missing")) return false;
+            if (path == CurveWalkClauses.RealPath) { WalkWrite(ctx, 200, RealCurveReply(), false); return true; }
+            if (!_showKeys && M("toy-closed-off")) { WalkFail(ctx, 409, "KEYS_HIDDEN", "closed"); return true; }
+            WalkWrite(ctx, 200, ToyCurveReply(), false);
+            return true;
+        }
+
+        static Dictionary<string, object> ToyPt(CurveWalkClauses.Pt p) { return p == null ? D("infinity", true) : D("x", (double)p.X, "y", (double)p.Y); }
+
+        Dictionary<string, object> ToyStep(CurveWalkClauses.Pt p, CurveWalkClauses.Pt q)
+        {
+            const int P = CurveWalkClauses.P;
+            bool dbl = p.X == q.X && p.Y == q.Y;
+            int num = dbl ? CurveWalkClauses.Mod(3L * p.X * p.X + CurveWalkClauses.A, P) : CurveWalkClauses.Mod(q.Y - p.Y, P);
+            int den = dbl ? CurveWalkClauses.Mod(2 * p.Y, P) : CurveWalkClauses.Mod(q.X - p.X, P);
+            int inv = CurveWalkClauses.Inv(den, P);
+            return D("kind", dbl ? "double" : "add", "p", ToyPt(p), "q", ToyPt(q), "result", ToyPt(CurveWalkClauses.Add(p, q)),
+                "numerator", (double)num, "denominator", (double)den, "inverse", D("of", (double)den, "modulus", (double)P, "value", (double)inv), "lambda", (double)CurveWalkClauses.Mod((long)num * inv, P));
+        }
+
+        Dictionary<string, object> ToyCurveReply()
+        {
+            const int N = CurveWalkClauses.N;
+            CurveWalkClauses.Pt g = new CurveWalkClauses.Pt(5, 1);
+            List<object> points = new List<object>();
+            foreach (CurveWalkClauses.Pt pt in CurveWalkClauses.AllPoints()) points.Add(ToyPt(pt));
+            if (M("toy-point-missing")) points.RemoveAt(0);
+            List<object> hops = new List<object>();
+            for (int k = 1; k <= N; k++) hops.Add(D("k", (double)k, "point", ToyPt(CurveWalkClauses.Mul(k, g))));
+            int kk = 13, d = 7, nonce = 3, z1 = 8, z2 = 11, a = 3, b = 7;
+            CurveWalkClauses.Pt q = CurveWalkClauses.Mul(d, g), bigR = CurveWalkClauses.Mul(nonce, g);
+            int r = CurveWalkClauses.Mod(bigR.X, N);
+            Func<int, Dictionary<string, object>> sig = z => D("z", (double)z, "nonce", (double)nonce, "bigR", ToyPt(bigR), "r", (double)r,
+                "s", (double)CurveWalkClauses.Mod((long)CurveWalkClauses.Inv(nonce, N) * (z + (long)r * d), N));
+            Func<int, Dictionary<string, object>> ver = z =>
+            {
+                int s = CurveWalkClauses.Mod((long)CurveWalkClauses.Inv(nonce, N) * (z + (long)r * d), N), w = CurveWalkClauses.Inv(s, N);
+                int u1 = CurveWalkClauses.Mod((long)z * w, N), u2 = CurveWalkClauses.Mod((long)r * w, N);
+                return D("u1", (double)u1, "u2", (double)u2, "x", ToyPt(CurveWalkClauses.Add(CurveWalkClauses.Mul(u1, g), CurveWalkClauses.Mul(u2, q))), "valid", true);
+            };
+            return D("source", "video 4Tfmwxr0I34", "keySource", "toy",
+                "curve", D("p", (double)CurveWalkClauses.P, "a", (double)CurveWalkClauses.A, "b", (double)CurveWalkClauses.B, "order", (double)N, "g", ToyPt(g)),
+                "points", points, "addExample", ToyStep(g, new CurveWalkClauses.Pt(6, 3)), "doubleExample", ToyStep(g, g), "hops", hops, "k", (double)kk,
+                "doubleAndAdd", new List<object> { D("bit", 0.0, "isOne", true, "after", ToyPt(CurveWalkClauses.Mul(kk, g))) },
+                "ladder", new List<object> { D("bit", 0.0, "isOne", true, "r0", ToyPt(CurveWalkClauses.Mul(kk, g))) },
+                "ecdh", D("alicePrivate", (double)a, "bobPrivate", (double)b, "alicePublic", ToyPt(CurveWalkClauses.Mul(a, g)), "bobPublic", ToyPt(CurveWalkClauses.Mul(b, g)),
+                    "aliceShared", ToyPt(CurveWalkClauses.Mul(a * b, g)), "bobShared", ToyPt(CurveWalkClauses.Mul(a * b, g))),
+                "ecdsa", D("signerPrivate", (double)d, "signerPublic", ToyPt(q), "first", sig(z1), "second", sig(z2), "firstVerify", ver(z1), "secondVerify", ver(z2),
+                    "recovery", D("nonce", (double)nonce, "privateKey", (double)(M("toy-recovery-wrong") ? d + 1 : d))));
+        }
+
+        Dictionary<string, object> RealCurveReply()
+        {
+            Func<double, double> y = x => Math.Sqrt(x * x * x + 2 * x + 2);
+            List<object> upper = new List<object>(), lower = new List<object>();
+            for (double x = -0.7709; x <= 3.0; x += 0.25) { double v = y(x); if (double.IsNaN(v)) continue; upper.Add(D("x", x, "y", v)); lower.Add(D("x", x, "y", -v)); }
+            if (M("real-off-curve")) upper[2] = D("x", -0.27, "y", 9.0);
+            Func<double, double, bool, Dictionary<string, object>> line = (x1, x2, tangent) =>
+            {
+                double y1 = y(x1), y2 = y(x2), l = tangent ? (3 * x1 * x1 + 2) / (2 * y1) : (y2 - y1) / (x2 - x1);
+                double x3 = l * l - x1 - x2, yr = y1 + l * (x3 - x1);
+                return D("kind", tangent ? "tangent" : "chord", "p", D("x", x1, "y", y1), "q", D("x", x2, "y", y2), "rPrime", D("x", x3, "y", yr), "r", D("x", x3, "y", -yr), "lambda", l);
+            };
+            return D("source", "video 4Tfmwxr0I34", "a", 2.0, "b", 2.0, "root", -0.7709, "xMax", 3.0, "upper", upper, "lower", lower, "chord", line(0.0, 1.0, false), "tangent", line(1.0, 1.0, true));
+        }
+
         /// <summary>True when the path is a walk route. The route has answered by then.</summary>
         bool WalkRoute(HttpListenerContext ctx, string path)
         {

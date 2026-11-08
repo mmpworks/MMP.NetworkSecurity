@@ -197,6 +197,7 @@ namespace Acceptance
             if (ScheduleRoute(ctx, path)) return;
             if (X25519Route(ctx, path)) return;
             if (DhRoute(ctx, path)) return;
+            if (CurveRoute(ctx, path)) return;
             if (WalkRoute(ctx, path)) return;
             if (path == "/api/health")
             {
