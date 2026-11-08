@@ -83,7 +83,7 @@ function Invoke-Tool {
     $stdout = Join-Path $work ("tool-" + [guid]::NewGuid().ToString('N') + ".out")
     $stderr = $stdout + '.err'
     if ($Exe -eq 'dotnet' -and $ToolArgs.Count -gt 0 -and $ToolArgs[0] -eq 'build') { $ToolArgs = @($ToolArgs) + @('-nodeReuse:false', '-p:UseSharedCompilation=false') }   # a private build, so a stuck shared build server of another session cannot hang this run
-    if ($Exe -in 'npm', 'npx') { $Exe = $Exe + '.cmd' }      # the extensionless npm and npx are shell scripts, not Win32 programs
+    if ($Exe -eq 'npm') { $Exe = 'npm.cmd' }      # the extensionless npm is a shell script, not a Win32 program
     $psi = @{ FilePath = $Exe; ArgumentList = $ToolArgs; NoNewWindow = $true; PassThru = $true; RedirectStandardOutput = $stdout; RedirectStandardError = $stderr }
     if ($Dir) { $psi.WorkingDirectory = $Dir }
     try { $p = Start-Process @psi }
@@ -412,7 +412,7 @@ if ($e2eMine.Count -gt 0) {
         $env:ACC_HOST_PORT = [string]$hostPort
         # Playwright strips the types and runs a spec that tsc would refuse, so a type error never failed a run. The specs are type-checked
         # first (acceptance/e2e/tsconfig.json), and a type error fails every selected e2e clause by name before any spec runs.
-        # tsc and Playwright run from this folder's own node_modules under node, never through npx, so a missing tool reads TOOL_MISSING and
+        # tsc and Playwright run from this folder's own node_modules under node, never through the package runner, so a missing tool reads TOOL_MISSING and
         # nothing is fetched from a registry or found elsewhere on the machine (Jared, #269).
         $tscJs = Join-Path $e2e 'node_modules/typescript/bin/tsc'
         $playwrightJs = Join-Path $e2e 'node_modules/@playwright/test/cli.js'
