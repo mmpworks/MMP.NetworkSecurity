@@ -357,4 +357,6 @@ test('a Show keys off the Host could not save shows "not saved yet" until the re
   } finally { await hold.release() }
   await expect(page.getByTestId('sec-show-keys-unsaved')).toHaveCount(0, { timeout: 10_000 })
   await expect(page.getByTestId('sec-show-keys-switch')).not.toBeChecked()
+  // The refusal's message warns that a restart may show keys again. Once the Host has saved the choice, that warning is false, so it goes.
+  await expect(page.getByTestId('sec-fault')).toHaveCount(0)
 })
