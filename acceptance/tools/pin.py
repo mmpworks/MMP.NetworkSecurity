@@ -31,8 +31,9 @@ def git(root, *args, stdin=None):
 def acceptance_tree(root):
     """The tree hash of HEAD:acceptance without its top-level PIN entry. git mktree builds the tree object from ls-tree lines, so the id
     equals what git would give a commit whose acceptance/ held no PIN."""
-    entries = [line for line in git(root, "ls-tree", "HEAD:acceptance").splitlines() if line.split("\t", 1)[-1] != "PIN"]
-    return git(root, "mktree", stdin="\n".join(entries) + ("\n" if entries else "")).strip()
+    # -z on both sides: entries end in NUL, so a file name that holds a tab or a newline cannot shift the id.
+    entries = [e for e in git(root, "ls-tree", "-z", "HEAD:acceptance").split("\0") if e and e.split("\t", 1)[-1] != "PIN"]
+    return git(root, "mktree", "-z", stdin="".join(e + "\0" for e in entries)).strip()
 
 
 def read_pin(root):
