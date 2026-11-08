@@ -2619,6 +2619,17 @@
    "counts": true
   },
   {
+   "id": "A19.host.des-walk-open-and-cavp",
+   "base": "A19.host.des-walk-open-and-cavp",
+   "assertion": "A19",
+   "group": "a17",
+   "build": "host",
+   "slice": "W1",
+   "referee": "NIST CAVP in the vector file, and .NET DES (vartext: CAVP alone, weak key)",
+   "roles": [],
+   "counts": true
+  },
+  {
    "id": "A19.host.dh-walk-open-and-modpow",
    "base": "A19.host.dh-walk-open-and-modpow",
    "assertion": "A19",
@@ -2641,6 +2652,17 @@
    "counts": true
   },
   {
+   "id": "A19.host.ecdsa-walk-open-and-rfc6979",
+   "base": "A19.host.ecdsa-walk-open-and-rfc6979",
+   "assertion": "A19",
+   "group": "a17",
+   "build": "host",
+   "slice": "W1",
+   "referee": "RFC 6979 A.2.5 in the vector file, the suite's P-256 arithmetic on .NET's curve, .NET ECDsa and OpenSSL",
+   "roles": [],
+   "counts": true
+  },
+  {
    "id": "A19.host.ed25519-walk-open-and-rfc8032",
    "base": "A19.host.ed25519-walk-open-and-rfc8032",
    "assertion": "A19",
@@ -2659,6 +2681,17 @@
    "build": "host",
    "slice": "W1",
    "referee": "FIPS 197 (2001) data, the suite's RefAes, and the .NET library",
+   "roles": [],
+   "counts": true
+  },
+  {
+   "id": "A19.host.hmac-walk-open-and-rfc4231",
+   "base": "A19.host.hmac-walk-open-and-rfc4231",
+   "assertion": "A19",
+   "group": "a17",
+   "build": "host",
+   "slice": "W1",
+   "referee": "RFC 4231 in the vector file, RFC 2104 run on .NET SHA-256, and .NET HMACSHA256",
    "roles": [],
    "counts": true
   },
@@ -2725,6 +2758,28 @@
    "build": "host",
    "slice": "W1",
    "referee": "FIPS 197 (2001) data, the suite's RefAes, and the .NET library",
+   "roles": [],
+   "counts": true
+  },
+  {
+   "id": "A19.host.seal-chain-walk-open-and-own-hash",
+   "base": "A19.host.seal-chain-walk-open-and-own-hash",
+   "assertion": "A19",
+   "group": "a17",
+   "build": "host",
+   "slice": "W1",
+   "referee": "the suite's own composition of each row's text, and .NET SHA-256",
+   "roles": [],
+   "counts": true
+  },
+  {
+   "id": "A19.host.sha256-walk-open-and-fips180",
+   "base": "A19.host.sha256-walk-open-and-fips180",
+   "assertion": "A19",
+   "group": "a17",
+   "build": "host",
+   "slice": "W1",
+   "referee": "FIPS 180-4 run in the suite (constants derived from prime roots), and .NET SHA-256",
    "roles": [],
    "counts": true
   },

@@ -22,6 +22,11 @@
     <Compile Include="..\groups\a17\Ed25519WalkClauses.cs" Link="a17\Ed25519WalkClauses.cs" />
     <Compile Include="..\groups\a17\DhWalkClauses.cs" Link="a17\DhWalkClauses.cs" />
     <Compile Include="..\groups\a17\Tls11WalkClauses.cs" Link="a17\Tls11WalkClauses.cs" />
+    <Compile Include="..\groups\a17\Sha256WalkClauses.cs" Link="a17\Sha256WalkClauses.cs" />
+    <Compile Include="..\groups\a17\HmacWalkClauses.cs" Link="a17\HmacWalkClauses.cs" />
+    <Compile Include="..\groups\a17\SealChainWalkClauses.cs" Link="a17\SealChainWalkClauses.cs" />
+    <Compile Include="..\groups\a17\EcdsaWalkClauses.cs" Link="a17\EcdsaWalkClauses.cs" />
+    <Compile Include="..\groups\a17\DesWalkClauses.cs" Link="a17\DesWalkClauses.cs" />
     <Compile Include="..\groups\a17\CurveWalkClauses.cs" Link="a17\CurveWalkClauses.cs" />
     <Compile Include="..\groups\a17\AttackRowClauses.cs" Link="a17\AttackRowClauses.cs" />
     <Compile Include="..\groups\a17\V0Clauses.cs" Link="a17\V0Clauses.cs" />

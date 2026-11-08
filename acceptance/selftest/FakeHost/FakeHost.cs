@@ -198,6 +198,11 @@ namespace Acceptance
             if (ScheduleRoute(ctx, path)) return;
             if (X25519Route(ctx, path)) return;
             if (Ed25519Route(ctx, path)) return;
+            if (Sha256Route(ctx, path)) return;
+            if (HmacRoute(ctx, path)) return;
+            if (SealChainRoute(ctx, path)) return;
+            if (EcdsaRoute(ctx, path)) return;
+            if (DesRoute(ctx, path)) return;
             if (DhRoute(ctx, path)) return;
             if (Tls11ScheduleRoute(ctx, path)) return;
             if (CurveRoute(ctx, path)) return;
