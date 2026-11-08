@@ -197,6 +197,7 @@ namespace Acceptance
             if (TypedRoute(ctx, path, body)) return;
             if (ScheduleRoute(ctx, path)) return;
             if (X25519Route(ctx, path)) return;
+            if (Ed25519Route(ctx, path)) return;
             if (DhRoute(ctx, path)) return;
             if (Tls11ScheduleRoute(ctx, path)) return;
             if (CurveRoute(ctx, path)) return;

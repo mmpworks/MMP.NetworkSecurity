@@ -129,6 +129,35 @@ namespace Acceptance
             return true;
         }
 
+        /// <summary>
+        /// The Ed25519 walk on RFC 8032 section 7.1's TESTs 1 to 3, open with Show keys OFF. The fake serves the vector file's seed, public key and
+        /// signature, and builds expanded, scalar, prefix, r and h with SHA-512. Defects: ed25519-closed-off, ed25519-unclamped,
+        /// ed25519-wrong-h, ed25519-bad-test-ok (test 4 answers 200).
+        /// </summary>
+        bool Ed25519Route(HttpListenerContext ctx, string path)
+        {
+            if (path != Ed25519WalkClauses.Path || M("walk-routes-missing")) return false;
+            if (!_showKeys && M("ed25519-closed-off")) { WalkFail(ctx, 409, "KEYS_HIDDEN", "closed"); return true; }
+            string t = ctx.Request.QueryString["test"];
+            int n = t == "1" ? 1 : t == "2" ? 2 : t == "3" ? 3 : t == "4" && M("ed25519-bad-test-ok") ? 1 : 0;
+            if (n == 0) { WalkFail(ctx, 400, "WALK_BAD_ARGUMENT", "test must be 1, 2 or 3."); return true; }
+            string vectors = Path.Combine(Path.GetDirectoryName(Path.GetDirectoryName(Path.GetDirectoryName(_vaultScript))), "vectors");
+            VectorRecord v = Nsv.Load(vectors, "ed25519-rfc8032.nsv", "ed25519")[n - 1];
+            byte[] seed = Hex.Decode(v.Str("seed")), msg = Hex.Decode(v.Str("message") ?? ""), pub = Hex.Decode(v.Str("public")), sig = Hex.Decode(v.Str("signature"));
+            byte[] expanded = Ed25519WalkClauses.Sha512(seed), low = new byte[32], prefix = new byte[32], rPoint = new byte[32], s = new byte[32];
+            Array.Copy(expanded, low, 32); Array.Copy(expanded, 32, prefix, 0, 32); Array.Copy(sig, rPoint, 32); Array.Copy(sig, 32, s, 0, 32);
+            byte[] scalar = M("ed25519-unclamped") ? low : Ed25519WalkClauses.Clamp(low);
+            System.Numerics.BigInteger r = Ed25519WalkClauses.FromLittleEndian(Ed25519WalkClauses.Sha512(prefix, msg)) % Ed25519WalkClauses.L;
+            System.Numerics.BigInteger h = Ed25519WalkClauses.FromLittleEndian(Ed25519WalkClauses.Sha512(rPoint, pub, msg)) % Ed25519WalkClauses.L;
+            if (M("ed25519-wrong-h")) h = (h + 1) % Ed25519WalkClauses.L;
+            Func<byte[], string> hx = b => Hex.Encode(b).ToLowerInvariant();
+            WalkWrite(ctx, 200, D("test", (double)n, "source", "RFC 8032 section 7.1", "keySource", "rfc8032", "byteOrder", "little-endian",
+                "seed", hx(seed), "message", hx(msg), "expanded", hx(expanded), "scalar", hx(scalar), "prefix", hx(prefix), "publicKey", hx(pub),
+                "r", hx(Ed25519WalkClauses.ToLittleEndian32(r)), "rPoint", hx(rPoint), "h", hx(Ed25519WalkClauses.ToLittleEndian32(h)), "s", hx(s), "signature", hx(sig),
+                "verify", D("sB", hx(new byte[32]), "minusHA", hx(new byte[32]), "rPrime", hx(rPoint), "valid", true)), false);
+            return true;
+        }
+
         /// <summary>The X25519 ladder walk on RFC 7748 section 6.1's public scalars, open with Show keys OFF. The fake serves the values from the suite's vector file and builds each row's bit from the clamped scalar.</summary>
         bool X25519Route(HttpListenerContext ctx, string path)
         {
