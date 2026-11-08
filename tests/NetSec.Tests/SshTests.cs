@@ -340,7 +340,10 @@ namespace NetSec.Tests
         [Theory]
         [InlineData(SshSuite.Modern)]
         [InlineData(SshSuite.Legacy)]
-        public void The_factory_gives_an_ssh_channel_that_runs_a_command(SshSuite suite)
+        public System.Threading.Tasks.Task The_factory_gives_an_ssh_channel_that_runs_a_command(SshSuite suite) => FactoryExec(suite);
+
+        /// <summary>The factory test's body. CoreStarvationTests runs several copies at once on a capped thread pool (issue #308).</summary>
+        internal static System.Threading.Tasks.Task FactoryExec(SshSuite suite)
         {
             MemoryLink[] links = MemoryLink.Pair();
             GlassTransportFactory factory = new GlassTransportFactory(new TrainingKeySource());
@@ -355,6 +358,7 @@ namespace NetSec.Tests
             Assert.Equal("training\n", Encoding.UTF8.GetString(output.ToArray()));
             Assert.True(channel.Close().Wait(60000), "the client did not close");
             Assert.True(server.Wait(60000), "the server did not open");
+            return System.Threading.Tasks.Task.CompletedTask;
         }
 
         [Fact]
