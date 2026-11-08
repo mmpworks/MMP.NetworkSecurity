@@ -386,10 +386,16 @@ if ($e2eMine.Count -gt 0) {
         $app = Join-Path $ProductRoot 'app'
         $toolRuns = @()
         if (-not (Test-Path (Join-Path $app 'node_modules')) -or $FreshChild) { $toolRuns += Invoke-Tool 'npm' @('ci', '--no-audit', '--no-fund') $app -TimeoutSec 1200 }
-        $toolRuns += Invoke-Tool 'npm' @('run', 'build') $app -TimeoutSec 1200
+        $appBuild = Invoke-Tool 'npm' @('run', 'build') $app -TimeoutSec 1200
+        $toolRuns += $appBuild
         if (-not (Test-Path (Join-Path $e2e 'node_modules'))) { $toolRuns += Invoke-Tool 'npm' @('ci', '--no-audit', '--no-fund') $e2e -TimeoutSec 1200 }
         $missing = @($toolRuns | Where-Object { $_.ExitCode -eq -998 })
-        if ($missing.Count -gt 0) { Set-All $e2eMine 'NOT RUN' 'TOOL_MISSING' (Tail $missing[0].Output 300) } else {
+        # A failed build leaves the last good app/dist in place, so the specs would judge an old screen and could pass (#288's red run did,
+        # 2026-11-08). A failed build or install fails every selected e2e clause by name, and no spec runs.
+        $failedPrep = @($toolRuns | Where-Object { $_.ExitCode -ne 0 -and $_.ExitCode -ne -998 })
+        if ($missing.Count -gt 0) { Set-All $e2eMine 'NOT RUN' 'TOOL_MISSING' (Tail $missing[0].Output 300) }
+        elseif ($appBuild.ExitCode -ne 0) { Set-All $e2eMine 'FAIL' 'APP_BUILD_FAILED' ("npm run build in app exit $($appBuild.ExitCode): " + (Tail $appBuild.Output 600)) }
+        elseif ($failedPrep.Count -gt 0) { Set-All $e2eMine 'FAIL' 'E2E_PREP_FAILED' ("an npm ci for the e2e run exit $($failedPrep[0].ExitCode): " + (Tail $failedPrep[0].Output 600)) } else {
         $env:ACC_ROOT = $ProductRoot; $env:ACC_HOST = $prep.host; $env:ACC_OUT = $out
         # Other sessions on this machine run Hosts and vite previews too. A fixed port that is already taken would connect the tests to
         # somebody else's server, so the run picks free ports.
