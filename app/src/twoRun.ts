@@ -108,13 +108,21 @@ export const firstChange = (wires: readonly WirePair[]): number => wires.findInd
   !!p.normal && !!p.attacked && p.normal.message === p.attacked.message
   && !!p.normal.wire && !!p.attacked.wire && p.normal.wire !== p.attacked.wire)
 
+/** Both runs hold the pair, and it differs in type, message or check result. */
+const differsAtPair = (p: RunPair): boolean => !!p.normal && !!p.attacked
+  && (p.normal.type !== p.attacked.type || p.normal.message !== p.attacked.message || p.normal.check?.result !== p.attacked.check?.result)
+
 /**
- * Where the 2 runs part: the first pair that only one run holds, or where the 2 runs send different messages. A scenario attack
- * (ECB in place of GCM, an old protocol) parts the runs this way, and a caught attack parts them where the attacked run stops.
+ * Where the 2 runs part: the first pair both runs hold that differs in type, message or check result. A scenario attack (ECB in place
+ * of GCM) parts the runs at the message that differs, and a caught attack parts them at the check that fails in the attacked run.
+ * Only when no pair differs does the first pair that one run lacks count. After a caught attack, how many more events the other side
+ * sends before the abort reaches it depends on timing, so a missing pair is not a stable place to part (L1-flip-gcm on #297).
  * -1 when the runs never part.
  */
-export const splitAt = (pairs: readonly RunPair[]): number => pairs.findIndex(p =>
-  !p.normal || !p.attacked || p.normal.type !== p.attacked.type || p.normal.message !== p.attacked.message)
+export function splitAt(pairs: readonly RunPair[]): number {
+  const i = pairs.findIndex(differsAtPair)
+  return i >= 0 ? i : pairs.findIndex(p => !p.normal || !p.attacked)
+}
 
 /** The byte offsets where 2 wire hex strings differ, over the longer of the 2. */
 export function changedBytes(a: string, b: string): number[] {

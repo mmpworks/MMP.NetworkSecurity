@@ -58,7 +58,12 @@ test('in the real L7 decrypt-recording run, the attacker holds nothing at the fi
   await open(page)
   await page.getByTestId('attack-index-open').click()
   await page.getByTestId('attack-row-L7-decrypt-recording').click()
-  await expect(page.getByTestId('engine-state')).toContainText(/finished/, { timeout: 90_000 })
+  // The row opens the two-run layout. The attacked run's own panes, with the event log and the secrets, open from its session tab.
+  await expect(page.getByTestId('two-run')).toBeVisible({ timeout: 90_000 })
+  await expect(page.getByTestId('two-run-running'), 'both runs finish').toHaveCount(0, { timeout: 90_000 })
+  await page.getByTestId('two-run-back').click()
+  await page.getByTestId('lesson-item-7').click()
+  await page.locator('.stab', { hasText: 'attack: L7-decrypt-recording' }).click()
   const rows = page.locator('[data-testid^="event-row-"]')
   const attacker = page.locator('[data-testid^="secret-row-attacker-"]')
   await rows.first().click()

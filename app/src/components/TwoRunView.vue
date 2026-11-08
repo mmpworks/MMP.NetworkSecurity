@@ -74,7 +74,7 @@ const checkWords = (r: 'pass' | 'fail' | 'none') => (r === 'pass' ? 'passes' : r
  */
 function doing(e: TraceEvent | null, key: string): string {
   if (!e) return `has no more ${key.split('/')[0]} events here`
-  if (e.check) return `runs the ${e.check.name} check`
+  if (e.check) return `runs the ${e.check.name} check, and it ${e.check.result === 'fail' ? 'fails' : 'passes'}`
   return `sends ${e.message || e.type}`
 }
 const label = (e: TraceEvent | null) => (e ? e.message || e.type : '')
