@@ -94,6 +94,12 @@ namespace Acceptance
                 }
                 Reply bad = HostHttp.Get(h, Path + "?edit=nope");
                 Check.True(bad.Status == 400 && bad.Code == "WALK_BAD_ARGUMENT", "an unknown edit should get 400 WALK_BAD_ARGUMENT, and got " + bad);
+                // A missing edit is not an error: it defaults to none (Richard's shape), so it must give the whole chain.
+                Reply plain = HostHttp.Get(h, Path);
+                Check.True(plain.Ok && plain.Json != null, "GET " + Path + " with no edit should answer as edit=none, and got " + plain);
+                Check.True(MiniJson.Str(plain.Json, "edit") == "none" && (int)MiniJson.Num(plain.Json, "firstBadSeq", -1) == 0, "with no edit the reply should be edit none, with firstBadSeq 0");
+                List<Dictionary<string, object>> plainLinks = Links(plain, "no edit");
+                for (int i = 0; i < 4; i++) Check.Equal("no edit: row " + (i + 1) + " equals edit=none's", Compose(byEdit["none"][i]), Compose(plainLinks[i]));
                 HostHttp.Put(h, "/api/security/show-keys", A17.Obj("on", true));
                 return "with Show keys OFF the 3 chains answer: each row's text is the suite's own composition and its hash is .NET's SHA-256, the links follow the seed, and the first bad link is 0, 3 and 0 (an edit to the newest row breaks no link); an unknown edit gets 400";
             }

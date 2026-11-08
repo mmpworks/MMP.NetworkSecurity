@@ -161,8 +161,11 @@ namespace Acceptance
                     foreach (uint v in hv) joined.Append(W8(v));
                     Check.Equal(name + ": the last block's hOut joined is the digest", bcl, joined.ToString());
                 }
-                Reply bad = HostHttp.Get(h, Path + "?name=nope");
-                Check.True(bad.Status == 400 && bad.Code == "WALK_BAD_ARGUMENT", "an unknown name should get 400 WALK_BAD_ARGUMENT, and got " + bad);
+                foreach (string q in new string[] { "", "?name=nope" })
+                {
+                    Reply bad = HostHttp.Get(h, Path + q);
+                    Check.True(bad.Status == 400 && bad.Code == "WALK_BAD_ARGUMENT", Path + q + " (a missing or unknown name) should get 400 WALK_BAD_ARGUMENT, and got " + bad);
+                }
                 HostHttp.Put(h, "/api/security/show-keys", A17.Obj("on", true));
                 return "with Show keys OFF both FIPS 180-4 examples answer: the digest equals .NET's, the padding, H(0), every schedule word and all " + roundsChecked + " rounds follow FIPS 180-4 run in the suite, and an unknown name gets 400";
             }
