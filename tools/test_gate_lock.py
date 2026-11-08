@@ -1,12 +1,12 @@
 """The gate takes the heavy-run lock: with another holder it waits (and never starts a step); with a free lock it runs under the lock.
 Run: python -I tools/test_gate_lock.py
 """
-import json
 import os
 import pathlib
 import subprocess
 import sys
 import tempfile
+import time
 import unittest
 
 TOOLS = pathlib.Path(__file__).resolve().parent
@@ -32,9 +32,14 @@ class GateLock(unittest.TestCase):
         return e
 
     def hold(self, label):
-        self.holder = subprocess.Popen([sys.executable, "-I", "-c", "import time; time.sleep(300)"])
-        r = subprocess.run([sys.executable, "-I", str(LOCK), "acquire", "--label", label, "--pid", str(self.holder.pid)], env=self.env(), capture_output=True, text=True)
-        self.assertEqual(r.returncode, 0, r.stdout + r.stderr)
+        """Another heavy run: `heavy_lock.py run` around a long sleep, in the same lock folder the gate will use."""
+        self.holder = subprocess.Popen([sys.executable, "-I", str(LOCK), "run", "--label", label, "--lock-dir", str(self.dir), "--",
+                                        sys.executable, "-I", "-c", "import time; time.sleep(300)"], stdout=subprocess.DEVNULL)
+        for _ in range(60):
+            if subprocess.run([sys.executable, "-I", str(LOCK), "status", "--lock-dir", str(self.dir)], capture_output=True).returncode == 2:
+                return
+            time.sleep(0.5)
+        self.fail("the holder never took the lock")
 
     def test_the_gate_waits_behind_another_holder_and_starts_no_step(self):
         self.hold("richard hang loop")

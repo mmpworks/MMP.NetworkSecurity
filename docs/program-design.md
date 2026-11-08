@@ -372,8 +372,8 @@ Heavy runs stacked on one machine pushed CPU to 100% and made product timing tes
 1. A heavy run is the full gate, the full app suite, an acceptance run, or any load loop or hang repro. Run it as `python -I tools/heavy_lock.py run --label "<what it is>" -- <command>`. `tools/gate.ps1` and `npm run e2e` do this themselves. A load burner or a hang loop takes the lock the same way.
 2. Small targeted runs stay unlocked: one spec, one test file, one unit test run.
 3. A waiter prints `HEAVY_LOCK waiting on '<label>' (pid N, started HH:MM, M min ago)` at once and every 30 seconds. Use `python -I tools/heavy_lock.py status` to see the holder (exit 2 when held). `--wait-minutes M`, or `NETSEC_LOCK_WAIT_MINUTES` for the gate, ends the wait with `LOCK_TIMEOUT` (exit 75).
-4. The lock file (`%LOCALAPPDATA%\mmp-netsec\locks\heavy-run.lock`) holds the holder's pid and process start time. A holder whose process is gone, or whose pid now belongs to a process with another start time, is stale: the next run replaces it, so a crash needs no cleanup.
-5. A run started inside a holder (the gate's own app suite, acceptance) sees `NETSEC_HEAVY_LOCK_HELD` and proceeds without waiting. A run that claims a holder that does not hold the lock still waits.
+4. The lock is an OS file lock (`%LOCALAPPDATA%\mmp-netsec\locks\heavy-run.lock`) held by the `run` process for as long as it lives. The OS drops it when that process ends, including a crash or a kill, so nothing is ever stale and a crash needs no cleanup. A second file, `heavy-run.info`, holds the holder's pid, label and start time for the waiting message only; it never decides who holds the lock.
+5. A run started inside a holder (the gate's own app suite, acceptance) sees `NETSEC_HEAVY_LOCK_HELD` and proceeds without waiting, but only when that pid is the live holder named in the info file and the lock is really held. A run that claims a holder that does not hold the lock still waits.
 
 ## 10. Open questions, with the default taken
 | # | Question | Default |
