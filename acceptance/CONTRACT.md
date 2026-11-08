@@ -193,6 +193,7 @@ UI test ids, all ASSUMED under the design's `aes-walk-` prefix:
 |---|---|
 | `aes-long-strip` | The long-text strip in Techniques (sections-plan.md R1, item 2; Q3 answer A): a sibling above `walk-root` inside `workspace`, 44 px high, one mono line that scrolls sideways, open with Show keys OFF. It reads `POST /api/walk/aes/long-text`. Clauses `A19.ui.long-strip-*` |
 | `aes-long-block-{n}` | One block of the strip per row of the long-text reply, n from 0. The current block carries `data-current="true"`, and exactly one block does |
+| `aes-long-link` | The link line from the strip to the walk's state grid, while the walk shows a value derived from the text (sections-plan.md line 107). `data-from` names the current block's test id. Its box reaches from the strip to the state grid and overlaps the current block across. No link while the picked item shows no walk value |
 | `aes-walk-tab`, `aes-walk-panel` | The tab shows when the run holds `aes.key`. A click fetches the block |
 | `aes-walk-first-view` | Shows on the first view. It starts on an empty grid, and each Next adds one byte in position order |
 | `aes-walk-next`, `aes-walk-back` | Next is disabled at the end of the walk |

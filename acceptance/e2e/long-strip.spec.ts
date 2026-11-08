@@ -6,10 +6,14 @@ import { openApp, requireLive, readState, HOST_PORT, TOKEN, NotRun } from './sup
  * the top of the workspace, as a sibling above walk-root and outside it. It shows one mono line of the long cleartext, the current block
  * highlighted, and it scrolls sideways so the walk's chosen block stays in view. It stays while the learner moves between the Techniques items.
  * It is 44 px high, so 1280 x 640 still fits the walk. It reads the rows of POST /api/walk/aes/long-text, and it shows with Show keys OFF.
- * Test ids (this clause sets them): aes-long-strip on the strip, aes-long-block-{n} on each block, data-current="true" on the highlighted one.
+ * A walk that shows a value derived from the text draws a link line from the strip to its grid (line 107).
+ * Test ids (these clauses set them): aes-long-strip on the strip, aes-long-block-{n} on each block, data-current="true" on the highlighted one,
+ * and aes-long-link on the link line, with data-from naming the strip block it starts from.
  * Where the AES walk opens and the strip is missing, these clauses FAIL. They read NOT RUN only when Techniques has no AES walk at all.
  */
 
+// The Origin is the built-in http://localhost:5173, which the Host allows with or without NETSEC_ORIGINS (#225). If the built-in list ever
+// drops it, this helper fails for a harness reason, and not because the strip is wrong.
 async function setShowKeys(on: boolean): Promise<void> {
   const live = readState();
   if (!live.hostUp || !live.previewUp) return;
@@ -96,4 +100,39 @@ test('[A19.ui.long-strip-shows-long-text-rows] the strip shows one block per row
   } finally {
     await setShowKeys(true);
   }
+});
+
+test('[A19.ui.long-strip-links-to-the-walk-grid] when the walk shows a value from the text, a link line runs from the current strip block to the state grid', async ({ page }) => {
+  requireLive();
+  await page.setViewportSize({ width: 1280, height: 800 });
+  await openAesTechnique(page);
+  const strip = page.getByTestId('aes-long-strip');
+  await expect(strip, 'Techniques shows the long-text strip (R1)').toBeVisible({ timeout: 15_000 });
+
+  // The first view starts on an empty grid, and each Next adds one byte of the block (CONTRACT.md, aes-walk-first-view). Step until a state cell shows.
+  const cells = page.locator('[data-testid^="aes-walk-cell-"]');
+  const next = page.getByTestId('aes-walk-next');
+  for (let i = 0; i < 20 && (await cells.count()) === 0; i++) {
+    if ((await next.count()) === 0 || !(await next.isEnabled())) break;
+    await next.click();
+  }
+  expect(await cells.count(), 'the walk shows a state cell, so it shows a value derived from the text').toBeGreaterThan(0);
+
+  const link = page.getByTestId('aes-long-link');
+  await expect(link, 'a link line runs from the strip to the walk grid (sections-plan.md line 107)').toBeVisible({ timeout: 10_000 });
+  const current = page.locator('[data-testid^="aes-long-block-"][data-current="true"]');
+  expect(await current.count(), 'exactly one strip block is current').toBe(1);
+  const from = await link.getAttribute('data-from');
+  expect(from, 'the link names the current strip block in data-from').toBe(await current.first().getAttribute('data-testid'));
+
+  // Its box reaches from the strip down to the state grid, and overlaps the current block across.
+  const lb = await link.boundingBox(), sb = await strip.boundingBox(), cb = await current.first().boundingBox(), gb = await cells.first().boundingBox();
+  expect(lb && sb && cb && gb, 'the link, the strip, the current block and a state cell each have a box').toBeTruthy();
+  expect(lb!.y, 'the link starts at the strip').toBeLessThanOrEqual(sb!.y + sb!.height + 2);
+  expect(lb!.y + lb!.height, 'the link reaches the state grid').toBeGreaterThanOrEqual(gb!.y - 2);
+  expect(lb!.x <= cb!.x + cb!.width && lb!.x + lb!.width >= cb!.x, 'the link overlaps the current block across').toBe(true);
+
+  // An item that shows no walk value draws no link.
+  await page.getByTestId('walk-item-hmac').click();
+  await expect(link, 'no link while the picked item shows no walk value').toHaveCount(0, { timeout: 5_000 });
 });
