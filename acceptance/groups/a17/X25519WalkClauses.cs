@@ -23,6 +23,42 @@ namespace Acceptance
 
         public static bool Bit(byte[] littleEndian, int bit) { return ((littleEndian[bit >> 3] >> (bit & 7)) & 1) == 1; }
 
+        /// <summary>
+        /// Each ladder row carries `swap` (the lead's answer on #278). This engine follows TweetNaCl's order: it swaps the pair by the row's bit
+        /// before the step and swaps it back after, so `swap` is the conditional-swap argument and equals the bit of the clamped scalar (Richard's
+        /// shape). The bit comes from RFC 7748's scalar in the suite's vector file, clamped by section 5, not from the engine's isOne.
+        /// </summary>
+        [Clause("A19.host.x25519-rows-carry-swap")]
+        public static string RowsCarrySwap(Ctx c)
+        {
+            VectorRecord v = c.Vectors("x25519-rfc7748.nsv", "x25519-dh")[0];
+            using (HostProc h = A17.Host(c, "walk-x25519-swap"))
+            {
+                Reply off = HostHttp.Put(h, "/api/security/show-keys", A17.Obj("on", false));
+                Check.True(off.Ok, "PUT show-keys got " + off);
+                int checkedRows = 0;
+                foreach (string step in new string[] { "alice-public", "bob-public" })
+                {
+                    Reply r = HostHttp.Get(h, Path + "?step=" + step);
+                    if (r.Status == 404 && string.IsNullOrEmpty(r.Code)) throw new NotRunException("PRODUCT_MISSING", "the Host has no route " + Path + " yet (slice P8)");
+                    Check.True(r.Ok && r.Json != null, "OFF: GET " + Path + "?step=" + step + " got " + r);
+                    List<object> rows = MiniJson.Arr(r.Json, "rows") ?? new List<object>();
+                    if (rows.TrueForAll(o => !MiniJson.AsObject(o).ContainsKey("swap"))) throw new NotRunException("PRODUCT_MISSING", "the X25519 rows carry no swap field yet (#278)");
+                    byte[] clamped = Clamp(Hex.Decode(step == "alice-public" ? v.Str("a") : v.Str("b")));
+                    foreach (object o in rows)
+                    {
+                        Dictionary<string, object> row = MiniJson.AsObject(o);
+                        int bit = (int)MiniJson.Num(row, "bit", -1);
+                        Check.True(row.ContainsKey("swap") && row["swap"] is bool, step + ": row for bit " + bit + " has no bool swap");
+                        Check.True((bool)row["swap"] == Bit(clamped, bit), step + ": bit " + bit + " has swap " + row["swap"] + ", and the clamped scalar's bit is " + Bit(clamped, bit));
+                        checkedRows++;
+                    }
+                }
+                HostHttp.Put(h, "/api/security/show-keys", A17.Obj("on", true));
+                return "with Show keys OFF " + checkedRows + " ladder rows each carry swap equal to the clamped RFC 7748 scalar's bit (this engine's conditional-swap argument)";
+            }
+        }
+
         [Clause("A19.host.x25519-walk-open-and-rfc7748")]
         public static string LadderOpenAndRfc7748(Ctx c)
         {

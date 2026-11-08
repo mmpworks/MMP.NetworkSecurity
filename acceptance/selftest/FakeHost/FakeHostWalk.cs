@@ -146,7 +146,8 @@ namespace Acceptance
             byte[] raw = Hex.Decode(scalar), clamped = X25519WalkClauses.Clamp(raw);
             byte[] bits = M("x25519-rows-unclamped") ? raw : clamped;
             List<object> rows = new List<object>();
-            for (int bit = 254; bit >= 0; bit--) rows.Add(D("bit", (double)bit, "isOne", X25519WalkClauses.Bit(bits, bit)));
+            // swap is the conditional-swap argument, the row's bit (TweetNaCl's order). The defect x25519-swap-wrong flips it on bit 100.
+            for (int bit = 254; bit >= 0; bit--) rows.Add(D("bit", (double)bit, "isOne", X25519WalkClauses.Bit(bits, bit), "swap", X25519WalkClauses.Bit(bits, bit) ^ (bit == 100 && M("x25519-swap-wrong"))));
             WalkWrite(ctx, 200, D("step", step, "source", "RFC 7748 section 6.1", "keySource", "rfc7748", "byteOrder", "little-endian", "scalar", scalar, "clamped", Hex.Encode(clamped), "point", point, "result", result, "rows", rows), false);
             return true;
         }
@@ -202,14 +203,44 @@ namespace Acceptance
         /// <summary>Slice P8a's teaching curves: the toy curve over GF(17) and the real-curve picture, open with Show keys OFF.</summary>
         bool CurveRoute(HttpListenerContext ctx, string path)
         {
-            if ((path != CurveWalkClauses.ToyPath && path != CurveWalkClauses.RealPath) || M("walk-routes-missing")) return false;
+            if ((path != CurveWalkClauses.ToyPath && path != CurveWalkClauses.RealPath && path != CurveWalkClauses.ToyAddPath) || M("walk-routes-missing")) return false;
             if (path == CurveWalkClauses.RealPath) { WalkWrite(ctx, 200, RealCurveReply(), false); return true; }
+            if (path == CurveWalkClauses.ToyAddPath) { ToyPickRoute(ctx); return true; }
             if (!_showKeys && M("toy-closed-off")) { WalkFail(ctx, 409, "KEYS_HIDDEN", "closed"); return true; }
             WalkWrite(ctx, 200, ToyCurveReply(), false);
             return true;
         }
 
         static Dictionary<string, object> ToyPt(CurveWalkClauses.Pt p) { return p == null ? D("infinity", true) : D("x", (double)p.X, "y", (double)p.Y); }
+
+        /// <summary>
+        /// The learner's pick on the toy curve, by index: 0 to 17 are the points in x, then y order, and 18 is O. Defects: toy-pick-wrong-result
+        /// names the next index as the sum, and toy-pick-bad-index-ok answers 200 for index 19.
+        /// </summary>
+        void ToyPickRoute(HttpListenerContext ctx)
+        {
+            List<CurveWalkClauses.Pt> list = CurveWalkClauses.AllPoints();
+            list.Add(null);
+            int i, j;
+            Func<string, int> pick = name =>
+            {
+                string s = ctx.Request.QueryString[name];
+                int v;
+                if (s == null || !int.TryParse(s, System.Globalization.NumberStyles.None, System.Globalization.CultureInfo.InvariantCulture, out v)) return -1;
+                if (v == list.Count && M("toy-pick-bad-index-ok")) return 0;
+                return v < list.Count ? v : -1;
+            };
+            i = pick("p"); j = pick("q");
+            if (i < 0 || j < 0) { WalkFail(ctx, 400, "WALK_BAD_ARGUMENT", (i < 0 ? "p" : "q") + " must be a whole number from 0 to 18."); return; }
+            CurveWalkClauses.Pt p = list[i], q = list[j], sum = CurveWalkClauses.Add(p, q);
+            int at = list.FindIndex(x => x == null ? sum == null : sum != null && x.X == sum.X && x.Y == sum.Y);
+            if (M("toy-pick-wrong-result")) at = (at + 1) % list.Count;
+            Dictionary<string, object> step;
+            if (p == null || q == null || (p.X == q.X && CurveWalkClauses.Mod(p.Y + q.Y, CurveWalkClauses.P) == 0))
+                step = D("kind", p == null || q == null ? "identity" : "opposite", "p", ToyPt(p), "q", ToyPt(q), "result", ToyPt(sum), "numerator", null, "denominator", null, "inverse", null, "lambda", null);
+            else step = ToyStep(p, q);
+            WalkWrite(ctx, 200, D("pIndex", (double)i, "qIndex", (double)j, "resultIndex", (double)at, "step", step), false);
+        }
 
         Dictionary<string, object> ToyStep(CurveWalkClauses.Pt p, CurveWalkClauses.Pt q)
         {
@@ -265,7 +296,10 @@ namespace Acceptance
                 double x3 = l * l - x1 - x2, yr = y1 + l * (x3 - x1);
                 return D("kind", tangent ? "tangent" : "chord", "p", D("x", x1, "y", y1), "q", D("x", x2, "y", y2), "rPrime", D("x", x3, "y", yr), "r", D("x", x3, "y", -yr), "lambda", l);
             };
-            return D("source", "video 4Tfmwxr0I34", "a", 2.0, "b", 2.0, "root", -0.7709, "xMax", 3.0, "upper", upper, "lower", lower, "chord", line(0.0, 1.0, false), "tangent", line(1.0, 1.0, true));
+            // The offered picks: 3 chords and 1 tangent, each R' inside -0.7709 to 3.0. The defect real-sample-off-line moves one R' off its line.
+            List<object> samples = new List<object> { line(-0.5, 0.5, false), line(0.0, 2.0, false), line(-0.25, 1.0, false), line(0.5, 0.5, true) };
+            if (M("real-sample-off-line")) { Dictionary<string, object> s1 = (Dictionary<string, object>)samples[1]; Dictionary<string, object> rp = (Dictionary<string, object>)s1["rPrime"]; s1["rPrime"] = D("x", (double)rp["x"], "y", (double)rp["y"] + 0.5); }
+            return D("source", "video 4Tfmwxr0I34", "a", 2.0, "b", 2.0, "root", -0.7709, "xMax", 3.0, "upper", upper, "lower", lower, "chord", line(0.0, 1.0, false), "tangent", line(1.0, 1.0, true), "samples", samples);
         }
 
         /// <summary>The TLS 1.1 key schedule walk on the built-in training key, open with Show keys OFF (sections-plan.md line 159).</summary>
