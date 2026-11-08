@@ -1684,6 +1684,17 @@
    "counts": true
   },
   {
+   "id": "A17.link.partial-holder-ends-on-read-deadline",
+   "base": "A17.link.partial-holder-ends-on-read-deadline",
+   "assertion": "A17",
+   "group": "a17",
+   "build": "host",
+   "slice": "V0",
+   "referee": "test over HTTP and WebSocket, OpenSSL, ssh.exe, Go referees; known-answer where no outside referee exists",
+   "roles": [],
+   "counts": true
+  },
+  {
    "id": "A17.mock.golden-trace-equal.cf",
    "base": "A17.mock.golden-trace-equal",
    "assertion": "A17",

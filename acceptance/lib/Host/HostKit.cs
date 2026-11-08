@@ -195,11 +195,12 @@ namespace Acceptance
         }
 
         /// <summary>
-        /// How long a run may send no frame before the suite stops reading. It must outlast the product's own read deadline,
-        /// FrameEngine.DeadlineMs = 30000 in src/NetSec.Core/Labs/FrameEngine.cs (lessons-4-5-names.md, L5-flip-record-length),
-        /// or the suite stops just as that lab ends by name with LINK_DEADLINE. Change both together.
+        /// How long a run may send no frame before the suite stops reading. It must outlast the product's longest link timer, or the suite
+        /// stops just as a lab ends by name. Since #309 that is the idle limit of the side that accepted the connection, 90,000 ms (LINK_IDLE);
+        /// the read deadline is 30,000 ms (LINK_DEADLINE). Change both together. 120 s leaves 30 s over 90 s, so a loaded machine cannot cut a
+        /// valid idle expiry off at the edge. A run that is not waiting on a link timer sends frames well inside this.
         /// </summary>
-        const int SilentFrameSeconds = 45;
+        const int SilentFrameSeconds = 120;
 
         static SessionRun Drive(HostProc h, string startJson, bool sendRun)
         {
