@@ -11,11 +11,11 @@ Owners: Richard (map, engine data, slices) and Nancy (screens). Decision owner: 
 
 1. Steve asked for 3 sections: **Handshake**, **Cryptographic techniques** and **Lessons**. Section 3 is today's lesson list with its attack runs ("let's call 'attacks' lessons", Steve, 2026-11-07, through the lead). This plan places all 12 lessons (0 to 11), every mock tab, the 5 key flows (the wizard) and every attack run. Section 1 is the map.
 2. Every lesson has a place: section 3 holds all 12. Each lesson also links to the walk in section 1 or 2 that shows its method, where one exists.
-3. The engine registers 56 attack runs. The tours play 52 of them. 4 are in no tour (section 1.4).
+3. The engine registers 57 attack runs. The tours play 52 of them. 5 are in no tour (section 1.4).
 4. The engine already holds every method the new walks need, with one exception: AES, SHA-256, HMAC, DES, the Diffie-Hellman group, X25519, Ed25519 and the TLS 1.3 key schedule are there. ECDSA is not, and Steve wants it, so its slice adds new engine code. Each new walk needs a new read-only walk type and a new route. No walk adds a field to W1a's frozen AES walk types (section 4).
 5. A walk that runs on a session's own key gives that key away row by row. So each walk names its key. No new walk type in this plan runs on a session's own key: each runs on a public practice key or an RFC vector. W1a's block walk and the session trace keep their existing Show keys OFF rules (section 4).
 6. The order is: the section shell, the AES walk with the long text (W1b), the attack index inside Lessons, the Handshake walk, then one technique walk per slice (section 5).
-7. Kill condition: by 2026-11-27, 3 sections live, 12 of 12 lessons in Lessons, 56 of 56 registered attack runs reachable from the attack index, the AES walk in section 2 with the long text visible, and Steve has stepped through each section in the app (section 6).
+7. Kill condition: by 2026-11-27, 3 sections live, 12 of 12 lessons in Lessons, 57 of 57 registered attack runs reachable from the attack index, the AES walk in section 2 with the long text visible, and Steve has stepped through each section in the app (section 6).
 
 ## Requirements
 
@@ -76,7 +76,7 @@ All 12 lessons go in section 3, Lessons, with their numbers kept. The last colum
 
 ### 1.4 Attack runs
 
-The engine registers **56** runs: 54 ids in `Labs.cs` and 2 in `Lesson11Timing.cs`. The live Host's `GET /api/lessons` and `/api/lessons/0` list the same 56 (Echo, 2026-11-07). The tours play **52**. All of them stay in their lessons, in section 3, and Lessons also gets an index of all 56 by kind (Steve, Q1). The kinds below are mine. Nancy's screen lines may rename them.
+The engine registers **57** runs: 55 ids in `Labs.cs` and 2 in `Lesson11Timing.cs`. The live Host's `GET /api/lessons` and `/api/lessons/0` list every registered run (Echo counted 56 on 2026-11-07, before P4b added `L7-decrypt-recording`). The tours play **52**. All of them stay in their lessons, in section 3, and Lessons also gets an index of all 57 by kind (Steve, Q1). The kinds below are mine. Nancy's screen lines may rename them.
 
 | Kind | Runs | Count |
 |---|---|---|
@@ -91,10 +91,10 @@ The engine registers **56** runs: 54 ids in `Labs.cs` and 2 in `Lesson11Timing.c
 | Side channel | L11-guess-leaky, L11-guess-constant-time | 2 |
 | Not settled: L5-clear-close-notify (a cut stream, not a byte change) | Placed under "Change bytes" for now | 1 |
 | **Tour runs, total** | | **52** |
-| In the engine, in no tour | L0-flip-wire-byte, L2-flip-hmac-message, L2-flip-cmac-tag, L10-wrong-role | 4 |
-| **Engine runs, total** | | **56** |
+| In the engine, in no tour | L0-flip-wire-byte, L2-flip-hmac-message, L2-flip-cmac-tag, L10-wrong-role, L7-decrypt-recording | 5 |
+| **Engine runs, total** | | **57** |
 
-The index lists all 56. An entry for a run that a tour plays opens its tour step. An entry for one of the 4 runs in no tour opens its lesson's free play at the run's button (`attack-<attackId>`, which the free-play log draws for every registered run). Kinds for the 4: L0-flip-wire-byte, L2-flip-hmac-message and L2-flip-cmac-tag change bytes on the wire. L10-wrong-role asks for what was never granted. The kill condition counts 56. The index reads the registry from `GET /api/lessons`, so a run added later appears with no edit to the index.
+The index lists all 57. An entry for a run that a tour plays opens its tour step. An entry for one of the 5 runs in no tour opens its lesson's free play at the run's button (`attack-<attackId>`, which the free-play log draws for every registered run). Kinds for the 5: L0-flip-wire-byte, L2-flip-hmac-message and L2-flip-cmac-tag change bytes on the wire. L10-wrong-role asks for what was never granted. L7-decrypt-recording opens a recorded run with a stolen server key; its kind label is Nancy's call. The kill condition counts 57. The index reads the registry from `GET /api/lessons`, so a run added later appears with no edit to the index.
 
 The 5 "Switch to the eavesdropper view" try-its and lesson 7's "Run both handshakes" are views and runs, not attacks. They stay in their lessons.
 
@@ -107,7 +107,7 @@ Nancy's screen lines, 2026-11-07, with her update for Steve's answers. Plan only
    - Techniques: AES, HMAC and chain, Feistel, Diffie-Hellman, X25519, Ed25519, ECDSA P-256. One item each. X25519 is the only elliptic-curve key-agreement item. Both signature families stay.
    - Lessons: today's 12 lessons, numbered as now, and one more item at the bottom, "Attack runs".
 2. **R1, "the long text is always visible".** A pinned strip across the top of the workspace in Techniques, above the walk root. It shows one line of the long cleartext, mono, with the current block highlighted. It scrolls sideways, and the walk's chosen block stays in view. It stays while the learner moves between the Techniques items. A walk that shows a value derived from the text draws a link line from the strip to its grid. Height 44 px, so 1280 x 640 still fits the walk. It mounts outside `walk-root`, so the walk's clip cannot cut it. It reads the rows of `POST /api/walk/aes/long-text`, and the typed-block route feeds the walk's text box. Both routes stay open with Show keys off, so the strip shows with Show keys off too.
-3. **Attack runs (the index, Steve's Q1).** "Attack runs" opens an index of all 56 runs grouped by kind. Each row names the attack, its lesson, and the check that catches it. The group labels on screen are Nancy's: tamper, replay, downgrade, swapped key or identity, nonce reuse, length extension, timing, token misuse. Slice P3 fixes how section 1.4's kinds map to these labels. A click on a row opens that lesson with the attack run: the normal run beside the attacked run, the changed message diffed in Message bytes with changed bytes lit, and the catching check under both, pass on the left and fail on the right. Back returns to the index with the row kept. This needs a new two-run layout: 2 sessions on one screen. The Both view does not do it, because Both shows one session's Endpoints and Eavesdropper diagrams (`ux-design.md`, "Both (split diagram)"). The nearest piece to reuse is lesson 7's "Old vs new race": 2 diagrams side by side on one clock (`ux-design.md` section 6, item 6). Slice P3 builds the two-run layout from it. Each pane uses the diagram that #219 made fill its pane.
+3. **Attack runs (the index, Steve's Q1).** "Attack runs" opens an index of all 57 runs grouped by kind. Each row names the attack, its lesson, and the check that catches it. The group labels on screen are Nancy's: tamper, replay, downgrade, swapped key or identity, nonce reuse, length extension, timing, token misuse. Slice P3 fixes how section 1.4's kinds map to these labels. A click on a row opens that lesson with the attack run: the normal run beside the attacked run, the changed message diffed in Message bytes with changed bytes lit, and the catching check under both, pass on the left and fail on the right. Back returns to the index with the row kept. This needs a new two-run layout: 2 sessions on one screen. The Both view does not do it, because Both shows one session's Endpoints and Eavesdropper diagrams (`ux-design.md`, "Both (split diagram)"). The nearest piece to reuse is lesson 7's "Old vs new race": 2 diagrams side by side on one clock (`ux-design.md` section 6, item 6). Slice P3 builds the two-run layout from it. Each pane uses the diagram that #219 made fill its pane.
 
    Group labels for section 1.4's kinds that Nancy's 8 labels do not name: "Ask for what was never granted" (L6-ask-past-key, L8-refused-tunnel, L10-ungranted-capability, L10-unissued-challenge, L10-wrong-role) gets a ninth label, "never granted". "Time or freshness" (L4-expired-cert, L10-expired-token) gets a tenth label, "expired or stale". P3 may merge labels, but no run goes without a group.
 4. **Security setup, wizard, vault, glossary.** A shared area outside the 3 sections, reached from the top bar (Security setup) and from Settings (Glossary). Each replaces the workspace and keeps the bar, as today.
@@ -122,7 +122,7 @@ Nancy's 2 screen questions are in section 8 as Q3 and Q4. Steve answered A to bo
 |---|---|---|
 | Lesson rail | Moves | Becomes section 3, Lessons. Lesson numbers and ids unchanged |
 | Tours, tour steps, try-its | Stay | No text or id change |
-| The 56 registered attack runs | Stay in tours and free play | `attacks.json` (new) with attack id, kind, tour step (or none), and the guard sentence. Content only. The check name and code come from `GET /api/lessons` |
+| The 57 registered attack runs | Stay in tours and free play | `attacks.json` (new) with attack id, kind, tour step (or none), and the guard sentence. Content only. The check name and code come from `GET /api/lessons` |
 | AES walk (W1b) | New screens in section 2 | Adds the long text (was W2) |
 | HMAC and chain walk | New | Section 2 |
 | Feistel walk | New | Section 2, on the engine's DES |
@@ -188,7 +188,7 @@ The attack index needs no engine data: `run-attack` already plays each run, and 
 | P1 section shell | The 3-section switch, with today's rail as Lessons, from Nancy's lines. No engine change | The specs pass with every lesson reachable. 12 of 12 lessons in Lessons | Builds on Nancy's shell (#196). The ux-refresh slices stay as planned |
 | P2 = W1b | The AES walk in section 2, chapter 1, with the long text (R1). Engine half built on `feat/w1b-aes-walk` | W1b's clauses, plus a long-text clause | **W1b becomes the AES walk in section 2.** It takes W2's long text forward. W2 keeps the S-box build, tap-a-byte and the flip spread |
 | Stop: show Steve | Steve steps through section 2 in the app | His reaction in `docs/learnings.md` | Unchanged stop from `walkthrough-design.md` |
-| P3 attack index | `attacks.json`, the list by kind inside Lessons, each entry opening its tour step or its free-play button. The two-run layout, built from lesson 7's race (section 2, item 3; Steve, Q4) | 56 of 56 registered runs reachable, each plays its run and shows its check | None to the tours. The race layout becomes shared by lesson 7 and the index |
+| P3 attack index | `attacks.json`, the list by kind inside Lessons, each entry opening its tour step or its free-play button. The two-run layout, built from lesson 7's race (section 2, item 3; Steve, Q4) | 57 of 57 registered runs reachable, each plays its run and shows its check | None to the tours. The race layout becomes shared by lesson 7 and the index |
 | P4 Handshake walk | The TLS 1.3 message walk, the key schedule walk, the chain view | RFC 8448 values, lesson 4 and 5 clauses | Takes **W4** (lesson 5 record walk) and the lesson 4 half of **W3** |
 | P4b TLS 1.1 key transport and forward secrecy, R8 | `Tls11KeyScheduleWalk`, and the attack run `L7-decrypt-recording`. The registry then holds 57 runs; every count in this plan follows the live count from `GET /api/lessons`, so P4b updates the literal 56 in section 1.4, P3 and the kill condition | The key log line, OpenSSL, and the recovered plaintext | Adds 1 attack run to lesson 7. The tour text does not change: L7-S05 already explains record now, decrypt later, and the index opens the new run at its free-play button |
 | P5 W1c | Chapter 2 modes, unchanged | W1c's clauses | Unchanged, now inside section 2 |
@@ -221,7 +221,7 @@ This plan's first step ends when all of these hold, by **2026-11-27**:
 
 1. 3 of 3 sections are live in the app.
 2. 12 of 12 lessons are in the Lessons section, with their numbers kept.
-3. 56 of 56 registered attack runs (the count `GET /api/lessons` and `/api/lessons/0` give) are reachable from the attack index, and each plays its run.
+3. 57 of 57 registered attack runs (the count `GET /api/lessons` and `/api/lessons/0` give) are reachable from the attack index, and each plays its run.
 4. The AES walk (W1b) runs in section 2, and the long text is on screen on every technique tab that exists.
 5. Steve has stepped through each section in the app and reacted.
 
@@ -261,7 +261,7 @@ From Steve's 2 videos (2026-11-07), answered by Steve:
 1. Elliptic-curve methods mean both key agreement (ECDH, X25519) and signatures (ECDSA, Ed25519). Both go in section 2.
 2. W1b becomes the AES walk inside section 2, and it goes before V4's certificate file path.
 3. Section 3 is named Lessons ("let's call 'attacks' lessons"). Today's lesson list, with its attack runs, becomes section 3. This answers the old question about lessons 6, 8, 9 and 10: they stay in Lessons with the rest. It also settles lesson numbers: Lessons keeps 0 to 11.
-4. Q1: A. Lessons gets an index of the attack runs by kind. The index lists all 56 registered runs, the live count from `GET /api/lessons`.
+4. Q1: A. Lessons gets an index of the attack runs by kind. The index lists all registered runs, the live count from `GET /api/lessons` (57 after P4b).
 5. Q2: A. X25519 is enough for key agreement. There is no ECDH walk on P-256. ECDSA keeps P-256 (slice P8b).
 6. Q3: A. The long text is a pinned one-line strip above the walk in Techniques. The W1b screens use it.
 7. Q4: A. An attack run from the index opens with the normal run and the attacked run side by side. P3 builds the two-run layout from lesson 7's race.

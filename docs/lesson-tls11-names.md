@@ -73,6 +73,7 @@ Round trips before the client can send data: 2 in TLS 1.1. The UI counts them fr
 | `compression offered` | `client`, `server` | `TLS11_COMPRESSION_REFUSED` | A fail only |
 | `message shape` | receiver | `TLS11_CCS_BODY`, `TLS11_RENEGOTIATION_INFO`, `TLS11_RECORD_OVERFLOW`, and parse codes | A fail only |
 | `downgrade sentinel` | `client` on `tls13` | `TLS13_DOWNGRADE_SENTINEL` | A fail only. Read on the TLS 1.3 client |
+| `forward secrecy` | `attacker` | `TLS11_NO_STORED_KEY` | In `L7-decrypt-recording` only. Fails when a stolen server key opens no ECDHE recording |
 
 ## Attacks
 
@@ -81,6 +82,7 @@ Round trips before the client can send data: 2 in TLS 1.1. The UI counts them fr
 | `L7-downgrade` | Stands for a rewrite of the TLS 1.3 `ClientHello`: the hello offers only TLS 1.1. The server speaks TLS 1.3 too, so it agrees and writes `DOWNGRD` into its random. The bytes sit in `ServerHello` on `wire.sent` | `Rejected` | `TLS13_DOWNGRADE_SENTINEL` | `downgrade sentinel` |
 | `L7-modern-server` | Connects the TLS 1.1 client to a server that speaks only TLS 1.3 | `Rejected` | `TLS11_ALERT_PROTOCOL_VERSION` | `protocol_version alert` |
 | `L7-flip-record` | Flips one bit in the client's `ApplicationData` cipher | `Rejected` | `TLS11_RECORD_MAC` | `record HMAC` |
+| `L7-decrypt-recording` | Records an RSA run and an ECDHE run, then opens both with the server's stolen `tls11.server` key. The RSA recording opens: `attack.recording.opened` on the `attacker` stream carries the client's line in `plain` and the recovered keys in `secrets[]`. The ECDHE recording stays closed | `Rejected` | `TLS11_NO_STORED_KEY` | `forward secrecy` |
 
 The sentinel helps only a client that speaks TLS 1.3. A TLS 1.1 client has nothing to check (accuracy rule 2). A builder test pins this: the TLS 1.1 client completes against a server that writes `DOWNGRD`.
 

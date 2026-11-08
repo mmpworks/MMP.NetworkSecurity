@@ -10,7 +10,8 @@
     { "id": "timing", "text": "timing" },
     { "id": "token-misuse", "text": "token misuse" },
     { "id": "never-granted", "text": "never granted" },
-    { "id": "expired", "text": "expired or stale" }
+    { "id": "expired", "text": "expired or stale" },
+    { "id": "stolen-key", "text": "stolen key" }
   ],
   "runs": [
     { "attackId": "L0-flip-wire-byte", "kind": "tamper", "tourStep": null,
@@ -69,6 +70,8 @@
       "guard": "The bank decrypts the PIN block and checks its format, so a changed bit gives a block that fails the format check." },
     { "attackId": "L6-replay-sale", "kind": "replay", "tourStep": "L6-S10",
       "guard": "The bank records each key serial number it has seen and refuses a sale that reuses one." },
+    { "attackId": "L7-decrypt-recording", "kind": "stolen-key", "tourStep": null,
+      "guard": "A stolen server key opens a recorded RSA session. The same key opens nothing on ECDHE, because neither side stores the shares that made its keys." },
     { "attackId": "L7-downgrade", "kind": "downgrade", "tourStep": "L7-S08",
       "guard": "A TLS 1.3 server that is forced to an older version writes a sentinel into its random value. A client that speaks TLS 1.3 sees it and stops." },
     { "attackId": "L7-flip-record", "kind": "tamper", "tourStep": "L7-S07",
