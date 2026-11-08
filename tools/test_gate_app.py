@@ -36,6 +36,10 @@ def plan(has_app=True, skip=False, lesson="", files=()):
               f"-AppDiffFiles @({names})")
 
 
+def plan_from(files):
+    return plan(files=files)
+
+
 class NonCode(unittest.TestCase):
     """The only way app proof is skipped on its own: every changed file under app/ is a Markdown file, or an image in a screens folder."""
 
@@ -45,6 +49,10 @@ class NonCode(unittest.TestCase):
     def test_markdown_is_non_code_anywhere_under_app(self):
         for path in DOCS + ["app/e2e/NOTES.MD"]:
             self.assertTrue(self.is_non_code(path), path)
+
+    def test_the_image_suffixes_are_a_fixed_list(self):
+        for path in ["app/screens/a.bmp", "app/screens/a.ico", "app/screens/a.tiff", "app/screens/a.psd", "app/screens/a.png.exe", "app/screens/a"]:
+            self.assertFalse(self.is_non_code(path), path)
 
     def test_images_in_a_screens_folder_are_non_code(self):
         for path in SCREENS + ["app/a/b/screens/x.JPG", "app/screens/y.webp", "app/screens/z.gif", "app/screens/w.jpeg"]:
@@ -163,6 +171,46 @@ class RepoFacts(unittest.TestCase):
 
     def count(self):
         return len(self.files())
+
+    # Jared's #277 review: what git reports for renames, deletes and new files decides whether the rule can be fooled.
+    def test_a_committed_rename_from_ts_to_md_reports_both_names_so_it_is_code(self):
+        self.commit("app/src/foo.ts", "export const a = 1\n")
+        git("update-ref", "refs/remotes/origin/main", "HEAD", cwd=self.repo)
+        git("mv", "app/src/foo.ts", "app/src/foo.md", cwd=self.repo)
+        git("commit", "-q", "-m", "rename", cwd=self.repo)
+        files = self.files()
+        self.assertIn("app/src/foo.ts", files)
+        self.assertIn("app/src/foo.md", files)
+        self.assertEqual(plan_from(files)["Mode"], "suite")
+
+    def test_an_uncommitted_rename_from_ts_to_md_reports_both_names_so_it_is_code(self):
+        self.commit("app/src/foo.ts", "export const a = 1\n")
+        git("update-ref", "refs/remotes/origin/main", "HEAD", cwd=self.repo)
+        git("mv", "app/src/foo.ts", "app/src/foo.md", cwd=self.repo)
+        files = self.files()
+        self.assertIn("app/src/foo.ts", files)
+        self.assertEqual(plan_from(files)["Mode"], "suite")
+
+    def test_deleting_a_ts_file_is_a_code_change(self):
+        self.commit("app/src/gone.ts", "x")
+        git("update-ref", "refs/remotes/origin/main", "HEAD", cwd=self.repo)
+        git("rm", "-q", "app/src/gone.ts", cwd=self.repo)
+        git("commit", "-q", "-m", "delete", cwd=self.repo)
+        self.assertEqual(plan_from(self.files())["Mode"], "suite")
+
+    def test_an_untracked_ts_file_is_a_code_change(self):
+        (self.repo / "app" / "new.ts").write_text("x", encoding="utf-8")
+        self.assertEqual(plan_from(self.files())["Mode"], "suite")
+
+    def test_markdown_plus_ts_runs_app_proof(self):
+        self.commit("app/NOTES.md", "n")
+        self.commit("app/src/x.ts", "x")
+        self.assertEqual(plan_from(self.files())["Mode"], "suite")
+
+    def test_markdown_only_in_a_real_repo_is_the_docs_mode(self):
+        self.commit("app/NOTES.md", "n")
+        self.commit("app/docs/screens/a.png", "png")
+        self.assertEqual(plan_from(self.files())["Mode"], "docs")
 
     def test_the_file_names_are_returned_not_only_a_count(self):
         self.commit("app/b.md", "b")
@@ -287,6 +335,18 @@ class Tools(unittest.TestCase):
         finally:
             del os.environ["ELECTRON_OVERRIDE_DIST_PATH"]
         self.assertEqual(out, [])
+
+    def test_an_electron_path_that_is_a_folder_is_missing(self):
+        self.tree("node_modules/electron/index.js")
+        (self.app / "node_modules" / "electron" / "index.js").write_text(self.FAKE_INDEX, encoding="utf-8")
+        folder = pathlib.Path(self.tmp.name) / "dist3"
+        (folder / "electron.exe").mkdir(parents=True)          # a folder where the binary should be
+        os.environ["ELECTRON_OVERRIDE_DIST_PATH"] = str(folder)
+        try:
+            out = ps(f"@(Test-ElectronBinary -AppDir '{self.app}')")
+        finally:
+            del os.environ["ELECTRON_OVERRIDE_DIST_PATH"]
+        self.assertTrue(any("TOOL_MISSING" in m for m in out), out)
 
     def test_an_electron_path_with_a_file_behind_it_is_ready(self):
         self.tree("node_modules/electron/index.js")

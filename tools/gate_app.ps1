@@ -20,8 +20,9 @@ function Get-AppDiffFiles([string]$Repo, [string]$Base = 'origin/main') {
     git -C $Repo rev-parse --verify -q $Base *> $null
     if ($LASTEXITCODE -ne 0) { return @('(origin/main unknown)') }
     $names = [System.Collections.Generic.SortedSet[string]]::new()
-    foreach ($n in @(git -C $Repo diff --name-only "$Base...HEAD" -- app 2>$null)) { if ($n) { [void]$names.Add($n) } }
-    foreach ($line in @(git -C $Repo status --porcelain -- app 2>$null)) { if ($line.Length -gt 3) { [void]$names.Add($line.Substring(3).Trim('"')) } }
+    # --no-renames lists a rename as a delete of the old path plus an add of the new one, so foo.ts renamed to foo.md still shows foo.ts (code).
+    foreach ($n in @(git -C $Repo diff --name-only --no-renames "$Base...HEAD" -- app 2>$null)) { if ($n) { [void]$names.Add($n) } }
+    foreach ($line in @(git -C $Repo status --porcelain --no-renames -- app 2>$null)) { if ($line.Length -gt 3) { [void]$names.Add($line.Substring(3).Trim('"')) } }
     return @($names)
 }
 
@@ -84,7 +85,7 @@ function Test-ElectronBinary([string]$AppDir) {
     # ELECTRON_OVERRIDE_DIST_PATH); it never checks the file exists, so the probe checks that too.
     Push-Location $AppDir
     # With the override and no path.txt, index.js returns <dist>/electron with no extension and Windows starts <dist>/electron.exe, so both count.
-    try { node -e "const p = require('electron'); const fs = require('fs'); if (typeof p !== 'string' || !(fs.existsSync(p) || fs.existsSync(p + '.exe'))) process.exit(3)" 2>$null *> $null; $code = $LASTEXITCODE } finally { Pop-Location }
+    try { node -e "const p = require('electron'); const fs = require('fs'); const isFile = f => fs.existsSync(f) && fs.statSync(f).isFile(); if (typeof p !== 'string' || !(isFile(p) || isFile(p + '.exe'))) process.exit(3)" 2>$null *> $null; $code = $LASTEXITCODE } finally { Pop-Location }
     if ($code -eq 0) { return @() }
     return @('TOOL_MISSING: the Electron binary is missing or broken in app/node_modules/electron. Set ELECTRON_OVERRIDE_DIST_PATH to another checkout''s node_modules/electron/dist, or run this yourself: cd app; node node_modules/electron/install.js')
 }
