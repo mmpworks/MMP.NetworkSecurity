@@ -351,7 +351,7 @@ test('a Show keys off the Host could not save shows "not saved yet" until the re
     await page.getByTestId('sec-show-keys-switch').click()
     await expect(page.getByTestId('sec-show-keys-switch')).not.toBeChecked()
     await expect(page.getByTestId('sec-show-keys-unsaved')).toBeVisible()
-    await expect(page.getByTestId('sec-show-keys-unsaved')).toHaveText('Show keys is off, but the choice is not saved yet. The course keeps trying.')
+    await expect(page.getByTestId('sec-show-keys-unsaved')).toHaveText('Show keys is off now. The choice is not saved yet. The course keeps trying, and until then a restart may show keys again.')
     expect(await hostOn()).toBe(false)
     await shot(page, '09-not-saved-yet')
   } finally { await hold.release() }
