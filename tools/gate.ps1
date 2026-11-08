@@ -79,6 +79,7 @@ switch ($Slice) {
 # ---------------------------------------------------------------- base gate
 Step 'layer_check' { python tools/layer_check.py src/NetSec.Core }
 Step 'secret_guard' { python -I tools/secret_guard.py }
+Step 'no package-runner calls in tools and app scripts' { python -I tools/no_npx.py }
 Step 'pre-push guard tests' { python -I tools/githooks/test_pre_push_guard.py }
 Step 'pre-push hook installed and current' { pwsh -NoProfile -File tools/githooks/check-installed.ps1 }
 
@@ -117,7 +118,18 @@ foreach ($tour in $tours) { Step "tic-gate $($tour.Name)" { python (Join-Path $H
 
 if ($appWhy) { Skip 'playwright lesson spec' $appWhy }
 elseif (-not $Lesson) { Skip 'playwright lesson spec' 'no -Lesson given' }
-else { Step "playwright lesson $Lesson" { Push-Location app; npx playwright test "e2e/lesson-$Lesson.spec.ts"; Pop-Location } }
+else {
+    # The local Playwright CLI, never the package runner: it can run a package of the same name from outside this repo (tools/no_npx.py guards this).
+    Step "playwright lesson $Lesson" {
+        Push-Location app
+        $cli = 'node_modules/@playwright/test/cli.js'
+        if (-not (Test-Path $cli)) { "TOOL_MISSING: app/$cli is absent. Run npm ci in app/."; Pop-Location; $global:LASTEXITCODE = 1; return }
+        node $cli test "e2e/lesson-$Lesson.spec.ts"
+        $code = $LASTEXITCODE
+        Pop-Location
+        $global:LASTEXITCODE = $code
+    }
+}
 
 Step 'lessons_status' { python tools/lessons_status.py docs/_runs }
 
