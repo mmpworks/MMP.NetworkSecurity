@@ -19,6 +19,7 @@ Each `.nsv` group carries a `# source:` line, and `SELF.vector-provenance` fails
 | `hmac-rfc4231.nsv` | HMAC-SHA-256, SHA-384, SHA-512 test cases 1 to 7 | RFC 4231 section 4 | text parse, byte counts checked against the RFC's own '(N bytes)'; case 5 is the truncated one | BCL HMAC |
 | `cmac-rfc4493.nsv` | AES-CMAC examples 1 to 4 | RFC 4493 section 4 | text parse, message length checked | a CMAC written for the self-test |
 | `hkdf-rfc5869.nsv` | HKDF test cases 1 to 7 (SHA-256 and SHA-1) | RFC 5869 appendix A | text parse | BCL HKDF |
+| `ecdsa-rfc6979.nsv` | ECDSA P-256 with SHA-256: the key pair, and k, r and s for the messages "sample" and "test" | RFC 6979 appendix A.2.5, rfc6979.txt | text parse; each of the 12 values checked against the RFC text by a script (2026-11-08) | P-256 arithmetic on .NET's own curve parameters, .NET ECDsa verify, and OpenSSL `dgst -verify` (A19.host.ecdsa-walk-open-and-rfc6979) |
 | `x25519-rfc7748.nsv` | X25519 scalar multiplication, 1 and 1,000 iterations, Diffie-Hellman | RFC 7748 sections 5.2 and 6.1 | text parse (the 1,000,000 iteration value is not used) | python cryptography X25519 |
 | `ed25519-rfc8032.nsv` | Ed25519 tests 1, 2, 3, 1024 and SHA(abc) | RFC 8032 section 7.1 | text parse, message length checked | python cryptography Ed25519 |
 | `dh-group14-rfc3526.nsv` | MODP group 14 prime and generator | RFC 3526 section 3 | text parse, 512 hex digits | python pow() with the DH vectors |

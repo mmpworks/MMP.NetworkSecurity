@@ -13,6 +13,11 @@
     { "route": "/api/walk/tls11/schedule", "off": "open", "why": "a fixed teaching run on the built-in training key, which is public in the source (sections-plan.md line 159, slice P4b). Clause: A19.host.tls11-schedule-open-and-prf" },
     { "route": "/api/walk/dh", "off": "open", "why": "it runs on public practice exponents, never a session's key (sections-plan.md section 4, slice P7). Clause: A19.host.dh-walk-open-and-modpow" },
     { "route": "/api/walk/ed25519", "off": "open", "why": "it runs on RFC 8032 section 7.1's published test keys only, never a session's key (sections-plan.md section 4, slice P8). Clause: A19.host.ed25519-walk-open-and-rfc8032" },
+    { "route": "/api/walk/sha256", "off": "open", "why": "FIPS 180-4's published examples, no key (sections-plan.md section 4, slice P6). Clause: A19.host.sha256-walk-open-and-fips180" },
+    { "route": "/api/walk/hmac", "off": "open", "why": "RFC 4231 section 4's published test keys only, never a session's key (slice P6). Clause: A19.host.hmac-walk-open-and-rfc4231" },
+    { "route": "/api/walk/seal-chain", "off": "open", "why": "a 4-row fixture chain from a public seed, never the learner's audit rows (slice P6). Clause: A19.host.seal-chain-walk-open-and-own-hash" },
+    { "route": "/api/walk/ecdsa", "off": "open", "why": "RFC 6979 A.2.5's published P-256 test key only, never a session's key (slice P8b). Clause: A19.host.ecdsa-walk-open-and-rfc6979" },
+    { "route": "/api/walk/des", "off": "open", "why": "NIST CAVP's published DES known answers only, never a session's key (slice P9). Clause: A19.host.des-walk-open-and-cavp" },
     { "route": "/api/walk/x25519", "off": "open", "why": "it runs on RFC 7748 section 6.1's public test scalars, never a session's key (sections-plan.md section 4, slice P8). Clause: A19.host.x25519-walk-open-and-rfc7748" },
     { "route": "/api/walk/aes/typed-block", "off": "open", "why": "it runs only on the public practice key, and reads no run's key (section 2.2g). Clause: A19.host.typed-routes-open-with-keys-off" },
     { "route": "/api/walk/aes/long-text", "off": "open", "why": "it runs only on the public practice key, and reads no run's key (section 2.2g). Clause: A19.host.typed-routes-open-with-keys-off" }

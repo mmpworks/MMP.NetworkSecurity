@@ -151,10 +151,15 @@ namespace Acceptance
             System.Numerics.BigInteger h = Ed25519WalkClauses.FromLittleEndian(Ed25519WalkClauses.Sha512(rPoint, pub, msg)) % Ed25519WalkClauses.L;
             if (M("ed25519-wrong-h")) h = (h + 1) % Ed25519WalkClauses.L;
             Func<byte[], string> hx = b => Hex.Encode(b).ToLowerInvariant();
+            // The verify middle points on the suite's edwards25519 arithmetic. The defect ed25519-sb-wrong shows 2*S*B as sB.
+            Ed25519WalkClauses.EPt bp = Ed25519WalkClauses.BasePoint(), aPt = Ed25519WalkClauses.Decode(pub);
+            Ed25519WalkClauses.EPt sB = Ed25519WalkClauses.EMul(Ed25519WalkClauses.FromLittleEndian(s), bp);
+            Ed25519WalkClauses.EPt minusHA = Ed25519WalkClauses.EMul(h, new Ed25519WalkClauses.EPt((Ed25519WalkClauses.Pq - aPt.X) % Ed25519WalkClauses.Pq, aPt.Y));
+            byte[] sBShown = Ed25519WalkClauses.Encode(M("ed25519-sb-wrong") ? Ed25519WalkClauses.EAdd(sB, sB) : sB);
             WalkWrite(ctx, 200, D("test", (double)n, "source", "RFC 8032 section 7.1", "keySource", "rfc8032", "byteOrder", "little-endian",
                 "seed", hx(seed), "message", hx(msg), "expanded", hx(expanded), "scalar", hx(scalar), "prefix", hx(prefix), "publicKey", hx(pub),
                 "r", hx(Ed25519WalkClauses.ToLittleEndian32(r)), "rPoint", hx(rPoint), "h", hx(Ed25519WalkClauses.ToLittleEndian32(h)), "s", hx(s), "signature", hx(sig),
-                "verify", D("sB", hx(new byte[32]), "minusHA", hx(new byte[32]), "rPrime", hx(rPoint), "valid", true)), false);
+                "verify", D("sB", hx(sBShown), "minusHA", hx(Ed25519WalkClauses.Encode(minusHA)), "rPrime", hx(rPoint), "valid", true)), false);
             return true;
         }
 

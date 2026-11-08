@@ -21,6 +21,48 @@ namespace Acceptance
 
         public static BigInteger FromLittleEndian(byte[] b) { return new BigInteger(b, isUnsigned: true, isBigEndian: false); }
 
+        // ---------------------------------------------------------------- edwards25519 (RFC 8032 section 5.1), affine, on BigInteger; the identity is (0, 1)
+
+        public static readonly BigInteger Pq = BigInteger.Pow(2, 255) - 19;
+        static BigInteger Fm(BigInteger v) { BigInteger r = v % Pq; return r.Sign < 0 ? r + Pq : r; }
+        static BigInteger FInv(BigInteger v) { return BigInteger.ModPow(Fm(v), Pq - 2, Pq); }
+        /// <summary>d = -121665 / 121666 mod p.</summary>
+        public static readonly BigInteger Dc = Fm(-121665 * FInv(121666));
+
+        public sealed class EPt { public BigInteger X, Y; public EPt(BigInteger x, BigInteger y) { X = x; Y = y; } }
+
+        /// <summary>The x for a y, with the given low bit (section 5.1.3). Null when no x fits.</summary>
+        public static EPt FromY(BigInteger y, int sign)
+        {
+            BigInteger u = Fm(y * y - 1), v = Fm(Dc * y * y + 1), x2 = Fm(u * FInv(v));
+            BigInteger x = BigInteger.ModPow(x2, (Pq + 3) / 8, Pq);
+            if (Fm(x * x) != x2) x = Fm(x * BigInteger.ModPow(2, (Pq - 1) / 4, Pq));
+            if (Fm(x * x) != x2) return null;
+            if ((int)(x & 1) != sign) x = Fm(-x);
+            return new EPt(x, y);
+        }
+
+        /// <summary>The base point B: y = 4/5, x even (section 5.1).</summary>
+        public static EPt BasePoint() { return FromY(Fm(4 * FInv(5)), 0); }
+
+        public static EPt EAdd(EPt p, EPt q)
+        {
+            BigInteger t = Fm(Dc * p.X * q.X * p.Y * q.Y);
+            return new EPt(Fm((p.X * q.Y + p.Y * q.X) * FInv(1 + t)), Fm((p.Y * q.Y + p.X * q.X) * FInv(1 - t)));
+        }
+
+        public static EPt EMul(BigInteger k, EPt p)
+        {
+            EPt r = new EPt(0, 1);
+            for (int bit = (int)k.GetBitLength() - 1; bit >= 0; bit--) { r = EAdd(r, r); if (!((k >> bit) & 1).IsZero) r = EAdd(r, p); }
+            return r;
+        }
+
+        /// <summary>Section 5.1.2: y little-endian, with the low bit of x in the top bit.</summary>
+        public static byte[] Encode(EPt p) { byte[] b = ToLittleEndian32(p.Y); if (!(p.X & 1).IsZero) b[31] |= 0x80; return b; }
+
+        public static EPt Decode(byte[] b) { byte[] y = (byte[])b.Clone(); int sign = y[31] >> 7; y[31] &= 0x7f; return FromY(FromLittleEndian(y), sign); }
+
         public static byte[] ToLittleEndian32(BigInteger v)
         {
             byte[] raw = v.ToByteArray(isUnsigned: true, isBigEndian: false);
@@ -56,12 +98,12 @@ namespace Acceptance
             return Hex.Decode(s);
         }
 
-        /// <summary>r and h may come as the 64-byte hash or as the 32-byte value mod L. Either must match the suite's own hash.</summary>
+        /// <summary>r and h come as the 32-byte little-endian value mod L, as RFC 8032 encodes scalars (Richard's shape), not the 64-byte hash.</summary>
         static void SameModL(string where, byte[] hash64, byte[] shown)
         {
             BigInteger want = FromLittleEndian(hash64) % L;
-            if (shown.Length == 64) Check.Equal(where + " (the 64-byte hash)", Hx(hash64), Hx(shown));
-            else Check.True(shown.Length == 32 && FromLittleEndian(shown) == want, where + ": the value is not the hash mod L (" + shown.Length + " bytes)");
+            Check.True(shown.Length == 32, where + ": the value is " + shown.Length + " bytes, and the contract gives 32 (the hash mod L)");
+            Check.Equal(where, Hx(ToLittleEndian32(want)), Hx(shown));
         }
 
         [Clause("A19.host.ed25519-walk-open-and-rfc8032")]
@@ -105,6 +147,15 @@ namespace Acceptance
                     Dictionary<string, object> verify = MiniJson.Obj(r.Json, "verify");
                     Check.True(verify != null && MiniJson.Bool(verify, "valid", false), where + ": verify.valid should be true");
                     Check.Equal(where + ": verify.rPrime equals R", Hx(rPoint), Hx(Field(verify, "rPrime", where + " verify")));
+                    // The middle points, on the suite's own edwards25519 arithmetic (Jared, #283): sB = S*B, minusHA = h*(-A), and their sum is R.
+                    EPt bp = BasePoint(), aPt = Decode(pub);
+                    Check.True(aPt != null, where + ": RFC 8032's public key does not decode to a curve point");
+                    Check.Equal(where + ": RFC 8032's public key is a*B on the suite's own curve arithmetic", Hx(pub), Hx(Encode(EMul(FromLittleEndian(a), bp))));
+                    BigInteger hModL = FromLittleEndian(hHash) % L;
+                    EPt sB = EMul(FromLittleEndian(sBytes), bp), minusHA = EMul(hModL, new EPt(Fm(-aPt.X), aPt.Y));
+                    Check.Equal(where + ": verify.sB is S*B", Hx(Encode(sB)), Hx(Field(verify, "sB", where + " verify")));
+                    Check.Equal(where + ": verify.minusHA is h*(-A)", Hx(Encode(minusHA)), Hx(Field(verify, "minusHA", where + " verify")));
+                    Check.Equal(where + ": S*B + h*(-A) is R, the RFC's own R", Hx(rPoint), Hx(Encode(EAdd(sB, minusHA))));
                 }
                 foreach (string bad in new string[] { "", "?test=4", "?test=0", "?test=a" })
                 {
