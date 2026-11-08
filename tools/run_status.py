@@ -25,6 +25,8 @@ import time
 ANSI = re.compile(r"\x1b\[[0-9;]*m")
 GATE_FINAL = re.compile(r"^gate (?P<slice>\S+?): (?P<n>\d+) of (?P<m>\d+) steps passed", re.M)
 GATE_EXIT = re.compile(r"^gate exit (?P<code>\d+)", re.M)
+# The commit a run was made on: tools/gate.ps1 prints "gate <slice> @ <sha>[+dirty]" first, and the Playwright globalSetup prints "run @ <sha>[+dirty]".
+HEAD_LINE = re.compile(r"^(?:gate \S+|run) @ (?P<head>[0-9a-f]+(?:\+dirty)?|unknown)\s*$", re.M)
 GATE_STEP = re.compile(r"^== (?P<name>.+?)(?::.*)?$", re.M)
 PW_PASSED = re.compile(r"^\s*(?P<n>\d+) passed \(", re.M)
 PW_FAILED = re.compile(r"^\s*(?P<n>\d+) failed\s*$", re.M)
@@ -96,16 +98,18 @@ def main(argv):
         print(f"NO_LOG  {args.log}")
         return 4
     text = ANSI.sub("", open(args.log, encoding="utf-8", errors="replace").read())
+    head = HEAD_LINE.search(text)
+    commit = f" @ {head['head']}" if head else ""
     done = final_line(text)
     if done:
-        print(f"{done[0]}  {done[1]}")
+        print(f"{done[0]}  {done[1]}{commit}")
         return 0 if done[0] == "PASSED" else 1
     quiet = (time.time() - os.path.getmtime(args.log)) / 60
     here = where(text)
     if quiet > args.stuck_after:
-        print(f"STUCK   at {here}; no output for {quiet:.0f} min (limit {args.stuck_after:g})")
+        print(f"STUCK   at {here}; no output for {quiet:.0f} min (limit {args.stuck_after:g}){commit}")
         return 3
-    print(f"RUNNING {here}; last output {quiet:.0f} min ago")
+    print(f"RUNNING {here}; last output {quiet:.0f} min ago{commit}")
     return 2
 
 

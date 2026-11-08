@@ -65,6 +65,7 @@ export default defineConfig({
   fullyParallel: false,
   retries: 0,
   reporter: [['list']],
+  globalSetup: './e2e/commit-line.ts',
   use: { baseURL: `http://localhost:${PORTS.preview}`, viewport: { width: 1440, height: 900 }, trace: 'retain-on-failure' },
   webServer: [
     { command: `node "${viteCli}" preview --port ${PORTS.preview} --strictPort`, port: PORTS.preview, reuseExistingServer: false, timeout: 60_000 },
