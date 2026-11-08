@@ -191,9 +191,12 @@ namespace Acceptance
         }
 
         /// <summary>The fixed practice key of design section 2.2g: SHAKE256 of the public label "MMP.NetworkSecurity practice key 128", 16 bytes. This group links no product code, so the .NET library computes it.</summary>
-        public static byte[] TypedPracticeKey()
+        public static byte[] TypedPracticeKey() { return TypedPracticeKey(128); }
+
+        /// <summary>The practice key at one size: SHAKE256 of "MMP.NetworkSecurity practice key " and the size, keyBits / 8 bytes (AesPractice.Key in Core).</summary>
+        public static byte[] TypedPracticeKey(int keyBits)
         {
-            return Shake256.HashData(Encoding.UTF8.GetBytes("MMP.NetworkSecurity practice key 128"), 16);
+            return Shake256.HashData(Encoding.UTF8.GetBytes("MMP.NetworkSecurity practice key " + keyBits), keyBits / 8);
         }
 
         static string EcbHex(byte[] key, byte[] block)
@@ -231,6 +234,44 @@ namespace Acceptance
                 SetShowKeys(h, true);
             }
             return "with Show keys OFF and no session, both typed routes answer under the practice key: keySource typed-practice, and the cipher bytes equal AES under SHAKE256 of the public label";
+        }
+
+        /// <summary>
+        /// Design section 2.2g, after #231: a typed block follows the key size picker. With keyBits 192 or 256 both typed routes run under that
+        /// size's practice key, and the reply names the size. Any other size is 400 WALK_BAD_ARGUMENT.
+        /// </summary>
+        [Clause("A19.host.typed-routes-follow-key-size")]
+        public static string TypedRoutesFollowKeySize(Ctx c)
+        {
+            byte[] block = Encoding.ASCII.GetBytes(TextBlock);
+            using (HostProc h = A17.Host(c, "walk-typed-size"))
+            {
+                foreach (int bits in new int[] { 192, 256 })
+                {
+                    byte[] key = TypedPracticeKey(bits);
+                    string want = EcbHex(key, block);
+                    Reply t = HostHttp.Post(h, "/api/walk/aes/typed-block", A17.Obj("text", TextBlock, "keyBits", (double)bits));
+                    Check.True(t.Ok && t.Json != null, bits + " bits: POST /api/walk/aes/typed-block got " + t);
+                    Dictionary<string, object> walk = MiniJson.Obj(t.Json, "walk");
+                    Check.True(walk != null, bits + " bits: the typed-block reply has no walk");
+                    Check.True((int)MiniJson.Num(walk, "keyBits", 0) == bits, bits + " bits: the typed block's keyBits is " + MiniJson.Num(walk, "keyBits", 0));
+                    Check.True((int)MiniJson.Num(walk, "rounds", 0) == bits / 32 + 6, bits + " bits: the typed block's rounds is " + MiniJson.Num(walk, "rounds", 0));
+                    Check.Equal(bits + " bits: keySource of the typed block", "typed-practice", MiniJson.Str(walk, "keySource"));
+                    Check.Equal(bits + " bits: the typed block's cipher bytes under that size's practice key", want, (MiniJson.Str(MiniJson.Obj(walk, "forward"), "output") ?? "").ToLowerInvariant());
+                    Reply l = HostHttp.Post(h, "/api/walk/aes/long-text", A17.Obj("text", TextBlock + TextBlock, "keyBits", (double)bits));
+                    Check.True(l.Ok && l.Json != null, bits + " bits: POST /api/walk/aes/long-text got " + l);
+                    Check.True((int)MiniJson.Num(l.Json, "keyBits", 0) == bits, bits + " bits: the long text's keyBits is " + MiniJson.Num(l.Json, "keyBits", 0));
+                    List<object> rows = MiniJson.Arr(l.Json, "rows");
+                    Check.True(rows != null && rows.Count > 0, bits + " bits: the long-text reply has no rows");
+                    Check.Equal(bits + " bits: ECB of the long text's first block under that size's practice key", want, (MiniJson.Str(MiniJson.AsObject(rows[0]), "ecb") ?? "").ToLowerInvariant());
+                }
+                foreach (string path in new string[] { "/api/walk/aes/typed-block", "/api/walk/aes/long-text" })
+                {
+                    Reply bad = HostHttp.Post(h, path, A17.Obj("text", TextBlock, "keyBits", 100.0));
+                    Check.True(bad.Status == 400 && bad.Code == "WALK_BAD_ARGUMENT", path + " with keyBits 100 should get 400 WALK_BAD_ARGUMENT, and got " + bad);
+                }
+            }
+            return "at 192 and 256 bits both typed routes name the size and run under that size's practice key, and keyBits 100 gets 400 WALK_BAD_ARGUMENT";
         }
 
         [Clause("A19.host.show-keys-off-closes-block-first")]

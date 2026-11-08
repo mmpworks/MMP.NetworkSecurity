@@ -72,7 +72,11 @@ namespace Acceptance
             if (M("walk-routes-missing")) return false;
             // Design section 2.2g: both run on the public practice key and stay open with Show keys OFF.
             if (!_showKeys && M("typed-closed-off")) { WalkFail(ctx, 409, "KEYS_HIDDEN", "closed"); return true; }
-            byte[] typedKey = M("typed-run-key") ? CannedWalkKey : AesWalkHostClauses.TypedPracticeKey();
+            int typedBits = body != null && body.ContainsKey("keyBits") ? (int)MiniJson.Num(body, "keyBits", 128) : 128;
+            if (typedBits != 128 && typedBits != 192 && typedBits != 256 && !M("typed-bad-size-accepted")) { WalkFail(ctx, 400, "WALK_BAD_ARGUMENT", "keyBits must be 128, 192 or 256."); return true; }
+            if (typedBits != 128 && typedBits != 192 && typedBits != 256) typedBits = 128;
+            if (M("typed-size-ignored")) typedBits = 128;
+            byte[] typedKey = M("typed-run-key") ? CannedWalkKey : AesWalkHostClauses.TypedPracticeKey(typedBits);
             byte[] text = Encoding.UTF8.GetBytes((body == null ? null : MiniJson.Str(body, "text")) ?? "");
             if (path.EndsWith("typed-block", StringComparison.Ordinal))
             {
@@ -81,7 +85,7 @@ namespace Acceptance
                 Array.Copy(text, block, used);
                 for (int i = used; i < 16; i++) block[i] = (byte)(16 - used);
                 WalkRun fw = new RefAes(typedKey).Encrypt(block);
-                WalkWrite(ctx, 200, D("walk", D("source", "typed", "keyBits", 128.0, "rounds", 10.0, "keySource", "typed-practice", "inputHex", Hex.Encode(block), "forward", RunJson(fw)),
+                WalkWrite(ctx, 200, D("walk", D("source", "typed", "keyBits", (double)typedBits, "rounds", (double)(typedBits / 32 + 6), "keySource", "typed-practice", "inputHex", Hex.Encode(block), "forward", RunJson(fw)),
                     "cut", D("block", Hex.Encode(block), "usedBytes", (double)used, "paddingBytes", (double)(16 - used))), false);
                 return true;
             }
@@ -103,7 +107,7 @@ namespace Acceptance
                     prev = ecb;
                 }
             }
-            WalkWrite(ctx, 200, D("keySource", "typed-practice", "blocks", (double)rows.Count, "rows", rows), false);
+            WalkWrite(ctx, 200, D("keySource", "typed-practice", "keyBits", (double)typedBits, "blocks", (double)rows.Count, "rows", rows), false);
             return true;
         }
 
