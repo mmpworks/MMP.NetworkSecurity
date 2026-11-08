@@ -12,7 +12,7 @@ namespace NetSec.Tests
 {
     /// <summary>
     /// The SHA-256 walk. Referees: FIPS 180-4's published digests, the BCL's SHA256, and a reference written here that derives K and H(0) from their
-    /// definitions (FIPS 180-4 sections 4.2.2 and 5.3.3: the fractional parts of cube and square roots of the first primes, by exact integer roots),
+    /// definitions (FIPS 180-4 sections 4.2.2 and 5.3.3: the fractional parts of cube and square roots of the first primes, by integer roots with no rounding),
     /// pads the message itself, and checks every schedule word and every round. It copies no table from the engine.
     /// </summary>
     public class Sha256WalksTests
