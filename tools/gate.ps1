@@ -108,6 +108,17 @@ Step 'gate app decision tests' { python -I tools/test_gate_app.py }
 Step 'dist stamp tests' { python -I tools/test_dist_stamp.py }
 Step 'every tools test has a gate step' { python -I tools/check_tests_wired.py }
 Step 'tests-wired check tests' { python -I tools/test_check_tests_wired.py }
+# A change to acceptance/ may touch only acceptance/ and docs/ (tools/check_acceptance_scope.py names each other path).
+Step 'acceptance scope (acceptance/ and docs/ only)' { python -I tools/check_acceptance_scope.py }
+Step 'acceptance scope check tests' { python -I tools/test_check_acceptance_scope.py }
+# A PR that changes acceptance/ bumps acceptance/PIN in the same PR (python -I acceptance/tools/pin.py --write). Until pin.py lands (#316) the two steps skip by name.
+if (Test-Path 'acceptance/tools/pin.py') {
+    Step 'acceptance PIN current' { python -I acceptance/tools/pin.py --check }
+    Step 'acceptance PIN tests' { python -I acceptance/tools/test_pin.py }
+} else {
+    Skip 'acceptance PIN current' 'acceptance/tools/pin.py arrives in #316'
+    Skip 'acceptance PIN tests' 'acceptance/tools/pin.py arrives in #316'
+}
 Step 'pre-push guard tests' { python -I tools/githooks/test_pre_push_guard.py }
 Step 'pre-push hook installed and current' { pwsh -NoProfile -File tools/githooks/check-installed.ps1 }
 
