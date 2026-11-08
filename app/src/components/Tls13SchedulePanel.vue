@@ -9,15 +9,20 @@ interface Reply { source: string; suite: string; keySource: string; steps: Step[
 
 const walk = useWalk<Reply>('/api/walk/tls13/schedule')
 
-/** The step as a formula, in RFC 8446's names. The label is the engine's own string. */
+/**
+ * The step as a formula. The label is the engine's own string. Derive-Secret shows its expanded form from RFC 8446 section 7.1,
+ * HKDF-Expand-Label(Secret, Label, Transcript-Hash(Messages), Hash.length), because the panel shows the transcript hash as an input
+ * (Richard and Jared on #324). The length is the output's own size in bytes.
+ */
 function formula(s: Step): string {
   const label = s.label ? `"${s.label}"` : ''
+  const length = s.output.length / 2
   switch (s.kind) {
     case 'TranscriptHash': return `Transcript-Hash(${(s.messages ?? []).join(', ')})`
     case 'KeyAgreement': return 'X25519(client private key, server public key)'
     case 'Extract': return 'HKDF-Extract(salt, input key)'
-    case 'DeriveSecret': return `Derive-Secret(secret, ${label}, transcript hash)`
-    case 'ExpandLabel': return `HKDF-Expand-Label(secret, ${label}, "", length)`
+    case 'DeriveSecret': return `Derive-Secret: HKDF-Expand-Label(secret, ${label}, transcript hash, ${length})`
+    case 'ExpandLabel': return `HKDF-Expand-Label(secret, ${label}, "", ${length})`
     case 'VerifyData': return 'HMAC(finished key, transcript hash)'
     default: return s.kind
   }
@@ -41,6 +46,7 @@ function inputs(s: Step): { name: string; hex: string }[] {
     <header class="schedule-head">
       <h2>The TLS 1.3 key schedule</h2>
       <p class="muted">Each row is one step of RFC 8446 section 7.1, run by the engine. A row's output feeds the rows after it.</p>
+      <p class="muted" data-testid="tls13-label-note">Each label shows without its "tls13 " prefix, because HKDF-Expand-Label adds that prefix itself.</p>
       <p class="key-source" data-testid="tls13-key-source" :data-key-source="walk.data?.keySource ?? ''">
         Key: RFC 8448's published test key (section 3). Every input is public, so this walk stays open with Show keys off.
       </p>

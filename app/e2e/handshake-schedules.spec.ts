@@ -34,6 +34,8 @@ async function tls13Matches(page: Page, steps: any[]) {
     await expect(page.getByTestId(`tls13-step-${i}`)).toHaveAttribute('data-name', steps[i].name)
     expect(await flat(page, `tls13-step-output-${i}`), `step ${i} output`).toBe(steps[i].output)
     if (steps[i].label) await expect(page.getByTestId(`tls13-step-label-${i}`)).toContainText(`"${steps[i].label}"`)
+    // RFC 8446's Derive-Secret takes the messages and hashes them itself, so the screen shows the expanded form with the hash.
+    if (steps[i].kind === 'DeriveSecret') await expect(page.getByTestId(`tls13-step-label-${i}`)).toContainText(`HKDF-Expand-Label(secret, "${steps[i].label}", transcript hash, ${steps[i].output.length / 2})`)
   }
 }
 
