@@ -12,7 +12,7 @@ import { HOST_PORT, NotRun, TOKEN, hostGet, openApp, readState, requireLive } fr
  * Show keys OFF.
  * Every value on screen is the engine's (R5). The TLS 1.3 values whose step name is a field of vectors/tls13-rfc8448.nsv are also checked
  * against the RFC there, not only against the engine.
- * Test ids (DRAFT, sent to Nancy to confirm): walk-item-tls13 opens tls13-schedule-panel inside walk-root, with one tls13-step-{i} per
+ * Test ids (agreed with Nancy, 2026-11-08; walk-item-tls11 is "TLS 1.1 with RSA (the old way)", after TLS 1.3, the lead's call): walk-item-tls13 opens tls13-schedule-panel inside walk-root, with one tls13-step-{i} per
  * engine step (data-name), holding tls13-step-label-{i} and tls13-step-output-{i}, and tls13-key-source (data-key-source) as the key's
  * label. walk-item-tls11 (Handshake rail, P4b) opens tls11-schedule-panel, with tls11-premaster, tls11-master, tls11-client-mac-key,
  * tls11-server-mac-key, tls11-client-key, tls11-server-key, tls11-key-log and tls11-key-source (data-key-source).
