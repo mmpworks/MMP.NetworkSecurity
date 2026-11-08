@@ -104,6 +104,8 @@ test('[A19.ui.long-strip-shows-long-text-rows] the strip shows one block per row
 
 test('[A19.ui.long-strip-links-to-the-walk-grid] when the walk shows a value from the text, a link line runs from the current strip block to the state grid', async ({ page }) => {
   requireLive();
+  // State cells show only with Show keys ON. Set it here, so this clause does not depend on the order the clauses run in.
+  await setShowKeys(true);
   await page.setViewportSize({ width: 1280, height: 800 });
   await openAesTechnique(page);
   const strip = page.getByTestId('aes-long-strip');
