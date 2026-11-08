@@ -1,0 +1,155 @@
+import { expect, test, type Page } from '@playwright/test'
+import { open } from './walk'
+
+// Steve's 3 fixes to the AES walk, to match the approved mock (E:/dev/ns-mock/design/mock/, the published copy): the block cells show
+// their index and character; the key schedule builds each word in motion, in the mock's landscape layout; and the key schedule zooms.
+// Test ids follow Echo's #317.
+
+const STAGES = ['previous', 'rotated', 'substituted', 'rcon', 'after-rcon', 'key-back', 'word']
+const stageRows = (page: Page) => page.locator(STAGES.map(s => `[data-testid="aes-walk-build-${s}"]`).join(', '))
+
+async function openPractice(page: Page) {
+  await page.emulateMedia({ reducedMotion: 'reduce' })
+  await open(page)
+  await page.getByTestId('section-techniques').click()
+  await page.getByTestId('walk-item-aes').click()
+  await expect(page.getByTestId('aes-walk-step-kind')).toBeVisible()
+}
+
+/** Moves to stop n from the start, under reduced motion, so each Next lands at once. */
+async function toStop(page: Page, n: number) {
+  for (let i = 0; i < n; i++) await page.getByTestId('aes-walk-next').click()
+}
+const FILL_END = 16
+const KEYS = FILL_END + 1
+
+/** The character rule from the strip legend: "sp" for a space, the character for printable ASCII, and a dot for any other byte. */
+const charOf = (hex: string) => { const n = parseInt(hex, 16); return n === 0x20 ? 'sp' : n > 0x20 && n < 0x7f ? String.fromCharCode(n) : '·' }
+
+test('each block cell shows its byte index and its character, and an empty cell shows its index only', async ({ page }) => {
+  await openPractice(page)
+  await toStop(page, 3)
+  for (let r = 0; r < 4; r++) for (let c = 0; c < 4; c++) {
+    const i = r + 4 * c, id = `aes-walk-cell-${r}-${c}`
+    await expect(page.getByTestId(`${id}-index`), `${id} index`).toHaveText(String(i))
+    if (i >= 3) {
+      await expect(page.getByTestId(id), `${id} is empty`).toHaveAttribute('data-hex', '')
+      await expect(page.getByTestId(`${id}-char`)).toHaveText('')
+    }
+  }
+  await toStop(page, FILL_END - 3)
+  for (let r = 0; r < 4; r++) for (let c = 0; c < 4; c++) {
+    const id = `aes-walk-cell-${r}-${c}`
+    const hex = (await page.getByTestId(id).getAttribute('data-hex')) ?? ''
+    expect(hex, `${id} holds a byte`).toMatch(/^[0-9a-f]{2}$/)
+    expect((await page.getByTestId(id).textContent())?.trim().slice(0, 2), `${id} reads its hex first`).toBe(hex)
+    await expect(page.getByTestId(`${id}-char`), `${id} char of ${hex}`).toHaveText(charOf(hex))
+  }
+})
+
+test('with motion on, Next onto a word shows the build rows one after another, then fills its 4 bytes one at a time', async ({ page }) => {
+  await openPractice(page)
+  await toStop(page, KEYS)
+  await page.emulateMedia({ reducedMotion: 'no-preference' })
+  await page.getByTestId('aes-walk-next').click()
+  const cells = [16, 17, 18, 19].map(n => page.getByTestId(`aes-walk-table-cell-${n}`))
+  const samples: { t: number; rows: number; filled: number; xor: string }[] = []
+  const start = Date.now()
+  while (Date.now() - start < 20_000) {
+    const rows = await stageRows(page).count()
+    let filled = 0
+    for (const c of cells) if ((await c.getAttribute('data-hex')) ?? '') filled++
+    const xor = (await page.getByTestId('aes-walk-build-xor').count()) ? ((await page.getByTestId('aes-walk-build-xor').textContent()) ?? '') : ''
+    samples.push({ t: Date.now() - start, rows, filled, xor })
+    if (filled === 4 && rows === STAGES.length) break
+    await page.waitForTimeout(40)
+  }
+  const last = samples[samples.length - 1]
+  expect(last, 'the build ends with every row and all 4 bytes').toMatchObject({ rows: STAGES.length, filled: 4 })
+  expect(samples[0].rows, 'the rows do not all appear in one frame').toBeLessThan(STAGES.length)
+  const allRows = samples.find(s => s.rows === STAGES.length)!
+  expect(allRows.t - samples[0].t, 'the rows take at least 300 ms').toBeGreaterThanOrEqual(300)
+  expect(samples.filter(s => s.filled > 0).every(s => s.rows === STAGES.length), 'the bytes fill after the rows').toBe(true)
+  expect(new Set(samples.map(s => s.filled)), 'the bytes fill one at a time').toEqual(new Set([0, 1, 2, 3, 4]))
+  // The byte XOR line: byte 0 of w0, the value it meets, and byte 0 of w4, each as 8 bits.
+  const bits = (hex: string) => parseInt(hex, 16).toString(2).padStart(8, '0')
+  const back = ((await page.getByTestId('aes-walk-build-key-back').textContent()) ?? '').match(/[0-9a-f]{8}/)![0]
+  const meets = ((await page.getByTestId('aes-walk-build-after-rcon').textContent()) ?? '').match(/[0-9a-f]{8}/)![0]
+  const word = ((await page.getByTestId('aes-walk-build-word').textContent()) ?? '').match(/[0-9a-f]{8}/)![0]
+  const frame = samples.map(s => s.xor.replace(/\s+/g, '')).find(x => x.includes(bits(back.slice(0, 2))) && x.includes(bits(meets.slice(0, 2))) && x.includes(bits(word.slice(0, 2))))
+  expect(frame, 'one frame shows byte 0 of w0, the value it meets, and byte 0 of w4, in bits').toBeTruthy()
+})
+
+test('the word built, the word before and the word Nk back each carry their role and their own color, in the grid and in the rows', async ({ page }) => {
+  await openPractice(page)
+  await toStop(page, KEYS + 1)
+  const roleOf = async (word: number) => page.getByTestId(`aes-walk-table-cell-${4 * word}`).getAttribute('data-role')
+  expect(await roleOf(4)).toBe('new')
+  expect(await roleOf(3)).toBe('previous')
+  expect(await roleOf(0)).toBe('key-back')
+  expect(await roleOf(1)).toBeNull()
+  const bg = (id: string) => page.getByTestId(id).evaluate(el => getComputedStyle(el).backgroundColor)
+  const colors = [await bg('aes-walk-table-cell-16'), await bg('aes-walk-table-cell-12'), await bg('aes-walk-table-cell-0'), await bg('aes-walk-table-cell-4')]
+  expect(new Set(colors).size, 'new, previous, key-back and a plain cell: 4 different colors').toBe(4)
+  expect(await bg('aes-walk-build-word')).toBe(colors[0])
+  expect(await bg('aes-walk-build-previous')).toBe(colors[1])
+  expect(await bg('aes-walk-build-key-back')).toBe(colors[2])
+})
+
+test('the round-constant strip lights the constant a rotating word uses, and none for a plain word', async ({ page }) => {
+  await openPractice(page)
+  await toStop(page, KEYS + 1)
+  await expect(page.getByTestId('aes-walk-rcon-0')).toHaveAttribute('data-lit', 'true')
+  await expect(page.locator('[data-testid^="aes-walk-rcon-"][data-lit="true"]')).toHaveCount(1)
+  await toStop(page, 1)
+  await expect(page.locator('[data-testid^="aes-walk-rcon-"][data-lit="true"]')).toHaveCount(0)
+})
+
+test('a tap on a built word replays its build, and the title names it', async ({ page }) => {
+  await openPractice(page)
+  await toStop(page, KEYS + 3)
+  await page.emulateMedia({ reducedMotion: 'no-preference' })
+  await page.getByTestId('aes-walk-table-cell-16').click()
+  await expect(page.getByTestId('aes-walk-ks-build-title')).toHaveText('How w4 is made')
+  const first = await stageRows(page).count()
+  expect(first, 'the replay starts without every row').toBeLessThan(STAGES.length)
+  await expect(stageRows(page)).toHaveCount(STAGES.length, { timeout: 10_000 })
+})
+
+const noSideways = (page: Page) => page.evaluate(() => {
+  const ks = document.querySelector('[data-testid="aes-walk-key-schedule"]') as HTMLElement
+  return { page: document.documentElement.scrollWidth > document.documentElement.clientWidth, ks: ks.scrollWidth > ks.clientWidth + 1 }
+})
+
+test('the key schedule zooms in and out with buttons and Ctrl and the wheel, resets, and never scrolls sideways at 1280', async ({ page }) => {
+  await page.setViewportSize({ width: 1280, height: 800 })
+  await openPractice(page)
+  await toStop(page, KEYS)
+  const width = () => page.getByTestId('aes-walk-table-cell-0').evaluate(el => el.getBoundingClientRect().width)
+  const base = await width()
+  const zin = page.getByTestId('aes-walk-ks-zoom-in'), zout = page.getByTestId('aes-walk-ks-zoom-out')
+  while (await zin.isEnabled() && (await width()) < base * 1.2) { await zin.click(); expect(await noSideways(page)).toEqual({ page: false, ks: false }) }
+  expect(await width(), 'zoom in reaches 1.2 times').toBeGreaterThanOrEqual(base * 1.2 - 0.5)
+  await page.getByTestId('aes-walk-ks-zoom-reset').click()
+  expect(await width()).toBeCloseTo(base, 0)
+  while (await zout.isEnabled() && (await width()) > base * 0.85) { await zout.click(); expect(await noSideways(page)).toEqual({ page: false, ks: false }) }
+  expect(await width(), 'zoom out reaches 0.85 times').toBeLessThanOrEqual(base * 0.85 + 0.5)
+  await page.getByTestId('aes-walk-ks-zoom-reset').click()
+  await page.getByTestId('aes-walk-ks-table').hover()
+  await page.keyboard.down('Control')
+  await page.mouse.wheel(0, -200)
+  await page.keyboard.up('Control')
+  await expect.poll(width, { message: 'Ctrl and the wheel zoom in' }).toBeGreaterThan(base + 0.5)
+})
+
+test('at 1280 wide and wider the round keys sit left of the build panel, below 1280 the panel stacks under them, and nothing scrolls sideways', async ({ page }) => {
+  for (const w of [1600, 1280, 1279, 1024]) {
+    await page.setViewportSize({ width: w, height: 800 })
+    await openPractice(page)
+    await toStop(page, KEYS + 1)
+    const t = (await page.getByTestId('aes-walk-ks-table').boundingBox())!, b = (await page.getByTestId('aes-walk-ks-build').boundingBox())!
+    if (w >= 1280) expect(t.x + t.width, `${w}: the table ends left of the panel`).toBeLessThanOrEqual(b.x + 1)
+    else expect(b.y, `${w}: the panel stacks below the table`).toBeGreaterThanOrEqual(t.y + t.height - 1)
+    expect(await noSideways(page), `${w}: no sideways scroll`).toEqual({ page: false, ks: false })
+  }
+})
