@@ -42,23 +42,36 @@ export async function fetchAesBlock(sessionId: string) {
   aesWalk.loading = true
   try {
     // Chapter 1 is block 1 of the run's text, at the key size the picker holds (design sections 2.2b and 3.4).
+    // The walk needs the tables too: Nk comes from their size table. Each call names itself in a failure, so the error line says which part failed.
     const [body] = await Promise.all([
-      hostGet(addr, `/api/sessions/${encodeURIComponent(sessionId)}/walk/aes/block?source=text&keyBits=${aesWalk.keyBits}`),
-      loadAesTables(),
+      named('the block route', hostGet(addr, `/api/sessions/${encodeURIComponent(sessionId)}/walk/aes/block?source=text&keyBits=${aesWalk.keyBits}`)),
+      named('the tables route', loadAesTables()),
     ])
     if (gen !== aesWalk.gen || !sec.showKeys) return
     aesWalk.block = body as AesBlockReply
   } catch (e: any) {
-    if (gen === aesWalk.gen) aesWalk.error = String(e?.body?.message ?? e?.body?.code ?? (e?.status ? `HTTP_${e.status}` : 'WALK_FAILED'))
+    if (gen === aesWalk.gen) aesWalk.error = e instanceof RouteFailure ? e.message : describe(e)
   } finally {
     if (gen === aesWalk.gen) aesWalk.loading = false
   }
 }
 
+const describe = (e: any): string => String(e?.body?.message ?? e?.body?.code ?? (e?.status ? `HTTP_${e.status}` : 'WALK_FAILED'))
+
+/** A failed call, named by the route it came from, such as "the tables route failed: HTTP_500". */
+class RouteFailure extends Error {}
+const named = <T>(route: string, p: Promise<T>): Promise<T> => p.catch(e => { throw new RouteFailure(`${route} failed: ${describe(e)}`) })
+
+// One shared request: two callers that race before the first reply wait on the same promise. A failure clears it, so the next call tries again.
+let tablesRequest: Promise<AesTables> | null = null
+
 /** The public tables, fetched once. The route stays open with Show keys off, so the closed walk can still show the S-box (design section 2.3). */
-export async function loadAesTables(): Promise<AesTables> {
-  if (!aesWalk.tables) aesWalk.tables = await hostGet(addr, '/api/walk/aes/tables') as AesTables
-  return aesWalk.tables
+export function loadAesTables(): Promise<AesTables> {
+  if (aesWalk.tables) return Promise.resolve(aesWalk.tables)
+  tablesRequest ??= (hostGet(addr, '/api/walk/aes/tables') as Promise<AesTables>)
+    .then(t => { aesWalk.tables = t; return t })
+    .finally(() => { tablesRequest = null })
+  return tablesRequest
 }
 
 /** The key size picker: the walk fetches the run's block again at the new size. */
