@@ -10,7 +10,7 @@ namespace NetSec.Host;
 /// The HMAC and seal-chain walks (docs/sections-plan.md, slice P6). The HMAC walk runs on RFC 4231's published test keys, and the chain walk on a
 /// fixture chain from the vault's public seed, never the learner's audit rows. Both stay open with Show keys off and take no bytes from the client.
 /// </summary>
-public static class HmacWalkRoutes
+public static class HashWalkRoutes
 {
     public static void Map(WebApplication app)
     {

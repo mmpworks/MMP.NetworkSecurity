@@ -41,6 +41,9 @@ namespace NetSec.Labs
 
         static readonly string[] Messages = { "abc", "abcdbcdecdefdefgefghfghighijhijkijkljklmklmnlmnomnopnopq" };
 
+        // FIPS 180-4's published digests of the two examples, so the guard also catches a fault in the engine, not only in the trace.
+        static readonly string[] Digests = { "ba7816bf8f01cfea414140de5dae2223b00361a396177a9cb410ff61f20015ad", "248d6a61d20638b8e5c026930c3e6039a33ce45964ff2167f6ecedd419db06c1" };
+
         public static Sha256Walk Fips180(string name)
         {
             int i = Array.IndexOf(Names, name);
@@ -78,7 +81,7 @@ namespace NetSec.Labs
 
             IHash plain = Hashes.Sha256();
             plain.Update(message, 0, message.Length);
-            Require(NetSec.Bytes.Hex.Encode(plain.Finish()) == NetSec.Bytes.Hex.Encode(digest));
+            Require(NetSec.Bytes.Hex.Encode(plain.Finish()) == NetSec.Bytes.Hex.Encode(digest) && NetSec.Bytes.Hex.Encode(digest) == Digests[i]);
             return w;
         }
 
