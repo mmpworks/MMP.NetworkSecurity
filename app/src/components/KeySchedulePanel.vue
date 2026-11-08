@@ -39,7 +39,10 @@ const flyer = ref<{ text: string; left: number; top: number } | null>(null)
 
 function endFrame() { token++; anim.word = null; anim.rows = 0; anim.filled = 4; anim.xor = null; phantom.value = null; flyer.value = null }
 
-/** Keeps the step in play in view: the panel scrolls itself, so the round keys stay where they are (the lead on #326). */
+/**
+ * Keeps the step in play in view (the lead on #326). At 1280 px and wider the panel is sticky and scrolls itself, so the round keys stay
+ * where they are. Below 1280 px the panel stacks under the round keys with no scroll of its own, so this scrolls the page (Jared on #326).
+ */
 async function reveal(run: number, selector: string) {
   await nextTick()
   if (run === token) root.value?.querySelector(selector)?.scrollIntoView({ block: 'nearest' })
