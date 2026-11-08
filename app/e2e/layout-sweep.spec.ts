@@ -52,6 +52,38 @@ const scan = (page: Page) => page.evaluate((freeText: string) => {
     const svg = sc.querySelector('svg')
     if (svg && svg.getBoundingClientRect().width < sc.clientWidth - 2) faults.push({ kind: 'diagram short', where: name(sc.closest('[data-testid]') ?? sc), text: `${Math.round(svg.getBoundingClientRect().width)} of ${sc.clientWidth}` })
   }
+  // 9. A diagram never scrolls sideways: it fits its pane (closer lanes, then a fitted zoom). A part-pixel overflow still draws a full bar,
+  // so the check tries to scroll and reads whether the box moved, which scrollWidth alone rounds away.
+  for (const sc of root.querySelectorAll<HTMLElement>('.diagram-scroll')) {
+    const before = sc.scrollLeft
+    sc.scrollLeft = 10_000
+    const moved = sc.scrollLeft
+    sc.scrollLeft = before
+    if (moved > 0) faults.push({ kind: 'diagram scrolls sideways', where: name(sc.closest('[data-testid]') ?? sc), text: `${moved.toFixed(2)} px` })
+  }
+  // 10. A diagram's text stays readable at a fitted zoom: labels at least 10 px on screen, byte counts at least 9 px. And a message
+  // label never runs past the 2 lanes of its arrow, at any lane spacing (gap 160 at the narrowest).
+  for (const svg of root.querySelectorAll<SVGSVGElement>('.diagram-scroll svg')) {
+    const vb = svg.viewBox.baseVal
+    const shown = svg.getBoundingClientRect().width
+    // A hidden diagram (the lesson panes behind Techniques) has no size on screen, so it has no text size to read.
+    if (!vb || vb.width === 0 || shown === 0) continue
+    const scale = shown / vb.width
+    const where = name(svg.closest('[data-testid]') ?? svg)
+    for (const [selector, min] of [['.arrow-label, .chk-name, .lane-name', 10], ['.arrow-sub, .chip-text', 9]] as const) {
+      for (const t of svg.querySelectorAll<SVGTextElement>(selector)) {
+        const px = parseFloat(getComputedStyle(t).fontSize) * scale
+        if (px < min - 0.05) { faults.push({ kind: 'diagram text too small', where, text: `${(t.textContent ?? '').trim().slice(0, 20)} ${px.toFixed(1)} px` }); break }
+      }
+    }
+    for (const t of svg.querySelectorAll<SVGTextElement>('.arrow-label')) {
+      const line = t.parentElement?.querySelector<SVGLineElement>('line.arrow')
+      if (!line) continue
+      // The line stops 8 units short of the far lane for its arrow head, so the 2 lanes stand 8 units further apart than the line is long.
+      const gap = Math.abs(line.x2.baseVal.value - line.x1.baseVal.value) + 8
+      if (t.getBBox().width > gap) faults.push({ kind: 'label wider than its lanes', where, text: (t.textContent ?? '').trim().slice(0, 30) })
+    }
+  }
   // 5. A button never cuts its label.
   // Height and width: a label can be cut at the bottom or at the side.
   for (const b of root.querySelectorAll('.v-btn')) { const r = b.getBoundingClientRect(); if (r.width > 0 && (b.scrollHeight > b.clientHeight + 1 || b.scrollWidth > b.clientWidth + 1)) faults.push({ kind: 'label cut', where: name(b), text: (b.textContent ?? '').trim().slice(0, 30) }) }

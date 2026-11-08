@@ -97,7 +97,7 @@ body { overflow: hidden; }
 .eve-count { margin-left: auto; font-size: 12px; color: var(--encrypted); font-weight: 600; }
 .diagram-scroll { flex: 1 1 auto; overflow: auto; min-height: 0; }
 .lane-head { fill: var(--surface2); stroke: var(--line); }
-.lane-name { fill: var(--text); font-size: 13px; font-weight: 700; text-transform: capitalize; }
+.lane-name { fill: var(--text); font-size: var(--lane, 13px); font-weight: 700; text-transform: capitalize; }
 .lane-line { stroke: var(--line); stroke-dasharray: 4 4; }
 .lane-band { fill: var(--surface); }
 .row-band { fill: transparent; cursor: pointer; }
@@ -107,17 +107,17 @@ body { overflow: hidden; }
 .arrow { stroke-width: 2.5; fill: none; }
 .arrow.readable { stroke: var(--readable); color: var(--readable); }
 .arrow.enc { stroke: var(--encrypted); color: var(--encrypted); stroke-dasharray: 8 4; }
-.arrow-label { fill: var(--text); font-size: 12px; font-weight: 600; }
+.arrow-label { fill: var(--text); font-size: var(--lbl, 12px); font-weight: 600; }
 .arrow-label.unreadable { fill: var(--encrypted); font-style: italic; }
-.arrow-sub { fill: var(--muted); font-size: 11px; }
+.arrow-sub { fill: var(--muted); font-size: var(--sub, 11px); }
 .note { fill: var(--surface2); stroke: var(--line); }
 .enc-note { stroke: var(--encrypted); stroke-dasharray: 4 3; }
 .hatch-line { stroke: var(--encrypted); stroke-width: 2; opacity: .5; }
 .chk-pass circle { fill: var(--pass); } .chk-fail circle { fill: var(--fail); stroke: var(--text); stroke-dasharray: 3 2; stroke-width: 1.5; }
 .chk-mark { fill: var(--on-mark); font-size: 13px; font-weight: 800; }
-.chk-name { font-size: 12px; font-weight: 700; } .chk-pass .chk-name { fill: var(--pass); } .chk-fail .chk-name { fill: var(--fail); }
+.chk-name { font-size: var(--lbl, 12px); font-weight: 700; } .chk-pass .chk-name { fill: var(--pass); } .chk-fail .chk-name { fill: var(--fail); }
 .chip-read { fill: var(--readable); } .chip-enc { fill: var(--encrypted); }
-.chip-text { fill: var(--on-mark); font: 11px var(--mono); font-weight: 700; }
+.chip-text { fill: var(--on-mark); font: var(--sub, 11px) var(--mono); font-weight: 700; }
 .wait-ring { fill: none; stroke: var(--warn); stroke-width: 2.5; animation: pulse 1.2s ease-out infinite; transform-box: fill-box; transform-origin: center; }
 @keyframes pulse { from { transform: scale(.8); opacity: 1; } to { transform: scale(1.8); opacity: 0; } }
 /* Reduced motion means no motion: a transition, even a short one, still runs as an animation (design 2.2a; A19.ui.reduced-motion-has-no-transition). */

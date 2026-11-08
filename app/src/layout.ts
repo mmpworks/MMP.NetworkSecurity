@@ -6,6 +6,16 @@ export const ROW_H = 56
 export const LANE_GAP = 220
 export const HEAD_H = 54
 export const LEFT = 110
+// In a pane too narrow for the natural spacing, the lanes move closer, down to these floors: a lane head is 140 wide, and a note 180.
+export const MIN_LANE_GAP = 160
+export const MIN_LEFT = 90
+
+/** The lane spacing for a pane `avail` wide: the natural spacing when it fits, else closer, never below the floors. Pure, so a test can call it. */
+export function laneSpacing(lanes: number, avail?: number): { left: number; gap: number } {
+  const natural = LEFT * 2 + Math.max(0, lanes - 1) * LANE_GAP
+  if (!avail || lanes < 2 || natural <= avail) return { left: LEFT, gap: LANE_GAP }
+  return { left: MIN_LEFT, gap: Math.max(MIN_LANE_GAP, Math.min(LANE_GAP, (avail - MIN_LEFT * 2) / (lanes - 1))) }
+}
 
 export interface Lane { name: string; x: number }
 export interface Row {
@@ -48,10 +58,12 @@ export function laneNames(events: readonly TraceEvent[], declared: readonly stri
   return out
 }
 
-export function layoutDiagram(events: readonly TraceEvent[], declared: readonly string[], view: 'endpoints' | 'eavesdropper'): Layout {
+/** `avail` is the pane's width. With it, a narrow pane draws its lanes closer (laneSpacing), so the drawing scrolls sideways less or not at all. */
+export function layoutDiagram(events: readonly TraceEvent[], declared: readonly string[], view: 'endpoints' | 'eavesdropper', avail?: number): Layout {
   const names = laneNames(events, declared)
-  const lanes: Lane[] = names.map((name, i) => ({ name, x: LEFT + i * LANE_GAP }))
-  const xOf = (n: string): number => { const k = n.toLowerCase(); return lanes.find(l => l.name === (LANE_ALIAS[k] && !lanes.some(x => x.name === k) ? LANE_ALIAS[k] : k))?.x ?? LEFT }
+  const { left, gap } = laneSpacing(names.length, avail)
+  const lanes: Lane[] = names.map((name, i) => ({ name, x: left + i * gap }))
+  const xOf = (n: string): number => { const k = n.toLowerCase(); return lanes.find(l => l.name === (LANE_ALIAS[k] && !lanes.some(x => x.name === k) ? LANE_ALIAS[k] : k))?.x ?? left }
   const rows: Row[] = []
   let learned = 0
   let total = 0
@@ -61,7 +73,7 @@ export function layoutDiagram(events: readonly TraceEvent[], declared: readonly 
     const isArrow = isWireSent(e) && !!e.from && !!e.to && e.from.toLowerCase() !== e.to.toLowerCase()
     // A run with two rounds on two streams (lesson 8: modern, then legacy) gets a divider where the stream changes.
     if (isArrow && lastProto && protocolOf(e) !== lastProto) {
-      rows.push({ seq: -rows.length - 1, y: HEAD_H + 30 + rows.length * ROW_H, kind: 'divider', fromX: LEFT, toX: LEFT, label: `next round: ${protocolOf(e)}`, bytes: 0, protectedBytes: false, unreadable: false, check: null, head: '' })
+      rows.push({ seq: -rows.length - 1, y: HEAD_H + 30 + rows.length * ROW_H, kind: 'divider', fromX: left, toX: left, label: `next round: ${protocolOf(e)}`, bytes: 0, protectedBytes: false, unreadable: false, check: null, head: '' })
     }
     if (isArrow) lastProto = protocolOf(e)
     const y = HEAD_H + 30 + rows.length * ROW_H
@@ -79,7 +91,7 @@ export function layoutDiagram(events: readonly TraceEvent[], declared: readonly 
       rows.push({ seq: e.seq, y, kind: 'note', fromX: xOf(e.actor), toX: xOf(e.actor), label: e.detail || e.message || e.type, bytes: 0, protectedBytes: true, unreadable: false, check: null, head: '' })
     }
   }
-  return { lanes, rows, width: LEFT * 2 + Math.max(0, lanes.length - 1) * LANE_GAP, height: HEAD_H + 60 + rows.length * ROW_H, learned, total }
+  return { lanes, rows, width: left * 2 + Math.max(0, lanes.length - 1) * gap, height: HEAD_H + 60 + rows.length * ROW_H, learned, total }
 }
 
 export function hexToBytes(hex: string): number[] {
