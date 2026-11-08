@@ -21,12 +21,30 @@ namespace NetSec.Host.Tests
         readonly List<Lab> _labs = new List<Lab>();
         readonly string _dir = Path.Combine(Path.GetTempPath(), "netsec-bridge-" + Guid.NewGuid().ToString("N"));
 
+        // Set when a checked result fails, so Dispose keeps the traces for the next diagnosis (issue #274).
+        bool _keep;
+
         public BridgeLiveTests() { Directory.CreateDirectory(_dir); }
 
         public void Dispose()
         {
             foreach (Lab lab in _labs) lab.Dispose();
+            if (_keep) return;
             try { Directory.Delete(_dir, recursive: true); } catch (IOException) { }
+        }
+
+        /// <summary>
+        /// Runs the result checks. A failure keeps this test's folder, with its trace files, and names the folder in the failure message.
+        /// xunit gives Dispose no pass or fail signal, so the check marks it.
+        /// </summary>
+        void KeepOnFail(Action check)
+        {
+            try { check(); }
+            catch (Exception e)
+            {
+                _keep = true;
+                throw new Xunit.Sdk.XunitException(e.Message + Environment.NewLine + "Traces kept in " + _dir);
+            }
         }
 
         static string Under(params string[] parts)
@@ -287,9 +305,13 @@ namespace NetSec.Host.Tests
             var run = await RunWhole("modern", bankDown: true);
             DateTime start = DateTime.UtcNow;
             JsonElement ce = Json(await run.ce.Line("CE-RESULT", 25000));
-            Assert.True(DateTime.UtcNow - start < TimeSpan.FromSeconds(20), "the CE waited for a deadline");
-            Assert.False(ce.GetProperty("ok").GetBoolean());
-            Assert.NotEqual("LINK_LOST", ce.GetProperty("code").GetString());
+            TimeSpan waited = DateTime.UtcNow - start;
+            KeepOnFail(() =>
+            {
+                Assert.True(waited < TimeSpan.FromSeconds(20), "the CE waited for a deadline");
+                Assert.False(ce.GetProperty("ok").GetBoolean());
+                Assert.NotEqual("LINK_LOST", ce.GetProperty("code").GetString());
+            });
         }
 
         [Fact]
@@ -299,7 +321,7 @@ namespace NetSec.Host.Tests
             string node = Under("src", "NetSec.Node", "bin", "Release", "net10.0", "NetSec.Node.dll");
             Lab lab = new Lab();
             _labs.Add(lab);
-            Child gateway = new Child("dotnet", $"\"{node}\" --role gateway --listen 0 --server 9 --link ssh --suite modern");
+            Child gateway = new Child("dotnet", $"\"{node}\" --role gateway --listen 0 --server 9 --link ssh --suite modern --trace-file \"{Path.Combine(_dir, name + "-gateway.ndjson")}\"");
             lab.Others.Add(gateway);
             int gatewayPort = Port(await gateway.Line("READY"));
             Child pad = new Child("dotnet", $"\"{node}\" --role pinpad --listen 0 --pin 1234 --pan 4111111111111111");
@@ -308,8 +330,11 @@ namespace NetSec.Host.Tests
             Child ce = new Child(Under("src", "NetSec.CeDevice", "bin", "Release", "net35", "NetSec.CeDevice.exe"), $"--pinpad {padPort} --gateway {gatewayPort} --trace-file \"{Path.Combine(_dir, name + "-ce.ndjson")}\" --link glass-ssh --suite legacy --pool 25");
             lab.Ce = ce;
             JsonElement result = Json(await ce.Line("CE-RESULT", 25000));
-            Assert.False(result.GetProperty("ok").GetBoolean());
-            Assert.StartsWith("SSH_", result.GetProperty("code").GetString());
+            KeepOnFail(() =>
+            {
+                Assert.False(result.GetProperty("ok").GetBoolean());
+                Assert.StartsWith("SSH_", result.GetProperty("code").GetString());
+            });
         }
 
         [Theory]
