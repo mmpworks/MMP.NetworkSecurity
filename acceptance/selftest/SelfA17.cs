@@ -64,7 +64,7 @@ namespace Acceptance
             new Case("A19.host.practice-key-192-256", AesWalkHostClauses.PracticeKeySizes, "walk-practice-no-xor", "walk-practice-says-run", "walk-block-open-off"),
             new Case("A19.host.tls13-schedule-open-and-rfc8448", Tls13WalkClauses.ScheduleOpenAndRfc8448, "schedule-closed-off", "schedule-step-flip", "schedule-other-keysource"),
             new Case("A19.host.typed-routes-follow-key-size", AesWalkHostClauses.TypedRoutesFollowKeySize, "typed-size-ignored", "typed-bad-size-accepted"),
-            new Case("A19.host.dh-walk-open-and-modpow", DhWalkClauses.DhOpenAndModPow, "dh-closed-off", "dh-shared-mismatch", "dh-row-skip-square"),
+            new Case("A19.host.dh-walk-open-and-modpow", DhWalkClauses.DhOpenAndModPow, "dh-closed-off", "dh-shared-mismatch", "dh-row-skip-square", "dh-real-bits-short"),
             new Case("A19.host.x25519-walk-open-and-rfc7748", X25519WalkClauses.LadderOpenAndRfc7748, "x25519-closed-off", "x25519-wrong-shared", "x25519-rows-unclamped"),
             new Case("A19.host.typed-routes-open-with-keys-off", AesWalkHostClauses.TypedRoutesOpen, "typed-closed-off", "typed-run-key"),
             new Case("A19.host.show-keys-off-closes-block-first", AesWalkHostClauses.OffClosesBlock, "walk-block-open-off", "walk-session-before-toggle", "walk-off-error-bytes", "walk-tables-closed-off"),
