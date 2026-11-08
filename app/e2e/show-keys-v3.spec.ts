@@ -2,6 +2,7 @@ import { expect, test, type Page } from '@playwright/test'
 import * as fs from 'node:fs'
 import * as path from 'node:path'
 import { MIN_RATIO, scanPage, setTheme } from './contrast'
+import { holdWithoutDeleteSharing } from './hold-file'
 import { startOwnHost, type OwnHost } from './own-host'
 import { open } from './walk'
 
@@ -336,4 +337,24 @@ test('OFF: the binary hover in What each side knows and in Message bytes shows n
   await page.mouse.move(5, 300)
   await page.locator('[data-testid^=convergence-grid-] .cell').first().hover()
   await shot(page, '08-off-binary-hover')
+})
+
+// Issue #292: with modes.json held, turning Show keys off still takes effect, but the Host cannot save it yet. The Security panel says
+// "not saved yet" until the Host's background retry saves it, then the note goes.
+test('a Show keys off the Host could not save shows "not saved yet" until the retry saves it', async ({ page }) => {
+  await open(page, host)
+  await page.getByTestId('security-setup-button').click()
+  await expect(page.getByTestId('sec-page')).toBeVisible()
+  await expect(page.getByTestId('sec-show-keys-unsaved')).toHaveCount(0)
+  const hold = await holdWithoutDeleteSharing(path.join(host.securityDir, 'modes.json'))
+  try {
+    await page.getByTestId('sec-show-keys-switch').click()
+    await expect(page.getByTestId('sec-show-keys-switch')).not.toBeChecked()
+    await expect(page.getByTestId('sec-show-keys-unsaved')).toBeVisible()
+    await expect(page.getByTestId('sec-show-keys-unsaved')).toHaveText('Show keys is off, but the choice is not saved yet. The course keeps trying.')
+    expect(await hostOn()).toBe(false)
+    await shot(page, '09-not-saved-yet')
+  } finally { await hold.release() }
+  await expect(page.getByTestId('sec-show-keys-unsaved')).toHaveCount(0, { timeout: 10_000 })
+  await expect(page.getByTestId('sec-show-keys-switch')).not.toBeChecked()
 })

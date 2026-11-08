@@ -9,7 +9,7 @@ import { HOST_ORIGIN_ENV, PORTS } from './ports'
 // so a spec that runs that flow on the shared Host changes what every later spec reads. One test or one spec file uses this Host at a time.
 const OWN: HostAddress = { port: PORTS.ownHost, token: 'own-host-token' }
 
-export interface OwnHost extends HostAddress { stop(): Promise<void> }
+export interface OwnHost extends HostAddress { securityDir: string; stop(): Promise<void> }
 
 async function waitForHealth(child: ChildProcess, timeoutMs = 60_000): Promise<void> {
   const started = Date.now()
@@ -33,7 +33,8 @@ export async function startOwnHost(): Promise<OwnHost> {
   await waitForHealth(child)
   return {
     ...OWN,
-    stop: () => new Promise(resolve => {
+    securityDir: dir,
+    stop:() => new Promise(resolve => {
       if (child.exitCode !== null) { resolve(); return }
       child.once('exit', () => resolve())
       child.kill()
