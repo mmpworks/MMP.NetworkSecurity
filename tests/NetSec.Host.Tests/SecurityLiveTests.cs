@@ -192,6 +192,43 @@ public class SecurityLiveTests
         Assert.Equal(200, status);
         Assert.Contains("Broken", body);
     }
+
+    /// <summary>
+    /// Opens modes.json the way an antivirus scan can: read and write sharing, no delete sharing. The store's save then cannot replace the
+    /// file (issue #292), and the route must answer with the named code rather than a bare 500.
+    /// </summary>
+    static FileStream HoldModesOpen(Host host) =>
+        new(Path.Combine(host.SecurityDir, "modes.json"), FileMode.Open, FileAccess.Read, FileShare.ReadWrite);
+
+    static void AssertSaveRefused(int status, string body)
+    {
+        Assert.True(status == 503, status + ": " + body);
+        JsonElement reply = JsonDocument.Parse(body).RootElement;
+        Assert.Equal("SECURITY_STORE_SAVE_FAILED", reply.GetProperty("code").GetString());
+        Assert.True(reply.GetProperty("retryable").GetBoolean(), body);
+    }
+
+    [Fact]
+    public async Task Turning_show_keys_off_while_the_settings_file_is_held_answers_by_name_and_says_keys_stay_on()
+    {
+        using Host host = await Host.StartAsync();
+        Assert.Equal(200, (await host.Put("/api/security/show-keys", "{\"on\":true}")).Status);
+        (int status, string body) refused;
+        using (HoldModesOpen(host)) refused = await host.Put("/api/security/show-keys", "{\"on\":false}");
+        AssertSaveRefused(refused.status, refused.body);
+        (int _, string after) = await host.Get("/api/security/show-keys");
+        Assert.True(JsonDocument.Parse(after).RootElement.GetProperty("on").GetBoolean(), "the failed save leaves Show keys on, and the page must not think it is off");
+    }
+
+    [Fact]
+    public async Task Setting_a_mode_while_the_settings_file_is_held_answers_by_name()
+    {
+        using Host host = await Host.StartAsync();
+        Assert.Equal(200, (await host.Put("/api/security/show-keys", "{\"on\":false}")).Status);
+        (int status, string body) refused;
+        using (HoldModesOpen(host)) refused = await host.Put("/api/security/types/tls13.server/mode", "{\"mode\":\"Mine\"}");
+        AssertSaveRefused(refused.status, refused.body);
+    }
     /// <summary>The Check step reaches the screen with Show keys off, and OpenSSL takes the key on its command line. So the reply shows a mark in its place, and it still shows who judged.</summary>
     [Fact]
     public async Task The_lesson_key_check_shows_no_key_in_its_command()
