@@ -7,46 +7,55 @@ import { HOST_PORT, NotRun, TOKEN, hostGet, openApp, readState, requireLive } fr
  *   client private red, server private blue, g yellow, client public and "from the client" orange, server public and "from the server"
  *   green, the shared secret on both sides brown, n (the prime) no chip.
  * The numbers stay the engine's (R5): the screen shows GET /api/walk/dh's values, and these clauses read them from the Host's own reply.
- * Colour never carries meaning alone (docs/ux-design.md line 187): each chip has a name for screen readers and one visible cue.
+ * Colour never carries meaning alone (docs/ux-design.md line 187): each chip has a name for screen readers that holds its colour word, and a
+ * visible letter in DH notation (a, b, g, A, B, s), with a legend that names each colour beside its letter.
  * The walk runs on a public practice exponent, so it stays open with Show keys OFF (sections-plan.md section 4, the "key decides" rule).
  *
- * Test ids (DRAFT, until Nancy confirms her P7 plan): dh-walk-root on the walk; dh-value-{name} on each value row, its number in
- * dh-num-{name}; dh-chip-{name} on its chip, with data-chip="{colour}" and an accessible name that names the colour; dh-real-size on the
- * real-size note. Names: client-private, server-private, generator, client-public, server-public, from-client, from-server, client-shared,
- * server-shared, prime.
+ * Test ids (Nancy's P7 plan, 2026-11-07): walk-item-dh opens dh-walk-panel inside walk-root. Each value row is dh-value-{name}, with the
+ * engine's number string, unchanged, in dh-value-{name}-number. Its chip is dh-chip-{name}, with data-chip="{colour}", data-letter="{letter}",
+ * the letter as its visible text, and an aria-label that names the colour. The legend is dh-chip-legend. The note is dh-real-size, with
+ * realExponentBits in dh-real-size-bits. Names: client-private, server-private, g, client-public, server-public, client-shared,
+ * server-shared, n. The plan also gives "from the client" and "from the server" their chips: dh-chip-from-client and dh-chip-from-server.
  * Where Techniques opens a DH walk and a chip is wrong or missing, these clauses FAIL. They read NOT RUN only when there is no DH walk at all.
  */
 
 test.describe.configure({ timeout: 120_000 });
 test.use({ actionTimeout: 15_000 });
 
-/** sections-plan.md section 5's table, written out from the plan. No value comes from the app. */
-const CHIPS: Record<string, string | null> = {
-  'client-private': 'red',
-  'server-private': 'blue',
-  'generator': 'yellow',
-  'client-public': 'orange',
-  'from-client': 'orange',
-  'server-public': 'green',
-  'from-server': 'green',
-  'client-shared': 'brown',
-  'server-shared': 'brown',
-  'prime': null,
-};
+/** sections-plan.md section 5's colours, and the DH letters for the visible cue. No value comes from the app. */
+const VALUES: { name: string; colour: string | null; letter: string | null }[] = [
+  { name: 'client-private', colour: 'red', letter: 'a' },
+  { name: 'server-private', colour: 'blue', letter: 'b' },
+  { name: 'g', colour: 'yellow', letter: 'g' },
+  { name: 'client-public', colour: 'orange', letter: 'A' },
+  { name: 'server-public', colour: 'green', letter: 'B' },
+  { name: 'client-shared', colour: 'brown', letter: 's' },
+  { name: 'server-shared', colour: 'brown', letter: 's' },
+  { name: 'n', colour: null, letter: null },
+];
+/** "from the client" and "from the server": chips with no value row of their own. */
+const FROM: { name: string; colour: string; letter: string }[] = [
+  { name: 'from-client', colour: 'orange', letter: 'A' },
+  { name: 'from-server', colour: 'green', letter: 'B' },
+];
 
-/** The Host's decimal for each named value, from GET /api/walk/dh. A power or a number is { hex, dec }, or a power holds result { hex, dec }. */
-function dec(v: any): string {
-  if (v && typeof v.dec === 'string') return v.dec;
-  if (v && v.result && typeof v.result.dec === 'string') return v.result.dec;
-  return '';
+/** The Host's { hex, dec } for each value row, from GET /api/walk/dh. A power holds result { hex, dec }. */
+function num(v: any): { hex: string; dec: string } {
+  const n = v && typeof v.dec === 'string' ? v : v?.result;
+  return { hex: String(n?.hex ?? '').toLowerCase(), dec: String(n?.dec ?? '') };
 }
-function hostValues(walk: any): Record<string, string> {
+function hostValues(walk: any): Record<string, { hex: string; dec: string }> {
   return {
-    'client-private': dec(walk.client?.private), 'server-private': dec(walk.server?.private), 'generator': dec(walk.generator),
-    'client-public': dec(walk.client?.public), 'from-client': dec(walk.client?.public),
-    'server-public': dec(walk.server?.public), 'from-server': dec(walk.server?.public),
-    'client-shared': dec(walk.client?.shared), 'server-shared': dec(walk.server?.shared), 'prime': dec(walk.prime),
+    'client-private': num(walk.client?.private), 'server-private': num(walk.server?.private), 'g': num(walk.generator),
+    'client-public': num(walk.client?.public), 'server-public': num(walk.server?.public),
+    'client-shared': num(walk.client?.shared), 'server-shared': num(walk.server?.shared), 'n': num(walk.prime),
   };
+}
+
+/** The screen shows the engine's string unchanged, and a long one may wrap. So white space goes, and the rest must equal dec or hex. */
+function showsHostNumber(text: string | null, want: { hex: string; dec: string }): boolean {
+  const t = (text ?? '').replace(/\s+/g, '');
+  return t.length > 0 && (t === want.dec || t.toLowerCase() === want.hex || t.toLowerCase() === '0x' + want.hex);
 }
 
 // The Origin is the built-in http://localhost:5173, which the Host allows with or without NETSEC_ORIGINS (#225).
@@ -59,7 +68,7 @@ async function setShowKeys(on: boolean): Promise<void> {
   expect(r.ok, 'PUT show-keys').toBe(true);
 }
 
-/** Opens Techniques, then its Diffie-Hellman item. Returns once dh-walk-root shows. No DH walk in Techniques reads NOT RUN. */
+/** Opens Techniques, then its Diffie-Hellman item. Returns once dh-walk-panel shows inside walk-root. No DH walk reads NOT RUN. */
 async function openDh(page: Page): Promise<void> {
   requireLive();
   await openApp(page);
@@ -69,9 +78,9 @@ async function openDh(page: Page): Promise<void> {
   const item = page.getByTestId('walk-item-dh');
   if ((await item.count()) === 0) throw new NotRun('UI_CONTROL_MISSING', 'the Techniques rail has no walk-item-dh');
   await item.click();
-  const root = page.getByTestId('dh-walk-root');
-  try { await root.waitFor({ state: 'visible', timeout: 15_000 }); }
-  catch { throw new NotRun('UI_CONTROL_MISSING', 'walk-item-dh opens no dh-walk-root yet (slice P7)'); }
+  const panel = page.getByTestId('walk-root').getByTestId('dh-walk-panel');
+  try { await panel.waitFor({ state: 'visible', timeout: 15_000 }); }
+  catch { throw new NotRun('UI_CONTROL_MISSING', 'walk-item-dh opens no dh-walk-panel inside walk-root yet (slice P7)'); }
 }
 
 /** The small group's walk, which the screen opens on. A Host with no DH route reads NOT RUN. */
@@ -82,47 +91,43 @@ async function smallWalk(): Promise<any> {
   return r.body;
 }
 
-/** Digits only, so a thousands separator or a line break inside a long number does not hide a match. */
-const digits = (s: string | null) => (s ?? '').replace(/[^0-9]/g, '');
-
 test('[A19.ui.dh-chips-match-the-plan] each DH value shows the Host\'s number and the plan\'s chip colour, and n has no chip', async ({ page }) => {
-  const walk = await smallWalk();
-  const want = hostValues(walk);
+  const want = hostValues(await smallWalk());
   await openDh(page);
-  for (const [name, colour] of Object.entries(CHIPS)) {
-    const row = page.getByTestId(`dh-value-${name}`);
-    await expect(row, `the walk shows the ${name} row`).toBeVisible();
-    expect(want[name], `the Host's walk has a decimal for ${name}`).not.toBe('');
-    expect(digits(await page.getByTestId(`dh-num-${name}`).textContent()), `${name} shows the Host's number (R5)`).toBe(want[name]);
-    const chip = page.getByTestId(`dh-chip-${name}`);
-    if (colour === null) { expect(await chip.count(), 'n, the prime, has no chip').toBe(0); continue; }
-    await expect(chip, `${name} has a chip`).toBeVisible();
-    expect(await chip.getAttribute('data-chip'), `${name}'s chip is ${colour}`).toBe(colour);
+  for (const v of VALUES) {
+    await expect(page.getByTestId(`dh-value-${v.name}`), `the walk shows the ${v.name} row`).toBeVisible();
+    expect(want[v.name].dec, `the Host's walk has a number for ${v.name}`).not.toBe('');
+    const shown = await page.getByTestId(`dh-value-${v.name}-number`).textContent();
+    expect(showsHostNumber(shown, want[v.name]), `${v.name} shows the Host's number unchanged (R5); it shows "${shown}", the Host gives ${want[v.name].dec}`).toBe(true);
+    const chip = page.getByTestId(`dh-chip-${v.name}`);
+    if (v.colour === null) { expect(await chip.count(), 'n, the prime, has no chip').toBe(0); continue; }
+    await expect(chip, `${v.name} has a chip`).toBeVisible();
+    expect(await chip.getAttribute('data-chip'), `${v.name}'s chip is ${v.colour}`).toBe(v.colour);
+  }
+  for (const f of FROM) {
+    const chip = page.getByTestId(`dh-chip-${f.name}`);
+    await expect(chip, `"${f.name.replace('-', ' the ')}" has a chip`).toBeVisible();
+    expect(await chip.getAttribute('data-chip'), `${f.name}'s chip is ${f.colour}`).toBe(f.colour);
   }
   // The point of the chips: the two shared values are one number, in one colour.
-  expect(want['client-shared'], 'the two sides reach one shared secret').toBe(want['server-shared']);
+  expect(want['client-shared'].dec, 'the two sides reach one shared secret').toBe(want['server-shared'].dec);
 });
 
-test('[A19.ui.dh-chips-not-colour-alone] each chip has a name for screen readers that names its colour, and one visible cue', async ({ page }) => {
+test('[A19.ui.dh-chips-not-colour-alone] each chip names its colour for screen readers and shows its DH letter, and a legend pairs them', async ({ page }) => {
   await smallWalk();
   await openDh(page);
-  const seen: string[] = [];
-  for (const [name, colour] of Object.entries(CHIPS)) {
-    if (colour === null) continue;
-    const chip = page.getByTestId(`dh-chip-${name}`);
-    await expect(chip, `${name} has a chip`).toBeVisible();
-    // The accessible name, as a screen reader gets it (aria-label, aria-labelledby, or title).
-    const label = (await chip.evaluate(el => el.getAttribute('aria-label') ?? (el.getAttribute('aria-labelledby') ? document.getElementById(el.getAttribute('aria-labelledby')!)?.textContent : null) ?? el.getAttribute('title') ?? '')) ?? '';
-    expect(label.toLowerCase(), `${name}'s chip has an accessible name with the word ${colour}`).toContain(colour);
-    // DRAFT: the visible cue is the chip's own visible text (a letter or a word). Nancy's plan may name another cue.
-    const cue = ((await chip.innerText()) ?? '').trim();
-    expect(cue.length, `${name}'s chip shows a visible cue beside its colour`).toBeGreaterThan(0);
-    seen.push(`${name}=${colour}:${cue}`);
+  for (const c of [...VALUES.filter(v => v.colour !== null), ...FROM] as { name: string; colour: string; letter: string }[]) {
+    const chip = page.getByTestId(`dh-chip-${c.name}`);
+    await expect(chip, `${c.name} has a chip`).toBeVisible();
+    const label = (await chip.getAttribute('aria-label')) ?? '';
+    expect(label.toLowerCase(), `${c.name}'s chip has an aria-label with the word ${c.colour}`).toContain(c.colour);
+    expect(await chip.getAttribute('data-letter'), `${c.name}'s chip carries the letter ${c.letter}`).toBe(c.letter);
+    expect(((await chip.innerText()) ?? '').trim(), `${c.name}'s chip shows the letter ${c.letter}, so the colour is not the only cue`).toBe(c.letter);
   }
-  // Two values share a colour only when the plan gives them the same colour, so the cue may repeat only there.
-  const cueOf = (n: string) => seen.find(s => s.startsWith(n + '='))!.split(':')[1];
-  expect(cueOf('client-private'), 'red and blue chips show different cues').not.toBe(cueOf('server-private'));
-  expect(cueOf('client-public'), 'orange and green chips show different cues').not.toBe(cueOf('server-public'));
+  const legend = page.getByTestId('dh-chip-legend');
+  await expect(legend, 'the walk shows a chip legend').toBeVisible();
+  const text = ((await legend.innerText()) ?? '').toLowerCase();
+  for (const colour of ['red', 'blue', 'yellow', 'orange', 'green', 'brown']) expect(text, `the legend names ${colour}`).toContain(colour);
 });
 
 test('[A19.ui.dh-real-size-note-reads-the-host] the real-size note shows the Host\'s realExponentBits, not a number of its own', async ({ page }) => {
@@ -137,23 +142,21 @@ test('[A19.ui.dh-real-size-note-reads-the-host] the real-size note shows the Hos
     await route.fulfill({ response: resp, json: { ...body, realExponentBits: planted } });
   });
   await openDh(page);
-  const note = page.getByTestId('dh-real-size');
-  await expect(note, 'the walk shows the real-size note').toBeVisible();
-  const text = (await note.innerText()) ?? '';
-  expect(text, `the note shows the value from the reply (${planted})`).toContain(String(planted));
-  expect(text, `the note does not show a fixed ${real}`).not.toContain(String(real));
+  await expect(page.getByTestId('dh-real-size'), 'the walk shows the real-size note').toBeVisible();
+  expect(((await page.getByTestId('dh-real-size-bits').textContent()) ?? '').trim(), `the note shows the value from the reply (${planted})`).toBe(String(planted));
+  expect((await page.getByTestId('dh-real-size').innerText()) ?? '', `the note does not show a fixed ${real}`).not.toContain(String(real));
 });
 
 test('[A19.ui.dh-open-with-show-keys-off] with Show keys OFF the DH walk still shows its teaching numbers and chips', async ({ page }) => {
-  const walk = await smallWalk();
-  const want = hostValues(walk);
+  const want = hostValues(await smallWalk());
   await setShowKeys(false);
   try {
     const off = await hostGet('/api/walk/dh?group=small');
     expect(off.status, 'OFF: the Host keeps /api/walk/dh open, since it runs on a public practice exponent').toBe(200);
     await openDh(page);
     for (const name of ['client-private', 'server-private', 'client-shared']) {
-      expect(digits(await page.getByTestId(`dh-num-${name}`).textContent()), `OFF: ${name} still shows the Host's number`).toBe(want[name]);
+      const shown = await page.getByTestId(`dh-value-${name}-number`).textContent();
+      expect(showsHostNumber(shown, want[name]), `OFF: ${name} still shows the Host's number; it shows "${shown}"`).toBe(true);
       await expect(page.getByTestId(`dh-chip-${name}`), `OFF: ${name} keeps its chip`).toBeVisible();
     }
   } finally {
