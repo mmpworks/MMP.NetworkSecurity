@@ -10,9 +10,9 @@
   3 minutes: the slowest test takes 11.4 s at 100% CPU, and a test that fails on its own 20 s waits takes about 1 minute.
 .PARAMETER SkipApp
   Skips the app steps (typecheck, build, Playwright). The report names the skip. With no app/package.json the app steps are skipped by the same rule.
-  When app/ differs from origin/main (committed or not), -SkipApp fails the gate with APP_PROOF_SKIPPED unless -SkipAppReason says why.
-.PARAMETER SkipAppReason
-  The reason for -SkipApp when app/ changed, for example a docs-only edit under app/. The report prints it.
+  When code under app/ differs from origin/main (committed or not), -SkipApp fails the gate with APP_PROOF_SKIPPED, and there is no override.
+  The one automatic skip: when every changed file under app/ is a Markdown file or an image in a screens folder, the gate skips app proof on its own
+  (with or without -SkipApp) and prints the file list. Anything else under app/ counts as code (tools/gate_app.ps1, Test-NonCodeAppFile).
 .PARAMETER Lesson
   The lesson whose app/e2e/lesson-<n>.spec.ts the gate runs. Default: none. When app/ changed and no lesson is named, the gate runs typecheck, build
   and the full Playwright suite on NETSEC_PORT_BASE=auto. Naming a lesson narrows that suite to the one spec, and the report says "narrowed".
@@ -27,8 +27,7 @@ param(
     [string]$NetCFRefDir = 'E:\dev\tools\netcf35-ref',
     [string]$HangLimit = '3m',
     [string]$Lesson,
-    [switch]$SkipApp,
-    [string]$SkipAppReason
+    [switch]$SkipApp
 )
 $ErrorActionPreference = 'Continue'
 $root = Split-Path -Parent $PSScriptRoot
@@ -70,9 +69,9 @@ function Skip([string]$name, [string]$why) {
 }
 
 $hasApp = Test-Path 'app/package.json'
-$appDiff = if ($hasApp) { Get-AppDiffCount $root } else { 0 }
-$appPlan = Get-AppProofPlan -HasApp $hasApp -SkipApp ([bool]$SkipApp) -SkipAppReason $SkipAppReason -Lesson $Lesson -AppDiffCount $appDiff
-$appWhy = if ($appPlan.Mode -in 'none', 'skip') { $appPlan.Why } else { '' }
+$appDiffFiles = if ($hasApp) { @(Get-AppDiffFiles $root) } else { @() }
+$appPlan = Get-AppProofPlan -HasApp $hasApp -SkipApp ([bool]$SkipApp) -Lesson $Lesson -AppDiffFiles $appDiffFiles
+$appWhy = if ($appPlan.Mode -in 'none', 'skip', 'docs') { $appPlan.Why } else { '' }
 
 # One app step, with the gate's rule that it never installs: a missing tool stops with TOOL_MISSING and the command to run yourself.
 function Step-App([string]$name, [scriptblock]$body) {
@@ -146,7 +145,7 @@ foreach ($tour in $tours) { Step "tic-gate $($tour.Name)" { python (Join-Path $H
 # An app/ change gets typecheck + build + the full Playwright suite on its own port block. -Lesson narrows the suite and the step says so.
 # The gate never installs: a missing tool is a TOOL_MISSING step with the command to run yourself.
 switch ($appPlan.Mode) {
-    { $_ -in 'none', 'skip' } {
+    { $_ -in 'none', 'skip', 'docs' } {
         Skip 'typecheck (app/src and app/e2e)' $appPlan.Why
         Skip 'playwright' $appPlan.Why
     }

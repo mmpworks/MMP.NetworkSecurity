@@ -25,9 +25,40 @@ def git(*args, cwd):
     subprocess.run(["git", *args], cwd=cwd, check=True, capture_output=True, text=True)
 
 
-def plan(has_app=True, skip=False, reason="", lesson="", diff=0):
-    return ps(f"Get-AppProofPlan -HasApp ${str(has_app).lower()} -SkipApp ${str(skip).lower()} -SkipAppReason '{reason}' "
-              f"-Lesson '{lesson}' -AppDiffCount {diff}")
+CODE = ["app/src/App.vue", "app/e2e/start.spec.ts"]
+DOCS = ["app/README.md", "app/docs/notes.md"]
+SCREENS = ["app/docs/screens/home.png", "app/src/screens/a.svg"]
+
+
+def plan(has_app=True, skip=False, lesson="", files=()):
+    names = ",".join(f"'{f}'" for f in files)
+    return ps(f"Get-AppProofPlan -HasApp ${str(has_app).lower()} -SkipApp ${str(skip).lower()} -Lesson '{lesson}' "
+              f"-AppDiffFiles @({names})")
+
+
+class NonCode(unittest.TestCase):
+    """The only way app proof is skipped on its own: every changed file under app/ is a Markdown file, or an image in a screens folder."""
+
+    def is_non_code(self, path):
+        return ps(f"Test-NonCodeAppFile '{path}'")
+
+    def test_markdown_is_non_code_anywhere_under_app(self):
+        for path in DOCS + ["app/e2e/NOTES.MD"]:
+            self.assertTrue(self.is_non_code(path), path)
+
+    def test_images_in_a_screens_folder_are_non_code(self):
+        for path in SCREENS + ["app/a/b/screens/x.JPG", "app/screens/y.webp", "app/screens/z.gif", "app/screens/w.jpeg"]:
+            self.assertTrue(self.is_non_code(path), path)
+
+    def test_an_image_outside_a_screens_folder_is_code(self):
+        # An image under src/ is bundled into the build, so it is app code.
+        for path in ["app/src/assets/logo.png", "app/public/icon.svg"]:
+            self.assertFalse(self.is_non_code(path), path)
+
+    def test_code_config_json_and_lockfiles_are_code(self):
+        for path in CODE + ["app/package.json", "app/package-lock.json", "app/src/tours/lesson-01.json", "app/playwright.config.ts",
+                            "app/electron/main.cjs", "app/screens/script.js", "app/screens/readme.txt", "app/screens/notes.md.bak"]:
+            self.assertFalse(self.is_non_code(path), path)
 
 
 class Plan(unittest.TestCase):
@@ -37,44 +68,66 @@ class Plan(unittest.TestCase):
         self.assertIn("app/package.json is absent", p["Why"])
 
     def test_skip_app_with_no_app_diff_skips(self):
-        p = plan(skip=True, diff=0)
+        p = plan(skip=True)
         self.assertEqual(p["Mode"], "skip")
         self.assertIn("-SkipApp", p["Why"])
 
-    def test_skip_app_with_an_app_diff_and_no_reason_is_refused(self):
-        p = plan(skip=True, diff=3)
+    def test_skip_app_with_a_code_change_is_refused_and_there_is_no_override(self):
+        p = plan(skip=True, files=CODE + DOCS)
         self.assertEqual(p["Mode"], "refuse")
         self.assertIn("APP_PROOF_SKIPPED", p["Why"])
-        self.assertIn("3 files", p["Why"])
-        self.assertIn("-SkipAppReason", p["Why"])
+        self.assertIn("app/src/App.vue", p["Why"])
+        self.assertNotIn("app/README.md", p["Why"], "only the code files are named as the reason")
+        self.assertNotIn("-SkipAppReason", p["Why"])
 
-    def test_skip_app_with_an_app_diff_and_a_reason_skips_and_keeps_the_reason(self):
-        p = plan(skip=True, diff=3, reason="docs-only edit under app/")
-        self.assertEqual(p["Mode"], "skip")
-        self.assertIn("docs-only edit under app/", p["Why"])
+    def test_the_gate_has_no_skip_reason_parameter(self):
+        gate = (TOOLS / "gate.ps1").read_text(encoding="utf-8")
+        self.assertNotIn("SkipAppReason", gate)
+        self.assertNotIn("SkipAppReason", LIB.read_text(encoding="utf-8"))
 
-    def test_an_app_diff_runs_typecheck_build_and_the_full_suite(self):
-        p = plan(diff=2)
+    def test_only_non_code_files_skip_app_proof_on_their_own_and_print_the_list(self):
+        p = plan(files=DOCS + SCREENS)
+        self.assertEqual(p["Mode"], "docs")
+        self.assertFalse(p["Typecheck"] or p["Build"] or p["Suite"])
+        for path in DOCS + SCREENS:
+            self.assertIn(path, p["Why"])
+
+    def test_non_code_only_skips_whether_or_not_skip_app_is_given(self):
+        self.assertEqual(plan(skip=True, files=DOCS)["Mode"], "docs")
+
+    def test_non_code_only_skips_even_when_a_lesson_is_named(self):
+        self.assertEqual(plan(lesson="3", files=DOCS)["Mode"], "docs")
+
+    def test_one_code_file_among_docs_runs_the_full_suite(self):
+        p = plan(files=DOCS + ["app/src/store.ts"])
+        self.assertEqual(p["Mode"], "suite")
+
+    def test_an_unknown_main_counts_as_code(self):
+        p = plan(skip=True, files=["(origin/main unknown)"])
+        self.assertEqual(p["Mode"], "refuse")
+
+    def test_a_code_change_runs_typecheck_build_and_the_full_suite(self):
+        p = plan(files=CODE)
         self.assertEqual(p["Mode"], "suite")
         self.assertTrue(p["Typecheck"] and p["Build"] and p["Suite"])
         self.assertEqual(p["Lesson"], "")
 
-    def test_an_app_diff_with_a_lesson_narrows_the_suite_and_says_so(self):
-        p = plan(diff=2, lesson="4")
+    def test_a_code_change_with_a_lesson_narrows_the_suite_and_says_so(self):
+        p = plan(files=CODE, lesson="4")
         self.assertEqual(p["Mode"], "narrowed")
         self.assertEqual(p["Lesson"], "4")
         self.assertIn("narrowed by -Lesson 4", p["Label"])
         self.assertTrue(p["Typecheck"] and p["Build"])
 
     def test_no_app_diff_with_a_lesson_runs_typecheck_and_that_lesson(self):
-        p = plan(diff=0, lesson="2")
+        p = plan(lesson="2")
         self.assertEqual(p["Mode"], "lesson")
         self.assertTrue(p["Typecheck"])
         self.assertTrue(p["Build"], "the preview serves app/dist, so a stale dist must not pass a lesson spec")
         self.assertEqual(p["Lesson"], "2")
 
     def test_no_app_diff_and_no_lesson_runs_typecheck_only(self):
-        p = plan(diff=0)
+        p = plan()
         self.assertEqual(p["Mode"], "check")
         self.assertTrue(p["Typecheck"])
         self.assertFalse(p["Suite"])
@@ -105,8 +158,15 @@ class RepoFacts(unittest.TestCase):
         git("add", "-A", cwd=self.repo)
         git("commit", "-q", "-m", "change " + rel, cwd=self.repo)
 
+    def files(self):
+        return ps(f"@(Get-AppDiffFiles -Repo '{self.repo}')")
+
     def count(self):
-        return ps(f"Get-AppDiffCount -Repo '{self.repo}'")
+        return len(self.files())
+
+    def test_the_file_names_are_returned_not_only_a_count(self):
+        self.commit("app/b.md", "b")
+        self.assertEqual(self.files(), ["app/b.md"])
 
     def head(self):
         return ps(f"Get-HeadLine -Repo '{self.repo}'")
