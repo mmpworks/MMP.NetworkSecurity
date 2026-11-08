@@ -16,7 +16,7 @@ import sys
 
 NPX = re.compile(r"\bnpx(?:\.cmd)?\b")
 SELF = {"no_npx.py", "test_no_npx.py"}
-SUFFIXES = {".ps1", ".py", ".mjs", ".cjs", ".js", ".ts", ".json"}
+SUFFIXES = {".ps1", ".py", ".mjs", ".cjs", ".js", ".ts", ".json", ".cs"}
 # Installed packages and run output are not scripts this repo wrote.
 SKIP_PARTS = {"node_modules", ".work", "test-results"}
 
