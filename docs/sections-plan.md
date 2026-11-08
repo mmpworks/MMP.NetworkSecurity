@@ -1,6 +1,6 @@
 # MMP.NetworkSecurity: the 3-section plan
 
-Owners: Richard (map, engine data, slices) and Nancy (screens). Decision owner: Steve. Reader before Steve: Jared. Date: 2026-11-07. Status: plan, with Steve's answers to Q1 to Q4 recorded on 2026-11-07. Slices build from it.
+Owners: Richard (map, engine data, slices) and Nancy (screens). Decision owner: Steve. Reader before Steve: Jared. Date: 2026-11-07. Status: plan, with Steve's answers to Q1 to Q4 recorded on 2026-11-07. Slices build from it. Q5 and Q6, from Steve's 2 videos, are open.
 
 ## The two changes I would make
 
@@ -27,6 +27,8 @@ Owners: Richard (map, engine data, slices) and Nancy (screens). Decision owner: 
 | R4 | Section 3, Lessons, holds today's lessons with their attack runs: how things break and how to guard against it. | Steve |
 | R5 | Every walk draws real engine data. The app runs no math (the real data rule, `walkthrough-design.md` section 3). | Existing rule |
 | R6 | No walk adds a field to W1a's frozen walk types. A walk that needs more data gets its own type and route. | `walkthrough-design.md` section 9 |
+| R7 | The elliptic-curve walks teach as video 4Tfmwxr0I34 does, Steve's favourite: "we should be able to see animations of the selecting of values on inputs on the curve and show how the values are built." Its order: the chord rule on the real curve (the line through P and Q, the third point R', the reflection), tangent doubling, the point at infinity, the slope formulas; then the same curve over a finite field (y² = x³ + 2x + 2 mod 17, a scatter of dots, 18 points plus O = 19), doubling by hand with a modular inverse, k·G as hops through the dots with order 19, double-and-add on k = 13's bits, and the Montgomery ladder as the defence against timing attacks; then ECDH and ECDSA on the same toy curve, where a reused nonce gives away the key. | Steve, 2026-11-07, through the lead |
+| R8 | The Handshake section uses video 25_ftpJ-2ME: TLS with RSA key exchange step by step, from the pre-master secret to the master secret to the directional keys, then the decryption of a recorded session after the fact with the server's private key. Its use here: contrast RSA key transport with TLS 1.3's ECDHE, and show forward secrecy as an attack a learner can run. | Steve, 2026-11-07, through the lead |
 
 ## 1. The map
 
@@ -148,16 +150,26 @@ So no new walk type in this plan runs on a session's own key: each runs on a pub
 | Feistel | `Des.cs`, which runs only inside `TdesKey`, and only tests call that. No lesson runs DES | FIPS 46-3 or SP 800-17 known-answer keys | Every subkey and the key | `DesWalk` (initial permutation, 16 rounds of left and right halves, expansion, S-boxes, permutation, subkeys) | `/api/walk/des` | FIPS 46-3 or SP 800-17 known answers |
 | Diffie-Hellman | `DhGroup14`, `BigUInt.ModPow`. Lesson 8's legacy exchange runs `DhGroup14` (`SshClientRules.cs`) | A public practice exponent, on a small prime and on group 14 | Every square-and-multiply row and the private exponent | `DhWalk` (square-and-multiply rows; a small prime for reading, group 14 for the real run). The engine computes the small-prime run too. The app computes nothing (R5) | `/api/walk/dh` | Python `pow()`, as `dh-group14-rfc3526.nsv` does today |
 | X25519 | `X25519`, `Montgomery` | RFC 7748 section 5.2 vector scalars | Every ladder row, each swap bit, and the scalar | `X25519Walk` (the ladder: one row per bit, the swap, the 4 field values) | `/api/walk/x25519` | RFC 7748 section 5.2 vectors |
+| Toy curve, R7 (slice P8a) | **New Core code, teaching only:** arithmetic on y² = x³ + 2x + 2 over GF(17) | Public curve and public toy values | Not applicable: no session key | `ToyCurveWalk`: every point of the curve (the scatter, 18 points plus O); point add and point double, each with its slope's numerator, denominator, modular inverse (with the extended Euclid steps) and λ; k·G as one row per hop until the cycle closes at the order, 19; double-and-add rows on k's bits; Montgomery ladder rows; ECDH on the toy curve; ECDSA sign and verify on the toy curve, and the recovery of the private key from 2 signatures with one reused nonce | `/api/walk/toy-curve` | Brute force in the tests with `System.Numerics.BigInteger`: every point by trying each x, each sum by the formulas, and the order by repeated addition |
+| Real curve picture, R7 (slice P8a) | **New Core code, teaching only:** the chord and tangent rules on y² = x³ + 2x + 2 over the real numbers | Public example points | Not applicable | `RealCurveSample`: the curve as a list of points to draw, and one chord example (P, Q, R', R) and one tangent example, as decimals. The app draws them and computes nothing (R5) | `/api/walk/real-curve` | The test checks that R' lies on the line through P and Q and on the curve, each within 1e-9. The curve has one connected piece (4a³ + 27b² = 140 > 0), so one sampled branch pair draws it whole |
 | Ed25519 signature | `Ed25519` | RFC 8032 section 7.1 vector keys | r, the secret scalar, and the seed | `Ed25519Walk` (r, R, k, S, then verify) | `/api/walk/ed25519` | RFC 8032 section 7.1 vectors |
 | ECDSA signature on P-256 | **No engine code exists.** The engine has no P-256 and no ECDSA | RFC 6979 section A.2.5 P-256 vector keys | Not applicable: walk-only, never a session key | New Core code first: P-256 point arithmetic, ECDSA sign and verify with RFC 6979 deterministic k, then `EcdsaWalk` | `/api/walk/ecdsa` | RFC 6979 A.2.5: the engine's R and S equal the vector values. OpenSSL signs with a random k, so OpenSSL referees by cross-verify: OpenSSL verifies the engine's signature, and the engine verifies OpenSSL's. Spike before sign-off |
 | TLS 1.3 key schedule | `Tls13KeySchedule` | The RFC 8448 section 3 trace | The shared secret and every derived secret | `Tls13ScheduleWalk` (each Extract and Derive-Secret, with its label and transcript hash) | `/api/walk/tls13/schedule` | RFC 8448 section 3 trace, as `tls13-rfc8448.nsv` does today |
 | TLS 1.3 messages and the chain | Trace events `tls.handshake.sent` and `.received`, lesson 4's certificate parse | The session's own run | As today: Show keys OFF already governs the trace | None. The trace already holds them | Existing session routes | Lesson 5's and lesson 4's clauses |
+| TLS 1.1 RSA key transport, R8 (slice P4b) | `Tls11Prf.MasterSecret`, `Tls11KeyBlock`, the RSA decrypt of the pre-master | A fixed teaching run on the course's built-in training key, which is public in the source | The pre-master, the master secret and the 4 keys (client and server MAC keys, client and server encryption keys) | `Tls11KeyScheduleWalk`: the encrypted pre-master, its decryption with the server's key, the master secret from the pre-master and both randoms, and the key block split into its 4 keys | `/api/walk/tls11/schedule` | The engine's own key log line, which Wireshark reads, and an OpenSSL decrypt of the pre-master with the same key |
+| Record now, decrypt later, R8 (slice P4b) | The same pieces, run over a recorded lesson 7 session | The run's recorded frames and the server's private key, as an attacker who stole the key holds them | The recovered keys and plaintext, under the session's Show keys rules | A new attack run in lesson 7, `L7-decrypt-recording`: on the RSA suite the stolen key opens the recording; on the ECDHE suite the same key opens nothing, because no stored key made the session keys | Existing `run-attack` | The recovered plaintext equals what the client sent; on ECDHE the run ends with a named refusal. With Show keys OFF, on a learner's own `tls11.server` key, the plaintext shows and no key byte shows: P4b's tests pin that |
 
 **ECDSA constraints (slice P8b):**
 1. The deterministic k comes from RFC 6979. FIPS 186-5 approves it: "known as deterministic ECDSA is also approved and specified in IETF RFC 6979". A random k would make the walk impossible to repeat and to match a fixed vector.
 2. `NetSec.Core.NetCF` compiles `..\NetSec.Core\**\*.cs`. So the P-256 code must build for CF 3.5 and pass the CE audit.
 3. The P-256 code is walk-only. No handshake ever offers it (non-goal 5).
 4. It is not constant-time. The walk says so, and links to lesson 11, which teaches timing leaks.
+
+**Toy-curve constraints (slice P8a):**
+1. The toy curve is teaching code. No handshake offers it, and no walk calls it secure: a curve of 19 points falls to a search a learner can do by hand. `ToyCurve` and `RealCurveSample` live in a `NetSec.Labs.Teaching` namespace, and one test fails if any file under `Tls11`, `Tls13`, `Ssh`, `Crypto` or `Pki` names them. That makes "never offered in a handshake" a gate, not a promise (Jared, #243).
+2. It builds for CF 3.5 and passes the CE audit, like all of Core.
+3. Every number the screen shows comes from the walk (R5). The animations move between engine values; the app computes no point.
+4. The Montgomery ladder rows show why the real X25519 code runs the same steps for every bit. The X25519 walk then shows the ladder on the real engine, from RFC 7748 vectors.
 
 The attack index needs no engine data: `run-attack` already plays each run, and each run's check is already a trace event. Its content is `app/src/attacks.json` (P3, content half).
 
@@ -178,10 +190,12 @@ The attack index needs no engine data: `run-attack` already plays each run, and 
 | Stop: show Steve | Steve steps through section 2 in the app | His reaction in `docs/learnings.md` | Unchanged stop from `walkthrough-design.md` |
 | P3 attack index | `attacks.json`, the list by kind inside Lessons, each entry opening its tour step or its free-play button. The two-run layout, built from lesson 7's race (section 2, item 3; Steve, Q4) | 56 of 56 registered runs reachable, each plays its run and shows its check | None to the tours. The race layout becomes shared by lesson 7 and the index |
 | P4 Handshake walk | The TLS 1.3 message walk, the key schedule walk, the chain view | RFC 8448 values, lesson 4 and 5 clauses | Takes **W4** (lesson 5 record walk) and the lesson 4 half of **W3** |
+| P4b TLS 1.1 key transport and forward secrecy, R8 | `Tls11KeyScheduleWalk`, and the attack run `L7-decrypt-recording`. The registry then holds 57 runs; every count in this plan follows the live count from `GET /api/lessons`, so P4b updates the literal 56 in section 1.4, P3 and the kill condition | The key log line, OpenSSL, and the recovered plaintext | Adds 1 attack run to lesson 7. The tour text does not change: L7-S05 already explains record now, decrypt later, and the index opens the new run at its free-play button |
 | P5 W1c | Chapter 2 modes, unchanged | W1c's clauses | Unchanged, now inside section 2 |
 | P6 HMAC and chain | `Sha256Walk`, `HmacWalk`, `SealChainWalk` | FIPS 180-4 and RFC 4231 | Takes lesson 2 from **W5** |
 | P7 Diffie-Hellman | `DhWalk`, with paint chips beside the numbers (the requirement under this table). Its live run in the course is lesson 8's legacy exchange | `pow()` references | Takes the lesson 3 half of **W3** |
-| P8 Elliptic curves, engine today | `X25519Walk` and `Ed25519Walk` | RFC 7748, RFC 8032 | New |
+| P8a Toy curve and real-curve picture, R7 | New Core code, teaching only: `ToyCurveWalk` and `RealCurveSample` | Brute-force BigInteger references | New. The video's order, from the chord rule to ECDSA nonce reuse |
+| P8 Elliptic curves, engine today | `X25519Walk` (the Montgomery ladder, one row per bit, on the real engine) and `Ed25519Walk` | RFC 7748, RFC 8032 | New |
 | P8b ECDSA | New Core code: P-256, ECDSA sign and verify with RFC 6979 k, then `EcdsaWalk`. Spike first | RFC 6979 A.2.5 values, and OpenSSL cross-verify both ways | New. The one slice that adds crypto to the engine |
 | P9 Feistel | `DesWalk` | DES known answers | New |
 
@@ -216,7 +230,7 @@ A progress report states these 5 counts. It does not substitute the fact that bu
 ## 7. Non-goals
 
 1. No new lesson and no tour rewrite. Sections group what exists.
-2. No new crypto in the engine, except ECDSA on P-256 in slice P8b, which Steve asked for. Every other walk reads engine code that already exists. DES runs today only in tests.
+2. No new crypto in the engine, except ECDSA on P-256 in slice P8b, which Steve asked for, and the toy curve and real-curve picture in slice P8a, which teach R7 and are never offered in a handshake. Every other walk reads engine code that already exists. DES runs today only in tests.
 3. No change to W1a's frozen walk types.
 4. No change to the acceptance clause ids.
 5. No handshake offers P-256 or ECDSA. That code is walk-only.
@@ -236,6 +250,13 @@ Nancy's 2 screen questions (section 2), answered by Steve:
 | Q3 | Where does the long text live in Techniques? | A pinned strip above the walk, one line, scrolling sideways | A side column, wrapped, about 280 px wide | **A.** The walk needs the width at 1280, and one line keeps byte offsets readable. **Steve: A** |
 | Q4 | When a learner opens an attack run from the index, what shows first? | The normal run and the attacked run side by side. This needs a new two-run layout, built from lesson 7's race layout | The attacked run alone, with a "show the normal run" toggle. This reuses today's one-run screen | **A.** The difference is the lesson. The cost is one new layout in P3, built on a layout the app already has. **Steve: A** |
 
+Open, from Steve's 2 videos (2026-11-07):
+
+| Id | Question | Option A | Option B | My pick |
+|---|---|---|---|---|
+| Q5 | The toy curve: the video's own curve, or another small curve? | The video's curve, y² = x³ + 2x + 2 mod 17, with 19 points, so a learner can follow the video and the app side by side | Another small curve of our own | **A.** The video is Steve's target, and the curve is a standard textbook example, so matching it costs nothing |
+| Q6 | Record now, decrypt later: a new attack run in lesson 7, or only a walk? | A new attack run, `L7-decrypt-recording`, that a learner plays, beside ECDHE where it fails, plus the key schedule walk | Only the key schedule walk in Handshake, with no new run | **A.** Lesson 7 already says it in words (L7-S05). A run a learner plays shows it, and the tour text stays as it is |
+
 **Answered (2026-11-07, Steve, through the lead):**
 1. Elliptic-curve methods mean both key agreement (ECDH, X25519) and signatures (ECDSA, Ed25519). Both go in section 2.
 2. W1b becomes the AES walk inside section 2, and it goes before V4's certificate file path.
@@ -253,4 +274,4 @@ Jared read 23df25c (same-vendor fresh read). His anchor: a git grep on origin/ma
 
 ## Disposition
 
-Jared passed this plan (35e95ce). Steve answered Q1 to Q4 in section 8 on 2026-11-07. The lead starts P1. Nancy builds the W1b screens after SC lands.
+Jared passed this plan (35e95ce). Steve answered Q1 to Q4 in section 8 on 2026-11-07. Q5 and Q6 wait for him. The lead starts P1. Nancy builds the W1b screens after SC lands.
