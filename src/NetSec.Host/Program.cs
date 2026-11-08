@@ -95,6 +95,7 @@ Tls13WalkRoutes.Map(app);
 TeachingCurveRoutes.Map(app);
 DhWalkRoutes.Map(app);
 X25519WalkRoutes.Map(app);
+Ed25519WalkRoutes.Map(app);
 VaultRoutes.Map(app, security.Vault, new VaultExercise(security.Vault, new OpenSslTool(Environment.GetEnvironmentVariable), Path.Combine(security.Root, "proof")));
 
 app.Map("/ws", async ctx =>

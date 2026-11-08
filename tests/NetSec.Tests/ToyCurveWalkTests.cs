@@ -173,7 +173,8 @@ namespace NetSec.Tests
                 Assert.True(Math.Abs(e.RPrime.Y * e.RPrime.Y - RealCurveSamples.Cubic(e.RPrime.X)) < 1e-9, e.Kind + ": R' is on the curve");
                 Assert.True(Math.Abs(e.RPrime.Y - (e.P.Y + e.Lambda * (e.RPrime.X - e.P.X))) < 1e-9, e.Kind + ": R' is on the line");
                 Assert.True(Math.Abs(e.Q.Y - (e.P.Y + e.Lambda * (e.Q.X - e.P.X))) < 1e-9, e.Kind + ": Q is on the line");
-                Assert.InRange(e.RPrime.X, s.Root, s.XMax);
+                // Inside the range by a margin, so R' never lands on the curve's tip or edge on screen (Jared, #284).
+                Assert.InRange(e.RPrime.X, s.Root + 0.1, s.XMax - 0.1);
                 Assert.Equal(-e.RPrime.Y, e.R.Y);
             }
         }
