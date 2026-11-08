@@ -69,10 +69,16 @@ const stopsInOrder = (reply: any): any[] => [...reply.forward.steps, { kind: DEC
 
 const cell = (page: Page, r: number, c: number) => page.getByTestId(`aes-walk-cell-${r}-${c}`);
 
+/** A block cell's byte: data-hex when the cell carries it (a cell that also shows its index and character), else the first 2 characters of its text. */
+async function cellHex(page: Page, r: number, c: number): Promise<string> {
+  const attr = await cell(page, r, c).getAttribute('data-hex');
+  return (attr ?? ((await cell(page, r, c).textContent()) ?? '').trim().slice(0, 2)).toLowerCase();
+}
+
 /** The byte in each cell, read by row and column and put back in FIPS order: position r + 4c. */
 async function grid(page: Page): Promise<string> {
   const out: string[] = new Array(16).fill('');
-  for (let c = 0; c < 4; c++) for (let r = 0; r < 4; r++) out[r + 4 * c] = ((await cell(page, r, c).textContent()) ?? '').trim().slice(0, 2).toLowerCase();
+  for (let c = 0; c < 4; c++) for (let r = 0; r < 4; r++) out[r + 4 * c] = await cellHex(page, r, c);
   return out.join('');
 }
 
@@ -451,4 +457,166 @@ test('[A19.ui.reconnect-reads-the-toggle-first] after a reconnect the app reads 
     expect(asksAfterClose, 'block requests after the reconnect, with Show keys OFF').toBe(0);
     await expect(page.locator('[data-testid^="aes-walk-cell-"]')).toHaveCount(0);
   } finally { await setShowKeys(true); }
+});
+
+/*
+ * Steve's three AES walk fixes (2026-11-08), with the design mock at E:/dev/ns-mock/design/mock/ (template.html, keys_anim.js):
+ * 1. a block cell shows its byte index and the character of the byte: "sp" for a space, a dot for a byte that is not printable;
+ * 2. the key schedule builds a word step by step (RotWord, SubWord, Rcon, XOR with the word Nk back), with one color per role;
+ * 3. the Key Schedule panel zooms in and out, with a reset, and nothing scrolls sideways at 1280 px wide.
+ * Steve's words win where the mock differs: the mock shows nothing for a byte that is not printable, and Steve asked for a dot.
+ */
+
+/** The character line of a byte, by Steve's rule. A byte that is not printable may show '.' or the middle dot, since both are a dot. */
+function charOk(hex: string, shown: string): boolean {
+  const n = parseInt(hex, 16);
+  if (n === 0x20) return shown === 'sp';
+  if (n > 0x20 && n < 0x7f) return shown === String.fromCharCode(n);
+  return shown === '.' || shown === '\u00b7';
+}
+
+async function requireCellParts(page: Page): Promise<void> {
+  if ((await page.getByTestId('aes-walk-cell-0-0-index').count()) === 0) throw new NotRun('UI_CONTROL_MISSING', 'block cells have no aes-walk-cell-{r}-{c}-index yet (Steve fix 1)');
+}
+
+/** Every cell's index and character line, against the 16 bytes the cells should hold ('' for an empty cell). */
+async function checkCellParts(page: Page, hex16: string[], where: string): Promise<void> {
+  for (let c = 0; c < 4; c++) for (let r = 0; r < 4; r++) {
+    const pos = r + 4 * c, h = hex16[pos];
+    const index = ((await page.getByTestId(`aes-walk-cell-${r}-${c}-index`).textContent()) ?? '').trim();
+    expect(index, `${where}: cell ${r},${c} shows its byte index`).toBe(String(pos));
+    const ch = ((await page.getByTestId(`aes-walk-cell-${r}-${c}-char`).textContent().catch(() => '')) ?? '').trim();
+    if (h === '') { expect(ch, `${where}: empty cell ${r},${c} shows no character`).toBe(''); continue; }
+    expect(charOk(h, ch), `${where}: cell ${r},${c} holds ${h} and shows "${ch}"`).toBe(true);
+    expect(await cellHex(page, r, c), `${where}: cell ${r},${c} still shows its hex`).toBe(h);
+  }
+}
+
+const bytesOf = (hex: string) => Array.from({ length: 16 }, (_, i) => hex.slice(2 * i, 2 * i + 2).toLowerCase());
+const printable = (h: string) => { const n = parseInt(h, 16); return n >= 0x20 && n < 0x7f; };
+
+test('[A19.ui.block-cell-shows-index-and-char] each block cell shows its byte index and its character: "sp" for a space, a dot for a byte that is not printable', async ({ page }) => {
+  const reply = await openWalk(page);
+  await requireCellParts(page);
+  await checkCellParts(page, new Array(16).fill(''), 'first view, nothing filled');
+  for (let pos = 0; pos < 16; pos++) await page.getByTestId('aes-walk-next').click();
+  // "Pump four is ok." holds letters, three spaces and a full stop.
+  await checkCellParts(page, bytesOf(reply.inputHex), 'block 1 filled');
+  await toFirstStep(page);
+  // The first AddRoundKey state holds bytes that are not printable, so the dot rule is tested on real engine bytes.
+  const state = bytesOf(reply.forward.steps[0].state);
+  expect(state.some(h => !printable(h)), 'the first AddRoundKey state holds a byte that is not printable').toBe(true);
+  await checkCellParts(page, state, 'first AddRoundKey');
+});
+
+/** The first time each watched element is seen, in ms from the start, sampled in the page once per frame. */
+async function firstSeen(page: Page, ids: string[], hexCells: string[], ms: number): Promise<{ rows: Record<string, number>; cells: Record<string, number> }> {
+  return await page.evaluate(({ ids, hexCells, ms }) => new Promise<{ rows: Record<string, number>; cells: Record<string, number> }>(done => {
+    const rows: Record<string, number> = {}, cells: Record<string, number> = {};
+    const t0 = performance.now();
+    const visible = (el: Element | null) => !!el && (el as HTMLElement).offsetParent !== null && getComputedStyle(el).visibility !== 'hidden' && Number(getComputedStyle(el).opacity) > 0.5;
+    const tick = () => {
+      const t = performance.now() - t0;
+      for (const id of ids) if (rows[id] === undefined && visible(document.querySelector(`[data-testid="${id}"]`))) rows[id] = t;
+      for (const id of hexCells) if (cells[id] === undefined && (document.querySelector(`[data-testid="${id}"]`)?.getAttribute('data-hex') ?? '') !== '') cells[id] = t;
+      if (t > ms || (Object.keys(rows).length === ids.length && Object.keys(cells).length === hexCells.length)) done({ rows, cells });
+      else requestAnimationFrame(tick);
+    };
+    tick();
+  }), { ids, hexCells, ms });
+}
+
+const STAGES = ['previous', 'rotated', 'substituted', 'rcon', 'after-rcon', 'key-back', 'word'];
+
+test('[A19.ui.key-word-build-runs-in-steps] with motion on, Next on a RotWord word shows RotWord, SubWord, Rcon and the XOR with the word Nk back one after another, then fills the new word one byte at a time', async ({ page }) => {
+  const reply = await openWalk(page);
+  await toKeySchedule(page);
+  const tables = await hostGet('/api/walk/aes/tables');
+  const nk = tables.body.sizes.find((s: any) => s.keyBits === reply.keyBits).keyWords;
+  const row = reply.keyWords.find((r: any) => r.i === nk);
+  await page.emulateMedia({ reducedMotion: 'no-preference' });
+  const ids = STAGES.map(s => `aes-walk-build-${s}`);
+  const newCells = [0, 1, 2, 3].map(b => `aes-walk-table-cell-${4 * nk + b}`);
+  const [seen] = await Promise.all([firstSeen(page, ids, newCells, 20_000), page.getByTestId('aes-walk-next').click()]);
+  const order = ids.map(id => seen.rows[id]);
+  if (order.every(t => t === undefined)) throw new NotRun('UI_CONTROL_MISSING', `Next onto w${nk} showed no aes-walk-build-* row without a tap (Steve fix 2: the build runs by itself)`);
+  ids.forEach(id => expect(seen.rows[id], `${id} appears during the build of w${nk}`).not.toBeUndefined());
+  for (let k = 1; k < ids.length; k++) expect(order[k], `${ids[k]} appears after ${ids[k - 1]} (FIPS 197 order)`).toBeGreaterThanOrEqual(order[k - 1]);
+  expect(order[ids.length - 1] - order[0], 'the stages come one after another, not in one frame').toBeGreaterThanOrEqual(300);
+  const fills = newCells.map(id => seen.cells[id]);
+  fills.forEach((t, b) => expect(t, `w${nk} byte ${b} is filled during the build`).not.toBeUndefined());
+  for (let b = 1; b < 4; b++) expect(fills[b], `w${nk} byte ${b} fills after byte ${b - 1}`).toBeGreaterThan(fills[b - 1]);
+  expect(fills[0], 'the new word fills after the stage rows begin').toBeGreaterThan(order[0]);
+  // The end frame holds the engine's values, the same as with reduced motion.
+  await expect.poll(() => running(page), { timeout: 20_000 }).toBe(0);
+  for (const [id, value] of [['previous', row.previous], ['rotated', row.rotated], ['substituted', row.substituted], ['rcon', row.rcon], ['after-rcon', row.afterRcon], ['key-back', row.keyBack], ['word', row.word]])
+    await expect(page.getByTestId(`aes-walk-build-${id}`), `end frame of w${nk}: ${id}`).toContainText(value, { ignoreCase: true });
+  for (let b = 0; b < 4; b++) expect(await hexOf(page, 4 * nk + b), `w${nk} byte ${b} at the end`).toBe(row.word.slice(2 * b, 2 * b + 2).toLowerCase());
+});
+
+/** Every background color an element and the elements inside it show, as computed strings. */
+const backgrounds = (page: Page, testid: string) => page.getByTestId(testid).evaluate(el => [el, ...Array.from(el.querySelectorAll('*'))].map(e => getComputedStyle(e).backgroundColor));
+
+test('[A19.ui.key-roles-have-colors] the word being built, the word before it and the word Nk back each have a role color, the same in the table and in the stage rows', async ({ page }) => {
+  const reply = await openWalk(page);
+  await toKeySchedule(page);
+  const tables = await hostGet('/api/walk/aes/tables');
+  const nk = tables.body.sizes.find((s: any) => s.keyBits === reply.keyBits).keyWords;
+  await page.getByTestId('aes-walk-next').click();
+  const roleCell = (role: string) => page.locator(`[data-testid^="aes-walk-table-cell-"][data-role="${role}"]`);
+  if ((await roleCell('new').count()) === 0) throw new NotRun('UI_CONTROL_MISSING', 'no aes-walk-table-cell-* carries data-role yet (Steve fix 2)');
+  const words: Record<string, string> = { new: `w${nk}`, previous: `w${nk - 1}`, 'key-back': 'w0' };
+  const color: Record<string, string> = {};
+  for (const [role, word] of Object.entries(words)) {
+    const cells = roleCell(role);
+    expect(await cells.count(), `${role}: the 4 cells of ${word}`).toBe(4);
+    const bgs = new Set<string>();
+    for (let k = 0; k < 4; k++) {
+      expect(await cells.nth(k).getAttribute('data-word'), `${role} cell ${k}`).toBe(word);
+      bgs.add(await cells.nth(k).evaluate(e => getComputedStyle(e).backgroundColor));
+    }
+    expect(bgs.size, `${role}: one color on all 4 cells`).toBe(1);
+    color[role] = [...bgs][0];
+  }
+  const plain = await tableCell(page, 4 * (nk + 5)).evaluate(e => getComputedStyle(e).backgroundColor);
+  const roles = Object.keys(words);
+  for (let a = 0; a < roles.length; a++) {
+    expect(color[roles[a]], `${roles[a]} differs from a cell with no role`).not.toBe(plain);
+    for (let b = a + 1; b < roles.length; b++) expect(color[roles[a]], `${roles[a]} and ${roles[b]} differ`).not.toBe(color[roles[b]]);
+  }
+  for (const [role, stage] of [['previous', 'previous'], ['key-back', 'key-back'], ['new', 'word']])
+    expect(await backgrounds(page, `aes-walk-build-${stage}`), `the ${stage} stage row shows the ${role} color`).toContain(color[role]);
+});
+
+/** How far the page and the Key Schedule panel scroll sideways, in px. */
+const sideScroll = (page: Page) => page.evaluate(() => {
+  const d = document.documentElement, p = document.querySelector('[data-testid="aes-walk-key-schedule"]') as HTMLElement | null;
+  return { page: d.scrollWidth - d.clientWidth, panel: p ? p.scrollWidth - p.clientWidth : 0 };
+});
+
+test('[A19.ui.key-schedule-zoom] at 1280 px the Key Schedule panel zooms in and out and resets, and nothing scrolls sideways at any zoom', async ({ page }) => {
+  await page.setViewportSize({ width: 1280, height: 800 });
+  await openWalk(page);
+  await toKeySchedule(page);
+  const zin = page.getByTestId('aes-walk-ks-zoom-in'), zout = page.getByTestId('aes-walk-ks-zoom-out'), zreset = page.getByTestId('aes-walk-ks-zoom-reset');
+  if ((await zin.count()) === 0) throw new NotRun('UI_CONTROL_MISSING', 'the Key Schedule panel has no aes-walk-ks-zoom-in yet (Steve fix 3)');
+  const width = async () => (await tableCell(page, 0).boundingBox())!.width;
+  const flat = async (where: string) => {
+    const s = await sideScroll(page);
+    expect(s.page, `${where}: the page does not scroll sideways`).toBeLessThanOrEqual(1);
+    expect(s.panel, `${where}: the Key Schedule panel does not scroll sideways`).toBeLessThanOrEqual(1);
+  };
+  await flat('default zoom');
+  const base = await width();
+  let biggest = base;
+  for (let k = 0; k < 6 && await zin.isEnabled(); k++) { await zin.click(); await page.waitForTimeout(250); biggest = Math.max(biggest, await width()); await flat(`zoom in ${k + 1}`); }
+  expect(biggest, 'zoom in makes the cells at least 20% larger').toBeGreaterThanOrEqual(base * 1.2);
+  await zreset.click(); await page.waitForTimeout(250);
+  expect(Math.abs((await width()) - base), 'reset gives the default size back').toBeLessThanOrEqual(1);
+  let smallest = base;
+  for (let k = 0; k < 6 && await zout.isEnabled(); k++) { await zout.click(); await page.waitForTimeout(250); smallest = Math.min(smallest, await width()); await flat(`zoom out ${k + 1}`); }
+  expect(smallest, 'zoom out makes the cells at least 15% smaller').toBeLessThanOrEqual(base * 0.85);
+  await zreset.click(); await page.waitForTimeout(250);
+  expect(Math.abs((await width()) - base), 'reset after zoom out gives the default size back').toBeLessThanOrEqual(1);
+  await flat('after reset');
 });
