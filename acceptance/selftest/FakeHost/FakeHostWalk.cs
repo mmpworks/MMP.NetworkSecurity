@@ -239,6 +239,8 @@ namespace Acceptance
             if (p == null || q == null || (p.X == q.X && CurveWalkClauses.Mod(p.Y + q.Y, CurveWalkClauses.P) == 0))
                 step = D("kind", p == null || q == null ? "identity" : "opposite", "p", ToyPt(p), "q", ToyPt(q), "result", ToyPt(sum), "numerator", null, "denominator", null, "inverse", null, "lambda", null);
             else step = ToyStep(p, q);
+            // toy-pick-wrong-kind names a double "add". The sum and the slope stay right, so only the kind check can catch it.
+            if (M("toy-pick-wrong-kind") && (string)step["kind"] == "double") step["kind"] = "add";
             WalkWrite(ctx, 200, D("pIndex", (double)i, "qIndex", (double)j, "resultIndex", (double)at, "step", step), false);
         }
 
@@ -298,6 +300,8 @@ namespace Acceptance
             };
             // The offered picks: 3 chords and 1 tangent, each R' inside -0.7709 to 3.0. The defect real-sample-off-line moves one R' off its line.
             List<object> samples = new List<object> { line(-0.5, 0.5, false), line(0.0, 2.0, false), line(-0.25, 1.0, false), line(0.5, 0.5, true) };
+            // real-sample-out-of-range: the tangent at x = -0.7 has a true R' at x near 13, on its line and the curve, but outside 3.0. Only the range check can catch it.
+            if (M("real-sample-out-of-range")) samples[3] = line(-0.7, -0.7, true);
             if (M("real-sample-off-line")) { Dictionary<string, object> s1 = (Dictionary<string, object>)samples[1]; Dictionary<string, object> rp = (Dictionary<string, object>)s1["rPrime"]; s1["rPrime"] = D("x", (double)rp["x"], "y", (double)rp["y"] + 0.5); }
             return D("source", "video 4Tfmwxr0I34", "a", 2.0, "b", 2.0, "root", -0.7709, "xMax", 3.0, "upper", upper, "lower", lower, "chord", line(0.0, 1.0, false), "tangent", line(1.0, 1.0, true), "samples", samples);
         }
