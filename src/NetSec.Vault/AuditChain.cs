@@ -15,10 +15,13 @@ public static class AuditChain
 {
     public static readonly string Seed = Hash("netsec-vault-audit-seed-v1");
 
-    /// <summary>The value the next row stores as prev_hash.</summary>
-    public static string HashOf(AuditRow row) => Hash(string.Join("\n",
+    /// <summary>The value the next row stores as prev_hash: the SHA-256 of TextOf(row), as lower-case hex.</summary>
+    public static string HashOf(AuditRow row) => Hash(TextOf(row));
+
+    /// <summary>The text a row's hash covers: prev_hash, seq, at, caller, op, name, version, result and detail, one per line. The seal-chain walk shows it.</summary>
+    public static string TextOf(AuditRow row) => string.Join("\n",
         row.PrevHash, row.Seq.ToString(System.Globalization.CultureInfo.InvariantCulture), row.At, row.Caller, row.Op, row.Name,
-        row.Version?.ToString(System.Globalization.CultureInfo.InvariantCulture) ?? "", row.Result, row.Detail));
+        row.Version?.ToString(System.Globalization.CultureInfo.InvariantCulture) ?? "", row.Result, row.Detail);
 
     /// <summary>The seq of the first row whose prev_hash does not fit the row before it, or 0 while the chain is whole.</summary>
     public static long FirstBadSeq(IReadOnlyList<AuditRow> rows)

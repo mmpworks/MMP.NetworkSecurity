@@ -110,6 +110,7 @@ namespace NetSec.Errors
         public const string Tls11WalkDiverged = "TLS11_WALK_DIVERGED";
         public const string Ed25519WalkDiverged = "ED25519_WALK_DIVERGED";
         public const string DesWalkDiverged = "DES_WALK_DIVERGED";
+        public const string HmacWalkDiverged = "HMAC_WALK_DIVERGED";
         public const string Tls13WalkDiverged = "TLS13_WALK_DIVERGED";
         public const string DhWalkDiverged = "DH_WALK_DIVERGED";
         public const string X25519WalkDiverged = "X25519_WALK_DIVERGED";
