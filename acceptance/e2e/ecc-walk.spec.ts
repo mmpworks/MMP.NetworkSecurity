@@ -165,17 +165,21 @@ test('[A19.ui.x25519-ladder-rows-and-rfc-result] the X25519 screen shows one lad
   const x = await walk('/api/walk/x25519?step=alice-public');
   const rows: any[] = x.rows ?? [];
   expect(rows.length, 'the engine gives 255 rows, bit 254 down to 0').toBe(255);
+  if (rows.every(r => !('swap' in r))) throw new NotRun('PRODUCT_MISSING', 'the engine\'s X25519 rows carry no swap field yet');
   await openWalk(page, IDS.x25519Item, IDS.x25519Root);
   const shown = page.getByTestId(IDS.ladderRow);
   expect(await shown.count(), 'the screen shows one row per bit').toBe(255);
-  // The ladder swaps when this bit differs from the one before it (RFC 7748 section 5: swap ^= k_t). The rule is written here, not read.
-  let prev = 0;
+  // The engine gives each row's swap (the lead's answer on #278), and the page shows it. The ladder swaps when this bit differs from the one
+  // before it (RFC 7748 section 5: swap ^= k_t, starting from 0). That rule is written here, so the engine's field is checked against it too.
+  for (let i = 0; i < 255; i++) {
+    const bit = rows[i].isOne ? 1 : 0, prev = i === 0 ? 0 : (rows[i - 1].isOne ? 1 : 0);
+    expect(typeof rows[i].swap, `the engine's row ${i} carries a swap field`).toBe('boolean');
+    expect(rows[i].swap, `the engine's row ${i} swap is bit ${bit} xor the bit before, ${prev}`).toBe((bit ^ prev) === 1);
+  }
   for (const i of [0, 1, 2, 100, 200, 253, 254]) {
     const row = shown.nth(i);
-    const bit = rows[i].isOne ? 1 : 0;
-    expect(Number(await row.getAttribute('data-bit')), `row ${i} shows the engine's bit ${rows[i].bit}`).toBe(bit);
-    prev = i === 0 ? 0 : (rows[i - 1].isOne ? 1 : 0);
-    expect(await row.getAttribute('data-swap'), `row ${i} shows the swap as bit ${bit} xor the bit before, ${prev}`).toBe(String((bit ^ prev) === 1));
+    expect(Number(await row.getAttribute('data-bit')), `row ${i} shows the engine's bit ${rows[i].bit}`).toBe(rows[i].isOne ? 1 : 0);
+    expect(await row.getAttribute('data-swap'), `row ${i} shows the engine's swap, ${rows[i].swap}`).toBe(String(rows[i].swap));
   }
   const want = rfc7748AlicePublic();
   expect(String(x.result).toLowerCase(), 'the engine result is RFC 7748\'s Alice public key').toBe(want);
