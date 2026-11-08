@@ -1,4 +1,5 @@
 import { expect, test, type Page } from '@playwright/test'
+import { scanPage, setTheme } from './contrast'
 import { PORTS } from './ports'
 import { TOKEN, open } from './walk'
 
@@ -90,6 +91,21 @@ test('a failed walk route shows its route and the Host\'s code, and Try again lo
   await page.getByTestId('tls11-schedule-error').getByRole('button', { name: 'Try again' }).click()
   await expect(page.getByTestId('tls11-premaster')).toBeVisible()
 })
+
+// The contrast sweep (contrast-sweep.spec.ts) visits the lesson screens only, so these 2 walks carry their own scan, in both themes.
+for (const theme of ['light', 'dark'] as const) {
+  test(`every text on both walks reads at 4.5 to 1 in the ${theme} theme`, async ({ page }) => {
+    for (const item of ['tls13', 'tls11'] as const) {
+      await openWalk(page, item)
+      await setTheme(page, theme)
+      await expect(page.locator(`[data-testid="${item}-schedule-panel"] .hex.out`).first()).toBeVisible()
+      await page.waitForTimeout(300)
+      const s = await scanPage(page)
+      expect(s.checked, `${item}: the scan read the walk's texts`).toBeGreaterThan(30)
+      expect(s.fails, `${item}: ${JSON.stringify(s.fails.slice(0, 5))}`).toEqual([])
+    }
+  })
+}
 
 // The house layout rule: no screen scrolls sideways at 1280 or at 1984 (layout-sweep.spec.ts check 9 tests the lesson panes).
 for (const size of [{ width: 1280, height: 640 }, { width: 1984, height: 1030 }]) {
