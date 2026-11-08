@@ -23,7 +23,7 @@ export interface AesKeyWordRow {
 }
 /** The public tables route: the S-boxes, the round constants, and the size table. It holds no key byte. */
 export interface AesSize { keyBits: number; keyWords: number; rounds: number; roundKeys: number; words: number; rconUsed: number }
-export interface AesTables { sbox: string; inverseSbox: string; rcon: string; sizes: AesSize[] }
+export interface AesTables { sbox: string; inverseSbox: string; shiftRows: number[]; inverseShiftRows: number[]; rcon: string; sizes: AesSize[] }
 export interface AesBlockReply {
   source?: string
   keySource?: string
@@ -86,6 +86,17 @@ export function stopsOf(b: AesBlockReply, nk: number): Stop[] {
     for (const step of b.inverse.steps) { stops.push({ kind: 'step', run: 'decrypt', step, state: step.state, prev }); prev = step.state }
   }
   return stops
+}
+
+/**
+ * The part of the walk a stop belongs to. Play runs to the end of one part and stops (design 2.8): the first view, one grid of the
+ * key schedule, or one round of encrypt or decrypt.
+ */
+export function playGroupOf(stop: Stop, nk: number): string {
+  if (stop.kind === 'fill') return 'fill'
+  if (stop.kind === 'keys') return `keys-${Math.floor((nk + stop.built - 1) / 4)}`
+  if (stop.kind === 'decrypt-start') return 'decrypt-start'
+  return `${stop.run}-${stop.step.round}`
 }
 
 /** The expanded key as one hex string, word after word, from the reply's rows. */
