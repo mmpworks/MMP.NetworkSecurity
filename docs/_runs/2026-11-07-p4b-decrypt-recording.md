@@ -1,11 +1,12 @@
 # Gate p4b-decrypt-recording, 2026-11-07
 
-Result: 23 of 23 steps passed. Skipped: 1.
+Result: 24 of 24 steps passed. Skipped: 1.
 
 | Step | Status | Exit |
 |---|---|---|
 | layer_check | PASS | 0 |
 | secret_guard | PASS | 0 |
+| pre-push guard tests | PASS | 0 |
 | A19.repo.walk-routes-listed | PASS | 0 |
 | dotnet build src/NetSec.Core | PASS | 0 |
 | dotnet build src/NetSec.Core.NetCF | PASS | 0 |
@@ -41,6 +42,17 @@ layer_check: 135 files, 0 problems
 
 ```
 
+## pre-push guard tests
+
+```
+test_reused_name_with_a_new_open_pr_allows (__main__.PrePushGuard.test_reused_name_with_a_new_open_pr_allows) ... ok
+
+----------------------------------------------------------------------
+Ran 13 tests in 44.576s
+
+OK
+```
+
 ## A19.repo.walk-routes-listed
 
 ```
@@ -55,7 +67,7 @@ Build succeeded.
     0 Warning(s)
     0 Error(s)
 
-Time Elapsed 00:00:02.51
+Time Elapsed 00:00:02.25
 ```
 
 ## dotnet build src/NetSec.Core.NetCF
@@ -66,7 +78,7 @@ Build succeeded.
     0 Warning(s)
     0 Error(s)
 
-Time Elapsed 00:00:02.59
+Time Elapsed 00:00:02.15
 ```
 
 ## dotnet test net10.0
@@ -75,9 +87,9 @@ Time Elapsed 00:00:02.59
 Test run for E:\dev\ns-p4b\tests\NetSec.Tests\bin\Release\net10.0\NetSec.Tests.dll (.NETCoreApp,Version=v10.0)
 A total of 1 test files matched the specified pattern.
 Data collector 'Blame' message: All tests finished running, Sequence file will not be generated.
-Results File: E:\dev\ns-p4b\docs\_runs\trx\p4b-decrypt-recording-net10\Steve_BEAST_2026-11-07_21_41_18.trx
+Results File: E:\dev\ns-p4b\docs\_runs\trx\p4b-decrypt-recording-net10\Steve_BEAST_2026-11-07_23_06_31.trx
 
-Passed!  - Failed:     0, Passed:   810, Skipped:     0, Total:   810, Duration: 1 m 59 s - NetSec.Tests.dll (net10.0)
+Passed!  - Failed:     0, Passed:   810, Skipped:     0, Total:   810, Duration: 2 m 5 s - NetSec.Tests.dll (net10.0)
 ```
 
 ## dotnet test net48 (CF binaries)
@@ -86,9 +98,9 @@ Passed!  - Failed:     0, Passed:   810, Skipped:     0, Total:   810, Duration:
 Test run for E:\dev\ns-p4b\tests\NetSec.Tests\bin\Release\net48\NetSec.Tests.dll (.NETFramework,Version=v4.8)
 A total of 1 test files matched the specified pattern.
 Data collector 'Blame' message: All tests finished running, Sequence file will not be generated.
-Results File: E:\dev\ns-p4b\docs\_runs\trx\p4b-decrypt-recording-cf\Steve_BEAST_2026-11-07_21_43_27.trx
+Results File: E:\dev\ns-p4b\docs\_runs\trx\p4b-decrypt-recording-cf\Steve_BEAST_2026-11-07_23_08_45.trx
 
-Passed!  - Failed:     0, Passed:   810, Skipped:     0, Total:   810, Duration: 2 m 53 s - NetSec.Tests.dll (net48)
+Passed!  - Failed:     0, Passed:   810, Skipped:     0, Total:   810, Duration: 2 m 59 s - NetSec.Tests.dll (net48)
 ```
 
 ## dotnet test Host (live process)
@@ -97,9 +109,9 @@ Passed!  - Failed:     0, Passed:   810, Skipped:     0, Total:   810, Duration:
 Test run for E:\dev\ns-p4b\tests\NetSec.Host.Tests\bin\Release\net10.0\NetSec.Host.Tests.dll (.NETCoreApp,Version=v10.0)
 A total of 1 test files matched the specified pattern.
 Data collector 'Blame' message: All tests finished running, Sequence file will not be generated.
-Results File: E:\dev\ns-p4b\docs\_runs\trx\p4b-decrypt-recording-host\Steve_BEAST_2026-11-07_21_46_30.trx
+Results File: E:\dev\ns-p4b\docs\_runs\trx\p4b-decrypt-recording-host\Steve_BEAST_2026-11-07_23_11_55.trx
 
-Passed!  - Failed:     0, Passed:   264, Skipped:     0, Total:   264, Duration: 1 m 25 s - NetSec.Host.Tests.dll (net10.0)
+Passed!  - Failed:     0, Passed:   264, Skipped:     0, Total:   264, Duration: 1 m 29 s - NetSec.Host.Tests.dll (net10.0)
 ```
 
 ## acceptance A9
@@ -109,8 +121,8 @@ Passed!  - Failed:     0, Passed:   264, Skipped:     0, Total:   264, Duration:
 [acceptance] preparing: MMP.AsyncProxy builds, product builds
 [acceptance] group binproof (net10): 4 clauses
 [acceptance] 4 of 4 clauses PASS (0 FAIL, 0 NOT RUN); M = 388
-[acceptance] report: E:\dev\ns-p4b\docs\_runs\acceptance-20261107-214756.md
-[acceptance] json:   E:\dev\ns-p4b\docs\_runs\acceptance-20261107-214756.json
+[acceptance] report: E:\dev\ns-p4b\docs\_runs\acceptance-20261107-231325.md
+[acceptance] json:   E:\dev\ns-p4b\docs\_runs\acceptance-20261107-231325.json
 ```
 
 ## tour_lint
