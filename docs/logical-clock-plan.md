@@ -1,6 +1,6 @@
 # Logical clock on trace events: plan
 
-Status: decisions 1 and 2 ranked by the lead on 2026-11-08; decision 3 open; for Jared's read before any code. Owner: Richard. Date: 2026-11-08.
+Status: decisions 1, 2 and 3 ranked by the lead on 2026-11-08; Jared's 3 review items folded in; for Jared's second read before any code. Owner: Richard. Date: 2026-11-08.
 
 ## The problem
 
@@ -12,7 +12,7 @@ Every engine-stream event carries a logical clock. Two runs of one seed give eve
 
 ## Kill condition
 
-The work ends when this holds, and a reader can check it with no judgement: a Host test runs one seed 20 times per case, 10 of them with the machine under extra load, and every engine-stream event has the same clock in all 20 runs. The cases are lessons 1, 10 and 11, a replay fork (`L6-replay-sale`), an inject fork (`L5-clear-close-notify`) and a drop fork (`L5-flip-record-length`). The count is 20 of 20 for each of the 6 cases, recorded in `docs/_runs/` with its date. The drop case reaches 20 of 20 only after decision 3.
+The work ends when this holds, and a reader can check it with no judgement: a Host test runs one seed 20 times per case, 10 of them with the machine under extra load, and every engine-stream event has the same clock in all 20 runs. The cases are lessons 1, 7, 9, 10 and 11, the lesson 7 recording fork (`L7-decrypt-recording`, the attacker stream), a replay fork (`L6-replay-sale`), an inject fork (`L5-clear-close-notify`) and a drop fork (`L5-flip-record-length`). The count is 20 of 20 for each of the 9 cases, recorded in `docs/_runs/` with its date. The drop case reaches 20 of 20 after #309 (decision 3). The test prints the first differing entry per stream for any run that differs, so a rare race names itself.
 
 ## Prior art and constraints
 
@@ -24,19 +24,20 @@ The work ends when this holds, and a reader can check it with no judgement: a Ho
 
 1. Where: `SessionManager.Write`, the one place every event of a session passes. The clock is written beside `seq` in the stored, saved and broadcast line, as `"clock": n`. No existing field changes.
 2. Sides: one clock per engine stream (per actor). Wire streams (`<streamId>/wire`) get no clock of their own (decision 2 below).
-3. Send and receive: engine events carry no `from` or `to`. An engine stream is named `<actor>/<connection>`, so a link is (connection, sending actor). An engine event whose type ends in `.sent` takes the next ordinal on its link and records its clock. The k-th event whose type ends in `.received` on the other end of that connection is the receive of the k-th send. TCP keeps order on a connection, so the ordinals match. The match is by ordinal, never by message name: a send named "Alert" is received as "alert level 1, number 0".
+3. Send and receive: engine events carry no `from` or `to`. An engine stream is named `<actor>/<connection>`. A link is an ordered pair (sender, receiver) on one connection name. An engine event whose type ends in `.sent` takes the next ordinal on its link and records its clock. The k-th event whose type ends in `.received` at the receiver is the receive of the k-th send. TCP keeps order on a connection, so the ordinals match. The match is by ordinal, never by message name: a send named "Alert" is received as "alert level 1, number 0".
+   - A connection name may have more actors than 2, if only 2 of them write `.sent` or `.received` events on it. Lesson 7's `tls11` has client, server and attacker, and only client and server send or receive. Lesson 9's `bridge` has 4 actors, and none of them sends or receives on it; the gateway's two hops are the separate connections `ssh` and `tls13`.
+   - If more than 2 actors write `.sent` or `.received` on one connection name, the receiver is ambiguous. That is an error, never a silent guess: the Host writes the events of that connection with own + 1 and `"unmatched": true`, and sends one `clock.link-ambiguous` frame naming the connection and its actors. A Host test runs every lesson and every attack fork and requires no such frame, so an ambiguous lesson cannot ship.
 4. Rule: each engine event takes own + 1. A receive takes max(own, the matched send's clock) + 1.
-5. A receive that reaches the Host before its send is held, and written when the send arrives (decision 1). In the spike this never happened in 920 matched pairs, so the hold is a safety net.
+5. A receive that reaches the Host before its send holds its whole engine stream, not only itself. The next event on the same stream needs own + 1, and own must include the receive's clock, so every later event of that stream waits behind the held receive. When the send arrives, the held events are written in stream order. Other streams keep flowing. `seq` is given at write, so a held event's `seq` is higher than the `seq` of events from other streams written while it waited. Within one stream, `seq` order and stream order stay the same. In the spike this never happened in 1,500 matched pairs, so the hold is a safety net.
 6. The attacker is its own clock side. A message the attacker injects or replays is a send on the attacker's side, so a receive of it matches the attacker's send. Today the attacks change bytes inside the pump, and a replay is a second send by the client's own engine (`L6-replay-sale`), so no attacker stream sends yet. The rule is the seam for an attack that does.
-7. A receive with no send by the end of the session is written with `"unmatched": true` and own + 1. It is never held past the session end, so a dropped or injected message cannot freeze the trace. A send with no receive needs no flag; the inject and drop forks each leave one in every run.
+7. A receive with no send by the end of the session is written with `"unmatched": true` and own + 1. It is never held past the session end, so a dropped or injected message cannot freeze the trace. The release runs in stream order: the unmatched receive is written first, and the events held behind it then take its clock as their base. A send with no receive needs no flag; the inject and drop forks each leave one in every run.
+8. Events with no clock: wire events, and any event written outside an engine stream (for example `key.in-use` on the `keys` stream), carry no `clock`. The page places such an event right after the last engine event of the same side that came before it in that side's order, and sorts it there by (that clock, side). A `wire.sent` follows the engine event that produced it; a `wire.received` follows the last engine event of its side before it. An event before any engine event of its side (the `keys` stream at session start) sorts at clock 0. So the bytes grid and "What each side knows" never fall back to arrival order, and #305's interim rule can go.
 
 ## Decisions
 
 1. A receive whose send has not reached the Host yet: A, hold that one event until its send arrives, with design items 6 and 7 (the attacker side, and "unmatched" at session end). Ranked by the lead, 2026-11-08. B was to write the event at once and send its clock in a later frame. What would change it: a receive reaching the Host before its send in practice, which the spike measured at 0 of 920.
 2. Wire events: A, no clock. Ranked by the lead, 2026-11-08. A clock on a varying stream promises a fixed order it cannot keep.
-3. Open: the drop fork's tail race (see the spike). In some runs the side that waits on its read deadline also writes `check.result peer stayed until the end` (`Tls13Engine.cs:105`) as the last event on its stream, and in others it does not.
-   - A. Fix the race first, in its own issue and PR, so the engine writes that event in every run or in none. Then the kill condition holds 20 of 20 for the drop fork too. My pick: it is a same-seed defect in the engine, and the clock should not hide it.
-   - B. Build the clock now, and let the kill condition name the one trailing event as allowed to be missing.
+3. The drop fork's tail race: A, fix the race first, in its own issue and PR (#309). Ranked by the lead, 2026-11-08, and Jared voted A. The kill condition then holds 20 of 20 for the drop fork, with no allowance. #309's diagnosis: both sides wait on the same read deadline, so either can time out first, and the deadline failure writes no trace event.
 4. Saved traces written before this change have no clock. The replay orders them by `seq`, as today. No rewrite of old files.
 
 ## Non-goals
@@ -81,6 +82,22 @@ Notes:
 3. The only name differences in matched pairs are cosmetic: a send named "Alert" is received as "alert level 1, number 0" (lesson 10, and the inject fork).
 4. A first pass matched by `from` and `to`, which engine events do not carry, and its pair counts were wrong. Matching by connection fixed the spike, not the product.
 
+Third result, 2026-11-08, seed 3, on main 10bcd03, for Jared's review item 2 (connections with more than 2 actors). 20 runs per case, 10 under load:
+
+| Case | Engine lists equal to run 1 | Matched pairs | Receives before their send | Actors that write sends or receives, per connection |
+|---|---|---|---|---|
+| Lesson 7 | 20 of 20 | 440 | 0 | tls11: client, server. tls13: client, server |
+| Lesson 7 recording fork, `L7-decrypt-recording` | 20 of 20 | 500 | 0 | tls11: client, server (the connection has 3 actors; the attacker writes no send or receive). tls11-ecdhe: client, server |
+| Lesson 9 (gateway, 2 hops) | 20 of 20 | 580 | 0 | ssh: ce, gateway. tls13: gateway, server. bridge: 4 actors, none sends or receives |
+
+Over the 3 spike results, 1,500 matched pairs had 0 receives reach the Host before their send.
+
 ## Anchor
 
-The kill-condition test is written before the implementation: same seed, 20 runs per case for the 6 cases above, 10 under load, all engine-stream clocks equal. Fixed-trace tests pin the rules: a receive takes max(own, sender) + 1; a receive that arrives before its send is held and then written with the right clock; a receive with no send is written at session end with `"unmatched": true`; a send from the attacker side matches a receive like any other send.
+The kill-condition test is written before the implementation: same seed, 20 runs per case for the 9 cases above, 10 under load, all engine-stream clocks equal, with the first differing entry printed for any run that differs. Fixed-trace tests pin the rules:
+1. A receive takes max(own, sender) + 1.
+2. A receive that arrives before its send holds its whole stream, and the stream is written in order when the send arrives, so no later event of that stream has a clock below the receive's.
+3. A receive with no send is written at session end with `"unmatched": true`, and the events held behind it follow in stream order.
+4. A send from the attacker side matches a receive like any other send.
+5. A connection where 3 actors write sends or receives gives one `clock.link-ambiguous` frame and no guessed match.
+6. A clockless event (wire, `keys`) sorts right after its side's last engine event before it, or at clock 0 before any.
