@@ -177,6 +177,55 @@ for (const theme of ['light', 'dark'] as const) {
   })
 }
 
+// Steve on #326 (AES-256, zoom 145%): the round keys scroll in their own box, so the step buttons and the build panel stay on screen while
+// he looks at the last round keys. A word that builds scrolls the box, and only the box, to its cells.
+const inWindow = async (page: Page, id: string) => {
+  const b = (await page.getByTestId(id).boundingBox())!
+  const vp = page.viewportSize()!
+  return b.y >= 0 && b.y + Math.min(b.height, 40) <= vp.height && b.x >= 0 && b.x + Math.min(b.width, 40) <= vp.width
+}
+for (const size of [{ width: 1984, height: 1086 }, { width: 1280, height: 640 }]) {
+  test(`at ${size.width} x ${size.height}, AES-256 at 145%: the round keys scroll in their own box, and Next word and the panel stay on screen`, async ({ page }) => {
+    await page.setViewportSize(size)
+    await openPractice(page)
+    await page.getByTestId('aes-walk-key-size-256').click()
+    await expect(page.getByTestId('aes-walk-step-kind')).toBeVisible()
+    await toStop(page, KEYS + 1)
+    const zin = page.getByTestId('aes-walk-ks-zoom-in')
+    while (await zin.isEnabled()) await zin.click()
+    const box = page.getByTestId('aes-walk-ks-table')
+    const scrolls = await box.evaluate(el => { const s = getComputedStyle(el); return el.scrollHeight > el.clientHeight && /auto|scroll/.test(s.overflowY) })
+    expect(scrolls, 'the round keys scroll inside their own box').toBe(true)
+    const pageTop = await page.getByTestId('workspace').evaluate(el => el.scrollTop)
+    await box.evaluate(el => { el.scrollTop = el.scrollHeight })
+    await expect(page.getByTestId('aes-walk-table-grid-14')).toBeInViewport({ ratio: 0.3 })
+    expect(await page.getByTestId('workspace').evaluate(el => el.scrollTop), 'the page does not move').toBe(pageTop)
+    expect(await inWindow(page, 'aes-walk-next'), 'Next word stays on screen').toBe(true)
+    expect(await inWindow(page, 'aes-walk-ks-build-title'), 'the build panel stays on screen').toBe(true)
+    expect(await page.evaluate(() => document.documentElement.scrollWidth > document.documentElement.clientWidth), 'no sideways page scroll').toBe(false)
+  })
+}
+
+test('when a late word builds, the round-key box scrolls to its cells, and the page stays put', async ({ page }) => {
+  await page.setViewportSize({ width: 1280, height: 640 })
+  await openPractice(page)
+  await page.getByTestId('aes-walk-key-size-256').click()
+  await expect(page.getByTestId('aes-walk-step-kind')).toBeVisible()
+  await toStop(page, KEYS)
+  const zin = page.getByTestId('aes-walk-ks-zoom-in')
+  while (await zin.isEnabled()) await zin.click()
+  const pageTop = await page.getByTestId('workspace').evaluate(el => el.scrollTop)
+  await toStop(page, 52)
+  // w59 is the last word: grid 14, column 3. Its byte 0 is cell 16 * 14 + 4 * 3 = 236.
+  await expect(page.getByTestId('aes-walk-ks-build-title')).toHaveText('How w59 is made')
+  const boxEl = page.getByTestId('aes-walk-ks-table')
+  expect(await boxEl.evaluate(el => el.scrollHeight > el.clientHeight && el.scrollTop > 0), 'the box scrolled down to the last round key').toBe(true)
+  const cell = await page.getByTestId('aes-walk-table-cell-236').boundingBox(), area = await boxEl.boundingBox()
+  expect(cell!.y >= area!.y - 1 && cell!.y + cell!.height <= area!.y + area!.height + 1, 'w59 is in view inside the box').toBe(true)
+  await expect(page.getByTestId('aes-walk-table-cell-236'), 'and on screen').toBeInViewport()
+  expect(await page.getByTestId('workspace').evaluate(el => el.scrollTop), 'the page does not move').toBe(pageTop)
+})
+
 const noSideways = (page: Page) => page.evaluate(() => {
   const ks = document.querySelector('[data-testid="aes-walk-key-schedule"]') as HTMLElement
   return { page: document.documentElement.scrollWidth > document.documentElement.clientWidth, ks: ks.scrollWidth > ks.clientWidth + 1 }
