@@ -53,6 +53,14 @@ class NoNpx(unittest.TestCase):
         self.assertIn("run.mjs:1", out)
         self.assertIn("other.ps1:1", out)
 
+    def test_npx_in_an_app_config_file_fails(self):
+        """playwright.config.ts starts the preview server for every e2e run, so it is scanned too (Jared, #271)."""
+        self.put("app/playwright.config.ts", "webServer: [{ command: `npx vite preview --port 1` }]\n")
+        self.put("app/vite.config.ts", "export default {}\n")
+        code, out = self.run_check()
+        self.assertEqual(code, 1, out)
+        self.assertIn("app/playwright.config.ts:1", out)
+
     def test_a_word_that_only_contains_npx_passes(self):
         self.put("tools/gate.ps1", "# unpxfoo and npxx are not the tool\n")
         code, out = self.run_check()

@@ -80,6 +80,7 @@ switch ($Slice) {
 Step 'layer_check' { python tools/layer_check.py src/NetSec.Core }
 Step 'secret_guard' { python -I tools/secret_guard.py }
 Step 'no package-runner calls in tools and app scripts' { python -I tools/no_npx.py }
+Step 'no package-runner check tests' { python -I tools/test_no_npx.py }
 Step 'pre-push guard tests' { python -I tools/githooks/test_pre_push_guard.py }
 Step 'pre-push hook installed and current' { pwsh -NoProfile -File tools/githooks/check-installed.ps1 }
 

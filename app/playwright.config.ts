@@ -53,6 +53,10 @@ process.env.NETSEC_SECURITY_DIR ??= fs.mkdtempSync(path.join(os.tmpdir(), 'ns-e2
 // A name of its own, so NETSEC_HOST_DLL stays as the person set it and start.spec still runs the path fallback in electron/main.cjs.
 process.env.NETSEC_E2E_HOST_DLL = hostDll
 
+// The preview server runs from the local vite file, never the package runner: that can run a package of the same name from outside this repo.
+const viteCli = path.resolve(__dirname, 'node_modules', 'vite', 'bin', 'vite.js')
+if (!fs.existsSync(viteCli)) throw new Error(`TOOL_MISSING: ${viteCli} is absent. Run npm ci in app/.`)
+
 export default defineConfig({
   testDir: './e2e',
   timeout: 120_000,
@@ -63,7 +67,7 @@ export default defineConfig({
   reporter: [['list']],
   use: { baseURL: `http://localhost:${PORTS.preview}`, viewport: { width: 1440, height: 900 }, trace: 'retain-on-failure' },
   webServer: [
-    { command: `npx vite preview --port ${PORTS.preview} --strictPort`, port: PORTS.preview, reuseExistingServer: false, timeout: 60_000 },
+    { command: `node "${viteCli}" preview --port ${PORTS.preview} --strictPort`, port: PORTS.preview, reuseExistingServer: false, timeout: 60_000 },
     { command: `dotnet "${hostDll}"`, port: HOST_PORT, reuseExistingServer: false, timeout: 60_000, env: { NETSEC_PORT: String(HOST_PORT), NETSEC_TOKEN: TOKEN, ...HOST_ORIGIN_ENV } },
     // A second Host on a damaged vault master key, for the VAULT_MASTER_KEY_BAD spec only.
     { command: 'node e2e/start-bad-key-host.cjs', port: PORTS.badKeyHost, reuseExistingServer: false, timeout: 60_000, env: { NETSEC_HOST_DLL: hostDll, NETSEC_PORT: String(PORTS.badKeyHost), ...HOST_ORIGIN_ENV } },
