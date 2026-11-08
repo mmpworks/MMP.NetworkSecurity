@@ -9,24 +9,30 @@ const emit = defineEmits<{ (e: 'lightbox'): void }>()
 
 // `protocol` keeps only the events of one stream family (lesson 7 draws TLS 1.1 and TLS 1.3 side by side).
 const events = computed(() => (props.protocol ? shownEvents.value.filter(e => protocolOf(e) === props.protocol) : shownEvents.value))
-const layout = computed(() => layoutDiagram(events.value, lessonRow.value?.lanes ?? [], props.view))
+// The pane's width goes in, so a narrow pane draws its lanes closer (layout.ts laneSpacing).
+const layout = computed(() => layoutDiagram(events.value, lessonRow.value?.lanes ?? [], props.view, boxW.value || undefined))
 const zoom = ref(1)
+// Until the learner zooms, a drawing still wider than its pane after the closer lanes scales down to the pane, so nothing scrolls sideways.
+// Once the learner zooms, their choice holds, and a wide drawing may scroll.
+const userZoomed = ref(false)
 const box = ref<HTMLElement | null>(null)
 // The drawing is at least as wide as its pane. The lanes keep their places, and the lane band and the row highlight run the full width.
 const boxW = ref(0)
 let sizer: ResizeObserver | null = null
-onMounted(() => { if (!box.value || typeof ResizeObserver !== 'function') return; sizer = new ResizeObserver(() => { boxW.value = box.value?.clientWidth ?? 0 }); sizer.observe(box.value) })
+// One pixel of slack: clientWidth rounds, and on a scaled screen (1.75 here) the real inner width can sit a fraction below it. A drawing
+// that wide overflows by under a pixel, and the browser still draws a full sideways scrollbar for that.
+onMounted(() => { if (!box.value || typeof ResizeObserver !== 'function') return; sizer = new ResizeObserver(() => { boxW.value = Math.max(0, (box.value?.clientWidth ?? 1) - 1) }); sizer.observe(box.value) })
 onBeforeUnmount(() => sizer?.disconnect())
 const viewW = computed(() => Math.max(layout.value.width, boxW.value / zoom.value))
 const reduced = typeof matchMedia === 'function' && matchMedia('(prefers-reduced-motion: reduce)').matches
 
 const clamp = (z: number) => Math.min(4, Math.max(0.25, z))
-const zoomIn = () => { zoom.value = clamp(zoom.value * 1.25) }
-const zoomOut = () => { zoom.value = clamp(zoom.value / 1.25) }
-const zoomFit = () => {
-  const w = box.value?.clientWidth ?? layout.value.width
-  zoom.value = clamp(Math.min(1, w / Math.max(1, layout.value.width)))
-}
+const fitZoom = () => clamp(Math.min(1, (boxW.value || layout.value.width) / Math.max(1, layout.value.width)))
+const zoomIn = () => { userZoomed.value = true; zoom.value = clamp(zoom.value * 1.25) }
+const zoomOut = () => { userZoomed.value = true; zoom.value = clamp(zoom.value / 1.25) }
+/** Fit hands the zoom back to the pane, so it follows the pane's width again. */
+const zoomFit = () => { userZoomed.value = false; zoom.value = fitZoom() }
+watch([() => layout.value.width, boxW], () => { if (!userZoomed.value) zoom.value = fitZoom() })
 
 function onKey(ev: KeyboardEvent) {
   if (ev.key === '+' || ev.key === '=') { zoomIn(); ev.preventDefault() }
@@ -91,7 +97,8 @@ const pulse = computed(() => replayTick.value)
       <span v-if="view === 'eavesdropper'" class="eve-count" data-testid="eve-count">The eavesdropper read {{ layout.learned }} of {{ layout.total }} messages</span>
     </div>
     <div ref="box" class="diagram-scroll" @wheel="onWheel" @scroll="onScroll">
-      <svg :width="viewW * zoom" :height="layout.height * zoom" :viewBox="`0 0 ${viewW} ${layout.height}`" xmlns="http://www.w3.org/2000/svg">
+      <!-- The width rounds down: at a fitted zoom such as 0.982, viewW * zoom lands a fraction past the pane, and the browser draws a scrollbar for it. -->
+      <svg :width="Math.floor(viewW * zoom)" :height="layout.height * zoom" :viewBox="`0 0 ${viewW} ${layout.height}`" xmlns="http://www.w3.org/2000/svg">
         <defs>
           <pattern id="hatch" width="6" height="6" patternUnits="userSpaceOnUse" patternTransform="rotate(45)"><line x1="0" y1="0" x2="0" y2="6" class="hatch-line" /></pattern>
           <marker id="arr" viewBox="0 0 10 10" refX="9" refY="5" markerWidth="7" markerHeight="7" orient="auto-start-reverse"><path d="M0,0 L10,5 L0,10 z" fill="context-stroke" /></marker>

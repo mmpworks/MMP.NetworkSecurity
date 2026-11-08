@@ -52,6 +52,15 @@ const scan = (page: Page) => page.evaluate((freeText: string) => {
     const svg = sc.querySelector('svg')
     if (svg && svg.getBoundingClientRect().width < sc.clientWidth - 2) faults.push({ kind: 'diagram short', where: name(sc.closest('[data-testid]') ?? sc), text: `${Math.round(svg.getBoundingClientRect().width)} of ${sc.clientWidth}` })
   }
+  // 9. A diagram never scrolls sideways: it fits its pane (closer lanes, then a fitted zoom). A part-pixel overflow still draws a full bar,
+  // so the check tries to scroll and reads whether the box moved, which scrollWidth alone rounds away.
+  for (const sc of root.querySelectorAll<HTMLElement>('.diagram-scroll')) {
+    const before = sc.scrollLeft
+    sc.scrollLeft = 10_000
+    const moved = sc.scrollLeft
+    sc.scrollLeft = before
+    if (moved > 0) faults.push({ kind: 'diagram scrolls sideways', where: name(sc.closest('[data-testid]') ?? sc), text: `${moved.toFixed(2)} px` })
+  }
   // 5. A button never cuts its label.
   // Height and width: a label can be cut at the bottom or at the side.
   for (const b of root.querySelectorAll('.v-btn')) { const r = b.getBoundingClientRect(); if (r.width > 0 && (b.scrollHeight > b.clientHeight + 1 || b.scrollWidth > b.clientWidth + 1)) faults.push({ kind: 'label cut', where: name(b), text: (b.textContent ?? '').trim().slice(0, 30) }) }
