@@ -35,7 +35,7 @@ The work ends when this holds, and a reader can check it with no judgement: a Ho
 
 ## Decisions
 
-1. A receive whose send has not reached the Host yet: A, hold that one event until its send arrives, with design items 6 and 7 (the attacker side, and "unmatched" at session end). Ranked by the lead, 2026-11-08. B was to write the event at once and send its clock in a later frame. What would change it: a receive reaching the Host before its send in practice, which the spike measured at 0 of 920.
+1. A receive whose send has not reached the Host yet: A, hold that one event until its send arrives, with design items 6 and 7 (the attacker side, and "unmatched" at session end). Ranked by the lead, 2026-11-08. B was to write the event at once and send its clock in a later frame. What would change it: a receive reaching the Host before its send in practice, which the spike measured at 0 of 1,500 matched pairs.
 2. Wire events: A, no clock. Ranked by the lead, 2026-11-08. A clock on a varying stream promises a fixed order it cannot keep.
 3. The drop fork's tail race: A, fix the race first, in its own issue and PR (#309). Ranked by the lead, 2026-11-08, and Jared voted A. The kill condition then holds 20 of 20 for the drop fork, with no allowance. #309's diagnosis: both sides wait on the same read deadline, so either can time out first, and the deadline failure writes no trace event.
 4. Saved traces written before this change have no clock. The replay orders them by `seq`, as today. No rewrite of old files.
