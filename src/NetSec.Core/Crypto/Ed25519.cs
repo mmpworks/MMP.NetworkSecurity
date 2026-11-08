@@ -6,6 +6,19 @@ namespace NetSec.Crypto
     /// Ed25519 (RFC 8032 section 5.1). A signature is R (a point, 32 bytes) then S (a scalar, 32 bytes).
     /// Built to show the parts. Do not copy: managed code gives no constant-time guarantee.
     /// </summary>
+    /// <summary>The steps of one Ed25519 sign and verify, for the walk. Each field is a copy, filled by the engine as it runs.</summary>
+    internal sealed class Ed25519Trace
+    {
+        /// <summary>Sign: SHA-512(seed), its clamped low half a, its high half (the prefix), and A = a*B.</summary>
+        public byte[] Expanded, Scalar, Prefix, PublicKey;
+
+        /// <summary>Sign: r = SHA-512(prefix || M) mod L, R = r*B, h = SHA-512(R || A || M) mod L, and S = (r + h*a) mod L.</summary>
+        public byte[] R, RPoint, H, S;
+
+        /// <summary>Verify: h, S*B, h*(-A), and R' = S*B + h*(-A), which must equal R.</summary>
+        public byte[] VerifyH, SB, MinusHA, RPrime;
+    }
+
     public static class Ed25519
     {
         const int SeedLength = 32;
@@ -18,7 +31,9 @@ namespace NetSec.Crypto
             return PublicFromScalar(ClampedScalar(Sha512(seed)));
         }
 
-        public static byte[] Sign(byte[] seed, byte[] msg)
+        public static byte[] Sign(byte[] seed, byte[] msg) { return Sign(seed, msg, null); }
+
+        internal static byte[] Sign(byte[] seed, byte[] msg, Ed25519Trace trace)
         {
             CheckSeed(seed);
             if (msg == null) throw new ArgumentNullException("msg");
@@ -38,6 +53,13 @@ namespace NetSec.Crypto
             Array.Copy(signature, 0, rBytes, 0, 32);
             byte[] h = Sc25519.Reduce(Sha512(rBytes, publicKey, msg));
             Sc25519.MulAdd(signature, 32, r, h, a);
+            if (trace != null)
+            {
+                trace.Expanded = Copy(expanded); trace.Scalar = Copy(a); trace.Prefix = Copy(prefix); trace.PublicKey = Copy(publicKey);
+                trace.R = Copy(r); trace.RPoint = Copy(rBytes); trace.H = Copy(h);
+                trace.S = new byte[32];
+                Array.Copy(signature, 32, trace.S, 0, 32);
+            }
             return signature;
         }
 
@@ -45,7 +67,9 @@ namespace NetSec.Crypto
         /// Checks S*B = R + h*A by computing R' = S*B + h*(-A) and comparing bytes with R. A comparison of encoded bytes
         /// also refuses an R in a form other than the canonical one.
         /// </summary>
-        public static bool Verify(byte[] pub, byte[] msg, byte[] sig)
+        public static bool Verify(byte[] pub, byte[] msg, byte[] sig) { return Verify(pub, msg, sig, null); }
+
+        internal static bool Verify(byte[] pub, byte[] msg, byte[] sig, Ed25519Trace trace)
         {
             if (pub == null) throw new ArgumentNullException("pub");
             if (msg == null) throw new ArgumentNullException("msg");
@@ -65,10 +89,21 @@ namespace NetSec.Crypto
             long[][] p = Ge25519.NewPoint();
             long[][] sB = Ge25519.NewPoint();
             Ge25519.ScalarMult(p, negatedA, h);
+            // ScalarMult uses negatedA as work space, so h*(-A) is read from p here, before the Add.
+            byte[] minusHA = null;
+            if (trace != null) { minusHA = new byte[32]; Ge25519.Pack(minusHA, 0, p); }
             Ge25519.ScalarBase(sB, s);
             Ge25519.Add(p, sB);
             byte[] computed = new byte[32];
             Ge25519.Pack(computed, 0, p);
+            if (trace != null)
+            {
+                trace.VerifyH = Copy(h);
+                trace.SB = new byte[32];
+                Ge25519.Pack(trace.SB, 0, sB);
+                trace.MinusHA = minusHA;
+                trace.RPrime = Copy(computed);
+            }
 
             int difference = 0;
             for (int i = 0; i < 32; i++) difference |= computed[i] ^ rBytes[i];
@@ -87,6 +122,8 @@ namespace NetSec.Crypto
                 if (pub[i] != 0xff) return true;
             return pub[0] < 0xed;
         }
+
+        static byte[] Copy(byte[] b) { return (byte[])b.Clone(); }
 
         static void CheckSeed(byte[] seed)
         {
