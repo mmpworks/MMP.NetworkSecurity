@@ -33,7 +33,7 @@ public class DhWalkRoutesLiveTests
     [Fact]
     public async Task Both_groups_answer_with_Show_keys_off_with_numbers_in_hex_and_decimal()
     {
-        using SecurityLiveTests.Host host = new();
+        using SecurityLiveTests.Host host = await SecurityLiveTests.Host.StartAsync();
         (int off, _) = await host.Put("/api/security/show-keys", "{\"on\":false}");
         Assert.Equal(200, off);
 
@@ -53,6 +53,7 @@ public class DhWalkRoutesLiveTests
         Assert.Contains("no-store", cache);
         Assert.Equal(Rfc3526PrimeHex(), g14.GetProperty("prime").GetProperty("hex").GetString());
         Assert.Equal(32, g14.GetProperty("client").GetProperty("public").GetProperty("rows").GetArrayLength());
+        Assert.Equal(512, g14.GetProperty("realExponentBits").GetInt32());
         Assert.Equal(g14.GetProperty("client").GetProperty("shared").GetProperty("result").GetProperty("hex").GetString(),
             g14.GetProperty("server").GetProperty("shared").GetProperty("result").GetProperty("hex").GetString());
     }
@@ -62,7 +63,7 @@ public class DhWalkRoutesLiveTests
     [InlineData("/api/walk/dh?group=group15")]
     public async Task An_unknown_group_is_a_400_with_its_code(string path)
     {
-        using SecurityLiveTests.Host host = new();
+        using SecurityLiveTests.Host host = await SecurityLiveTests.Host.StartAsync();
         (int status, JsonElement body, string cache) = await Get(host, path);
         Assert.Equal(400, status);
         Assert.Equal("WALK_BAD_ARGUMENT", body.GetProperty("code").GetString());

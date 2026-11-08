@@ -3,6 +3,7 @@ using System.Collections.Generic;
 using System.Text;
 using NetSec.Crypto;
 using NetSec.Errors;
+using NetSec.Ssh;
 
 namespace NetSec.Labs
 {
@@ -43,6 +44,10 @@ namespace NetSec.Labs
         public string Group;
         public byte[] Prime, Generator;
         public DhSideWalk Client, Server;
+
+        /// <summary>The exponent size lesson 8's legacy exchange draws, in bits (SshKex.DhPrivateSize). The walk's own exponents are short practice values,
+        /// so the screen can say how far they are from the real ones, from the code's own number.</summary>
+        public int RealExponentBits;
     }
 
     /// <summary>
@@ -102,6 +107,7 @@ namespace NetSec.Labs
             walk.Server = new DhSideWalk();
             walk.Client.Private = a;
             walk.Server.Private = b;
+            walk.RealExponentBits = SshKex.DhPrivateSize * 8;
             walk.Client.Public = Pow(g, a, p);
             walk.Server.Public = Pow(g, b, p);
             walk.Client.Shared = Pow(BigUInt.FromBytes(walk.Server.Public.Result), a, p);

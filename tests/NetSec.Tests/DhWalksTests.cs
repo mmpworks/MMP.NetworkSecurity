@@ -76,6 +76,9 @@ namespace NetSec.Tests
             Assert.Equal(Num(DhGroup14.Shared(a, DhGroup14.Public(b))), Num(w.Client.Shared.Result));
             foreach (DhPowWalk pow in new[] { w.Client.Public, w.Server.Public, w.Client.Shared, w.Server.Shared }) CheckPow(pow, p);
             Assert.Equal(32, w.Client.Public.Rows.Length);
+            // The real size, from the code lesson 8 runs: 64 bytes, so 512 bits (SshKex.cs). A practice exponent of 32 bits is far below it.
+            Assert.Equal(512, w.RealExponentBits);
+            Assert.Equal(NetSec.Ssh.SshKex.DhPrivateSize * 8, w.RealExponentBits);
         }
 
         [Fact]

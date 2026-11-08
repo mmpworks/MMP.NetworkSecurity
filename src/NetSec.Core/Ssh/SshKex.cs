@@ -12,7 +12,7 @@ namespace NetSec.Ssh
         const int X25519PrivateSize = 32;
 
         /// <summary>The design's DH exponent: 512 random bits. It cuts a device's work about 4 times compared with a full-size exponent.</summary>
-        const int DhPrivateSize = 64;
+        public const int DhPrivateSize = 64;
 
         const string None = "none";
 

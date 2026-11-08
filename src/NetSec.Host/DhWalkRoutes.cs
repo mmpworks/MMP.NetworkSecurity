@@ -49,6 +49,7 @@ public static class DhWalkRoutes
         keySource = "practice",
         prime = Number(w.Prime),
         generator = Number(w.Generator),
+        realExponentBits = w.RealExponentBits,
         client = Side(w.Client),
         server = Side(w.Server),
     };
