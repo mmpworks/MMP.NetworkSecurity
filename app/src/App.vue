@@ -255,7 +255,7 @@ const shortcuts: [string, string][] = [
         <footer class="statusbar" data-testid="status-bar">
           <span data-testid="engine-state">engine: {{ engineText }}</span>
           <span v-if="active">session {{ active.id }} · seed {{ active.seed }}</span>
-          <span>{{ position }}</span>
+          <span v-if="!ui.twoRun" data-testid="status-position">{{ position }}</span>
           <v-chip v-if="active?.replay" size="x-small" color="info" data-testid="replay-chip">REPLAY</v-chip>
           <span v-if="tour.driving" class="muted" data-testid="engine-waiting">waiting for the engine</span>
           <v-spacer />

@@ -11,33 +11,48 @@ export const streamKey = (e: TraceEvent): string => `${e.streamId.split('/').sli
 /** Two events at one key differ when their type, message or wire bytes differ. */
 const differs = (a: TraceEvent, b: TraceEvent): boolean => a.type !== b.type || a.message !== b.message || a.wire !== b.wire
 
+/** A run's events by key. A key held twice is a stream opened twice, which pairing by stream cannot tell apart, so it is reported. */
+function byKey(events: readonly TraceEvent[]): { map: Map<string, TraceEvent>; duplicates: string[] } {
+  const map = new Map<string, TraceEvent>()
+  const duplicates: string[] = []
+  for (const e of events) {
+    if (!e.streamId) continue
+    const key = streamKey(e)
+    if (map.has(key)) duplicates.push(key)
+    else map.set(key, e)
+  }
+  return { map, duplicates }
+}
+
+/** The stream name and place of a key, for the order of the steps. */
+const parts = (key: string): { stream: string; seq: number } => {
+  const at = key.lastIndexOf('#')
+  return { stream: key.slice(0, at), seq: Number(key.slice(at + 1)) }
+}
+
 /**
- * The pairs, in the normal run's order, with each key the attacked run alone holds placed after the pair before it in the attacked
- * run. Events with no stream id stay out: they belong to no stream, so they cannot pair.
+ * The 2 runs, paired by key, one step per key that either run holds. The order of the steps comes from the streams alone: by place in
+ * stream, then by stream name. The engine runs client and server on 2 threads, so the order of events across the 2 sides is not the
+ * same from one run to the next, and the screen must never take an order from it. Within a stream the order is stable. So one attack
+ * run gives the same steps, the same split, and the same count every time (the lead and Richard on #297).
+ * Events with no stream id stay out: they belong to no stream, so they cannot pair.
  */
 export function pairRuns(normal: readonly TraceEvent[], attacked: readonly TraceEvent[]): RunPair[] {
-  const byKey = new Map(attacked.filter(e => e.streamId).map(e => [streamKey(e), e]))
-  const pairs: RunPair[] = []
-  const used = new Set<string>()
-  for (const n of normal) {
-    if (!n.streamId) continue
-    const key = streamKey(n)
-    const a = byKey.get(key) ?? null
-    if (a) used.add(key)
-    pairs.push({ key, normal: n, attacked: a, changed: !!a && differs(n, a) })
-  }
-  // Keys only the attacked run holds: insert each after the pair that precedes it in the attacked run.
-  let after = -1
-  for (const a of attacked) {
-    if (!a.streamId) continue
-    const key = streamKey(a)
-    const at = pairs.findIndex(p => p.key === key)
-    if (at >= 0) { after = at; continue }
-    if (used.has(key)) continue
-    pairs.splice(after + 1, 0, { key, normal: null, attacked: a, changed: false })
-    after++
-  }
-  return pairs
+  return pairing(normal, attacked).pairs
+}
+
+/** The pairs, and any key a run holds twice. With a duplicate the pairs cannot be trusted, and the screen says so. */
+export function pairing(normal: readonly TraceEvent[], attacked: readonly TraceEvent[]): { pairs: RunPair[]; duplicates: string[] } {
+  const n = byKey(normal), a = byKey(attacked)
+  const keys = [...new Set([...n.map.keys(), ...a.map.keys()])].sort((x, y) => {
+    const px = parts(x), py = parts(y)
+    return px.seq - py.seq || (px.stream < py.stream ? -1 : px.stream > py.stream ? 1 : 0)
+  })
+  const pairs = keys.map(key => {
+    const ne = n.map.get(key) ?? null, ae = a.map.get(key) ?? null
+    return { key, normal: ne, attacked: ae, changed: !!ne && !!ae && differs(ne, ae) }
+  })
+  return { pairs, duplicates: [...n.duplicates, ...a.duplicates] }
 }
 
 /**

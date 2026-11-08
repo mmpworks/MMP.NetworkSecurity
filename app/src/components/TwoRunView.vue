@@ -1,7 +1,7 @@
 <script setup lang="ts">
 import { computed, ref, watch } from 'vue'
 import { lessons, showAttackIndex, ui } from '../store'
-import { changedBytes, checkResult, firstChange, pairRuns, splitAt, streamKey } from '../twoRun'
+import { changedBytes, checkResult, firstChange, pairing, splitAt, streamKey } from '../twoRun'
 import type { TraceEvent } from '../types'
 import SequenceDiagram from './SequenceDiagram.vue'
 
@@ -16,7 +16,10 @@ const attacked = computed(() => runOf(props.attackedId))
 // Where the runs part and what changed are read only once both runs have finished: while one still runs, its missing events would
 // look like a split that is not there.
 const done = computed(() => !!recOf(props.normalId)?.finished && !!recOf(props.attackedId)?.finished)
-const pairs = computed(() => pairRuns(normal.value, attacked.value))
+const paired = computed(() => pairing(normal.value, attacked.value))
+const pairs = computed(() => paired.value.pairs)
+// A run that holds one key twice cannot pair by stream. The screen says so and shows no split or change, which would be a guess.
+const unpaired = computed(() => paired.value.duplicates.length > 0)
 const run = computed(() => lessons.value.flatMap(l => l.attacks.map(a => ({ ...a, lesson: l.lesson }))).find(a => a.attackId === props.attackId) ?? null)
 const checkName = computed(() => run.value?.expectCheck ?? '')
 
@@ -36,20 +39,24 @@ const attackedShown = computed(() => upTo(attacked.value))
 const normalCheck = computed(() => checkResult(normal.value, checkName.value))
 const attackedCheck = computed(() => checkResult(attacked.value, checkName.value))
 
-const split = computed(() => { const i = done.value ? splitAt(pairs.value) : -1; return i >= 0 ? { index: i, pair: pairs.value[i] } : null })
+const readable = computed(() => done.value && !unpaired.value)
+const split = computed(() => { const i = readable.value ? splitAt(pairs.value) : -1; return i >= 0 ? { index: i, pair: pairs.value[i] } : null })
 // A byte change counts only before the runs part: after a scenario attack parts them, every later message differs, and that is not
 // a change the attack made inside one message.
 const change = computed(() => {
-  const i = done.value ? firstChange(pairs.value) : -1
+  const i = readable.value ? firstChange(pairs.value) : -1
   return i >= 0 && (!split.value || i < split.value.index) ? { index: i, pair: pairs.value[i] } : null
 })
 const changed = computed(() => (change.value ? new Set(changedBytes(change.value.pair.normal!.wire, change.value.pair.attacked!.wire)) : new Set<number>()))
 
 const bytesOf = (hex: string) => Array.from({ length: hex.length >> 1 }, (_, i) => hex.slice(2 * i, 2 * i + 2))
 const checkWords = (r: 'pass' | 'fail' | 'none') => (r === 'pass' ? 'passes' : r === 'fail' ? 'fails' : 'does not run')
-/** What a run does at a pair, in words: a message it sends, a check it runs, or that it has stopped. */
-function doing(e: TraceEvent | null): string {
-  if (!e) return 'has stopped'
+/**
+ * What a run does at a pair, in words: a message it sends, or a check it runs. A run with no event at the pair has no more events on
+ * that stream. It can still send on other streams, so the words name the stream and never say the run stopped (Richard on #297).
+ */
+function doing(e: TraceEvent | null, key: string): string {
+  if (!e) return `has no more events on the ${key.slice(0, key.lastIndexOf('#'))} stream`
   if (e.check) return `runs the ${e.check.name} check`
   return `sends ${e.message || e.type}`
 }
@@ -68,10 +75,13 @@ const label = (e: TraceEvent | null) => (e ? e.message || e.type : '')
       <v-btn size="small" :disabled="step === 0" data-testid="two-run-prev" @click="move(step - 1)">Back</v-btn>
       <input type="range" min="0" :max="pairs.length" :value="step" aria-label="Step through both runs" data-testid="two-run-clock" @input="move(Number(($event.target as HTMLInputElement).value))" />
       <v-btn size="small" :disabled="step >= pairs.length" data-testid="two-run-next" @click="move(step + 1)">Next</v-btn>
-      <span class="muted">Step {{ step }} of {{ pairs.length }}</span>
+      <span class="muted" data-testid="two-run-step" title="One step is one place in one stream. Both runs move together.">Step {{ step }} of {{ pairs.length }}</span>
     </div>
-    <p v-if="split" class="tr-split" data-testid="two-run-split" :data-at="split.index">
-      The runs part at step {{ split.index + 1 }}: the normal run {{ doing(split.pair.normal) }}, and the attacked run {{ doing(split.pair.attacked) }}.
+    <p v-if="unpaired" class="tr-split" data-testid="two-run-unpaired" :data-count="paired.duplicates.length">
+      These runs cannot pair by stream: a run sends 2 events at one place in one stream. The panes show both runs, with no split line.
+    </p>
+    <p v-else-if="split" class="tr-split" data-testid="two-run-split" :data-at="split.index">
+      The runs part at step {{ split.index + 1 }}: the normal run {{ doing(split.pair.normal, split.pair.key) }}, and the attacked run {{ doing(split.pair.attacked, split.pair.key) }}.
     </p>
     <p v-else-if="!done" class="muted tr-wait" data-testid="two-run-running">Both runs are still running. Where they part shows when both have finished.</p>
 
@@ -81,7 +91,7 @@ const label = (e: TraceEvent | null) => (e ? e.message || e.type : '')
         <div class="tr-diagram"><SequenceDiagram view="endpoints" :run-events="normalShown" /></div>
         <p class="tr-check" data-testid="two-run-check-normal" :data-result="normalCheck">
           <template v-if="checkName"><b>{{ checkName }}</b> {{ checkWords(normalCheck) }}.</template>
-          <template v-else>No check catches this attack.</template>
+          <template v-else>The normal run has no attack to catch.</template>
         </p>
       </div>
       <div class="tr-pane tr-pane-attacked" data-testid="two-run-attacked">
