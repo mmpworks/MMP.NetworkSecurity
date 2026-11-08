@@ -1,0 +1,515 @@
+HEAD 56ca6a44629b2f2a673bd47aa5eb2f5606e9ccd9
+NETSEC_PORT_BASE=36700
+started 2026-11-08T12:02:04-06:00
+  Determining projects to restore...
+  All projects are up-to-date for restore.
+  MMP.AsyncProxy -> E:\dev\ns-deadline\src\AsyncProxy.Local\bin\Release\netstandard2.0\MMP.AsyncProxy.dll
+  NetSec.Core -> E:\dev\ns-deadline\src\NetSec.Core\bin\Release\net10.0\NetSec.Core.dll
+  NetSec.Vault -> E:\dev\ns-deadline\src\NetSec.Vault\bin\Release\net10.0\NetSec.Vault.dll
+  NetSec.Host -> E:\dev\ns-deadline\src\NetSec.Host\bin\Release\net10.0\NetSec.Host.dll
+
+Build succeeded.
+    0 Warning(s)
+    0 Error(s)
+
+Time Elapsed 00:00:06.26
+
+> netsec-app@0.1.0 e2e
+> npm run build && playwright test --reporter=line
+
+
+> netsec-app@0.1.0 build
+> vue-tsc --noEmit && vite build
+
+[36mvite v6.0.7 [32mbuilding for production...[36m[39m
+transforming...
+[32m✓[39m 687 modules transformed.
+rendering chunks...
+computing gzip size...
+[2mdist/[22m[32mindex.html                                                    [39m[1m[2m    0.41 kB[22m[1m[22m[2m │ gzip:   0.28 kB[22m
+[2mdist/[22m[32massets/familjen-grotesk-latin-700-normal-DP3KK2u2.woff2       [39m[1m[2m   11.82 kB[22m[1m[22m
+[2mdist/[22m[32massets/familjen-grotesk-latin-500-normal-BASv1Bog.woff2       [39m[1m[2m   12.06 kB[22m[1m[22m
+[2mdist/[22m[32massets/atkinson-hyperlegible-latin-400-normal-BbWidj28.woff   [39m[1m[2m   14.02 kB[22m[1m[22m
+[2mdist/[22m[32massets/atkinson-hyperlegible-latin-700-normal-BK6Glc0m.woff   [39m[1m[2m   14.29 kB[22m[1m[22m
+[2mdist/[22m[32massets/familjen-grotesk-latin-700-normal-Cqh4U_Q6.woff        [39m[1m[2m   15.22 kB[22m[1m[22m
+[2mdist/[22m[32massets/familjen-grotesk-latin-500-normal-BJWE1t8Q.woff        [39m[1m[2m   15.57 kB[22m[1m[22m
+[2mdist/[22m[32massets/atkinson-hyperlegible-latin-400-normal-BrHNak5F.woff2  [39m[1m[2m   17.21 kB[22m[1m[22m
+[2mdist/[22m[32massets/atkinson-hyperlegible-latin-700-normal-GZI4o3u0.woff2  [39m[1m[2m   17.52 kB[22m[1m[22m
+[2mdist/[22m[32massets/jetbrains-mono-latin-400-normal-V6pRDFza.woff2         [39m[1m[2m   21.17 kB[22m[1m[22m
+[2mdist/[22m[32massets/jetbrains-mono-latin-600-normal-C8RAYTDA.woff2         [39m[1m[2m   21.86 kB[22m[1m[22m
+[2mdist/[22m[32massets/jetbrains-mono-latin-400-normal-6-qcROiO.woff          [39m[1m[2m   27.50 kB[22m[1m[22m
+[2mdist/[22m[32massets/jetbrains-mono-latin-600-normal-BfsvjouI.woff          [39m[1m[2m   28.18 kB[22m[1m[22m
+[2mdist/[22m[32massets/materialdesignicons-webfont-Dp5v-WZN.woff2             [39m[1m[2m  403.22 kB[22m[1m[22m
+[2mdist/[22m[32massets/materialdesignicons-webfont-PXm3-2wK.woff              [39m[1m[2m  587.98 kB[22m[1m[22m
+[2mdist/[22m[32massets/materialdesignicons-webfont-B7mPwVP_.ttf               [39m[1m[2m1,307.66 kB[22m[1m[22m
+[2mdist/[22m[32massets/materialdesignicons-webfont-CSr8KVlo.eot               [39m[1m[2m1,307.88 kB[22m[1m[22m
+[2mdist/[22m[35massets/index-Dq9D1IY6.css                                     [39m[1m[2m1,042.24 kB[22m[1m[22m[2m │ gzip: 151.52 kB[22m
+[2mdist/[22m[36massets/index-ChqKWTor.js                                      [39m[1m[33m1,041.54 kB[39m[22m[2m │ gzip: 323.19 kB[22m
+[33m
+(!) Some chunks are larger than 500 kB after minification. Consider:
+- Using dynamic import() to code-split the application
+- Use build.rollupOptions.output.manualChunks to improve chunking: https://rollupjs.org/configuration-options/#output-manualchunks
+- Adjust chunk size limit for this warning via build.chunkSizeWarningLimit.[39m
+[32m✓ built in 5.96s[39m
+
+Running 215 tests using 1 worker
+
+[1/215] e2e\aes-walk-fetch.spec.ts:15:5 › a failed tables call names the tables route in the walk's error line
+[2/215] e2e\aes-walk-fetch.spec.ts:22:5 › callers that race before the first tables reply share one request
+[3/215] e2e\aes-walk-motion.spec.ts:23:5 › Pause freezes a running step in place, and Resume finishes it from there
+[4/215] e2e\aes-walk-motion.spec.ts:41:5 › Back during a motion lands on the step before, with no old-byte mark and nothing moving
+[5/215] e2e\aes-walk-motion.spec.ts:52:5 › through the ShiftRows roll, every column of every moving row shows a byte
+[6/215] e2e\aes-walk-motion.spec.ts:88:5 › Next while paused ends the motion and moves on one step
+[7/215] e2e\aes-walk-typed.spec.ts:8:5 › the strip's lesson text equals the text in Lesson01Aes.cs
+[8/215] e2e\aes-walk-typed.spec.ts:34:5 › with no run, Techniques AES shows the practice walk on the default text
+[9/215] e2e\aes-walk-typed.spec.ts:49:5 › typed text longer than 16 bytes walks its first 16 bytes and marks the rest as not included
+[10/215] e2e\aes-walk-typed.spec.ts:71:5 › with Show keys off, the run walk closes and its offer opens the practice walk
+[11/215] e2e\attack-index.spec.ts:24:5 › the index lists every attack run the Host registers, once, in a group, with its lesson and its check
+[12/215] e2e\attack-index.spec.ts:41:5 › each row shows its readable name, with the id as a small second line
+[13/215] e2e\attack-index.spec.ts:48:5 › the L7 recording row carries the guard words agreed for it
+[14/215] e2e\attack-index.spec.ts:58:5 › the first row of each group plays its run in its lesson, and Back returns to that row
+[15/215] e2e\attacks-index.spec.ts:37:5 › the file holds one row for each run the Host registers, no more and no fewer
+[16/215] e2e\attacks-index.spec.ts:46:5 › every run has one of the labels, and every label holds at least one run
+[17/215] e2e\attacks-index.spec.ts:52:5 › each tourStep names the step that plays the run, and null means no tour plays it
+[18/215] e2e\attacks-index.spec.ts:58:5 › each run has a readable name under 50 characters, and no two runs in one lesson share a name
+[19/215] e2e\attacks-index.spec.ts:74:5 › each guard is one or two short sentences
+[20/215] e2e\bytes-fit.spec.ts:44:7 › at 1536 x 760 TextGcm1 shows all 5 fields and no cut row, in all 3 views
+[21/215] e2e\bytes-fit.spec.ts:44:7 › at 1440 x 760 TextGcm1 shows all 5 fields and no cut row, in all 3 views
+[22/215] e2e\bytes-fit.spec.ts:44:7 › at 1440 x 900 TextGcm1 shows all 5 fields and no cut row, in all 3 views
+[23/215] e2e\bytes-fit.spec.ts:44:7 › at 1280 x 640 TextGcm1 shows all 5 fields and no cut row, in all 3 views
+[24/215] e2e\bytes-fit.spec.ts:44:7 › at 1984 x 1030 TextGcm1 shows all 5 fields and no cut row, in all 3 views
+[25/215] e2e\bytes-fit.spec.ts:56:5 › a view switch turns off a lit field
+[26/215] e2e\bytes-fit.spec.ts:67:5 › real Electron at 1440 x 770 shows all 5 fields and no cut row, in Free play and on the first tour step that shows TextGcm1
+[27/215] e2e\bytes-grid.spec.ts:69:7 › at 1100 wide every byte column and the text column line up, and nothing overflows
+[28/215] e2e\bytes-grid.spec.ts:69:7 › at 1280 wide every byte column and the text column line up, and nothing overflows
+[29/215] e2e\bytes-grid.spec.ts:69:7 › at 1440 wide every byte column and the text column line up, and nothing overflows
+[30/215] e2e\bytes-grid.spec.ts:95:7 › the eavesdropper can pick the ciphertext and see the bytes it fills, in the light theme
+[31/215] e2e\bytes-grid.spec.ts:95:7 › the eavesdropper can pick the ciphertext and see the bytes it fills, in the dark theme
+[32/215] e2e\bytes-grid.spec.ts:129:7 › lesson 6: the eavesdropper can pick pinBlock of Sale, bytes 16 to 31
+[33/215] e2e\bytes-grid.spec.ts:129:7 › lesson 7: the eavesdropper can pick cipher of ApplicationData, bytes 21 to 68
+[34/215] e2e\bytes-grid.spec.ts:129:7 › lesson 8: the eavesdropper can pick encryptedPacket of ServiceRequest, bytes 0 to 31
+[35/215] e2e\bytes-grid.spec.ts:142:5 › an event with no wire bytes shows the eavesdropper no bytes and no rows
+[36/215] e2e\bytes-grid.spec.ts:178:7 › at 1440 x 760 no key row sits under the match box
+[37/215] e2e\bytes-grid.spec.ts:178:7 › at 1536 x 760 no key row sits under the match box
+[38/215] e2e\bytes-grid.spec.ts:178:7 › at 1440 x 900 no key row sits under the match box
+[39/215] e2e\bytes-grid.spec.ts:178:7 › at 1280 x 800 no key row sits under the match box
+[40/215] e2e\bytes-grid.spec.ts:178:7 › at 1100 x 800 no key row sits under the match box
+[41/215] e2e\bytes-grid.spec.ts:194:7 › at 1440 x 770 the "locked with the key, then sent" line covers no hex row
+[42/215] e2e\bytes-grid.spec.ts:194:7 › at 1280 x 640 the "locked with the key, then sent" line covers no hex row
+[43/215] e2e\bytes-grid.spec.ts:194:7 › at 1280 x 640, resized from 1440 x 770, the "locked with the key, then sent" line covers no hex row
+[44/215] e2e\bytes-grid.spec.ts:209:5 › a hex byte in the bytes panel and in a match grid shows its binary on hover
+[45/215] e2e\bytes-layout.spec.ts:21:5 › an encrypted message: fields sit on the wire bytes, and the readable bytes became the cipher span
+[46/215] e2e\bytes-layout.spec.ts:29:5 › the eavesdropper sees no readable bytes of a locked message
+[47/215] e2e\bytes-layout.spec.ts:35:5 › a message sent in the clear shows one grid, with the fields on it
+[48/215] e2e\bytes-layout.spec.ts:43:5 › a message whose payload shows in the wire links the payload to its place
+[49/215] e2e\bytes-layout.spec.ts:51:5 › fields that describe the inner message sit on the readable bytes
+[50/215] e2e\bytes-layout.spec.ts:57:5 › an engine event with no wire bytes shows only the fields that fit its bytes
+[51/215] e2e\bytes-layout.spec.ts:64:5 › a step inside an endpoint shows the eavesdropper nothing
+[52/215] e2e\bytes-layout.spec.ts:75:5 › the window fits the screen work area of a 1080p screen at 100, 125 and 150 percent
+[53/215] e2e\bytes-panel.spec.ts:19:5 › the panel has one name, and the tab and the title both say it
+[54/215] e2e\bytes-panel.spec.ts:25:5 › before and after show side by side: 64 readable bytes became 96 bytes on the wire
+[55/215] e2e\bytes-panel.spec.ts:34:5 › nothing is lit until a field is picked, and a field lights only its own bytes
+[56/215] e2e\bytes-panel.spec.ts:49:5 › a field value reads the wire bytes at its own offsets
+[57/215] e2e\bytes-panel.spec.ts:57:5 › the cipher field lights the readable bytes it was made from
+[58/215] e2e\bytes-panel.spec.ts:64:5 › the eavesdropper gets no readable bytes of a locked message
+[59/215] e2e\bytes-panel.spec.ts:73:7 › lit fields read at 4.5 to 1 in the light theme
+[60/215] e2e\bytes-panel.spec.ts:73:7 › lit fields read at 4.5 to 1 in the dark theme
+[61/215] e2e\bytes-panel.spec.ts:86:7 › the whole app fits 1536 x 760 with no cut edges, and the lane names stay in view
+[62/215] e2e\bytes-panel.spec.ts:86:7 › the whole app fits 1920 x 970 with no cut edges, and the lane names stay in view
+[63/215] e2e\contrast-sweep.spec.ts:37:7 › every screen, tooltip, dialog, banner and chip reads at 4.5 to 1 in the dark theme
+e2e\contrast-sweep.spec.ts:37:7 › every screen, tooltip, dialog, banner and chip reads at 4.5 to 1 in the dark theme
+dark  start, nothing picked                        checked   63, failed 0
+dark  tooltip of training-only-label               checked   64, failed 0
+dark  tooltip of keys-chip                         checked   64, failed 0
+dark  tooltip of show-keys-switch                  checked   64, failed 0
+dark  settings menu                                checked   69, failed 0
+dark  keyboard shortcuts dialog                    checked   88, failed 0
+dark  glossary                                     checked  306, failed 0
+dark  lesson 1 tour step 1                         checked   86, failed 0
+dark  lesson 1 tour step with the GCM term         checked  338, failed 0
+dark  tooltip of term-gcm                          checked  340, failed 0
+dark  lesson 0 free play, both views               checked  153, failed 0
+dark  lesson 0 attack result                       checked  159, failed 0
+dark  lesson 1 free play, both views               checked  353, failed 0
+dark  lesson 1 inspector tab bytes                 checked  353, failed 0
+dark  lesson 1 inspector tab picture               checked  343, failed 0
+dark  lesson 1 inspector tab measures              checked  354, failed 0
+dark  lesson 1 attack result                       checked  356, failed 0
+dark  lesson 2 free play, both views               checked  274, failed 0
+dark  lesson 2 inspector tab bytes                 checked  274, failed 0
+dark  lesson 2 inspector tab measures              checked  266, failed 0
+dark  lesson 2 attack result                       checked  249, failed 0
+dark  lesson 3 free play, both views               checked  714, failed 0
+dark  lesson 3 attack result                       checked  860, failed 0
+dark  lesson 4 free play, both views               checked 1184, failed 0
+dark  lesson 4 inspector tab bytes                 checked 1184, failed 0
+dark  lesson 4 inspector tab chain                 checked 1192, failed 0
+dark  lesson 4 inspector tab ladder                checked 1199, failed 0
+dark  lesson 4 attack result                       checked  854, failed 0
+dark  lesson 5 free play, both views               checked 1404, failed 0
+dark  lesson 5 inspector tab bytes                 checked 1404, failed 0
+dark  lesson 5 inspector tab ladder                checked 1429, failed 0
+dark  lesson 5 attack result                       checked 1118, failed 0
+dark  lesson 6 free play, both views               checked  633, failed 0
+dark  lesson 6 inspector tab bytes                 checked  633, failed 0
+dark  lesson 6 inspector tab ladder                checked  658, failed 0
+dark  lesson 6 attack result                       checked  386, failed 0
+dark  lesson 7 free play, both views               checked 2096, failed 0
+dark  lesson 7 inspector tab bytes                 checked 2096, failed 0
+dark  lesson 7 inspector tab ladder                checked 2165, failed 0
+dark  lesson 7 attack result                       checked  234, failed 0
+dark  lesson 8 free play, both views               checked 2197, failed 0
+dark  lesson 8 inspector tab bytes                 checked 2197, failed 0
+dark  lesson 8 inspector tab hostkey               checked 2177, failed 0
+dark  lesson 8 inspector tab ladder                checked 2233, failed 0
+dark  lesson 8 attack result                       checked  689, failed 0
+dark  lesson 9 free play, both views               checked 2670, failed 0
+dark  lesson 9 inspector tab bytes                 checked 2670, failed 0
+dark  lesson 9 inspector tab hostkey               checked 2640, failed 0
+dark  lesson 9 inspector tab ladder                checked 2757, failed 0
+dark  lesson 9 inspector tab onion                 checked 2641, failed 0
+dark  lesson 9 attack result                       checked 1501, failed 0
+dark  lesson 10 free play, both views              checked 1647, failed 0
+dark  lesson 10 inspector tab bytes                checked 1647, failed 0
+dark  lesson 10 inspector tab ladder               checked 1684, failed 0
+dark  lesson 10 inspector tab token                checked 1693, failed 0
+dark  lesson 10 inspector tab measures             checked 1639, failed 0
+dark  lesson 10 attack result                      checked 1727, failed 0
+dark  lesson 11 free play, both views              checked  158, failed 0
+dark  lesson 11 inspector tab bytes                checked  378, failed 0
+dark  lesson 11 inspector tab timing               checked  158, failed 0
+dark  lesson 11 attack result                      checked  105, failed 0
+dark  refusal banner                               checked   78, failed 0
+dark  refusal banner, confirm                      checked   80, failed 0
+dark  security setup, all built-in                 checked  154, failed 0
+dark  tooltip of sec-show-keys-switch              checked  154, failed 0
+dark  wizard intro                                 checked  168, failed 0
+dark  wizard make                                  checked  177, failed 0
+dark  wizard files, refusal                        checked  173, failed 0
+dark  wizard cancel sheet                          checked  177, failed 0
+dark  wizard review                                checked  189, failed 0
+dark  wizard check                                 checked  175, failed 0
+dark  wizard done                                  checked  172, failed 0
+dark  security setup, keys set up                  checked  154, failed 0
+dark  security setup, one key needs setup          checked  156, failed 0
+
+[64/215] e2e\contrast-sweep.spec.ts:37:7 › every screen, tooltip, dialog, banner and chip reads at 4.5 to 1 in the light theme
+e2e\contrast-sweep.spec.ts:37:7 › every screen, tooltip, dialog, banner and chip reads at 4.5 to 1 in the light theme
+light start, nothing picked                        checked   63, failed 0
+light tooltip of training-only-label               checked   64, failed 0
+light tooltip of keys-chip                         checked   64, failed 0
+light tooltip of show-keys-switch                  checked   64, failed 0
+light settings menu                                checked   69, failed 0
+light keyboard shortcuts dialog                    checked   88, failed 0
+light glossary                                     checked  306, failed 0
+light lesson 1 tour step 1                         checked   86, failed 0
+light lesson 1 tour step with the GCM term         checked  338, failed 0
+light tooltip of term-gcm                          checked  340, failed 0
+light lesson 0 free play, both views               checked  153, failed 0
+light lesson 0 attack result                       checked  159, failed 0
+light lesson 1 free play, both views               checked  350, failed 0
+light lesson 1 inspector tab bytes                 checked  350, failed 0
+light lesson 1 inspector tab picture               checked  340, failed 0
+light lesson 1 inspector tab measures              checked  351, failed 0
+light lesson 1 attack result                       checked  359, failed 0
+light lesson 2 free play, both views               checked  274, failed 0
+light lesson 2 inspector tab bytes                 checked  274, failed 0
+light lesson 2 inspector tab measures              checked  266, failed 0
+light lesson 2 attack result                       checked  336, failed 0
+light lesson 3 free play, both views               checked  714, failed 0
+light lesson 3 attack result                       checked  373, failed 0
+light lesson 4 free play, both views               checked 1184, failed 0
+light lesson 4 inspector tab bytes                 checked 1184, failed 0
+light lesson 4 inspector tab chain                 checked 1192, failed 0
+light lesson 4 inspector tab ladder                checked 1199, failed 0
+light lesson 4 attack result                       checked  854, failed 0
+light lesson 5 free play, both views               checked 1404, failed 0
+light lesson 5 inspector tab bytes                 checked 1404, failed 0
+light lesson 5 inspector tab ladder                checked 1429, failed 0
+light lesson 5 attack result                       checked 1118, failed 0
+light lesson 6 free play, both views               checked  633, failed 0
+light lesson 6 inspector tab bytes                 checked  633, failed 0
+light lesson 6 inspector tab ladder                checked  658, failed 0
+light lesson 6 attack result                       checked  386, failed 0
+light lesson 7 free play, both views               checked 2096, failed 0
+light lesson 7 inspector tab bytes                 checked 2096, failed 0
+light lesson 7 inspector tab ladder                checked 2165, failed 0
+light lesson 7 attack result                       checked  234, failed 0
+light lesson 8 free play, both views               checked 2203, failed 0
+light lesson 8 inspector tab bytes                 checked 2203, failed 0
+light lesson 8 inspector tab hostkey               checked 2183, failed 0
+light lesson 8 inspector tab ladder                checked 2239, failed 0
+light lesson 8 attack result                       checked  689, failed 0
+light lesson 9 free play, both views               checked 2670, failed 0
+light lesson 9 inspector tab bytes                 checked 2670, failed 0
+light lesson 9 inspector tab hostkey               checked 2640, failed 0
+light lesson 9 inspector tab ladder                checked 2757, failed 0
+light lesson 9 inspector tab onion                 checked 2641, failed 0
+light lesson 9 attack result                       checked 1501, failed 0
+light lesson 10 free play, both views              checked 1647, failed 0
+light lesson 10 inspector tab bytes                checked 1647, failed 0
+light lesson 10 inspector tab ladder               checked 1684, failed 0
+light lesson 10 inspector tab token                checked 1693, failed 0
+light lesson 10 inspector tab measures             checked 1639, failed 0
+light lesson 10 attack result                      checked 1727, failed 0
+light lesson 11 free play, both views              checked  158, failed 0
+light lesson 11 inspector tab bytes                checked  378, failed 0
+light lesson 11 inspector tab timing               checked  158, failed 0
+light lesson 11 attack result                      checked  105, failed 0
+light refusal banner                               checked   78, failed 0
+light refusal banner, confirm                      checked   80, failed 0
+light security setup, all built-in                 checked  154, failed 0
+light tooltip of sec-show-keys-switch              checked  154, failed 0
+light wizard intro                                 checked  168, failed 0
+light wizard make                                  checked  177, failed 0
+light wizard files, refusal                        checked  173, failed 0
+light wizard cancel sheet                          checked  177, failed 0
+light wizard review                                checked  189, failed 0
+light wizard check                                 checked  175, failed 0
+light wizard done                                  checked  172, failed 0
+light security setup, keys set up                  checked  154, failed 0
+light security setup, one key needs setup          checked  156, failed 0
+
+[65/215] e2e\contrast-tooltip.spec.ts:19:7 › the GCM tooltip reads at 4.5 to 1 or better in the dark theme
+[66/215] e2e\contrast-tooltip.spec.ts:19:7 › the GCM tooltip reads at 4.5 to 1 or better in the light theme
+[67/215] e2e\eavesdropper-sweep.spec.ts:123:7 › lesson 0: the Eavesdropper view shows nothing a listener could not see
+e2e\eavesdropper-sweep.spec.ts:123:7 › lesson 0: the Eavesdropper view shows nothing a listener could not see
+lesson 0: forbids 1 texts, 0 windows, 0 key ends, 0 base64. 11 events, 7 scanned, 0 tabs, 0 shown
+
+[68/215] e2e\eavesdropper-sweep.spec.ts:123:7 › lesson 1: the Eavesdropper view shows nothing a listener could not see
+e2e\eavesdropper-sweep.spec.ts:123:7 › lesson 1: the Eavesdropper view shows nothing a listener could not see
+lesson 1: forbids 12 texts, 69 windows, 2 key ends, 3 base64. 49 events, 21 scanned, 3 tabs, 0 shown
+
+[69/215] e2e\eavesdropper-sweep.spec.ts:123:7 › lesson 2: the Eavesdropper view shows nothing a listener could not see
+e2e\eavesdropper-sweep.spec.ts:123:7 › lesson 2: the Eavesdropper view shows nothing a listener could not see
+lesson 2: forbids 6 texts, 32 windows, 2 key ends, 2 base64. 31 events, 16 scanned, 2 tabs, 0 shown
+
+[70/215] e2e\eavesdropper-sweep.spec.ts:123:7 › lesson 3: the Eavesdropper view shows nothing a listener could not see
+e2e\eavesdropper-sweep.spec.ts:123:7 › lesson 3: the Eavesdropper view shows nothing a listener could not see
+lesson 3: forbids 4 texts, 0 windows, 18 key ends, 9 base64. 65 events, 37 scanned, 0 tabs, 0 shown
+
+[71/215] e2e\eavesdropper-sweep.spec.ts:123:7 › lesson 4: the Eavesdropper view shows nothing a listener could not see
+e2e\eavesdropper-sweep.spec.ts:123:7 › lesson 4: the Eavesdropper view shows nothing a listener could not see
+lesson 4: forbids 33 texts, 656 windows, 22 key ends, 18 base64. 88 events, 31 scanned, 3 tabs, 0 shown
+
+[72/215] e2e\eavesdropper-sweep.spec.ts:123:7 › lesson 5: the Eavesdropper view shows nothing a listener could not see
+e2e\eavesdropper-sweep.spec.ts:123:7 › lesson 5: the Eavesdropper view shows nothing a listener could not see
+lesson 5: forbids 30 texts, 474 windows, 24 key ends, 17 base64. 90 events, 29 scanned, 2 tabs, 0 shown
+
+[73/215] e2e\eavesdropper-sweep.spec.ts:123:7 › lesson 6: the Eavesdropper view shows nothing a listener could not see
+e2e\eavesdropper-sweep.spec.ts:123:7 › lesson 6: the Eavesdropper view shows nothing a listener could not see
+lesson 6: forbids 15 texts, 0 windows, 12 key ends, 6 base64. 65 events, 18 scanned, 2 tabs, 0 shown
+
+[74/215] e2e\eavesdropper-sweep.spec.ts:207:7 › lesson 4: the chain tab closes to a listener, says why, and opens again for an endpoint
+[75/215] e2e\eavesdropper-sweep.spec.ts:207:7 › lesson 6: the ladder tab closes to a listener, says why, and opens again for an endpoint
+[76/215] e2e\eavesdropper-sweep.spec.ts:207:7 › lesson 9: the onion tab closes to a listener, says why, and opens again for an endpoint
+[77/215] e2e\eavesdropper-sweep.spec.ts:207:7 › lesson 11: the timing tab closes to a listener, says why, and opens again for an endpoint
+[78/215] e2e\eavesdropper-sweep.spec.ts:220:5 › lesson 10: the token tab stays open to a listener and says it is public
+[79/215] e2e\eavesdropper-sweep.spec.ts:229:5 › lesson 1: the listener keeps the repeated-block count, which comes from the ciphertext
+[80/215] e2e\eavesdropper-sweep.spec.ts:236:5 › lesson 2: the avalanche count comes from inside an endpoint, so the listener does not get it
+[81/215] e2e\eavesdropper-sweep.spec.ts:245:5 › a locked message keeps its name from the listener
+[82/215] e2e\eavesdropper-sweep.spec.ts:255:5 › the log lists on-wire events only, and it counts them
+[83/215] e2e\eavesdropper-sweep.spec.ts:267:5 › lesson 8: the host key is public, and the client's verdict on it is not
+[84/215] e2e\eavesdropper-sweep.spec.ts:276:5 › lesson 7: the TLS 1.1 certificate crosses in the clear, so the listener sees it, and the screen says it is public
+[85/215] e2e\eavesdropper-sweep.spec.ts:285:5 › a token that crosses in the clear stays open, and one under a lock closes
+[86/215] e2e\eavesdropper-sweep.spec.ts:291:5 › a measure of token claims shows the listener only while the token crosses in the clear
+[87/215] e2e\eavesdropper-sweep.spec.ts:298:5 › a certificate that crosses the wire in the clear is public, and one that does not is closed
+[88/215] e2e\fonts.spec.ts:10:5 › the 3 fonts load from the app, and no request leaves this machine
+[89/215] e2e\glossary.spec.ts:13:5 › search matches the term, the short text, the kind and the uses
+[90/215] e2e\glossary.spec.ts:22:5 › the glossary opens from Settings with every method, its status tag, and its sources as links
+[91/215] e2e\glossary.spec.ts:57:5 › a term in a tour step opens its glossary entry
+[92/215] e2e\glossary.spec.ts:70:5 › real Electron opens a glossary source in the outside browser, refuses an unlisted link, and keeps one window
+[93/215] e2e\glossary.spec.ts:94:5 › a term inside the wizard keeps its hover and opens no glossary page behind the dialog
+[94/215] e2e\glossary.spec.ts:109:5 › Space on a term in a tour opens its entry, as Enter does
+[95/215] e2e\layout-sweep.spec.ts:124:7 › at 1280 x 640, lessons 3, 1, 5 and 10 in all 3 views: no broken word, nothing sticks out, the diagrams fill their panes
+[96/215] e2e\layout-sweep.spec.ts:147:7 › at 1280 x 640, Techniques AES with the long-text strip: no broken word, nothing cut
+[97/215] e2e\layout-sweep.spec.ts:124:7 › at 1440 x 770, lessons 3, 1, 5 and 10 in all 3 views: no broken word, nothing sticks out, the diagrams fill their panes
+[98/215] e2e\layout-sweep.spec.ts:147:7 › at 1440 x 770, Techniques AES with the long-text strip: no broken word, nothing cut
+[99/215] e2e\layout-sweep.spec.ts:124:7 › at 1984 x 1030, lessons 3, 1, 5 and 10 in all 3 views: no broken word, nothing sticks out, the diagrams fill their panes
+[100/215] e2e\layout-sweep.spec.ts:147:7 › at 1984 x 1030, Techniques AES with the long-text strip: no broken word, nothing cut
+[101/215] e2e\lesson-0.spec.ts:23:5 › the rail shows lesson 0 as Start here beside lessons 1 to 11
+[102/215] e2e\lesson-0.spec.ts:29:5 › the target device dropdown offers this computer and shows the CE boxes disabled
+[103/215] e2e\lesson-0.spec.ts:42:5 › walks every step of lesson 0 against the live Host
+[104/215] e2e\lesson-0.spec.ts:67:5 › the eavesdropper view hides what the wire hides, and the attack names its check
+[105/215] e2e\lesson-0.spec.ts:82:5 › the OS transport relabels the chip and hides secret rows
+[106/215] e2e\lesson-1.spec.ts:5:5 › walks every step of lesson 1 against the live Host
+[107/215] e2e\lesson-1.spec.ts:10:5 › lesson 1 shows the same picture clear and locked, and the ECB leak is a measured number
+[108/215] e2e\lesson-1.spec.ts:25:5 › lesson 1 attack on GCM names the check that caught it
+[109/215] e2e\lesson-10.spec.ts:8:5 › walks every step of lesson 10 against the live Host
+[110/215] e2e\lesson-10.spec.ts:13:5 › lesson 10 splits the token into three parts and reads its claims in words
+[111/215] e2e\lesson-10.spec.ts:22:5 › lesson 10 changed token claim is caught by the token signature check
+[112/215] e2e\lesson-11.spec.ts:8:5 › walks every step of lesson 11 against the live Host
+[113/215] e2e\lesson-11.spec.ts:13:5 › lesson 11 shows measured timings and the t values for this run
+[114/215] e2e\lesson-11.spec.ts:21:5 › lesson 11 guess against the constant-time compare stops, and the leaky guess finds bytes
+[115/215] e2e\lesson-2.spec.ts:5:5 › walks every step of lesson 2 against the live Host
+[116/215] e2e\lesson-2.spec.ts:10:5 › lesson 2 draws the avalanche as 256 bit cells, and the count matches the cells
+[117/215] e2e\lesson-2.spec.ts:22:5 › lesson 2 attack on HMAC names HMAC compare
+[118/215] e2e\lesson-3.spec.ts:5:5 › walks every step of lesson 3 against the live Host
+[119/215] e2e\lesson-3.spec.ts:10:5 › lesson 3 shows both sides holding the same secret, and the hybrid secret as 64 cells
+[120/215] e2e\lesson-3.spec.ts:19:5 › lesson 3 ML-KEM tamper: the confirmation MAC names the catch
+[121/215] e2e\lesson-4.spec.ts:5:5 › walks every step of lesson 4 against the live Host
+[122/215] e2e\lesson-4.spec.ts:10:5 › lesson 4 draws root, leaf and proof as linked cards, and the links pass on a clean run
+[123/215] e2e\lesson-4.spec.ts:20:5 › lesson 4 expired certificate breaks the validity badge and names the check
+[124/215] e2e\lesson-5.spec.ts:5:5 › walks every step of lesson 5 against the live Host
+[125/215] e2e\lesson-5.spec.ts:10:5 › lesson 5 lists the secret ladder in the order the engine made it
+[126/215] e2e\lesson-5.spec.ts:21:5 › lesson 5 flipped record byte is caught by the AEAD tag
+[127/215] e2e\lesson-6.spec.ts:5:5 › walks every step of lesson 6 against the live Host
+[128/215] e2e\lesson-6.spec.ts:10:5 › lesson 6 shows erased rungs and reads the register count from the event
+[129/215] e2e\lesson-6.spec.ts:17:5 › lesson 6 replayed sale is caught by KSN already seen
+[130/215] e2e\lesson-7.spec.ts:5:5 › walks every step of lesson 7 against the live Host
+[131/215] e2e\lesson-7.spec.ts:10:5 › lesson 7 races TLS 1.1 against TLS 1.3 with counters read from the trace
+[132/215] e2e\lesson-7.spec.ts:24:5 › lesson 7 flipped record is caught by the record HMAC
+[133/215] e2e\lesson-8.spec.ts:5:5 › walks every step of lesson 8 against the live Host
+[134/215] e2e\lesson-8.spec.ts:10:5 › lesson 8 shows the host key card, and a divider where the legacy round starts
+[135/215] e2e\lesson-8.spec.ts:18:5 › lesson 8 changed host key is refused by known_hosts match, and the card says so
+[136/215] e2e\lesson-9.spec.ts:8:5 › walks every step of lesson 9 against the live Host
+[137/215] e2e\lesson-9.spec.ts:13:5 › lesson 9 onion: the inner PIN block stays closed at the gateway and opens only at the bank
+[138/215] e2e\lesson-9.spec.ts:21:5 › lesson 9 flipped PIN block passes both hops and is refused only by the bank check
+[139/215] e2e\links.spec.ts:13:5 › the link list equals the hosts of the glossary sources
+[140/215] e2e\links.spec.ts:17:5 › the rule takes every glossary source and refuses http, look-alike hosts, user info, a port, other schemes and text that is no URL
+[141/215] e2e\links.spec.ts:42:5 › real Electron sends only a listed https link outside, opens no second window, and stays on its page
+[142/215] e2e\origins-electron.spec.ts:16:5 › Electron strips NETSEC_ORIGINS from the Host it spawns
+[143/215] e2e\payment-v6.spec.ts:19:5 › the payment files branch shows the check value field, refuses a wrong value and a short key by name, and takes a matching value
+[144/215] e2e\payment-v6.spec.ts:55:5 › the check value field shows on the payment flow only
+[145/215] e2e\secrets-held.spec.ts:27:5 › at TextGcm1 both sides hold the AES key, in the order most runs record
+[146/215] e2e\secrets-held.spec.ts:33:5 › at TextGcm1 both sides hold the AES key when the server loads it after the client sends
+[147/215] e2e\secrets-held.spec.ts:42:5 › a side with no wire event holds its secrets only from their own events
+[148/215] e2e\secrets-held.spec.ts:57:5 › in the real L7 decrypt-recording run, the attacker holds nothing at the first event and the opened secrets at the last
+[149/215] e2e\secrets-held.spec.ts:73:5 › a key a side makes after its first wire event shows only from its own event
+[150/215] e2e\secrets-order.spec.ts:5:5 › the columns follow the lesson lanes, whatever order the key events arrive in
+[151/215] e2e\secrets-order.spec.ts:12:5 › a holder that is not a lane follows the lanes, in the order it first appears
+[152/215] e2e\sections.spec.ts:14:5 › the top bar holds 3 sections in order, and the app opens in Lessons
+[153/215] e2e\sections.spec.ts:22:5 › Lessons holds 12 of 12 lessons with their numbers kept
+[154/215] e2e\sections.spec.ts:31:5 › Techniques lists its 7 items and Handshake its 3 walks, as placeholders, and Lessons comes back as it was
+[155/215] e2e\sections.spec.ts:48:5 › the mode switch sits inside Lessons, and Tour and Free play still switch
+[156/215] e2e\sections.spec.ts:60:7 › at 1280 x 640 the top bar keeps one row with the 3 sections, in every section
+[157/215] e2e\sections.spec.ts:60:7 › at 1366 x 768 the top bar keeps one row with the 3 sections, in every section
+[158/215] e2e\sections.spec.ts:60:7 › at 1440 x 770 the top bar keeps one row with the 3 sections, in every section
+[159/215] e2e\sections.spec.ts:60:7 › at 1536 x 760 the top bar keeps one row with the 3 sections, in every section
+[160/215] e2e\sections.spec.ts:60:7 › at 1984 x 1030 the top bar keeps one row with the 3 sections, in every section
+[161/215] e2e\sections.spec.ts:71:5 › the AES walk shows only in Techniques, and another section never shows it on top
+[162/215] e2e\sections.spec.ts:88:5 › the AES walk names its key from the reply: the run key at 128 bits, a practice key at 192 and 256
+[163/215] e2e\security-v0.spec.ts:23:5 › the top bar shows the keys chip, the security button, the Show keys switch and the OS transport button
+[164/215] e2e\security-v0.spec.ts:33:5 › the Show keys switch is on by default and can be used
+[165/215] e2e\security-v0.spec.ts:42:5 › the Security setup screen lists 15 types with the two-button mode switch and the states
+[166/215] e2e\security-v0.spec.ts:56:5 › a lesson whose key is not ready shows the refusal banner, and the built-in button runs the lesson
+[167/215] e2e\security-v0.spec.ts:77:5 › walks the five screens of Make my sign-in set and ends with the two chips
+[168/215] e2e\security-v0.spec.ts:132:5 › Keep my place leaves the run open and the row reads Setup paused
+[169/215] e2e\security-v0.spec.ts:152:5 › the files branch refuses the wrong kind of key and a file that is no key, by name, and accepts an Ed25519 key
+[170/215] e2e\shell.spec.ts:13:7 › at 1440 x 770 the top bar keeps one row, a Target device label, and OS transport
+[171/215] e2e\shell.spec.ts:13:7 › at 1280 x 640 the top bar keeps one row, a Target device label, and OS transport
+[172/215] e2e\shell.spec.ts:26:5 › Settings holds speed, theme and keyboard keys, and closes on Escape and on an outside click
+[173/215] e2e\shell.spec.ts:48:5 › the overlay layer sits outside the workspace, so the walk's clip cannot cut a tip
+[174/215] e2e\show-keys-v3.spec.ts:47:5 › ON: rows show bytes, the Keys in use strip names the key, and the switch reads ON
+[175/215] e2e\show-keys-v3.spec.ts:57:5 › OFF: bytes leave the panel at once, fingerprints stay, the banner shows, and ON brings the bytes back
+[176/215] e2e\show-keys-v3.spec.ts:85:5 › built-in keys: lesson 10 names pki.root-ca in the strip with its key ON and its fingerprint OFF
+[177/215] e2e\show-keys-v3.spec.ts:98:5 › built-in keys with no long-term key: lesson 1 names lab.aes-key with no value
+[178/215] e2e\show-keys-v3.spec.ts:105:5 › own keys: lesson 10 names token.issuer in the strip with its key ON and its fingerprint OFF, and the bytes come back
+[179/215] e2e\show-keys-v3.spec.ts:129:5 › OFF: two sides that hold one key still show a match, from the fingerprints
+[180/215] e2e\show-keys-v3.spec.ts:138:5 › OFF at 1440 x 760: the banner cuts no row of the Message bytes panel
+[181/215] e2e\show-keys-v3.spec.ts:154:5 › a late reply from an ON read cannot put key bytes back after OFF
+[182/215] e2e\show-keys-v3.spec.ts:175:5 › a failed read after OFF leaves no key bytes, and it claims no match
+[183/215] e2e\show-keys-v3.spec.ts:202:5 › OFF then ON, with the OFF reply landing last: the screen follows the Host, which is ON
+[184/215] e2e\show-keys-v3.spec.ts:216:5 › ON then OFF, with the ON reply landing last: the screen follows the Host, which is OFF
+[185/215] e2e\show-keys-v3.spec.ts:233:5 › a flip during a run loses no event
+[186/215] e2e\show-keys-v3.spec.ts:257:5 › a saved trace opens as a replay, and a flip to OFF takes its key bytes off the screen
+[187/215] e2e\show-keys-v3.spec.ts:275:5 › OFF: the key log is refused by name
+[188/215] e2e\show-keys-v3.spec.ts:287:7 › every Show keys state reads at 4.5 to 1 in the light theme
+e2e\show-keys-v3.spec.ts:287:7 › every Show keys state reads at 4.5 to 1 in the light theme
+light lesson 1, keys shown, strip: 328 texts checked, 0 failed
+
+light lesson 1, keys hidden, banner, strip: 312 texts checked, 0 failed
+
+light lesson 3, keys hidden: 424 texts checked, 0 failed
+
+light lesson 6, keys hidden: 504 texts checked, 0 failed
+
+light lesson 6, keys hidden, tab inspector-tab-bytes: 504 texts checked, 0 failed
+
+light lesson 6, keys hidden, tab inspector-tab-ladder: 540 texts checked, 0 failed
+
+[189/215] e2e\show-keys-v3.spec.ts:287:7 › every Show keys state reads at 4.5 to 1 in the dark theme
+e2e\show-keys-v3.spec.ts:287:7 › every Show keys state reads at 4.5 to 1 in the dark theme
+dark lesson 1, keys shown, strip: 328 texts checked, 0 failed
+
+dark lesson 1, keys hidden, banner, strip: 312 texts checked, 0 failed
+
+dark lesson 3, keys hidden: 424 texts checked, 0 failed
+
+dark lesson 6, keys hidden: 504 texts checked, 0 failed
+
+dark lesson 6, keys hidden, tab inspector-tab-bytes: 504 texts checked, 0 failed
+
+dark lesson 6, keys hidden, tab inspector-tab-ladder: 540 texts checked, 0 failed
+
+[190/215] e2e\show-keys-v3.spec.ts:309:5 › OFF: the binary hover in What each side knows and in Message bytes shows no key bytes
+[191/215] e2e\show-keys-v3.spec.ts:344:5 › a Show keys off the Host could not save shows "not saved yet" until the retry saves it
+[192/215] e2e\spec-cards.spec.ts:37:5 › every row names a source that the glossary holds, and no name or alias belongs to two rows
+[193/215] e2e\spec-cards.spec.ts:45:5 › every spec name on screen today gets a card
+[194/215] e2e\spec-cards.spec.ts:54:5 › the longest name wins, a name matches only whole, and a section number stays text beside its card
+[195/215] e2e\spec-cards.spec.ts:68:5 › a spec in glossary text opens a card on hover, keeps it while the pointer is on it, and Esc closes it
+[196/215] e2e\spec-cards.spec.ts:90:5 › a spec in tour text opens its card on keyboard focus, and Enter toggles it
+[197/215] e2e\start.spec.ts:6:5 › Electron starts the Host, the window connects, and the rail shows
+[198/215] e2e\theme-switch.spec.ts:11:5 › the switch offers System, Light, Dark in that order, and a first run opens in Dark
+[199/215] e2e\theme-switch.spec.ts:20:5 › System follows the operating system while the page stays open
+[200/215] e2e\theme-switch.spec.ts:31:5 › Light and Dark ignore the operating system, and the choice survives a reload
+[201/215] e2e\theme-switch.spec.ts:52:5 › an unknown saved value falls back to Dark
+[202/215] e2e\theme-switch.spec.ts:59:7 › the Security setup screen and a tour step in the light theme
+[203/215] e2e\theme-switch.spec.ts:59:7 › the Security setup screen and a tour step in the dark theme
+[204/215] e2e\tour-panel.spec.ts:6:7 › at 1440 x 770 the footer stays on screen for every lesson 1 step
+[205/215] e2e\tour-panel.spec.ts:6:7 › at 1280 x 640 the footer stays on screen for every lesson 1 step
+[206/215] e2e\vault-v1.spec.ts:29:5 › the vault page opens from the map footer, states what it is, and lists the two exercise keys without key bytes
+[207/215] e2e\vault-v1.spec.ts:42:5 › screen 1: the test-keys line comes first, a message is signed and checked by OpenSSL, and one label gives one fingerprint
+[208/215] e2e\vault-v1.spec.ts:75:5 › screen 2: reading a non-exportable key out is refused with VAULT_EXPORT_REFUSED
+[209/215] e2e\vault-v1.spec.ts:84:5 › screen 3: the audit list shows the rows of this session, and the chain check says every row fits
+[210/215] e2e\vault-v1.spec.ts:96:7 › every vault screen and result reads at 4.5 to 1 in the light theme
+e2e\vault-v1.spec.ts:96:7 › every vault screen and result reads at 4.5 to 1 in the light theme
+light security setup with the vault button: 155 texts checked, 0 failed
+
+light vault page, sign and derive: 44 texts checked, 0 failed
+
+light sign result, check output and derived keys: 63 texts checked, 0 failed
+
+light refuse screen: 38 texts checked, 0 failed
+
+light refusal result: 42 texts checked, 0 failed
+
+light audit rows and chain result: 124 texts checked, 0 failed
+
+[211/215] e2e\vault-v1.spec.ts:96:7 › every vault screen and result reads at 4.5 to 1 in the dark theme
+e2e\vault-v1.spec.ts:96:7 › every vault screen and result reads at 4.5 to 1 in the dark theme
+dark security setup with the vault button: 155 texts checked, 0 failed
+
+dark vault page, sign and derive: 44 texts checked, 0 failed
+
+dark sign result, check output and derived keys: 63 texts checked, 0 failed
+
+dark refuse screen: 38 texts checked, 0 failed
+
+dark refusal result: 42 texts checked, 0 failed
+
+dark audit rows and chain result: 148 texts checked, 0 failed
+
+[212/215] e2e\vault-v1.spec.ts:132:5 › a failed audit write refuses the request, names VAULT_AUDIT_FAILED and says the learner can try again
+e2e\vault-v1.spec.ts:132:5 › a failed audit write refuses the request, names VAULT_AUDIT_FAILED and says the learner can try again
+light audit failed refusal: 47 texts checked, 0 failed
+
+dark audit failed refusal: 47 texts checked, 0 failed
+
+[213/215] e2e\vault-v1.spec.ts:145:5 › the chain check names the row after an edited row, and both results name what the check misses
+[214/215] e2e\vault-v1.spec.ts:164:5 › the broken-chain result and the limits line read at 4.5 to 1 in both themes
+e2e\vault-v1.spec.ts:164:5 › the broken-chain result and the limits line read at 4.5 to 1 in both themes
+light broken chain result: 148 texts checked, 0 failed
+
+dark broken chain result: 148 texts checked, 0 failed
+
+[215/215] e2e\vault-v1.spec.ts:173:5 › a Host on a damaged master.key refuses the vault by name, and the page shows the words in both themes
+e2e\vault-v1.spec.ts:173:5 › a Host on a damaged master.key refuses the vault by name, and the page shows the words in both themes
+light master key refusal: 39 texts checked, 0 failed
+
+dark master key refusal: 39 texts checked, 0 failed
+
+  Slow test file: e2e\contrast-sweep.spec.ts (7.0m)
+  Consider running tests from slow files in parallel. See: https://playwright.dev/docs/test-parallel
+  215 passed (20.5m)
+finished 2026-11-08T12:22:54-06:00 exit 0

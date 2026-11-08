@@ -551,7 +551,9 @@ namespace NetSec.Tests
             MemoryLink[] pair = MemoryLink.Pair();
             IFuture<PumpResult> run = new EnginePump(Client(Tls11CipherSuite.RsaAes128CbcSha), pair[0], new NullSink(), new FreeRunGate(), null, 200).Run();
             Assert.True(run.Wait(10000), "the pump did not end");
-            Assert.Equal(ErrorCodes.LinkDeadline, run.Result.Error.Code);
+            // The peer sent nothing, so no part of a frame waits, and the idle limit ends the run (issue #309).
+            Assert.Equal(ErrorCodes.LinkIdle, run.Result.Error.Code);
+            Assert.Equal("idle limit", run.Result.Error.CheckName);
         }
 
         [Fact]

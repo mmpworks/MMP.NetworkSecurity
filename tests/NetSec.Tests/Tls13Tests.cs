@@ -392,6 +392,100 @@ namespace NetSec.Tests
 
         static AttackDefinition Attack(string id) => AttackCatalog.All.Single(a => a.AttackId == id);
 
+        // Issue #309. The read deadline and the idle limits must end a stuck run on a fixed side, so one seed shows one trace. Half the runs
+        // run beside a CPU burner, because load is what moved the outcome before.
+        const int ShortDeadlineMs = 1000, SideRuns = 20;
+
+        static void BurnWhile(Action work)
+        {
+            using System.Threading.CancellationTokenSource stop = new();
+            System.Threading.Tasks.Task[] burners = Enumerable.Range(0, Environment.ProcessorCount).Select(_ => System.Threading.Tasks.Task.Factory.StartNew(() =>
+            {
+                double x = 1;
+                while (!stop.IsCancellationRequested) x = Math.Sqrt(x + 1.5);
+            }, System.Threading.Tasks.TaskCreationOptions.LongRunning)).ToArray();
+            try { work(); }
+            finally { stop.Cancel(); System.Threading.Tasks.Task.WaitAll(burners); }
+        }
+
+        /// <summary>The checks one side wrote, in its stream order, named by check.</summary>
+        static string[] ChecksOf(TraceEvent[] events, string actor) =>
+            events.Where(e => e.Actor == actor && e.Type == "check.result" && !e.StreamId.EndsWith("/wire")).OrderBy(e => e.StreamSeq).Select(e => e.Message).ToArray();
+
+        /// <summary>Runs one attack SideRuns times, the second half under load, and returns a line per run naming each side's checks.</summary>
+        static List<string> SideOutcomes(AttackDefinition attack, Func<string[], string[], string> judge, int lesson = 5, string acceptor = "server")
+        {
+            List<string> bad = new();
+            for (int run = 0; run < SideRuns; run++)
+            {
+                LabContext c = Context(7, attack, null, ShortDeadlineMs);
+                LabResult result = null!;
+                if (run < SideRuns / 2) result = Run(lesson, c);
+                else BurnWhile(() => result = Run(lesson, c));
+                TraceEvent[] events = ((ListSink)c.Sink).Events;
+                string verdict = judge(ChecksOf(events, "client"), ChecksOf(events, acceptor));
+                if (verdict != null)
+                    bad.Add($"run {run + 1} ({(run < SideRuns / 2 ? "idle" : "load")}): {verdict}; client [{string.Join(", ", ChecksOf(events, "client"))}], {acceptor} [{string.Join(", ", ChecksOf(events, acceptor))}], result {result.FailedCode} ({result.FailedCheck})");
+            }
+            return bad;
+        }
+
+        [Fact]
+        public void A_record_length_too_long_is_caught_by_the_receivers_read_deadline_in_every_run()
+        {
+            // The server's Finished claims more bytes than it holds, so the client holds part of a record. The guard says the receiver's read
+            // deadline ends the wait. The server then sees its peer close mid-handshake.
+            List<string> bad = SideOutcomes(Attack("L5-flip-record-length"), (client, server) =>
+                !client.Contains("read deadline") ? "the client shows no read deadline"
+                : client.Contains("peer stayed until the end") ? "the client shows peer stayed until the end"
+                : server.LastOrDefault() != "peer stayed until the end" ? "the server does not end with peer stayed until the end"
+                : null);
+            Assert.True(bad.Count == 0, $"{bad.Count} of {SideRuns} runs differ:\n" + string.Join("\n", bad));
+        }
+
+        [Fact]
+        public void A_whole_dropped_message_ends_on_the_side_that_opened_the_connection_in_every_run()
+        {
+            // No catalog attack drops a whole message, so this one is built here: the server's Finished is replaced by nothing, the last
+            // message of the server's flight. Neither side holds part of a frame. The client opened the connection, so its shorter idle limit
+            // ends the run (roles only, so no tie); the server then sees its peer close.
+            AttackDefinition drop = new AttackDefinition
+            {
+                AttackId = "test-drop-finished", Lesson = 5, Kind = "drop", Options = new LabOption[0],
+                Plan = new TamperPlan { Message = "Finished", Replacement = new byte[0] },
+            };
+            List<string> bad = SideOutcomes(drop, OpenerEnds);
+            Assert.True(bad.Count == 0, $"{bad.Count} of {SideRuns} runs differ:\n" + string.Join("\n", bad));
+        }
+
+        /// <summary>
+        /// Jared's strict-alternation case, on lesson 10's login connection: the issuer sends its challenge, the client answers, and the answer is
+        /// dropped. The client waits for its token and the issuer for the answer, and each sent last, so a rule built on "who sent last" saw both
+        /// sides owed a reply and tied. The role rule ends it on the opener, the client, in every run. (Lesson 5 has no such drop: right after its
+        /// Finished the TLS 1.3 client sends application data, so the server fails on that record, not on a wait.)
+        /// </summary>
+        [Fact]
+        public void A_dropped_message_right_after_a_reply_ends_on_the_side_that_opened_the_connection_in_every_run()
+        {
+            LabContext control = Context(7, null, null, ShortDeadlineMs);
+            Run(10, control);
+            TraceEvent answer = ((ListSink)control.Sink).Events.First(e => e.Actor == "client" && e.Message == "ChallengeResponse" && e.Type.EndsWith(".sent") && !e.StreamId.EndsWith("/wire"));
+            AttackDefinition drop = new AttackDefinition
+            {
+                AttackId = "test-drop-challenge-response", Lesson = 10, Kind = "drop", Options = new LabOption[0],
+                Plan = new TamperPlan { StreamId = answer.StreamId, StreamSeq = answer.StreamSeq, Replacement = new byte[0] },
+            };
+            List<string> bad = SideOutcomes(drop, OpenerEnds, 10, "issuer");
+            Assert.True(bad.Count == 0, $"{bad.Count} of {SideRuns} runs differ:\n" + string.Join("\n", bad));
+        }
+
+        /// <summary>The opener (client) ends on its idle limit; the acceptor never does, and ends on the close it then reads.</summary>
+        static string OpenerEnds(string[] client, string[] acceptor) =>
+            !client.Contains("idle limit") ? "the client shows no idle limit"
+            : acceptor.Contains("idle limit") ? "the acceptor shows an idle limit"
+            : acceptor.LastOrDefault() != "peer stayed until the end" ? "the acceptor does not end with peer stayed until the end"
+            : null;
+
         [Theory]
         [InlineData(4)]
         [InlineData(5)]

@@ -11,7 +11,7 @@ namespace NetSec.Tls11
     /// The sans-IO shell of the TLS 1.1 engine: bytes in, records out of the reader, each message through the table. It holds no socket and no thread.
     /// A wire length that never arrives leaves this engine waiting, and the pump's read deadline ends that wait with LINK_DEADLINE.
     /// </summary>
-    public sealed class Tls11Engine : ITlsEngine
+    public sealed class Tls11Engine : ITlsEngine, IPartialInput
     {
         const string AppStep = "tls11.app";
 
@@ -105,8 +105,16 @@ namespace NetSec.Tls11
                 Send(c.Bytes);
             else if (c.Kind == EngineCommandKind.Abort && !_machine.IsEnded)
                 _machine.Fail(c.AbortCode, c.AbortCode, c.AbortDetail, AppStep);
+            else if (c.Kind == EngineCommandKind.Expire && !_machine.IsEnded)
+            {
+                _noAlertOwed = true;
+                _machine.Fail(c.Expiry.Code, c.Expiry.CheckName, c.Expiry.Message, null);
+            }
             return Take();
         }
+
+        /// <summary>Part of a record, or part of a handshake message split across records, still waits for bytes (issue #309).</summary>
+        public bool HoldsPartialInput { get { return _records.HoldsPartial || !_handshake.IsEmpty; } }
 
         /// <summary>After each call: a failure sends the peer one fatal alert, unless the peer ended the session first. RFC 4346 section 7.2.2 names the alerts and leaves some levels to the sender. This engine sends each one as fatal.</summary>
         EngineOutput Take()

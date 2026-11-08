@@ -103,7 +103,9 @@ namespace NetSec.CeDevice
             EchoEngine server = EchoEngine.Server(new TraceStream("ce/server/echo", "ce", "ce", null, "server", clock), null);
             EchoEngine client = EchoEngine.Client(message, new TraceStream("ce/client/echo", "ce", "ce", null, "client", clock), null);
             IFuture<PumpResult> serverRun = new EnginePump(server, serverLink, null, null, null, 15000).Run();
-            IFuture<PumpResult> clientRun = new EnginePump(client, clientLink, null, null, null, 15000).Run();
+            EnginePump clientPump = new EnginePump(client, clientLink, null, null, null, 15000);
+            clientPump.OpenedLink = true;
+            IFuture<PumpResult> clientRun = clientPump.Run();
             yield return clientRun;
             yield return serverRun;
 

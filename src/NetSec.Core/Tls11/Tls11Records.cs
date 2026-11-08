@@ -124,6 +124,9 @@ namespace NetSec.Tls11
             _pending = joined;
         }
 
+        /// <summary>True while bytes of a record that is not whole yet wait here (issue #309).</summary>
+        public bool HoldsPartial { get { return _pending.Length > 0; } }
+
         /// <summary>The next whole record, or null when more bytes must come.</summary>
         public Tls11RawRecord Next()
         {

@@ -36,6 +36,7 @@ namespace NetSec.Io
         {
             _engine = engine;
             _pump = new EnginePump(engine, request.Link, request.Sink, request.Gate, request.Tamper, DeadlineMs, request.Clock ?? new MonotonicClock());
+            _pump.OpenedLink = request.Role == EngineRole.Client;
             _pump.OnApp = Arrive;
             IFuture<PumpResult> run = _pump.Run();
             run.GetAwaiter().OnCompleted(delegate { End(run); });

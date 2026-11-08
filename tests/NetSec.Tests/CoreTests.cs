@@ -255,6 +255,7 @@ namespace NetSec.Tests
             EnginePump server = new EnginePump(EchoEngine.Server(Make.Stream("server"), null), serverLink, p.Sink, gate, null, deadlineMs);
             EnginePump client = new EnginePump(EchoEngine.Client(Make.Hello, Make.Stream("client"), null), clientLink, p.Sink, gate, tamper, clientDeadlineMs < 0 ? deadlineMs : clientDeadlineMs);
             client.OnApp = c => p.Delivered = Encoding.UTF8.GetString(c.Bytes, 0, c.Bytes.Length);
+            client.OpenedLink = true;
             p.Server = server.Run();
             p.Client = client.Run();
             return p;
@@ -346,7 +347,9 @@ namespace NetSec.Tests
             EnginePump client = new EnginePump(EchoEngine.Client(Make.Hello, Make.Stream("client"), null), links[0], null, null, null, 200);
             IFuture<PumpResult> run = client.Run();
             Make.Done(run);
-            Assert.Equal(ErrorCodes.LinkDeadline, run.Result.Error.Code);
+            // The client holds no part of a frame, only an unanswered hello, so its idle limit ends the wait (issue #309). This pump has no pair, so it keeps the acceptor role.
+            Assert.Equal(ErrorCodes.LinkIdle, run.Result.Error.Code);
+            Assert.Equal("idle limit", run.Result.Error.CheckName);
             Assert.Equal(EngineStatus.Failed, run.Result.Status);
         }
 
@@ -361,31 +364,34 @@ namespace NetSec.Tests
         }
 
         /// <summary>
-        /// The length promises more bytes than ever come, so both sides wait on a read. The side whose deadline fires reports LINK_DEADLINE and closes the
-        /// link. The other side then reads that close, so PEER_CLOSED_EARLY is its true outcome. The two orders prove the deadline on each side in turn.
-        /// The 300 ms and 5000 ms deadlines fix the order. Only a stall of over 4 s could swap it.
+        /// The length promises more bytes than ever come. The server holds part of a frame, so it waits its read deadline; the client holds nothing, so it
+        /// waits its idle limit, twice its read deadline as the side that opened the connection (issue #309). Whichever limit runs out first ends that side by name and
+        /// closes the link, and the other side then reads the close, so PEER_CLOSED_EARLY is its true outcome. Row 1: the server's 300 ms read deadline
+        /// beats the client's 10,000 ms idle limit. Row 2: the client's 600 ms idle limit beats the server's 5,000 ms read deadline.
         /// </summary>
         [Theory]
         [InlineData(300, 5000, ErrorCodes.LinkDeadline, ErrorCodes.PeerClosedEarly)]
-        [InlineData(5000, 300, ErrorCodes.PeerClosedEarly, ErrorCodes.LinkDeadline)]
+        [InlineData(5000, 300, ErrorCodes.PeerClosedEarly, ErrorCodes.LinkIdle)]
         public void A_flipped_length_byte_ends_in_the_named_deadline_on_both_sides(int serverDeadlineMs, int clientDeadlineMs, string serverCode, string clientCode)
         {
             Pair p = FlippedLength(serverDeadlineMs, clientDeadlineMs);
             Assert.Equal(serverCode, p.Server.Result.Error.Code);
             Assert.Equal(clientCode, p.Client.Result.Error.Code);
-            NetSecError stuck = serverCode == ErrorCodes.LinkDeadline ? p.Server.Result.Error : p.Client.Result.Error;
-            Assert.Equal("read deadline", stuck.CheckName);
+            NetSecError stuck = serverCode == ErrorCodes.PeerClosedEarly ? p.Client.Result.Error : p.Server.Result.Error;
+            Assert.Equal(stuck.Code == ErrorCodes.LinkDeadline ? "read deadline" : "idle limit", stuck.CheckName);
         }
 
-        /// <summary>With equal deadlines either side can fire first, or both can. Each side still ends by name, and at least one names the deadline.</summary>
+        /// <summary>
+        /// With equal deadlines the outcome no longer races (issue #309): the server holds the part of a frame, so its read deadline runs out first, and the
+        /// client, waiting twice as long as the opener, then reads the close.
+        /// </summary>
         [Fact]
-        public void Equal_deadlines_end_each_side_by_name_whichever_fires_first()
+        public void Equal_deadlines_end_on_the_side_that_holds_the_partial_frame()
         {
             Pair p = FlippedLength(300, 300);
-            string[] allowed = { ErrorCodes.LinkDeadline, ErrorCodes.PeerClosedEarly };
-            Assert.Contains(p.Server.Result.Error.Code, allowed);
-            Assert.Contains(p.Client.Result.Error.Code, allowed);
-            Assert.True(p.Server.Result.Error.Code == ErrorCodes.LinkDeadline || p.Client.Result.Error.Code == ErrorCodes.LinkDeadline);
+            Assert.Equal(ErrorCodes.LinkDeadline, p.Server.Result.Error.Code);
+            Assert.Equal("read deadline", p.Server.Result.Error.CheckName);
+            Assert.Equal(ErrorCodes.PeerClosedEarly, p.Client.Result.Error.Code);
         }
 
         [Fact]

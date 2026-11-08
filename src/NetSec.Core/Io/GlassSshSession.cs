@@ -51,6 +51,7 @@ namespace NetSec.Io
             if (engine == null) throw new ArgumentNullException("engine");
             _openTarget = openTarget;
             _pump = new EnginePump(engine, new ResetEndsStreamLink(link), sink, gate, tamper, deadlineMs, clock ?? new MonotonicClock());
+            _pump.OpenedLink = engine.IsClient;
             _pump.OnApp = OnChunk;
             _info = new ChannelInfo();
             _info.Protocol = "SSH-2.0";

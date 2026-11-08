@@ -11,7 +11,7 @@ namespace NetSec.Ssh
     /// RFC 4253. Built to show the parts. Do not copy. It shows every key on purpose, and it has had no side-channel review.
     /// The CF build compiles this same source. It runs on the desktop CLR, and it has never run on CE.
     /// </summary>
-    public sealed class SshEngine : IProtocolEngine
+    public sealed class SshEngine : IProtocolEngine, IPartialInput
     {
         const string PacketStep = "ssh.packet";
 
@@ -87,8 +87,19 @@ namespace NetSec.Ssh
             }
         }
 
+        /// <summary>The SSH client dials the server in every lab, so a pump uses this as its opener role (issue #309).</summary>
+        public bool IsClient { get { return _session.IsClient; } }
+
+        /// <summary>The packet reader holds part of a line or a packet (issue #309).</summary>
+        public bool HoldsPartialInput { get { return _session.Reader.HoldsPartial; } }
+
         void Run(EngineCommand c)
         {
+            if (c.Kind == EngineCommandKind.Expire)
+            {
+                _machine.Fail(c.Expiry.Code, c.Expiry.CheckName, c.Expiry.Message, null);
+                return;
+            }
             if (c.Kind == EngineCommandKind.PeerClosed)
             {
                 if (_session.IsOpen && _session.Channels.Count == 0) _machine.CloseCleanly();

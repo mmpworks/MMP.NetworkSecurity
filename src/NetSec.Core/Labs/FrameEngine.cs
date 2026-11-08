@@ -84,7 +84,7 @@ namespace NetSec.Labs
     }
 
     /// <summary>A table-driven engine for a primitive lab. Each lesson gives it a table and a session, and this class parses frames.</summary>
-    public sealed class FrameEngine<TSession> : IProtocolEngine where TSession : FrameSession
+    public sealed class FrameEngine<TSession> : IProtocolEngine, IPartialInput where TSession : FrameSession
     {
         readonly Interpreter<TSession> _machine;
         readonly TSession _session;
@@ -134,8 +134,13 @@ namespace NetSec.Labs
                 _machine.Fail(ErrorCodes.PeerClosedEarly, "peer stayed until the end", "the peer closed in state " + _machine.State, null);
             else if (c.Kind == EngineCommandKind.Close)
                 _machine.CloseCleanly();
+            else if (c.Kind == EngineCommandKind.Expire && !_machine.IsEnded)
+                _machine.Fail(c.Expiry.Code, c.Expiry.CheckName, c.Expiry.Message, null);
             return _machine.TakeOutput();
         }
+
+        /// <summary>Feed dispatches every whole frame, so bytes still waiting here are part of a frame (issue #309).</summary>
+        public bool HoldsPartialInput { get { return _pending.Length > 0; } }
 
         void Append(byte[] b, int off, int n)
         {
@@ -196,6 +201,7 @@ namespace NetSec.Labs
             int deadline = c.DeadlineMs > 0 ? c.DeadlineMs : DeadlineMs;
             EnginePump serverPump = new EnginePump(server, accepted.Result, c.Sink, c.Gate, tamper, deadline, c.Clock);
             EnginePump clientPump = new EnginePump(client, connected.Result, c.Sink, c.Gate, tamper, deadline, c.Clock);
+            clientPump.OpenedLink = true;
             if (setup != null) setup(clientPump, serverPump);
             IFuture<PumpResult> serverRun = serverPump.Run();
             IFuture<PumpResult> clientRun = clientPump.Run();
