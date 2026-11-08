@@ -2933,7 +2933,7 @@
    "group": "e2e",
    "build": "host",
    "slice": "W1",
-   "referee": "the live Host's /api/lessons and /api/lessons/0, and app/src/attacks.json, read through Playwright",
+   "referee": "the live Host's /api/lessons (lessons 0 to 11) and app/src/attacks.json, read through Playwright",
    "roles": [],
    "counts": true
   },

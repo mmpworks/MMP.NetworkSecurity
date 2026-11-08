@@ -2,7 +2,7 @@ import { test, expect } from '@playwright/test';
 import { openApp, hostGet, requireLive, NotRun } from './support';
 
 /**
- * prd.md line 93: "Every lesson has attack buttons." The rows come from the live Host's GET /api/lessons and GET /api/lessons/0, which list AttackCatalog,
+ * prd.md line 93: "Every lesson has attack buttons." The rows come from the live Host's GET /api/lessons (lessons 0 to 11), which lists AttackCatalog,
  * so the count is never taken from a text search. Each row must have its button, data-testid attack-{attackId}, in its lesson's drawer.
  * A17.attacks.every-row-forks-to-its-code checks that each row's fork ends with its code and names its check.
  */
@@ -25,10 +25,9 @@ test('[A17.ui.every-attack-row-has-a-button] each attack row the Host lists has 
   const lessons = await hostGet('/api/lessons');
   expect(lessons.status, 'GET /api/lessons').toBe(200);
   const listed: any[] = Array.isArray(lessons.body) ? lessons.body : lessons.body?.lessons ?? [];
-  // The list holds lessons 1 to 11. Lesson 0 has its own route, and it has an attack row too.
-  const zero = await hostGet('/api/lessons/0');
-  expect(zero.status, 'GET /api/lessons/0').toBe(200);
-  const rows: any[] = [zero.body, ...listed];
+  // The list holds lessons 0 to 11, so lesson 0's attack row comes from the same list as the rest (no second route, no hand copy).
+  expect(listed.some(l => Number(l.lesson) === 0), 'GET /api/lessons lists lesson 0').toBe(true);
+  const rows: any[] = listed;
   const withAttacks = rows.filter(r => r.built && Array.isArray(r.attacks) && r.attacks.length > 0);
   if (withAttacks.length === 0) throw new NotRun('LESSON_NOT_BUILT', 'no built lesson lists an attack row');
   const missing: string[] = [];

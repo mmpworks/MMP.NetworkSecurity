@@ -25,7 +25,9 @@ test('[A13.home-page-shows-built-and-unbuilt-lessons] the rail agrees with GET /
   const lessons = await hostGet('/api/lessons');
   expect(lessons.status, 'GET /api/lessons').toBe(200);
   const rows: any[] = Array.isArray(lessons.body) ? lessons.body : lessons.body?.lessons ?? [];
-  expect(rows.length, 'lessons the Host lists').toBe(11);
+  // GET /api/lessons lists lessons 0 to 11, in that order (Richard's contract change, 2026-11-08). Every count comes from the Host.
+  expect(rows.length, 'lessons the Host lists, 0 to 11').toBe(12);
+  expect(rows.map(r => Number(r.lesson)), 'the Host lists lessons 0 to 11 in order').toEqual([0, 1, 2, 3, 4, 5, 6, 7, 8, 9, 10, 11]);
   await openApp(page);
   for (const row of rows) {
     const n = row.lesson;

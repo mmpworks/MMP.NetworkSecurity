@@ -94,7 +94,7 @@ REFEREE_BY_PREFIX = [
     ("A19.ui.toy-curve-", "Playwright, against the Host's reply"),
     ("A19.ui.real-curve-", "Playwright, against the Host's reply"),
     ("A19.ui.x25519-", "Playwright, against the Host's reply and RFC 7748 in the vector file"),
-    ("A19.ui.attack-", "the live Host's /api/lessons and /api/lessons/0, and app/src/attacks.json, read through Playwright"),
+    ("A19.ui.attack-", "the live Host's /api/lessons (lessons 0 to 11) and app/src/attacks.json, read through Playwright"),
     ("A19.ui.two-run-", "the live Host's registry and its forked runs, read through Playwright"),
     ("A19.ui.tls13-", "Playwright, against the Host's reply and RFC 8448 in the vector file"),
     ("A19.ui.tls11-", "Playwright, against the Host's reply"),

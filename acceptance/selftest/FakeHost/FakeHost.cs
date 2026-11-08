@@ -215,7 +215,7 @@ namespace Acceptance
                 return;
             }
             if (path == "/api/lessons") { Write(ctx, 200, LessonsJson()); return; }
-            // As the real Host: the list holds lessons 1 to 11, and lesson 0 has its own route.
+            // Lesson 0 also keeps its own route, as on the real Host.
             if (path == "/api/lessons/0") { Write(ctx, 200, D("lesson", 0.0, "title", "Lesson 0", "built", true, "attacks", new List<object>())); return; }
             if (path == "/api/security" && method == "GET") { Write(ctx, 200, SecurityJson()); return; }
             if (path == "/api/security/readiness") { Write(ctx, 200, ReadinessJson(int.Parse(ctx.Request.QueryString["lesson"] ?? "0"))); return; }
