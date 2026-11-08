@@ -194,6 +194,7 @@ namespace Acceptance
         void Route(HttpListenerContext ctx, string method, string path, Dictionary<string, object> body)
         {
             if (TypedRoute(ctx, path, body)) return;
+            if (ScheduleRoute(ctx, path)) return;
             if (WalkRoute(ctx, path)) return;
             if (path == "/api/health")
             {
