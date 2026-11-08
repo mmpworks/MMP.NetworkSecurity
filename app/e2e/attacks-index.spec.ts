@@ -13,9 +13,10 @@ const file = JSON.parse(fs.readFileSync(path.join(src, 'attacks.json'), 'utf8'))
 async function registry(request: import('@playwright/test').APIRequestContext): Promise<string[]> {
   const headers = { Authorization: `Bearer ${TOKEN}`, Origin: `http://localhost:${PORTS.preview}` }
   const all = await request.get(`http://127.0.0.1:${PORT}/api/lessons`, { headers })
-  const zero = await request.get(`http://127.0.0.1:${PORT}/api/lessons/0`, { headers })
-  expect(all.ok() && zero.ok(), 'the Host answers both lesson routes').toBe(true)
-  const rows = [...((await all.json()) as { attacks: { attackId: string }[] }[]), (await zero.json()) as { attacks: { attackId: string }[] }]
+  expect(all.ok(), 'the Host answers the lesson list').toBe(true)
+  // The list holds every lesson, the toy (lesson 0) included.
+  const rows = (await all.json()) as { lesson: number; attacks: { attackId: string }[] }[]
+  expect(rows.map(r => r.lesson), 'lessons 0 to 11, in order').toEqual([0, 1, 2, 3, 4, 5, 6, 7, 8, 9, 10, 11])
   return rows.flatMap(r => r.attacks.map(a => a.attackId))
 }
 

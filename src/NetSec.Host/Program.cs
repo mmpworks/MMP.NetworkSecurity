@@ -124,7 +124,7 @@ namespace NetSec.Host
     {
         static readonly string[] Titles =
         [
-            "A pipe with two ends",
+            "Start here",
             "Secrets and locks", "Tamper seals", "Agreeing on a secret in public", "Who are you",
             "TLS 1.3 message by message", "Key per sale", "The old world", "SSH", "The bridge",
             "Client proof and permission", "Unmanaged space",
@@ -132,10 +132,14 @@ namespace NetSec.Host
 
         readonly Dictionary<int, JsonElement> _lastRuns = ReadLastRuns();
 
-        /// <summary>built comes from the lab catalog. lastRun comes from docs/_runs/lessons.json when the file exists.</summary>
-        public object[] All() => Enumerable.Range(1, Titles.Length - 1).Select(Row).ToArray();
+        /// <summary>
+        /// Every lesson, 0 to 11, so each count the app shows comes from here. Lesson 0 is the toy ("Start here"); its tour's first step
+        /// keeps the heading "A pipe with two ends". built comes from the lab catalog. lastRun comes from docs/_runs/lessons.json when the
+        /// file exists.
+        /// </summary>
+        public object[] All() => Enumerable.Range(0, Titles.Length).Select(Row).ToArray();
 
-        /// <summary>One row by number. The toy, lesson 0, stays out of the list and is reachable here.</summary>
+        /// <summary>One row by number, the same row All() gives.</summary>
         public object? One(int n) => n >= 0 && n < Titles.Length ? Row(n) : null;
 
         object Row(int n) => new

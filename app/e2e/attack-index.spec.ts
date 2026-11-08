@@ -11,9 +11,8 @@ async function hostRuns(): Promise<HostRun[]> {
   const r = await fetch(`http://127.0.0.1:${PORTS.host}/api/lessons`, { headers: { Authorization: `Bearer ${TOKEN}` } })
   const body: any = await r.json()
   const rows: any[] = Array.isArray(body) ? body : body?.lessons ?? []
-  const runs = rows.flatMap(l => (l.attacks ?? []).map((a: any) => ({ lesson: l.lesson, attackId: String(a.attackId ?? a.id ?? a), label: String(a.label ?? a.attackId ?? a), expectCheck: a.expectCheck })))
-  // Lesson 0 is the toy, which the Host's list leaves out and the app adds with its one run (store.ts TOY_LESSON).
-  return [{ lesson: 0, attackId: 'L0-flip-wire-byte', label: 'Flip a byte on the wire', expectCheck: 'echo compare' }, ...runs]
+  // The Host's list holds every lesson, the toy (lesson 0) included, so the runs to meet come from it alone.
+  return rows.flatMap(l => (l.attacks ?? []).map((a: any) => ({ lesson: l.lesson, attackId: String(a.attackId ?? a.id ?? a), label: String(a.label ?? a.attackId ?? a), expectCheck: a.expectCheck })))
 }
 
 async function openIndex(page: Page) {

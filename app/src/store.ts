@@ -15,7 +15,9 @@ export const LESSON_NOTES: Record<number, string> = {
   11: 'Managed code has no constant-time guarantee. The native library is the only place this course claims one.',
 }
 
+// The rail's titles until the Host answers, indexed by lesson number. GET /api/lessons then gives every row, lesson 0 included.
 const DEFAULT_TITLES = [
+  'Start here',
   'Secrets and locks', 'Tamper seals', 'Agreeing in public', 'Who are you', 'TLS 1.3 message by message', 'Key per sale',
   'The old world', 'SSH', 'The bridge', 'Client proof and permission', 'Unmanaged space',
 ]
@@ -37,8 +39,7 @@ export interface SessionRec {
 
 export const addr = resolveHostAddress()
 export const hostState = ref<'connecting' | 'connected' | 'offline'>('connecting')
-const TOY_LESSON: LessonRow = { lesson: 0, title: 'Start here', built: true, lanes: ['client', 'server'], attacks: [{ attackId: 'L0-flip-wire-byte', label: 'Flip a byte on the wire', expectCheck: 'echo compare', expectCode: 'ECHO_MISMATCH' }] }
-export const lessons = ref<LessonRow[]>([TOY_LESSON, ...DEFAULT_TITLES.map((title, i) => ({ lesson: i + 1, title, built: false, lanes: [], attacks: [] }))])
+export const lessons = ref<LessonRow[]>(DEFAULT_TITLES.map((title, lesson) => ({ lesson, title, built: false, lanes: [], attacks: [] })))
 export const cePanel = ref<{ label: string; state: string } | null>(null)
 
 // The labs run on this computer only. The CE boxes stay listed and disabled until their work starts.
@@ -162,12 +163,11 @@ async function refreshHostData() {
   try {
     const body = await hostGet(addr, '/api/lessons')
     const rows: any[] = Array.isArray(body) ? body : body?.lessons ?? []
-    // Lesson 0 is the toy. The rail always shows it as "Start here" and never asks the Host's list (the list holds lessons 1 to 11).
-    lessons.value = [0, ...DEFAULT_TITLES.map((_, i) => i + 1)].map(n => {
-      const r = n === 0 ? undefined : rows.find(x => x.lesson === n)
-      if (n === 0) return TOY_LESSON
+    // The Host lists every lesson, the toy (lesson 0) included, so each row and each count comes from the Host.
+    lessons.value = DEFAULT_TITLES.map((_, n) => {
+      const r = rows.find(x => x.lesson === n)
       return {
-        lesson: n, title: r?.title || DEFAULT_TITLES[n - 1], built: !!r?.built, lanes: Array.isArray(r?.lanes) ? r.lanes.map(String) : [],
+        lesson: n, title: r?.title || DEFAULT_TITLES[n], built: !!r?.built, lanes: Array.isArray(r?.lanes) ? r.lanes.map(String) : [],
         attacks: Array.isArray(r?.attacks) ? r.attacks.map((a: any) => (typeof a === 'string' ? { attackId: a, label: attackName(a, a) } : { attackId: String(a.attackId ?? a.id), label: attackName(String(a.attackId ?? a.id), String(a.label ?? a.attackId ?? a.id)), expectCheck: a.expectCheck, expectCode: a.expectCode })) : [],
       }
     })
