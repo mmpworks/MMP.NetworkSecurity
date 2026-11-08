@@ -9,9 +9,14 @@
   The longest one test may run in a dotnet test step. Past it, the test host ends, the step fails, and the output names the test. The default is
   3 minutes: the slowest test takes 11.4 s at 100% CPU, and a test that fails on its own 20 s waits takes about 1 minute.
 .PARAMETER SkipApp
-  Skips the app steps (npm, Playwright). The report names the skip. With no app/package.json the app steps are skipped by the same rule.
+  Skips the app steps (typecheck, build, Playwright). The report names the skip. With no app/package.json the app steps are skipped by the same rule.
+  When app/ differs from origin/main (committed or not), -SkipApp fails the gate with APP_PROOF_SKIPPED unless -SkipAppReason says why.
+.PARAMETER SkipAppReason
+  The reason for -SkipApp when app/ changed, for example a docs-only edit under app/. The report prints it.
 .PARAMETER Lesson
-  The lesson whose app/e2e/lesson-<n>.spec.ts the gate runs. Default: none.
+  The lesson whose app/e2e/lesson-<n>.spec.ts the gate runs. Default: none. When app/ changed and no lesson is named, the gate runs typecheck, build
+  and the full Playwright suite on NETSEC_PORT_BASE=auto. Naming a lesson narrows that suite to the one spec, and the report says "narrowed".
+  The gate never installs packages: a missing node_modules or Electron binary stops with TOOL_MISSING and the command to run yourself.
 .EXAMPLE
   pwsh tools/gate.ps1 -Slice S0 -Clauses A9
 #>
@@ -22,11 +27,16 @@ param(
     [string]$NetCFRefDir = 'E:\dev\tools\netcf35-ref',
     [string]$HangLimit = '3m',
     [string]$Lesson,
-    [switch]$SkipApp
+    [switch]$SkipApp,
+    [string]$SkipAppReason
 )
 $ErrorActionPreference = 'Continue'
 $root = Split-Path -Parent $PSScriptRoot
 Set-Location $root
+. (Join-Path $PSScriptRoot 'gate_app.ps1')
+# Every run log names the commit it ran on, first (tools/run_status.py prints it).
+$head = Get-HeadLine $root
+Write-Host "gate $Slice @ $head"
 $date = Get-Date -Format 'yyyy-MM-dd'
 $trx = "docs/_runs/trx/$Slice"
 $report = "docs/_runs/$date-$Slice.md"
@@ -60,15 +70,28 @@ function Skip([string]$name, [string]$why) {
 }
 
 $hasApp = Test-Path 'app/package.json'
-$appWhy = if ($SkipApp) { 'the -SkipApp switch' } elseif (-not $hasApp) { 'app/package.json is absent; Nancy owns app/ and her PR has not landed' } else { '' }
+$appDiff = if ($hasApp) { Get-AppDiffCount $root } else { 0 }
+$appPlan = Get-AppProofPlan -HasApp $hasApp -SkipApp ([bool]$SkipApp) -SkipAppReason $SkipAppReason -Lesson $Lesson -AppDiffCount $appDiff
+$appWhy = if ($appPlan.Mode -in 'none', 'skip') { $appPlan.Why } else { '' }
+
+# One app step, with the gate's rule that it never installs: a missing tool stops with TOOL_MISSING and the command to run yourself.
+function Step-App([string]$name, [scriptblock]$body) {
+    $wrapped = {
+        $tools = @(Test-AppTools 'app')
+        if ($tools.Count -gt 0) { $tools; $global:LASTEXITCODE = 1; return }
+        Push-Location app
+        try { & $body } finally { Pop-Location }
+    }.GetNewClosure()
+    Step $name $wrapped
+}
 
 # ---------------------------------------------------------------- slice extras
 switch ($Slice) {
     'S0' {
         Step 'dotnet build src/NetSec.Host' { dotnet build src/NetSec.Host -c Release --nologo -v q }
         Step 'dotnet build src/NetSec.CeDevice' { dotnet build src/NetSec.CeDevice -c Release --nologo -v q $cf }
-        if ($appWhy) { Skip 'npm ci; npm run build (app)' $appWhy }
-        else { Step 'npm ci; npm run build (app)' { Push-Location app; npm ci; if ($LASTEXITCODE -eq 0) { npm run build }; Pop-Location } }
+        if ($appWhy) { Skip 'npm run build (app)' $appWhy }
+        else { Step-App 'npm run build (app)' { npm run build } }
     }
     'S1' { Step 'dotnet build acceptance/referees/bcl' { dotnet build acceptance/referees/bcl -c Release --nologo -v q } }
     { $_ -in 'S3', 'S4', 'S5', 'S6' } { Step 'go build referees' { Push-Location acceptance/referees/go; go build -o bin/ ./...; Pop-Location } }
@@ -117,31 +140,37 @@ $tours = @(Get-ChildItem 'app/src/tours/lesson-*.json' -ErrorAction SilentlyCont
 if ($tours.Count -eq 0) { Skip 'tic-gate on tours' 'no tour file in this tree yet' }
 foreach ($tour in $tours) { Step "tic-gate $($tour.Name)" { python (Join-Path $HOME '.claude/hooks/tic-gate.py') $tour.FullName } }
 
-# app/e2e had no tsconfig, so "npm run typecheck" checked app/src only and no spec file was ever type-checked. It checks both now.
-if ($appWhy) { Skip 'typecheck (app/src and app/e2e)' $appWhy }
-else {
-    Step 'typecheck (app/src and app/e2e)' {
-        Push-Location app
-        if (-not (Test-Path 'node_modules')) { npm ci --no-audit --no-fund; if ($LASTEXITCODE -ne 0) { Pop-Location; return } }
-        npm run typecheck
-        $code = $LASTEXITCODE
-        Pop-Location
-        $global:LASTEXITCODE = $code
+# ---------------------------------------------------------------- app proof (tools/gate_app.ps1 decides; docs/program-design.md section 9)
+# An app/ change gets typecheck + build + the full Playwright suite on its own port block. -Lesson narrows the suite and the step says so.
+# The gate never installs: a missing tool is a TOOL_MISSING step with the command to run yourself.
+switch ($appPlan.Mode) {
+    { $_ -in 'none', 'skip' } {
+        Skip 'typecheck (app/src and app/e2e)' $appPlan.Why
+        Skip 'playwright' $appPlan.Why
     }
-}
-
-if ($appWhy) { Skip 'playwright lesson spec' $appWhy }
-elseif (-not $Lesson) { Skip 'playwright lesson spec' 'no -Lesson given' }
-else {
-    # The local Playwright CLI, never the package runner: it can run a package of the same name from outside this repo (tools/no_npx.py guards this).
-    Step "playwright lesson $Lesson" {
-        Push-Location app
-        $cli = 'node_modules/@playwright/test/cli.js'
-        if (-not (Test-Path $cli)) { "TOOL_MISSING: app/$cli is absent. Run npm ci in app/."; Pop-Location; $global:LASTEXITCODE = 1; return }
-        node $cli test "e2e/lesson-$Lesson.spec.ts"
-        $code = $LASTEXITCODE
-        Pop-Location
-        $global:LASTEXITCODE = $code
+    'refuse' { Step 'app proof' { $appPlan.Why; $global:LASTEXITCODE = 1 } }
+    default {
+        # One named failure when the tools are absent, instead of a failure per step.
+        $appTools = @(Test-AppTools 'app')
+        if ($appTools.Count -gt 0) { Step 'app tools present' { $appTools; $global:LASTEXITCODE = 1 }; break }
+        # app/e2e had no tsconfig, so "npm run typecheck" checked app/src only; it checks both now.
+        if ($appPlan.Typecheck) { Step-App 'typecheck (app/src and app/e2e)' { npm run typecheck } }
+        if ($appPlan.Build) { Step-App 'npm run build (app)' { npm run build } }
+        if ($appPlan.Mode -eq 'check') { Skip 'playwright' $appPlan.Why }
+        else {
+            # Real-Electron specs are part of the full suite and need the Electron binary, which npm ci can skip.
+            if ($appPlan.Mode -eq 'suite') {
+                Step 'Electron binary present' { $missing = @(Test-ElectronBinary 'app'); if ($missing.Count -gt 0) { $missing; $global:LASTEXITCODE = 1 } else { 'Electron loads'; $global:LASTEXITCODE = 0 } }
+            }
+            # The suite runs the Release Host; build it from this tree so the run cannot test an older Host.
+            Step 'dotnet build src/NetSec.Host (Release, for the app run)' { dotnet build src/NetSec.Host -c Release --nologo -v q }
+            $spec = if ($appPlan.Lesson) { "e2e/lesson-$($appPlan.Lesson).spec.ts" } else { '' }
+            # The local Playwright CLI, never the package runner: it can run a package of the same name from outside this repo (tools/no_npx.py guards this).
+            Step-App $appPlan.Label {
+                if (-not $env:NETSEC_PORT_BASE) { $env:NETSEC_PORT_BASE = 'auto' }
+                if ($spec) { node node_modules/@playwright/test/cli.js test $spec } else { node node_modules/@playwright/test/cli.js test }
+            }
+        }
     }
 }
 
@@ -150,6 +179,8 @@ Step 'lessons_status' { python tools/lessons_status.py docs/_runs }
 # ---------------------------------------------------------------- report
 $lines = [System.Collections.Generic.List[string]]::new()
 $lines.Add("# Gate $Slice, $date")
+$lines.Add('')
+$lines.Add("Head: $head")
 $lines.Add('')
 $lines.Add("Result: $(@($rows | Where-Object Status -eq 'PASS').Count) of $(@($rows | Where-Object Status -ne 'SKIPPED').Count) steps passed. Skipped: $(@($rows | Where-Object Status -eq 'SKIPPED').Count).")
 $lines.Add('')

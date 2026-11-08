@@ -132,6 +132,36 @@ class RunStatus(unittest.TestCase):
         self.assertEqual(code, 0, out)
         self.assertIn("70 of 70", out)
 
+    # Every run log names the commit it ran on (gate: first line "gate <slice> @ <sha>[+dirty]"; Playwright: a line "run @ <sha>[+dirty]").
+    def test_a_gate_log_with_a_head_line_prints_the_commit(self):
+        code, out = self.status("gate Slice @ abc1234\n" + GATE_PASS)
+        self.assertEqual(code, 0, out)
+        self.assertTrue(out.endswith("@ abc1234"), out)
+
+    def test_a_dirty_head_is_shown_as_dirty(self):
+        code, out = self.status("gate Slice @ abc1234+dirty\n" + GATE_FAIL)
+        self.assertEqual(code, 1, out)
+        self.assertTrue(out.endswith("@ abc1234+dirty"), out)
+
+    def test_a_running_gate_log_prints_the_commit_too(self):
+        code, out = self.status("gate Slice @ abc1234\n" + GATE_START, age_minutes=1)
+        self.assertEqual(code, 2, out)
+        self.assertIn("@ abc1234", out)
+
+    def test_a_playwright_log_with_a_run_line_prints_the_commit(self):
+        code, out = self.status("Running 190 tests using 1 worker\nrun @ 9f8e7d6+dirty\n" + PLAYWRIGHT_PASS)
+        self.assertEqual(code, 0, out)
+        self.assertTrue(out.endswith("@ 9f8e7d6+dirty"), out)
+
+    def test_a_log_with_no_head_line_prints_no_commit(self):
+        code, out = self.status(GATE_PASS)
+        self.assertEqual(code, 0, out)
+        self.assertNotIn(" @ ", out)
+
+    def test_a_gate_head_line_is_not_mistaken_for_the_summary(self):
+        code, out = self.status("gate Slice @ abc1234\n" + GATE_START, age_minutes=1)
+        self.assertTrue(out.startswith("RUNNING"), out)
+
     def test_a_missing_log_is_its_own_answer(self):
         r = subprocess.run([sys.executable, "-I", str(SCRIPT), str(pathlib.Path(self.tmp.name) / "nope.log")], capture_output=True, text=True)
         self.assertEqual(r.returncode, 4)
