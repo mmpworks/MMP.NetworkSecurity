@@ -3169,6 +3169,50 @@
    "counts": true
   },
   {
+   "id": "A19.ui.two-run-back-keeps-row",
+   "base": "A19.ui.two-run-back-keeps-row",
+   "assertion": "A19",
+   "group": "e2e",
+   "build": "host",
+   "slice": "W1",
+   "referee": "the live Host's registry and its forked runs, read through Playwright",
+   "roles": [],
+   "counts": true
+  },
+  {
+   "id": "A19.ui.two-run-flip-shows-diff-and-checks",
+   "base": "A19.ui.two-run-flip-shows-diff-and-checks",
+   "assertion": "A19",
+   "group": "e2e",
+   "build": "host",
+   "slice": "W1",
+   "referee": "the live Host's registry and its forked runs, read through Playwright",
+   "roles": [],
+   "counts": true
+  },
+  {
+   "id": "A19.ui.two-run-nothing-catches-shows-none",
+   "base": "A19.ui.two-run-nothing-catches-shows-none",
+   "assertion": "A19",
+   "group": "e2e",
+   "build": "host",
+   "slice": "W1",
+   "referee": "the live Host's registry and its forked runs, read through Playwright",
+   "roles": [],
+   "counts": true
+  },
+  {
+   "id": "A19.ui.two-run-scenario-marks-split",
+   "base": "A19.ui.two-run-scenario-marks-split",
+   "assertion": "A19",
+   "group": "e2e",
+   "build": "host",
+   "slice": "W1",
+   "referee": "the live Host's registry and its forked runs, read through Playwright",
+   "roles": [],
+   "counts": true
+  },
+  {
    "id": "A19.ui.word-build-lights-its-two-words",
    "base": "A19.ui.word-build-lights-its-two-words",
    "assertion": "A19",
