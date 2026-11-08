@@ -19,7 +19,27 @@
   },
   "keySource": {
     "run": "This run's key",
-    "practice": "A practice key. It never ran in the lesson"
+    "practice": "A practice key. It never ran in the lesson",
+    "typed-practice": "This is a practice key, not this run's key. It is public, so it stays on screen with Show keys off"
+  },
+  "wireTyped": "Your text. It did not go on the wire.",
+  "typed": {
+    "defaultBlock": "Pump four is ok.",
+    "lessonText": "Pump four is ok.Pump four is ok.Pump four is ok.Pump four is ok.",
+    "label": "Your text",
+    "why": "Your text runs under a practice key, because the course must not lock whatever you type under the key this run uses.",
+    "bytes": "A block holds 16 bytes. Some characters take more than one byte.",
+    "notIncluded": "Not included",
+    "split": "This character crosses the 16-byte edge. {n} of its bytes are in the block.",
+    "padding": "AES needs 16 bytes, so we fill the rest. Each fill byte holds the number of fill bytes. ECB and CBC in this lesson pad the same way.",
+    "full": "A mode with this padding adds a whole extra block here. Chapter 2 shows that.",
+    "differs": "This key differs from the run's.",
+    "offer": "Walk your own text instead",
+    "backToRun": "Back to the run's key"
+  },
+  "strip": {
+    "label": "The long text",
+    "current": "Block {n} is the one the walk shows."
   },
   "keys": {
     "title": "Key schedule",
