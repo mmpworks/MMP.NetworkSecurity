@@ -24,7 +24,7 @@ namespace NetSec.Labs
 
         /// <summary>
         /// The conditional-swap argument of this step. This engine uses TweetNaCl's order: it swaps the pair by the bit before the step's work
-        /// and swaps it back after, so Swap equals IsOne. RFC 7748 section 5 shows an equivalent form with one swap per step (swap ^= k_t).
+        /// and swaps it back after, so Swap equals IsOne. RFC 7748 section 5 writes the same ladder with swap = k_t XOR k_(t+1) and one swap per step. acceptance/CONTRACT.md, the `swap` row, pins this field as k_t.
         /// </summary>
         public bool Swap;
     }
