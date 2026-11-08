@@ -55,6 +55,10 @@ public sealed class SecurityStore
     readonly Dictionary<string, string> _flowOf;
     ModesFile _modes;
 
+    // The restart gap (issue #292): true while memory holds a choice the file does not, after a refused save of Show keys off.
+    bool _unsaved;
+    Timer? _retry;
+
     public string Root { get; }
     public IVault Vault { get; }
 
@@ -89,9 +93,17 @@ public sealed class SecurityStore
 
     public bool ShowKeys { get { lock (_gate) return _modes.ShowKeys; } }
 
+    /// <summary>False while memory holds a Show keys choice that modes.json does not, so a restart would lose it. The page shows "not saved yet".</summary>
+    public bool Saved { get { lock (_gate) return !_unsaved; } }
+
+    /// <summary>Raised once, outside the lock, when the background retry has saved the choice that a refused save left only in memory.</summary>
+    public event Action? SaveHealed;
+
+    const int RetryEveryMs = 500;
+
     /// <summary>
     /// Saves the Show keys choice. Off fails closed (issue #292): when the save is refused, off still takes effect in memory at once, and
-    /// the error says only that the choice was not saved for the next start. On fails open: a refused save keeps keys hidden.
+    /// the error says only that the choice was not saved for the next start. On also fails closed: a refused save keeps keys hidden.
     /// </summary>
     public void SetShowKeys(bool on)
     {
@@ -102,10 +114,40 @@ public sealed class SecurityStore
             catch (NetSec.Errors.NetSecException x) when (!on && x.Error.Code == NetSec.Errors.ErrorCodes.SecurityStoreSaveFailed)
             {
                 _modes = next;
+                _unsaved = true;
+                _retry ??= new Timer(_ => RetrySave(), null, RetryEveryMs, RetryEveryMs);
                 throw new NetSec.Errors.NetSecException(NetSec.Errors.NetSecError.Of(x.Error.Code,
-                    $"Show keys is off now. The choice could not be saved, so the next start may show keys again. {x.Error.Message}"));
+                    $"Show keys is off now. The choice is not saved yet; the Host keeps trying, and until then a restart may show keys again. {x.Error.Message}"));
             }
         }
+    }
+
+    /// <summary>
+    /// The background retry for the restart gap. Each tick makes one try, so it never holds _gate for the full retry budget. Any later
+    /// save also writes the whole of _modes, so it heals the gap too; the next tick then sees _unsaved false and stops.
+    /// </summary>
+    void RetrySave()
+    {
+        lock (_gate)
+        {
+            if (_retry is null) return;
+            // A deleted security folder stops the retry and leaves Saved false, so the page keeps saying "not saved yet". That is true:
+            // nothing on disk holds the choice. The next save recreates the folder and the file. Test teardown deletes the folder too.
+            if (!Directory.Exists(Root)) { StopRetry(); return; }
+            if (_unsaved)
+            {
+                try { Save(_modes, tries: 1); }
+                catch (Exception e) when (e is NetSec.Errors.NetSecException or IOException or UnauthorizedAccessException) { return; }
+            }
+            StopRetry();
+        }
+        SaveHealed?.Invoke();
+    }
+
+    void StopRetry()
+    {
+        _retry?.Dispose();
+        _retry = null;
     }
 
     public string FlowOf(string typeId) => _flowOf[typeId];
@@ -303,15 +345,17 @@ public sealed class SecurityStore
 
     void Put(string typeId, TypeEntry entry) => Save(_modes with { Types = new Dictionary<string, TypeEntry>(_modes.Types) { [typeId] = entry } });
 
-    void Save(ModesFile next)
+    /// <summary>Writes next to modes.json and makes it the value in force. next is always a whole file, so a success also ends the restart gap.</summary>
+    void Save(ModesFile next, int tries = ReplaceTries)
     {
         Directory.CreateDirectory(Root);
         string readme = Path.Combine(Root, "README.txt");
         if (!File.Exists(readme)) File.WriteAllText(readme, "This folder holds your test keys for MMP.NetworkSecurity. Git ignores it. Use test keys only: this course shows your keys on screen and in saved files.\n");
         string temp = _modesPath + ".tmp";
         File.WriteAllText(temp, JsonSerializer.Serialize(next, Json));
-        ReplaceModes(temp);
+        ReplaceModes(temp, tries);
         _modes = next;
+        _unsaved = false;
     }
 
     // On Windows a replacing move fails while another handle holds the target open without delete sharing. An antivirus scan or the search
@@ -320,17 +364,17 @@ public sealed class SecurityStore
     // up to about 1 s. A hold is rare and short, so this is accepted.
     const int ReplaceTries = 20, ReplaceWaitMs = 50;
 
-    /// <summary>Moves the temp file over modes.json, trying up to ReplaceTries times. After that it fails with SECURITY_STORE_SAVE_FAILED, and the old file stays.</summary>
-    void ReplaceModes(string temp)
+    /// <summary>Moves the temp file over modes.json, trying up to tries times. After that it fails with SECURITY_STORE_SAVE_FAILED, and the old file stays.</summary>
+    void ReplaceModes(string temp, int tries)
     {
         for (int attempt = 1; ; attempt++)
         {
             try { File.Move(temp, _modesPath, overwrite: true); return; }
             catch (Exception e) when (e is IOException or UnauthorizedAccessException)
             {
-                if (attempt >= ReplaceTries)
+                if (attempt >= tries)
                     throw new NetSec.Errors.NetSecException(NetSec.Errors.NetSecError.Of(NetSec.Errors.ErrorCodes.SecurityStoreSaveFailed,
-                        $"{_modesPath} could not be saved, possibly because another program held it open, after {ReplaceTries} tries over {ReplaceTries * ReplaceWaitMs} ms ({e.Message}) Close any program that has the file open, then try again."));
+                        $"{_modesPath} could not be saved, possibly because another program held it open, after {tries} tries over {tries * ReplaceWaitMs} ms ({e.Message}) Close any program that has the file open, then try again."));
                 Thread.Sleep(ReplaceWaitMs);
             }
         }

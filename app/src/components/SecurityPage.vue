@@ -46,6 +46,7 @@ async function runWithMine() {
       <ShowKeysSwitch testid="sec-show-keys-switch" />
     </header>
     <p class="sec-line" data-testid="sec-test-keys-line">{{ sec.showKeys ? words('wizard.common.test-keys-only') : words('wizard.common.test-keys-hidden') }}</p>
+    <p v-if="!sec.showKeysSaved" class="sec-line" role="status" data-testid="sec-show-keys-unsaved">{{ words('wizard.common.show-keys-unsaved') }}</p>
 
     <v-alert v-if="sec.fault" type="error" density="compact" class="mb-3" data-testid="sec-fault"><span data-testid="sec-fault-code">{{ sec.fault.code }}</span> <TextWithSpecs :text="sec.fault.message" /></v-alert>
 

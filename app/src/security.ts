@@ -1,5 +1,5 @@
 import { computed, reactive, watch } from 'vue'
-import { addr, lessons, onShowKeys, replaceOpenSessions, showKeysFrameCount, startSession, ui } from './store'
+import { addr, lessons, onShowKeys, onShowKeysSaved, replaceOpenSessions, showKeysFrameCount, startSession, ui } from './store'
 import { hostGet, hostSend } from './host'
 import copy from './wizard-copy.json'
 
@@ -44,6 +44,8 @@ export const sec = reactive({
   types: [] as TypeRow[],
   flows: [] as FlowRow[],
   showKeys: true,
+  // False while the Host holds a Show keys choice it could not save yet (issue #292). The Security panel then says "not saved yet".
+  showKeysSaved: true,
   loaded: false,
   run: null as Step | null,
   busy: false,
@@ -88,6 +90,7 @@ export async function loadSecurity() {
     sec.types = list(b.types).map(toType)
     sec.flows = list(b.flows).map((f): FlowRow => ({ flowId: str(f.flowId), openRunId: str(f.openRunId), stepIndex: Number(f.stepIndex ?? 0), stepCount: Number(f.stepCount ?? 0) }))
     sec.showKeys = b.showKeys !== false
+    sec.showKeysSaved = b.showKeysSaved !== false
     sec.loaded = true
     sec.fault = null
   } catch (e: any) { fault(e?.status === 404 ? 'PRODUCT_MISSING' : 'HOST_SECURITY_FAILED', 'The course could not read the security setup from the engine.') }
@@ -141,7 +144,7 @@ export async function setShowKeys(on: boolean) {
   const r = await hostSend(addr, 'PUT', '/api/security/show-keys', { on })
   if (r.status < 300) {
     // The reply acts only when no frame came in the meantime, which keeps the case where the socket is down.
-    if (frames === showKeysFrameCount()) { sec.showKeys = on; await replaceOpenSessions(on) }
+    if (frames === showKeysFrameCount()) { sec.showKeys = on; sec.showKeysSaved = r.body?.saved !== false; await replaceOpenSessions(on) }
   } else fault(str(r.body?.code) || 'SHOW_KEYS_FAILED', str(r.body?.message))
 }
 
@@ -237,3 +240,8 @@ export const lessonsBuilt = computed(() => lessons.value.filter(l => l.built))
 
 // The Host broadcasts security.show-keys when any client flips the switch. The store replaces each open session, and this keeps the switch in step.
 onShowKeys(on => { sec.showKeys = on })
+// Once the Host has saved the choice, the save-failed warning ("a restart may show keys again") is false, so it goes too.
+onShowKeysSaved(saved => {
+  sec.showKeysSaved = saved
+  if (saved && sec.fault?.code === 'SECURITY_STORE_SAVE_FAILED') sec.fault = null
+})

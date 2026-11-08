@@ -22,6 +22,7 @@ public static class SecurityRoutes
             schema = 1,
             root = store.Root,
             showKeys = store.ShowKeys,
+            showKeysSaved = store.Saved,
             flows = runs.Table.Flows.Select(f => new { flowId = f.FlowId, types = f.Types, openRunId = runs.OpenRunOf(f.FlowId) }),
             types = SecurityTypes.All.Select(id => TypeRow(store, id)),
         }));
@@ -39,7 +40,7 @@ public static class SecurityRoutes
             LabDecision d = store.Decide(LabCatalog.Needs(lesson));
             return Results.Json(new { mayRun = d.MayRun, problems = d.Problems.Select(p => new { typeId = p.TypeId, code = p.Code, detail = p.Detail }) });
         });
-        app.MapGet("/api/security/show-keys", () => Results.Json(new { on = store.ShowKeys }));
+        app.MapGet("/api/security/show-keys", () => Results.Json(new { on = store.ShowKeys, saved = store.Saved }));
         app.MapPut("/api/security/show-keys", (ShowKeysBody body) =>
         {
             // Off fails closed in the store (issue #292): a refused save of off is still off in memory. So the sockets hear the flip either
@@ -52,7 +53,7 @@ public static class SecurityRoutes
                 return SaveRefused(x);
             }
             showKeysChanged(store.ShowKeys);
-            return Results.Json(new { on = store.ShowKeys });
+            return Results.Json(new { on = store.ShowKeys, saved = store.Saved });
         });
         app.MapPost("/api/security/flows/{flowId}/runs", (string flowId) =>
             runs.Start(flowId) is { } started

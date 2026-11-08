@@ -1,6 +1,7 @@
 {
   "wizard.common.test-keys-only": "Use test keys only. This course shows your keys on screen and in saved files.",
   "wizard.common.test-keys-hidden": "This course hides your keys on screen for now and shows short fingerprints instead. Saved files can still hold them.",
+  "wizard.common.show-keys-unsaved": "Show keys is off now. The choice is not saved yet. The course keeps trying, and until then a restart may show keys again.",
   "wizard.my-login.intro.what-this-is": "This set makes two keys. The first key signs {{term:token}}s. A token is a small note that says who you are and what you may do, and the signature on it shows nobody changed it. The second key belongs to one device, so the device can prove who it is.",
   "wizard.my-login.intro.why-it-exists": "A real service signs tokens, and other services check the signature. If the signing key leaks, anyone can make tokens that pass the check. That is why real teams guard it.",
   "wizard.my-login.intro.what-you-do-now": "Read this, then choose Continue. The whole set takes about 2 minutes.",
