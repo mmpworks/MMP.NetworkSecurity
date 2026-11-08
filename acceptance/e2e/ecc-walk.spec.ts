@@ -24,6 +24,7 @@ const IDS = {
   tangentP: 'real-tangent-p', tangentRPrime: 'real-tangent-rprime', tangentR: 'real-tangent-r', tangentLine: 'real-tangent-line',
   hop: 'toy-hop', dadRow: 'toy-dad-row', dadK: 'toy-dad-k',
   ecdsa: 'toy-ecdsa-recovery',
+  pickResult: 'toy-pick-result', pickLambda: 'toy-pick-lambda', pickKind: 'toy-pick-kind', realSample: 'real-sample',
   x25519Item: 'walk-item-x25519', x25519Root: 'x25519-walk-panel', ladderRow: 'x25519-row', ladderResult: 'x25519-result',
 };
 
@@ -98,6 +99,39 @@ test('[A19.ui.real-curve-tangent-doubling] the doubling view draws the tangent a
   await expect(page.getByTestId(IDS.tangentLine), 'the doubling view draws the tangent line').toBeVisible();
 });
 
+test('[A19.ui.toy-curve-free-pick] picking any 2 dots shows the engine\'s sum from /api/walk/toy-curve/add, a double included', async ({ page }) => {
+  // Indexes follow the engine's list: 0 to 17 are /api/walk/toy-curve's points in order, 18 is O. Each dot carries data-index.
+  const probe = await hostGet('/api/walk/toy-curve/add?p=0&q=0');
+  if (probe.status === 404) throw new NotRun('PRODUCT_MISSING', 'the Host has no /api/walk/toy-curve/add yet (#278)');
+  await openWalk(page, IDS.toyItem, IDS.toyRoot);
+  for (const [i, j] of [[1, 7], [4, 4], [2, 18]] as [number, number][]) {
+    const want = await walk(`/api/walk/toy-curve/add?p=${i}&q=${j}`);
+    await page.locator(`[data-testid="${i === 18 ? IDS.infinity : IDS.dot}"][data-index="${i}"]`).click();
+    await page.locator(`[data-testid="${j === 18 ? IDS.infinity : IDS.dot}"][data-index="${j}"]`).click();
+    const result = page.getByTestId(IDS.pickResult);
+    await expect(result, `picking ${i} and ${j} shows a result`).toBeVisible();
+    expect(same(await shownPt(result), pt(want.step.result)), `picking ${i} and ${j} shows the engine's ${show(pt(want.step.result))}`).toBe(true);
+    expect(((await page.getByTestId(IDS.pickKind).textContent()) ?? '').toLowerCase(), `the pick names the engine's kind, ${want.step.kind}`).toContain(String(want.step.kind));
+    if (want.step.lambda !== null) {
+      expect(((await page.getByTestId(IDS.pickLambda).textContent()) ?? '').trim(), `the pick shows the engine's slope, ${want.step.lambda}`).toContain(String(want.step.lambda));
+    }
+  }
+});
+
+test('[A19.ui.real-curve-offered-picks] each offered real-curve pick draws the engine\'s P, Q, R\' and R', async ({ page }) => {
+  const real = await walk('/api/walk/real-curve');
+  if (!Array.isArray(real.samples)) throw new NotRun('PRODUCT_MISSING', '/api/walk/real-curve has no samples yet (#278)');
+  await openWalk(page, IDS.toyItem, IDS.toyRoot);
+  for (let s = 0; s < real.samples.length; s++) {
+    const e = real.samples[s];
+    await page.getByTestId(`${IDS.realSample}-${s}`).click();
+    for (const [id, key] of [[IDS.chordP, 'p'], [IDS.chordQ, 'q'], [IDS.chordRPrime, 'rPrime'], [IDS.chordR, 'r']] as [string, string][]) {
+      const got = await shownPt(page.getByTestId(id));
+      expect(got !== null && Math.abs(got.x - Number(e[key].x)) < 1e-9 && Math.abs(got.y - Number(e[key].y)) < 1e-9, `sample ${s} (${e.kind}) ${key} is the engine's, and the screen shows ${show(got)}`).toBe(true);
+    }
+  }
+});
+
 test('[A19.ui.toy-curve-hops-close-at-19] k*G hops through the dots, one hop per k, and the 19th lands on O', async ({ page }) => {
   const toy = await walk('/api/walk/toy-curve');
   const hops: any[] = toy.hops ?? [];
@@ -169,12 +203,12 @@ test('[A19.ui.x25519-ladder-rows-and-rfc-result] the X25519 screen shows one lad
   await openWalk(page, IDS.x25519Item, IDS.x25519Root);
   const shown = page.getByTestId(IDS.ladderRow);
   expect(await shown.count(), 'the screen shows one row per bit').toBe(255);
-  // The engine gives each row's swap (the lead's answer on #278), and the page shows it. The ladder swaps when this bit differs from the one
-  // before it (RFC 7748 section 5: swap ^= k_t, starting from 0). That rule is written here, so the engine's field is checked against it too.
+  // The engine gives each row's swap (the lead's answer on #278), and the page shows it. This engine follows TweetNaCl's order: it swaps the
+  // pair by the row's bit before the step and back after, so swap is the conditional-swap argument and equals the row's bit (Richard's shape).
+  // The Host clause A19.host.x25519-rows-carry-swap checks that against the clamped RFC 7748 scalar.
   for (let i = 0; i < 255; i++) {
-    const bit = rows[i].isOne ? 1 : 0, prev = i === 0 ? 0 : (rows[i - 1].isOne ? 1 : 0);
     expect(typeof rows[i].swap, `the engine's row ${i} carries a swap field`).toBe('boolean');
-    expect(rows[i].swap, `the engine's row ${i} swap is bit ${bit} xor the bit before, ${prev}`).toBe((bit ^ prev) === 1);
+    expect(rows[i].swap, `the engine's row ${i} swap is its bit`).toBe(!!rows[i].isOne);
   }
   for (const i of [0, 1, 2, 100, 200, 253, 254]) {
     const row = shown.nth(i);
