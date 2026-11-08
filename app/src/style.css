@@ -117,7 +117,8 @@ body { overflow: hidden; }
 .chip-text { fill: var(--on-mark); font: 11px var(--mono); font-weight: 700; }
 .wait-ring { fill: none; stroke: var(--warn); stroke-width: 2.5; animation: pulse 1.2s ease-out infinite; transform-box: fill-box; transform-origin: center; }
 @keyframes pulse { from { transform: scale(.8); opacity: 1; } to { transform: scale(1.8); opacity: 0; } }
-@media (prefers-reduced-motion: reduce) { .wait-ring { animation: none; } * { transition-duration: .15s !important; } }
+/* Reduced motion means no motion: a transition, even a short one, still runs as an animation (design 2.2a; A19.ui.reduced-motion-has-no-transition). */
+@media (prefers-reduced-motion: reduce) { .wait-ring { animation: none; } *, *::before, *::after { transition: none !important; } }
 
 /* Inspector */
 .inspector, .secrets, .tour { display: flex; flex-direction: column; height: 100%; min-height: 0; }
@@ -427,6 +428,12 @@ body { overflow: hidden; }
 .aw-key-source { margin: 0; font-weight: 600; }
 .aw-key-source-practice { color: var(--warn); }
 .aw-row { display: contents; }
+/* Motion (design 2.2a). The cell holds the engine's new byte; during a motion its old byte shows on the ::after layer, read from data-old.
+   The grid clips, so a ShiftRows row can roll in from past the edge. */
+.aw-grid { overflow: hidden; padding: 3px; perspective: 600px; }
+.aw-cell { position: relative; }
+.aw-cell[data-old]::after { content: attr(data-old); position: absolute; inset: -1px; display: grid; place-items: center; border-radius: inherit; background: var(--surface2); border: 1px solid var(--line); color: var(--muted); pointer-events: none; }
+.aw-cell.aw-wrap { background: color-mix(in srgb, var(--encrypted) 22%, var(--surface2)); border-color: var(--encrypted); }
 .aw-cell[tabindex] { cursor: pointer; }
 .aw-cell.aw-picked { border-color: var(--accent); box-shadow: 0 0 0 2px var(--accent) inset; }
 /* Key schedule (design section 2.2b): one 4 by 4 grid per round key, cells like block cells with a position mark and a word name. */

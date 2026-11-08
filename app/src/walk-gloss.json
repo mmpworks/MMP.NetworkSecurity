@@ -6,7 +6,7 @@
   "steps": {
     "AddRoundKey": "Each byte is XORed with the byte in the same place of round key {round}.",
     "SubBytes": "Each byte is looked up in the S-box table, and the value there takes its place.",
-    "ShiftRows": "Row 0 stays. Row 1 moves 1 place to the left, row 2 moves 2, and row 3 moves 3. Bytes that leave on the left come back on the right.",
+    "ShiftRows": "Row 0 stays. Rows 1, 2 and 3 rotate left by 1, 2 and 3 bytes. The name says shift, but no byte is lost: FIPS 197 calls it a cyclic shift, the same idea as a rotate left (ROL).",
     "MixColumns": "Each column is multiplied by a fixed matrix in the AES field, so every byte of a column now depends on all 4 bytes of that column.",
     "InvShiftRows": "Each row moves back to the right by the places ShiftRows moved it to the left.",
     "InvSubBytes": "Each byte is looked up in the inverse S-box table, which undoes the S-box.",
