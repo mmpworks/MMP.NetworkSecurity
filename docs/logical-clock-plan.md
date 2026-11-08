@@ -54,6 +54,15 @@ The work ends when this holds, and a reader can check it with no judgement: a Ho
 
 Run lesson 1 and lesson 10 with one seed, 20 times each, 10 of them under extra load. Count the events per stream, and compare each engine stream's list of (type, message). Expected: the engine streams match in 20 of 20, and the wire streams may differ. The result goes in this file before the build starts.
 
+Result, 2026-11-08, seed 3, on main 0b4c3e1 (throwaway test `ClockSpikeTests` on local branch `spike/clock-counts`, commit noted in the PR):
+
+| Lesson | Engine streams | Engine lists equal to run 1 | Wire event counts seen |
+|---|---|---|---|
+| 1 | 3 | 20 of 20 (10 idle, 10 under load) | server/aes/wire: 7, 6 or 5 idle; 3 or 5 under load. client/aes/wire: 7 in all 20 |
+| 10 | 7 | 20 of 20 (10 idle, 10 under load) | client/auth-mtls/wire: 9 or 10 (12 in an earlier run); the other 5 wire streams fixed |
+
+So the base assumption holds: engine streams repeat for one seed, idle and loaded, and wire streams do not. A first run of the spike reported 1 of 20, because the stream ids start with the session id. Stripping that prefix fixed the spike, not the product.
+
 ## Anchor
 
 The kill-condition test is written before the implementation: same seed, 20 runs, 10 under load, all engine-stream clocks equal. A second test pins the rule on a fixed two-side trace: a receive takes max(own, sender) + 1.
