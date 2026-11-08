@@ -412,7 +412,12 @@ if ($e2eMine.Count -gt 0) {
         $env:ACC_HOST_PORT = [string]$hostPort
         # Playwright strips the types and runs a spec that tsc would refuse, so a type error never failed a run. The specs are type-checked
         # first (acceptance/e2e/tsconfig.json), and a type error fails every selected e2e clause by name before any spec runs.
-        $tc = Invoke-Tool 'npx' @('tsc', '-p', 'tsconfig.json', '--pretty', 'false') $e2e -TimeoutSec 300
+        # tsc and Playwright run from this folder's own node_modules under node, never through npx, so a missing tool reads TOOL_MISSING and
+        # nothing is fetched from a registry or found elsewhere on the machine (Jared, #269).
+        $tscJs = Join-Path $e2e 'node_modules/typescript/bin/tsc'
+        $playwrightJs = Join-Path $e2e 'node_modules/@playwright/test/cli.js'
+        $noTool = { param($p) [pscustomobject]@{ ExitCode = -998; Output = "no local tool at $p. Run npm ci in acceptance/e2e" } }
+        $tc = if (Test-Path $tscJs) { Invoke-Tool 'node' @($tscJs, '-p', 'tsconfig.json', '--pretty', 'false') $e2e -TimeoutSec 300 } else { & $noTool $tscJs }
         $typeBroken = $tc.ExitCode -ne 0
         # Run only the selected clauses. Before this, every spec ran, and a failure outside the selection never reached the report.
         $env:ACC_E2E_GREP = if ($Clauses -contains 'All') { '' } else { (@($e2eMine | ForEach-Object { '\[' + [regex]::Escape($_.id) + '\]' }) -join '|') }
@@ -420,7 +425,9 @@ if ($e2eMine.Count -gt 0) {
         elseif ($typeBroken) { Set-All $e2eMine 'FAIL' 'E2E_TYPE_ERROR' ("tsc -p acceptance/e2e/tsconfig.json exit $($tc.ExitCode): " + (Tail $tc.Output 600)) }
         elseif ($previewPort) { $env:ACC_PREVIEW_PORT = [string]$previewPort }
         else { Set-All $e2eMine 'NOT RUN' 'PORT_BUSY' 'no free preview port: the acceptance block (36800 to 36899, or ACC_PORT_BASE) is full, or, on a tree from before #225, ports 4180 and 5173 are both in use. The UI cannot be served here without testing against a stranger.' }
-        $r = if ($previewPort -and -not $typeBroken) { Invoke-Tool 'npx' @('playwright', 'test') $e2e -TimeoutSec 1800 } else { [pscustomobject]@{ ExitCode = -997; Output = '' } }
+        $r = if (-not $previewPort -or $typeBroken) { [pscustomobject]@{ ExitCode = -997; Output = '' } }
+             elseif (Test-Path $playwrightJs) { Invoke-Tool 'node' @($playwrightJs, 'test') $e2e -TimeoutSec 1800 }
+             else { & $noTool $playwrightJs }
         $json = Join-Path $out 'playwright.json'
         if ($r.ExitCode -eq -997) { }      # E2E_TYPE_ERROR, TOOL_MISSING or PORT_BUSY was recorded above
         elseif ($r.ExitCode -eq -998) { Set-All $e2eMine 'NOT RUN' 'TOOL_MISSING' (Tail $r.Output 300) }
