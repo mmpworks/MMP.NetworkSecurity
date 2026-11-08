@@ -85,6 +85,7 @@ app.MapPost("/api/ce/stop", () => { ce.Stop(); return Results.Json(ce.Status());
 SecurityRoutes.Map(app, security, flowRuns, on => sessions.Broadcast(JsonSerializer.Serialize(new { type = "security.show-keys", on })));
 AesWalkRoutes.Map(app, security, sessions);
 Tls13WalkRoutes.Map(app);
+TeachingCurveRoutes.Map(app);
 DhWalkRoutes.Map(app);
 X25519WalkRoutes.Map(app);
 VaultRoutes.Map(app, security.Vault, new VaultExercise(security.Vault, new OpenSslTool(Environment.GetEnvironmentVariable), Path.Combine(security.Root, "proof")));
