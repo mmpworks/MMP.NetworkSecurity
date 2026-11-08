@@ -178,3 +178,7 @@ Each correction goes here, newest slice last. Later slices read this file first.
 3. **Lesson 10 never traced the issuer's public key.** The server only remembers it (`Lesson10Auth.cs:228`). A trace event there would move the engine stream and break the golden trace. So the Host writes one `key.public` event on its own stream, `<sessionId>/keys`, and that stream is not in the golden trace.
 4. **A pinned tool path can name a file that is gone.** `Process.Start` then throws. `OpenSslPath` checks the file, so the flow says `REFEREE_MISSING` and the key stays saved and unchecked. A test pins it.
 5. **The Show keys toggle stores its value and hides nothing until V3.** The UI must not offer it as working before then.
+
+## Deadlines (#309)
+
+1. **A stuck run must end on a fixed side, and the ending must show in the trace.** Two sides waiting on equal deadlines made the side that timed out depend on load, and the expiry wrote no event. Now the read deadline runs only while a side holds part of a frame, and an idle side waits two or three read deadlines by role. Engine readers: the values, the rule and the check that holds them are the deadline clause in `acceptance/CONTRACT.md`; the code is `EnginePump.ReadLimitMs` and `IPartialInput` (`Machine/Engine.cs`).
