@@ -7,9 +7,9 @@ namespace Acceptance
     /// <summary>
     /// The link's read deadline and idle limits (Richard's #309, the lead's ask). The read deadline, 30,000 ms, is armed only while a side holds
     /// unconsumed input at some layer (part of a frame, record, handshake message, or SSH line or packet). A side that holds no partial input
-    /// waits an idle limit: 60,000 ms for the side whose last link action was a send (it is owed a reply), 90,000 ms for the other. Twice and
-    /// three times the read deadline, so the side holding a partial record always times out first, and in a mutual wait the 30 s gap is far
-    /// above scheduling jitter. Every expiry writes a check.result on the engine's own stream, "read deadline" or "idle limit".
+    /// waits an idle limit set by role only: 60,000 ms for the side that opened the connection, 90,000 ms for the side that accepted it. Twice
+    /// and three times the read deadline, so the side holding a partial record always times out first, and in a mutual wait the opener does, by
+    /// a 30 s gap. A role rule cannot tie. Every expiry writes a check.result on the engine's own stream, "read deadline" or "idle limit".
     /// The checkable case: the drop fork L5-flip-record-length grows a record length by 256 bytes that never come (Labs.cs), so the client,
     /// which holds the cut-short Finished record, must end on "read deadline", and the server on "peer stayed until the end", in 20 of 20 runs.
     /// </summary>
