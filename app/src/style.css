@@ -85,6 +85,9 @@ body { overflow: hidden; }
 .rail-body { display: flex; flex-direction: column; min-width: 0; }
 .rail-title { font-size: 13px; line-height: 1.3; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
 .rail-status { font-size: 11px; line-height: 1.3; color: var(--muted); }
+/* A short window (Steve's 1280 x 640) cannot hold 12 lessons and the attack entry at 2 lines each, so the rows go to 1 line and each
+   status moves into the row's tooltip and screen-reader label. Nothing is cut from the rail (bytes-fit, "a lesson is cut from the rail"). */
+@media (max-height: 700px) { .rail-status { display: none; } .rail-item { padding-top: 3px; padding-bottom: 3px; } }
 
 /* Diagram */
 .diagrams { flex: 1 1 auto; min-height: 0; display: flex; }
@@ -246,6 +249,8 @@ body { overflow: hidden; }
 .tabs-row { display: flex; gap: 4px; padding: 4px 8px 0; }
 .stab { all: unset; cursor: pointer; padding: 3px 10px; border-radius: 6px 6px 0 0; background: var(--surface2); font-size: 12px; }
 .stab.on { border-bottom: 2px solid var(--readable); }
+.stab-back { background: transparent; color: var(--accent); font-weight: 600; margin-right: 6px; }
+.stab:focus-visible { outline: 2px solid var(--focus); outline-offset: 1px; }
 .lightbox { background: var(--bg); height: 100vh; position: relative; }
 .lb-close { position: absolute; top: 8px; right: 12px; z-index: 5; }
 .sc-row { display: flex; gap: 12px; padding: 3px 0; font-size: 13px; }
@@ -404,6 +409,20 @@ body { overflow: hidden; }
 @media (max-width: 1700px) { .topbar > .app-title { display: none; } }
 .section-placeholder { padding: 24px 28px; }
 .section-placeholder h2 { font: 700 20px/1.2 var(--display); margin: 0 0 8px; }
+/* The attack index (sections-plan item 3): groups of rows, each row a button that plays its run. */
+.attack-index { padding: 16px 20px 24px; display: grid; gap: 16px; align-content: start; }
+.ai-head h2 { font: 700 20px/1.2 var(--display); margin: 0 0 4px; }
+.ai-head p { margin: 0; max-width: 80ch; }
+.ai-group { display: grid; gap: 6px; }
+.ai-group-name { font: 700 15px var(--display); margin: 4px 0 2px; text-transform: capitalize; }
+.ai-row { all: unset; box-sizing: border-box; display: grid; gap: 2px; padding: 8px 12px; border: 1px solid var(--line); border-left: 4px solid var(--fail); border-radius: 8px; background: var(--surface); cursor: pointer; max-width: 100ch; }
+.ai-row:hover { background: var(--surface2); }
+.ai-row:focus-visible { outline: 2px solid var(--focus); outline-offset: 2px; }
+.ai-row.kept { border-color: var(--accent); border-left-color: var(--accent); }
+.ai-row-top { display: flex; gap: 12px; align-items: baseline; flex-wrap: wrap; }
+.ai-row-name { font-weight: 600; }
+.ai-row-guard { font-size: 13px; }
+.ai-row-id { font: 12px var(--mono); }
 .section-placeholder p { color: var(--muted); margin: 0; }
 
 /* The AES walk (slice P2a). The grid follows the approved mock's bench: a large 4 by 4 block, the words beside it, the controls under it. */
