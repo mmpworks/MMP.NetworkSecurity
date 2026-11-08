@@ -460,14 +460,16 @@ test('[A19.ui.reconnect-reads-the-toggle-first] after a reconnect the app reads 
 });
 
 /*
- * Steve's three AES walk fixes (2026-11-08), with the design mock at E:/dev/ns-mock/design/mock/ (template.html, keys_anim.js):
- * 1. a block cell shows its byte index and the character of the byte: "sp" for a space, a dot for a byte that is not printable;
+ * Steve's AES walk fixes (2026-11-08), with the design mock at E:/dev/ns-mock/design/mock/ (template.html, keys_anim.js):
+ * 1. a block cell shows its byte index and its letter;
  * 2. the key schedule builds a word step by step (RotWord, SubWord, Rcon, XOR with the word Nk back), with one color per role;
- * 3. the Key Schedule panel zooms in and out, with a reset, and nothing scrolls sideways at 1280 px wide.
- * Steve's words win where the mock differs: the mock shows nothing for a byte that is not printable, and Steve asked for a dot.
+ * 3. the Key Schedule panel zooms in and out, with a reset, and nothing scrolls sideways at 1280 px wide;
+ * 4. the landscape view: the round-key grid left and the "How wN is made" panel right at 1280 px and up, stacked below.
+ * The letter line for a byte that is not printable follows the app's own long-text strip legend (walk-gloss.json, strip.legend:
+ * "· is a byte that is not a printable character"), and a space shows "sp", as in the mock. The mock shows nothing for such a byte.
  */
 
-/** The character line of a byte, by Steve's rule. A byte that is not printable may show '.' or the middle dot, since both are a dot. */
+/** The letter line of a byte. A byte that is not printable may show '.' or the middle dot of the strip legend, since both are a dot. */
 function charOk(hex: string, shown: string): boolean {
   const n = parseInt(hex, 16);
   if (n === 0x20) return shown === 'sp';
@@ -477,6 +479,15 @@ function charOk(hex: string, shown: string): boolean {
 
 async function requireCellParts(page: Page): Promise<void> {
   if ((await page.getByTestId('aes-walk-cell-0-0-index').count()) === 0) throw new NotRun('UI_CONTROL_MISSING', 'block cells have no aes-walk-cell-{r}-{c}-index yet (Steve fix 1)');
+}
+
+/** The step panel's title, such as "How w4 is made". */
+async function buildTitle(page: Page): Promise<string> { return ((await page.getByTestId('aes-walk-ks-build-title').textContent().catch(() => '')) ?? '').trim(); }
+
+/** The 8 bits of a byte as the mock prints them: two nibbles, with an optional space between. */
+function bitsRe(hex: string): string {
+  const b = parseInt(hex, 16).toString(2).padStart(8, '0');
+  return `${b.slice(0, 4)}\\s?${b.slice(4)}`;
 }
 
 /** Every cell's index and character line, against the 16 bytes the cells should hold ('' for an empty cell). */
@@ -500,7 +511,7 @@ test('[A19.ui.block-cell-shows-index-and-char] each block cell shows its byte in
   await requireCellParts(page);
   await checkCellParts(page, new Array(16).fill(''), 'first view, nothing filled');
   for (let pos = 0; pos < 16; pos++) await page.getByTestId('aes-walk-next').click();
-  // "Pump four is ok." holds letters, three spaces and a full stop.
+  // "Pump four is ok." holds letters, three spaces and a full stop. A space shows "sp".
   await checkCellParts(page, bytesOf(reply.inputHex), 'block 1 filled');
   await toFirstStep(page);
   // The first AddRoundKey state holds bytes that are not printable, so the dot rule is tested on real engine bytes.
@@ -619,4 +630,119 @@ test('[A19.ui.key-schedule-zoom] at 1280 px the Key Schedule panel zooms in and 
   await zreset.click(); await page.waitForTimeout(250);
   expect(Math.abs((await width()) - base), 'reset after zoom out gives the default size back').toBeLessThanOrEqual(1);
   await flat('after reset');
+});
+
+test('[A19.ui.key-panel-landscape-layout] at 1280 px and up the round-key grid sits left of the "How wN is made" panel; below 1280 they stack, and nothing scrolls sideways', async ({ page }) => {
+  await page.setViewportSize({ width: 1280, height: 800 });
+  const reply = await openWalk(page);
+  await toKeySchedule(page);
+  const tables = await hostGet('/api/walk/aes/tables');
+  const nk = tables.body.sizes.find((s: any) => s.keyBits === reply.keyBits).keyWords;
+  if ((await page.getByTestId('aes-walk-ks-build').count()) === 0) throw new NotRun('UI_CONTROL_MISSING', 'the Key Schedule panel has no aes-walk-ks-build step panel yet (Steve fix 4)');
+  await page.getByTestId('aes-walk-next').click();
+  await expect.poll(() => buildTitle(page), { timeout: 15_000 }).toBe(`How w${nk} is made`);
+  const boxes = async () => ({ table: (await page.getByTestId('aes-walk-ks-table').boundingBox())!, build: (await page.getByTestId('aes-walk-ks-build').boundingBox())! });
+  const flat = async (where: string) => {
+    const s = await sideScroll(page);
+    expect(s.page, `${where}: the page does not scroll sideways`).toBeLessThanOrEqual(1);
+    expect(s.panel, `${where}: the Key Schedule panel does not scroll sideways`).toBeLessThanOrEqual(1);
+  };
+  for (const width of [1280, 1600]) {
+    await page.setViewportSize({ width, height: 800 }); await page.waitForTimeout(300);
+    const b = await boxes();
+    expect(b.table.x + b.table.width, `${width} px: the grid ends before the step panel starts`).toBeLessThanOrEqual(b.build.x + 1);
+    expect(b.build.y, `${width} px: the step panel sits beside the grid, not below it`).toBeLessThan(b.table.y + b.table.height);
+    await flat(`${width} px`);
+  }
+  for (const width of [1279, 1024]) {
+    await page.setViewportSize({ width, height: 800 }); await page.waitForTimeout(300);
+    const b = await boxes();
+    expect(b.build.y, `${width} px: the step panel stacks below the grid`).toBeGreaterThanOrEqual(b.table.y + b.table.height - 1);
+    await flat(`${width} px`);
+  }
+});
+
+/** Per watched testid, every distinct text it showed while visible, sampled once per frame until motion stops (or ms). */
+async function textsDuring(page: Page, ids: string[], ms: number): Promise<Record<string, string[]>> {
+  return await page.evaluate(({ ids, ms }) => new Promise<Record<string, string[]>>(done => {
+    const out: Record<string, string[]> = Object.fromEntries(ids.map(id => [id, [] as string[]]));
+    const t0 = performance.now();
+    let still = 0;
+    const tick = () => {
+      const t = performance.now() - t0;
+      for (const id of ids) {
+        const el = document.querySelector(`[data-testid="${id}"]`) as HTMLElement | null;
+        const text = el && el.offsetParent !== null ? (el.textContent ?? '') : '';
+        if (text && !out[id].includes(text)) out[id].push(text);
+      }
+      still = document.getAnimations().some(a => a.playState === 'running') ? 0 : still + 1;
+      if (t > ms || (t > 1500 && still > 30)) done(out); else requestAnimationFrame(tick);
+    };
+    tick();
+  }), { ids, ms });
+}
+
+/** The first time each stage row shows the given word's own value, in ms, sampled once per frame. Rows of another word do not count. */
+async function stagesWithValues(page: Page, want: Record<string, string>, ms: number): Promise<Record<string, number>> {
+  return await page.evaluate(({ want, ms }) => new Promise<Record<string, number>>(done => {
+    const seen: Record<string, number> = {};
+    const t0 = performance.now();
+    const tick = () => {
+      const t = performance.now() - t0;
+      for (const [id, value] of Object.entries(want)) {
+        const el = document.querySelector(`[data-testid="${id}"]`) as HTMLElement | null;
+        const shows = !!el && el.offsetParent !== null && Number(getComputedStyle(el).opacity) > 0.5 && (el.textContent ?? '').toLowerCase().includes(value.toLowerCase());
+        if (seen[id] === undefined && shows) seen[id] = t;
+      }
+      if (t > ms || Object.keys(seen).length === Object.keys(want).length) done(seen); else requestAnimationFrame(tick);
+    };
+    tick();
+  }), { want, ms });
+}
+
+test('[A19.ui.key-panel-xor-rcon-replay] the build shows each byte XOR in binary, the round-constant strip lights the constant in use, and a tap on a built word replays its build', async ({ page }) => {
+  await page.setViewportSize({ width: 1280, height: 800 });
+  const reply = await openWalk(page);
+  await toKeySchedule(page);
+  const tables = await hostGet('/api/walk/aes/tables');
+  const nk = tables.body.sizes.find((s: any) => s.keyBits === reply.keyBits).keyWords;
+  const rows: any[] = reply.keyWords.slice().sort((a: any, b: any) => a.i - b.i);
+  const row = rows.find(r => r.i === nk);
+  if ((await page.getByTestId('aes-walk-ks-build').count()) === 0) throw new NotRun('UI_CONTROL_MISSING', 'the Key Schedule panel has no aes-walk-ks-build step panel yet (Steve fix 4)');
+  // The XOR line, with motion on: for each byte j, one frame shows w(i - Nk) byte j, the value it meets, and the result, each in binary.
+  await page.emulateMedia({ reducedMotion: 'no-preference' });
+  const [texts] = await Promise.all([textsDuring(page, ['aes-walk-build-xor'], 20_000), page.getByTestId('aes-walk-next').click()]);
+  const lines = texts['aes-walk-build-xor'];
+  expect(lines.length, `the XOR line shows during the build of w${nk}`).toBeGreaterThan(0);
+  const temp: string = row.afterRcon ?? row.substituted ?? row.previous;
+  for (let j = 0; j < 4; j++) {
+    const parts = [row.keyBack, temp, row.word].map((w: string) => bitsRe(w.slice(2 * j, 2 * j + 2)));
+    const hit = lines.some(l => parts.every(p => new RegExp(p).test(l)));
+    expect(hit, `byte ${j}: one frame shows ${row.keyBack.slice(2 * j, 2 * j + 2)} XOR ${temp.slice(2 * j, 2 * j + 2)} = ${row.word.slice(2 * j, 2 * j + 2)} in binary`).toBe(true);
+  }
+  // The round-constant strip: w(Nk) uses constant 1, the first chip. A word with no Rcon lights none, and w(2 Nk) lights the second.
+  const lit = async () => {
+    const chips = page.locator('[data-testid^="aes-walk-rcon-"][data-lit="true"]');
+    const ids: string[] = [];
+    for (let k = 0; k < await chips.count(); k++) ids.push((await chips.nth(k).getAttribute('data-testid')) ?? '');
+    return ids;
+  };
+  expect(await lit(), `w${nk} lights round constant 1`).toEqual(['aes-walk-rcon-0']);
+  await expect(page.getByTestId('aes-walk-rcon-0')).toContainText(tables.body.rcon.slice(0, 2), { ignoreCase: true });
+  await reduced(page);
+  await page.getByTestId('aes-walk-next').click();
+  expect(await lit(), `w${nk + 1} uses no round constant`).toEqual([]);
+  for (let k = nk + 1; k < 2 * nk; k++) await page.getByTestId('aes-walk-next').click();
+  expect(await lit(), `w${2 * nk} lights round constant 2`).toEqual(['aes-walk-rcon-1']);
+  // Tap a built word: its build plays again, row by row, with its own values.
+  await page.emulateMedia({ reducedMotion: 'no-preference' });
+  const want: Record<string, string> = {};
+  for (const [id, value] of [['previous', row.previous], ['rotated', row.rotated], ['substituted', row.substituted], ['after-rcon', row.afterRcon], ['key-back', row.keyBack], ['word', row.word]])
+    want[`aes-walk-build-${id}`] = value;
+  const [seen] = await Promise.all([stagesWithValues(page, want, 20_000), tableCell(page, 4 * nk).click()]);
+  await expect.poll(() => buildTitle(page), { timeout: 15_000 }).toBe(`How w${nk} is made`);
+  const order = Object.keys(want).map(id => seen[id]);
+  Object.keys(want).forEach(id => expect(seen[id], `replay of w${nk}: ${id} shows its value`).not.toBeUndefined());
+  for (let k = 1; k < order.length; k++) expect(order[k], `replay of w${nk}: ${Object.keys(want)[k]} after ${Object.keys(want)[k - 1]}`).toBeGreaterThanOrEqual(order[k - 1]);
+  expect(order[order.length - 1] - order[0], `the replay of w${nk} runs in steps, not in one frame`).toBeGreaterThanOrEqual(300);
 });

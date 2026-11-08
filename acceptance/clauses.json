@@ -3037,6 +3037,28 @@
    "counts": true
   },
   {
+   "id": "A19.ui.key-panel-landscape-layout",
+   "base": "A19.ui.key-panel-landscape-layout",
+   "assertion": "A19",
+   "group": "e2e",
+   "build": "host",
+   "slice": "W1",
+   "referee": "FIPS 197 (2001) data, the suite's RefAes, and the .NET library",
+   "roles": [],
+   "counts": true
+  },
+  {
+   "id": "A19.ui.key-panel-xor-rcon-replay",
+   "base": "A19.ui.key-panel-xor-rcon-replay",
+   "assertion": "A19",
+   "group": "e2e",
+   "build": "host",
+   "slice": "W1",
+   "referee": "FIPS 197 (2001) data, the suite's RefAes, and the .NET library",
+   "roles": [],
+   "counts": true
+  },
+  {
    "id": "A19.ui.key-roles-have-colors",
    "base": "A19.ui.key-roles-have-colors",
    "assertion": "A19",

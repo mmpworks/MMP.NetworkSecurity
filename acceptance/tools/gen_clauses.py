@@ -118,8 +118,9 @@ AES_WALK_IDS = {
     "A19.ui.multiply-shows-the-engine-terms", "A19.ui.next-alone-gives-the-text-back", "A19.ui.off-shows-the-closed-line",
     "A19.ui.play-stops-at-the-end-of-a-round", "A19.ui.reconnect-reads-the-toggle-first", "A19.ui.reduced-motion-has-no-transition",
     "A19.ui.sbox-click-matches-next-state", "A19.ui.socket-close-clears-the-walk", "A19.ui.step-order-by-next", "A19.ui.word-build-lights-its-two-words",
-    # Steve's three AES walk fixes, 2026-11-08: cell index and character, the key word build in steps with role colors, Key Schedule zoom.
+    # Steve's AES walk fixes, 2026-11-08: cell index and letter, the key word build in steps with role colors, Key Schedule zoom, the landscape panel.
     "A19.ui.block-cell-shows-index-and-char", "A19.ui.key-word-build-runs-in-steps", "A19.ui.key-roles-have-colors", "A19.ui.key-schedule-zoom",
+    "A19.ui.key-panel-landscape-layout", "A19.ui.key-panel-xor-rcon-replay",
 }
 
 
