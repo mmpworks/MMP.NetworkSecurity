@@ -89,9 +89,23 @@ public sealed class SecurityStore
 
     public bool ShowKeys { get { lock (_gate) return _modes.ShowKeys; } }
 
+    /// <summary>
+    /// Saves the Show keys choice. Off fails closed (issue #292): when the save is refused, off still takes effect in memory at once, and
+    /// the error says only that the choice was not saved for the next start. On fails open: a refused save keeps keys hidden.
+    /// </summary>
     public void SetShowKeys(bool on)
     {
-        lock (_gate) Save(_modes with { ShowKeys = on });
+        lock (_gate)
+        {
+            ModesFile next = _modes with { ShowKeys = on };
+            try { Save(next); }
+            catch (NetSec.Errors.NetSecException x) when (!on && x.Error.Code == NetSec.Errors.ErrorCodes.SecurityStoreSaveFailed)
+            {
+                _modes = next;
+                throw new NetSec.Errors.NetSecException(NetSec.Errors.NetSecError.Of(x.Error.Code,
+                    $"Show keys is off now. The choice could not be saved, so the next start may show keys again. {x.Error.Message}"));
+            }
+        }
     }
 
     public string FlowOf(string typeId) => _flowOf[typeId];

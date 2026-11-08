@@ -42,10 +42,15 @@ public static class SecurityRoutes
         app.MapGet("/api/security/show-keys", () => Results.Json(new { on = store.ShowKeys }));
         app.MapPut("/api/security/show-keys", (ShowKeysBody body) =>
         {
-            // A failed save keeps the old value, so a learner who turns Show keys off and is refused still has keys on screen. The named
-            // refusal tells the page so (issue #292).
+            // Off fails closed in the store (issue #292): a refused save of off is still off in memory. So the sockets hear the flip either
+            // way, and the named refusal says only that the choice was not saved. A refused on changes nothing, so nothing is told.
+            bool before = store.ShowKeys;
             try { store.SetShowKeys(body.On); }
-            catch (NetSecException x) when (x.Error.Code == ErrorCodes.SecurityStoreSaveFailed) { return SaveRefused(x); }
+            catch (NetSecException x) when (x.Error.Code == ErrorCodes.SecurityStoreSaveFailed)
+            {
+                if (store.ShowKeys != before) showKeysChanged(store.ShowKeys);
+                return SaveRefused(x);
+            }
             showKeysChanged(store.ShowKeys);
             return Results.Json(new { on = store.ShowKeys });
         });
