@@ -129,6 +129,76 @@ namespace Acceptance
             return true;
         }
 
+        /// <summary>The X25519 ladder walk on RFC 7748 section 6.1's public scalars, open with Show keys OFF. The fake serves the values from the suite's vector file and builds each row's bit from the clamped scalar.</summary>
+        bool X25519Route(HttpListenerContext ctx, string path)
+        {
+            if (path != X25519WalkClauses.Path || M("walk-routes-missing")) return false;
+            if (!_showKeys && M("x25519-closed-off")) { WalkFail(ctx, 409, "KEYS_HIDDEN", "closed"); return true; }
+            string step = ctx.Request.QueryString["step"];
+            if (step != "alice-public" && step != "bob-public" && step != "shared") { WalkFail(ctx, 400, "WALK_BAD_ARGUMENT", "step must be alice-public, bob-public or shared."); return true; }
+            string vectors = Path.Combine(Path.GetDirectoryName(Path.GetDirectoryName(Path.GetDirectoryName(_vaultScript))), "vectors");
+            VectorRecord v = Nsv.Load(vectors, "x25519-rfc7748.nsv", "x25519-dh")[0];
+            string nine = "09" + new string('0', 62);
+            string scalar = step == "bob-public" ? v.Str("b") : v.Str("a");
+            string point = step == "shared" ? v.Str("b_pub") : nine;
+            string result = step == "alice-public" ? v.Str("a_pub") : step == "bob-public" ? v.Str("b_pub") : v.Str("k");
+            if (step == "shared" && M("x25519-wrong-shared")) result = (result[0] == '0' ? "1" : "0") + result.Substring(1);
+            byte[] raw = Hex.Decode(scalar), clamped = X25519WalkClauses.Clamp(raw);
+            byte[] bits = M("x25519-rows-unclamped") ? raw : clamped;
+            List<object> rows = new List<object>();
+            for (int bit = 254; bit >= 0; bit--) rows.Add(D("bit", (double)bit, "isOne", X25519WalkClauses.Bit(bits, bit)));
+            WalkWrite(ctx, 200, D("step", step, "source", "RFC 7748 section 6.1", "keySource", "rfc7748", "byteOrder", "little-endian", "scalar", scalar, "clamped", Hex.Encode(clamped), "point", point, "result", result, "rows", rows), false);
+            return true;
+        }
+
+        /// <summary>The Diffie-Hellman walk on public practice exponents, open with Show keys OFF. The fake computes each number with BigInteger.</summary>
+        bool DhRoute(HttpListenerContext ctx, string path)
+        {
+            if (path != DhWalkClauses.Path || M("walk-routes-missing")) return false;
+            if (!_showKeys && M("dh-closed-off")) { WalkFail(ctx, 409, "KEYS_HIDDEN", "closed"); return true; }
+            string group = ctx.Request.QueryString["group"];
+            if (group != "small" && group != "group14") { WalkFail(ctx, 400, "WALK_BAD_ARGUMENT", "group must be small or group14."); return true; }
+            System.Numerics.BigInteger p, g, x, y;
+            if (group == "small") { p = 467; g = 5; x = 153; y = 197; }
+            else
+            {
+                string vectors = Path.Combine(Path.GetDirectoryName(Path.GetDirectoryName(Path.GetDirectoryName(_vaultScript))), "vectors");
+                VectorRecord v = Nsv.Load(vectors, "dh-group14-rfc3526.nsv", "dh-group14-params")[0];
+                p = DhWalkClauses.FromHex(v.Str("p")); g = DhWalkClauses.FromHex(v.Str("g"));
+                x = DhWalkClauses.FromHex("9b" + new string('3', 62)); y = DhWalkClauses.FromHex("a7" + new string('5', 62));
+            }
+            System.Numerics.BigInteger cp = System.Numerics.BigInteger.ModPow(g, x, p), sp = System.Numerics.BigInteger.ModPow(g, y, p);
+            WalkWrite(ctx, 200, D("group", group, "keySource", "practice", "prime", DhNum(p), "generator", DhNum(g),
+                "client", D("private", DhNum(x), "public", DhPow(g, x, p), "shared", DhPow(sp, x, p)),
+                "server", D("private", DhNum(y), "public", DhPow(g, y, p), "shared", DhPow(cp, y, p, M("dh-shared-mismatch")))), false);
+            return true;
+        }
+
+        static Dictionary<string, object> DhNum(System.Numerics.BigInteger v)
+        {
+            string hex = v.ToString("x").TrimStart('0');
+            if (hex.Length == 0) hex = "0";
+            if (hex.Length % 2 == 1) hex = "0" + hex;
+            return D("hex", hex, "dec", v.ToString(System.Globalization.CultureInfo.InvariantCulture));
+        }
+
+        Dictionary<string, object> DhPow(System.Numerics.BigInteger b, System.Numerics.BigInteger e, System.Numerics.BigInteger p, bool wrongResult = false)
+        {
+            System.Numerics.BigInteger acc = 1, bb = b % p;
+            int top = 0; for (System.Numerics.BigInteger t = e; t > 0; t >>= 1) top++;
+            List<object> rows = new List<object>();
+            for (int bit = top - 1; bit >= 0; bit--)
+            {
+                bool one = !(e >> bit).IsEven;
+                if (!M("dh-row-skip-square")) acc = acc * acc % p;
+                Dictionary<string, object> row = D("bit", (double)bit, "isOne", one, "afterSquare", DhNum(acc));
+                if (one) { acc = acc * bb % p; row["afterMultiply"] = DhNum(acc); }
+                rows.Add(row);
+            }
+            System.Numerics.BigInteger result = wrongResult ? (acc + 1) % p : acc;
+            return D("base", DhNum(bb), "exponent", DhNum(e), "result", DhNum(result), "rows", rows);
+        }
+
         /// <summary>True when the path is a walk route. The route has answered by then.</summary>
         bool WalkRoute(HttpListenerContext ctx, string path)
         {

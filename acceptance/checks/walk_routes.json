@@ -7,6 +7,8 @@
     { "route": "/api/sessions/{id}/walk/aes/ghash", "off": "409 KEYS_HIDDEN", "why": "it holds H, and each Y value is built from H" },
     { "route": "/api/sessions/{id}/walk/aes/forge", "off": "409 KEYS_HIDDEN", "why": "H is key material, on Jared's recommendation" },
     { "route": "/api/walk/tls13/schedule", "off": "open", "why": "it runs on the public inputs of RFC 8448 section 3, never on a session's key (sections-plan.md section 4). Clause: A19.host.tls13-schedule-open-and-rfc8448" },
+    { "route": "/api/walk/dh", "off": "open", "why": "it runs on public practice exponents, never a session's key (sections-plan.md section 4, slice P7). Clause: A19.host.dh-walk-open-and-modpow" },
+    { "route": "/api/walk/x25519", "off": "open", "why": "it runs on RFC 7748 section 6.1's public test scalars, never a session's key (sections-plan.md section 4, slice P8). Clause: A19.host.x25519-walk-open-and-rfc7748" },
     { "route": "/api/walk/aes/typed-block", "off": "open", "why": "it runs only on the public practice key, and reads no run's key (section 2.2g). Clause: A19.host.typed-routes-open-with-keys-off" },
     { "route": "/api/walk/aes/long-text", "off": "open", "why": "it runs only on the public practice key, and reads no run's key (section 2.2g). Clause: A19.host.typed-routes-open-with-keys-off" }
   ]
