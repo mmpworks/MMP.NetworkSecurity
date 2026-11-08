@@ -324,7 +324,7 @@ dotnet test tests/NetSec.Tests -c Release -f net48   $cf --logger trx --results-
 pwsh acceptance/run.ps1 -Clauses <list>
 python tools/tour_lint.py app/src/tours --max-grade 8.9 --max-concept 0.30
 python ~/.claude/hooks/tic-gate.py <each changed tour file>
-cd app; npx playwright test e2e/lesson-<n>.spec.ts
+cd app; node node_modules/@playwright/test/cli.js test e2e/lesson-<n>.spec.ts
 python tools/lessons_status.py docs/_runs
 ```
 | Slice | Clauses | Extras before the base gate |

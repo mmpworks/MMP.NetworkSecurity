@@ -25,7 +25,7 @@ Owner: Nancy. Decision owner: Steve. Date: 2026-11-06.
 The work ends when all of these are true, by 2026-11-13:
 
 1. All 5 slices are merged.
-2. `npx playwright test` passes every spec on one head, and `acceptance/run.ps1 -Clauses All` has no new failure against main. The real-Electron fit test failed 2 times in 33 runs, then 0 times in 67, with no cause found (#181). Steve waived it on 2026-11-06 until it happens again. The catch stays in the test, and a next failure goes down the `/bugfix` path.
+2. `node node_modules/@playwright/test/cli.js test` (in `app/`) passes every spec on one head, and `acceptance/run.ps1 -Clauses All` has no new failure against main. The real-Electron fit test failed 2 times in 33 runs, then 0 times in 67, with no cause found (#181). Steve waived it on 2026-11-06 until it happens again. The catch stays in the test, and a next failure goes down the `/bugfix` path.
 3. Real Electron at 1440 x 770 and 1280 x 640 shows 0 cut panels, 0 cut lesson names, and 1 row of top-bar controls.
 4. Steve has seen slice 2 and slice 3 in the app and reacted.
 

@@ -2,6 +2,15 @@
 // only when every run passes. Usage: node scripts/concurrent-e2e.mjs [base ...] -- [playwright args]
 // Default: bases 36200 and 36300, and the specs that start a preview, both Hosts and a real Electron Host.
 import { spawn } from 'node:child_process'
+import { existsSync } from 'node:fs'
+import { fileURLToPath } from 'node:url'
+
+// The local Playwright CLI, never the package runner: it can run a package of the same name from outside this repo.
+const cli = fileURLToPath(new URL('../node_modules/@playwright/test/cli.js', import.meta.url))
+if (!existsSync(cli)) {
+  console.error(`TOOL_MISSING: ${cli} is absent. Run npm ci in app/.`)
+  process.exit(4)
+}
 
 const sep = process.argv.indexOf('--')
 const bases = process.argv.slice(2, sep < 0 ? undefined : sep).map(Number).filter(Number.isInteger)
@@ -11,8 +20,8 @@ const runs = bases.length ? bases : [36200, 36300]
 function run(base) {
   return new Promise(resolve => {
     const started = Date.now()
-    const child = spawn('npx', ['playwright', 'test', `--output=test-results/concurrent-${base}`, ...specs], {
-      stdio: ['ignore', 'pipe', 'pipe'], shell: true,
+    const child = spawn(process.execPath, [cli, 'test', `--output=test-results/concurrent-${base}`, ...specs], {
+      stdio: ['ignore', 'pipe', 'pipe'],
       env: { ...process.env, NETSEC_PORT_BASE: String(base) },
     })
     let tail = ''
