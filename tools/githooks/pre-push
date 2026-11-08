@@ -1,0 +1,3 @@
+#!/bin/sh
+# Git runs this before every push (core.hooksPath = tools/githooks, set by tools/bootstrap.ps1). The rule lives in pre_push_guard.py.
+exec python -I "$(dirname "$0")/pre_push_guard.py" "$@"
