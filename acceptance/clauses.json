@@ -2641,6 +2641,17 @@
    "counts": true
   },
   {
+   "id": "A19.host.real-curve-open-and-on-curve",
+   "base": "A19.host.real-curve-open-and-on-curve",
+   "assertion": "A19",
+   "group": "a17",
+   "build": "host",
+   "slice": "W1",
+   "referee": "FIPS 197 (2001) data, the suite's RefAes, and the .NET library",
+   "roles": [],
+   "counts": true
+  },
+  {
    "id": "A19.host.replies-carry-no-store",
    "base": "A19.host.replies-carry-no-store",
    "assertion": "A19",
@@ -2687,6 +2698,17 @@
   {
    "id": "A19.host.tls13-schedule-open-and-rfc8448",
    "base": "A19.host.tls13-schedule-open-and-rfc8448",
+   "assertion": "A19",
+   "group": "a17",
+   "build": "host",
+   "slice": "W1",
+   "referee": "FIPS 197 (2001) data, the suite's RefAes, and the .NET library",
+   "roles": [],
+   "counts": true
+  },
+  {
+   "id": "A19.host.toy-curve-open-and-brute-force",
+   "base": "A19.host.toy-curve-open-and-brute-force",
    "assertion": "A19",
    "group": "a17",
    "build": "host",
