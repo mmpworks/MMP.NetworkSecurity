@@ -1,4 +1,5 @@
 import { expect, test, type Page } from '@playwright/test'
+import { scanPage, setTheme } from './contrast'
 import { open } from './walk'
 
 // Steve's 3 fixes to the AES walk, to match the approved mock (E:/dev/ns-mock/design/mock/, the published copy): the block cells show
@@ -73,9 +74,9 @@ test('with motion on, Next onto a word shows the build rows one after another, t
   expect(new Set(samples.map(s => s.filled)), 'the bytes fill one at a time').toEqual(new Set([0, 1, 2, 3, 4]))
   // The byte XOR line: byte 0 of w0, the value it meets, and byte 0 of w4, each as 8 bits.
   const bits = (hex: string) => parseInt(hex, 16).toString(2).padStart(8, '0')
-  const back = ((await page.getByTestId('aes-walk-build-key-back').textContent()) ?? '').match(/[0-9a-f]{8}/)![0]
-  const meets = ((await page.getByTestId('aes-walk-build-after-rcon').textContent()) ?? '').match(/[0-9a-f]{8}/)![0]
-  const word = ((await page.getByTestId('aes-walk-build-word').textContent()) ?? '').match(/[0-9a-f]{8}/)![0]
+  const valueOf = async (stage: string) => ((await page.getByTestId(`aes-walk-build-${stage}`).locator('code').textContent()) ?? '').replace(/\s+/g, '')
+  const back = await valueOf('key-back'), meets = await valueOf('after-rcon'), word = await valueOf('word')
+  for (const v of [back, meets, word]) expect(v, 'a stage row holds 4 bytes').toMatch(/^[0-9a-f]{8}$/)
   const frame = samples.map(s => s.xor.replace(/\s+/g, '')).find(x => x.includes(bits(back.slice(0, 2))) && x.includes(bits(meets.slice(0, 2))) && x.includes(bits(word.slice(0, 2))))
   expect(frame, 'one frame shows byte 0 of w0, the value it meets, and byte 0 of w4, in bits').toBeTruthy()
 })
@@ -115,6 +116,20 @@ test('a tap on a built word replays its build, and the title names it', async ({
   expect(first, 'the replay starts without every row').toBeLessThan(STAGES.length)
   await expect(stageRows(page)).toHaveCount(STAGES.length, { timeout: 10_000 })
 })
+
+for (const theme of ['light', 'dark'] as const) {
+  test(`the block's corners, the role colors and the build panel read at 4.5 to 1 in the ${theme} theme`, async ({ page }) => {
+    await openPractice(page)
+    await setTheme(page, theme)
+    await toStop(page, FILL_END)
+    let s = await scanPage(page)
+    expect(s.fails, `block: ${JSON.stringify(s.fails.slice(0, 5))}`).toEqual([])
+    await toStop(page, 2)
+    s = await scanPage(page)
+    expect(s.checked, 'the scan read the key schedule').toBeGreaterThan(100)
+    expect(s.fails, `key schedule: ${JSON.stringify(s.fails.slice(0, 5))}`).toEqual([])
+  })
+}
 
 const noSideways = (page: Page) => page.evaluate(() => {
   const ks = document.querySelector('[data-testid="aes-walk-key-schedule"]') as HTMLElement

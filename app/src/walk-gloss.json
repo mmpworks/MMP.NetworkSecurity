@@ -55,7 +55,12 @@
     "band256": "The first 8 words are the key, so round key 1 is all key bytes.",
     "keyNote": "This word is part of the key, so nothing is calculated.",
     "rcon": "Round constants. Each value is the one before it, doubled in the field. The list starts at 01. No key goes in, so every AES key uses this same list.",
-    "rconUnused": "AES-{bits} uses {used} of these 10."
+    "rconUnused": "AES-{bits} uses {used} of these 10.",
+    "tapHint": "Each column is one word. Tap a built word to see how it was made.",
+    "rotCopy": "RotWord works on a copy of w{prev}, so w{prev} itself does not change. The copy moves up one byte, and the top byte wraps to the bottom. All 4 bytes of w{i} then use this one finished copy.",
+    "subCopy": "AES-256 only: a copy of w{prev} goes through the S-box, with no rotation. w{prev} itself does not change.",
+    "fillsKey": "The key fills w0 to w{last}",
+    "madeOf": "How w{i} is made"
   },
   "sbox": {
     "pick": "Click a byte in the grid. Its first digit picks the row and its second digit picks the column.",

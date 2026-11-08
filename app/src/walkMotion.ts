@@ -54,15 +54,8 @@ export function startMotion({ root, to, tables, nk, animate }: MotionInput) {
     if (el) animate(el, [{ transform: 'translateY(-28px)', opacity: 0 }, { transform: 'translateY(0)', opacity: 1 }], { duration: 300 })
     return
   }
-  if (to.kind === 'keys') {
-    if (to.built === 0) return
-    const word = nk + to.built - 1
-    for (let b = 0; b < 4; b++) {
-      const el = root.querySelector(`[data-testid="aes-walk-table-cell-${4 * word + b}"]`)
-      if (el) animate(el, [{ transform: 'scale(0.4)', opacity: 0 }, { transform: 'scale(1)', opacity: 1 }], { duration: 260, delay: 110 * b })
-    }
-    return
-  }
+  // The key schedule panel plays each word's build itself, on the same clock (KeySchedulePanel.vue).
+  if (to.kind === 'keys') return
   if (to.kind !== 'step') return
   const kind = to.step.kind
   const old = (i: number) => byteAt(to.prev, i)
