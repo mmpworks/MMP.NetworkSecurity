@@ -19,6 +19,7 @@
     <Compile Include="..\groups\a17\A17Kit.cs" Link="a17\A17Kit.cs" />
     <Compile Include="..\groups\a17\Tls13WalkClauses.cs" Link="a17\Tls13WalkClauses.cs" />
     <Compile Include="..\groups\a17\X25519WalkClauses.cs" Link="a17\X25519WalkClauses.cs" />
+    <Compile Include="..\groups\a17\Ed25519WalkClauses.cs" Link="a17\Ed25519WalkClauses.cs" />
     <Compile Include="..\groups\a17\DhWalkClauses.cs" Link="a17\DhWalkClauses.cs" />
     <Compile Include="..\groups\a17\Tls11WalkClauses.cs" Link="a17\Tls11WalkClauses.cs" />
     <Compile Include="..\groups\a17\CurveWalkClauses.cs" Link="a17\CurveWalkClauses.cs" />
