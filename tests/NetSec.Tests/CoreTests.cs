@@ -375,6 +375,21 @@ namespace NetSec.Tests
             Assert.True(close.IsCompleted && !close.IsFaulted, "a close after the end must stay a quiet success");
         }
 
+        /// <summary>The idle limit is set by role only (issue #309): the opener waits twice the read deadline, the acceptor three times. The detail names it.</summary>
+        [Theory]
+        [InlineData(true, "no bytes for 400 ms")]
+        [InlineData(false, "no bytes for 600 ms")]
+        public void A_silent_peer_waits_twice_the_deadline_as_opener_and_three_times_as_acceptor(bool opened, string detail)
+        {
+            MemoryLink[] links = MemoryLink.Pair();
+            EnginePump client = new EnginePump(EchoEngine.Client(Make.Hello, Make.Stream("client"), null), links[0], null, null, null, 200);
+            client.OpenedLink = opened;
+            IFuture<PumpResult> run = client.Run();
+            Make.Done(run);
+            Assert.Equal(ErrorCodes.LinkIdle, run.Result.Error.Code);
+            Assert.StartsWith(detail, run.Result.Error.Message);
+        }
+
         static Pair FlippedLength(int serverDeadlineMs, int clientDeadlineMs)
         {
             MemoryLink[] links = MemoryLink.Pair();
