@@ -111,6 +111,9 @@ namespace NetSec.Crypto
             r = rx.Mod(P256.N);
             BigUInt kInverse = InvN(k);
             s = kInverse.Multiply(e.Add(r.Multiply(x))).Mod(P256.N);
+            // RFC 6979 section 3.2 and FIPS 186-5 draw a new k when r or s is 0. The chance is about 2^-256, and this code signs only RFC 6979's
+            // fixed test key, whose r and s are not 0, so it throws rather than retries (Jared, #289).
+            if (r.IsZero || s.IsZero) throw new InvalidOperationException("r or s is 0; RFC 6979 would draw a new k");
             if (trace != null)
             {
                 trace.Hash = hash; trace.E = e; trace.K = k;

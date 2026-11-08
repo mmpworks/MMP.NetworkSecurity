@@ -102,7 +102,8 @@ namespace NetSec.Labs
             Require(valid && EcdsaP256.Verify(qx, qy, m, r, s));
             EcdsaWalkBit last = w.Bits[w.Bits.Length - 1];
             Require(Same(last.IsOne ? last.AddX : last.DoubleX, w.Rx) && Same(last.IsOne ? last.AddY : last.DoubleY, w.Ry));
-            Require(Same(w.Xx, w.Rx) || verifying.Xx.Mod(P256.N).CompareTo(r) == 0);
+            // u1*G + u2*Q equals R as a point, so both coordinates must match; Verify's own x mod n check is weaker (Jared, #289).
+            Require(Same(w.Xx, w.Rx) && Same(w.Xy, w.Ry));
             return w;
         }
 
