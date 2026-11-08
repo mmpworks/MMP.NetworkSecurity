@@ -35,7 +35,19 @@ namespace NetSec.Tests
                 Task[] copies = Enumerable.Range(0, cap + 2).Select(i => Task.Run(() => SshTests.FactoryExec(i % 2 == 0 ? SshSuite.Modern : SshSuite.Legacy))).ToArray();
                 Task all = Task.WhenAll(copies);
                 Task first = await Task.WhenAny(all, Task.Delay(TimeSpan.FromSeconds(30)));
-                Assert.True(first == all, $"{copies.Count(c => !c.IsCompleted)} of {copies.Length} copies had not finished after 30 s on a pool capped at {cap} threads");
+                if (first != all)
+                {
+                    // Tell starvation from a hang (the lead's question on #308): lift the cap, let the pool add threads fast, and wait 60 s more.
+                    // If every copy then finishes, it was starvation: slow, but it heals. If some never finish with threads to spare, it is a hang.
+                    int stuck = copies.Count(c => !c.IsCompleted);
+                    ThreadPool.SetMaxThreads(workers, io);
+                    ThreadPool.SetMinThreads(Math.Max(minWorkers, cap * 8), minIo);
+                    Task after = await Task.WhenAny(all, Task.Delay(TimeSpan.FromSeconds(60)));
+                    string shape = after == all
+                        ? "STARVATION: all finished once the cap was lifted"
+                        : $"HANG: {copies.Count(c => !c.IsCompleted)} still unfinished 60 s after the cap was lifted";
+                    Assert.Fail($"{stuck} of {copies.Length} copies had not finished after 30 s on a pool capped at {cap} threads. {shape}.");
+                }
                 await all;
             }
             finally
