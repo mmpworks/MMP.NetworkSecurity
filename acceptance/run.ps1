@@ -97,6 +97,22 @@ function Invoke-Tool {
     return [pscustomobject]@{ ExitCode = $p.ExitCode; Output = $text }
 }
 
+# An npm ci when node_modules is missing, when -Force, or when package-lock.json changed since the last good install. A tree that kept
+# node_modules across a lockfile change built against old packages, and the app build failed on a missing import (#288's run, 2026-11-08).
+# After a good install the lockfile's SHA-256 goes into node_modules/.netsec-lock.sha256; a missing or different stamp means install again.
+# Returns the tool run, or $null when node_modules is current.
+function Invoke-NpmCiIfStale([string]$Dir, [switch]$Force) {
+    $modules = Join-Path $Dir 'node_modules'
+    $stamp = Join-Path $modules '.netsec-lock.sha256'
+    $lock = Join-Path $Dir 'package-lock.json'
+    $want = if (Test-Path $lock) { (Get-FileHash -Algorithm SHA256 $lock).Hash } else { 'no-lockfile' }
+    $have = if (Test-Path $stamp) { (Get-Content $stamp -Raw).Trim() } else { $null }
+    if (-not $Force -and (Test-Path $modules) -and $have -eq $want) { return $null }
+    $run = Invoke-Tool 'npm' @('ci', '--no-audit', '--no-fund') $Dir -TimeoutSec 1200
+    if ($run.ExitCode -eq 0) { Set-Content -Path $stamp -Value $want -NoNewline }
+    return $run
+}
+
 function Tail([string]$s, [int]$n = 600) { $s = ($s ?? '').Trim(); if ($s.Length -gt $n) { return $s.Substring($s.Length - $n) } else { return $s } }
 
 # ------------------------------------------------------------------ load the clause list
@@ -385,10 +401,12 @@ if ($e2eMine.Count -gt 0) {
       try {
         $app = Join-Path $ProductRoot 'app'
         $toolRuns = @()
-        if (-not (Test-Path (Join-Path $app 'node_modules')) -or $FreshChild) { $toolRuns += Invoke-Tool 'npm' @('ci', '--no-audit', '--no-fund') $app -TimeoutSec 1200 }
+        $appCi = Invoke-NpmCiIfStale $app -Force:$FreshChild
+        if ($appCi) { $toolRuns += $appCi }
         $appBuild = Invoke-Tool 'npm' @('run', 'build') $app -TimeoutSec 1200
         $toolRuns += $appBuild
-        if (-not (Test-Path (Join-Path $e2e 'node_modules'))) { $toolRuns += Invoke-Tool 'npm' @('ci', '--no-audit', '--no-fund') $e2e -TimeoutSec 1200 }
+        $e2eCi = Invoke-NpmCiIfStale $e2e
+        if ($e2eCi) { $toolRuns += $e2eCi }
         $missing = @($toolRuns | Where-Object { $_.ExitCode -eq -998 })
         # A failed build leaves the last good app/dist in place, so the specs would judge an old screen and could pass (#288's red run did,
         # 2026-11-08). A failed build or install fails every selected e2e clause by name, and no spec runs.
