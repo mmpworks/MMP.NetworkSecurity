@@ -395,7 +395,7 @@ namespace NetSec.Tests
         // Issue #309. The read deadline and the idle limits must end a stuck run on a fixed side, so one seed shows one trace.
         // The test deadline is 3,000 ms, so the role gap between opener and acceptor is 3 s; at 1,000 ms a starved pump on a saturated
         // machine missed the 1 s gap (#316's gate). The product's gap is 30 s.
-        // NETSEC_LOAD_RUNS=1 (dedicated loops and the clock kill condition) runs 20 runs, the second half beside a CPU burner on every core:
+        // NETSEC_LOAD_RUNS=1 (set by `pwsh tools/load_runs.ps1` under the heavy lock, and by the clock kill condition) runs 20 runs, the second half beside a CPU burner on every core:
         // that is where "20 of 20" is measured. The shared suite runs 6 runs with no burner. The burner doubled the suite's time and loaded
         // every class running beside it, and 20 runs at a 3 s deadline pushed acceptance A9's suite run past its 900 s limit.
         static readonly bool LoadRuns = Environment.GetEnvironmentVariable("NETSEC_LOAD_RUNS") == "1";

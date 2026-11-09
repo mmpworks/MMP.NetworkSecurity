@@ -352,6 +352,8 @@ ssh.exe -F NUL -o BatchMode=yes -o UserKnownHostsFile=<file> -i <key> -L P:127.0
 tap -listen 127.0.0.1:A -to 127.0.0.1:B -log hop.hex [-flip-at N]                                                       # A10, A10a
 tokenverify -pub issuer.pub -token <jws>                                                                                # A11
 ```
+Under-load runs, outside the gate. The shared suite runs the #309 side tests 6 times with no burner. `pwsh tools/load_runs.ps1` runs them 20 times each, the second half beside a CPU burner on every core (`NETSEC_LOAD_RUNS=1`). It takes the heavy lock and writes `docs/_runs/<date>-load-runs.md`. Run it after a change to the pump, the deadline rule or the side tests, and before a claim of "20 of 20 under load".
+
 A10 runs from outside the app, with the steps in section 11. Expected tamper codes: `SSH_PACKET_MAC`, `TLS13_AEAD_TAG`, `DUKPT_MAC_MISMATCH`, each beside a passing control.
 
 Electron spawns the Host detached, handles `EPIPE` as in the MMP.GasPumpSimulator `main.cjs`, and ends the tree with `taskkill /T`. `e2e/start.spec.ts` launches real Electron with `_electron.launch`. Lesson walks run against `vite preview` on 4180 and a live Host on 5180, one worker (or the `NETSEC_PORT_BASE` block, which gives each worktree its own ports).
