@@ -43,6 +43,24 @@ param(
     [switch]$FreshChild
 )
 
+# Every run takes the machine-wide heavy-run lock first (tools/heavy_lock.py, #320), so acceptance runs queue behind gates and app suites
+# instead of loading a busy machine. A run started under a holder (a gate, a -Fresh parent, or this wrapper) has NETSEC_HEAVY_LOCK_HELD set
+# and goes straight on. A missing lock tool fails the run by name; it never skips the lock.
+if (-not $env:NETSEC_HEAVY_LOCK_HELD) {
+    $lockTool = Join-Path $PSScriptRoot '..\tools\heavy_lock.py'
+    if (-not (Test-Path $lockTool)) { Write-Host "[acceptance] LOCK_MISSING: $lockTool is absent, so this run cannot queue behind other heavy runs"; exit 3 }
+    # param() binds every argument, so $args is empty: forward the bound parameters, switches as bare names.
+    $forward = @()
+    foreach ($p in $PSBoundParameters.GetEnumerator()) {
+        if ($p.Value -is [System.Management.Automation.SwitchParameter]) { if ($p.Value.IsPresent) { $forward += "-$($p.Key)" } }
+        else { $forward += "-$($p.Key)"; $forward += (@($p.Value) -join ',') }
+    }
+    $label = 'acceptance ' + (@($Clauses) -join ',')
+    if ($label.Length -gt 80) { $label = $label.Substring(0, 77) + '...' }
+    python -I $lockTool run --label $label -- pwsh -NoProfile -File $PSCommandPath @forward
+    exit $LASTEXITCODE
+}
+
 $ErrorActionPreference = 'Stop'
 Set-StrictMode -Version Latest
 $acc = $PSScriptRoot
