@@ -202,7 +202,7 @@ class RunStatus(unittest.TestCase):
         path = pathlib.Path(self.tmp.name) / "run.log"
         path.write_text("✓ 697 modules transformed.\n", encoding="utf-8")       # the vite line that crashed the tool
         env = {**os.environ, "PYTHONIOENCODING": "cp1252", "PYTHONUTF8": "0"}
-        r = subprocess.run([sys.executable, "-I", str(SCRIPT), str(path)], capture_output=True, env=env)
+        r = subprocess.run([sys.executable, str(SCRIPT), str(path)], capture_output=True, env=env)   # no -I: -I ignores PYTHONIOENCODING, and the test needs the cp1252 console
         self.assertEqual(r.returncode, 2, r.stderr)
         self.assertNotIn(b"Traceback", r.stderr)
 

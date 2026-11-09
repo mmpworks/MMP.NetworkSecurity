@@ -28,7 +28,7 @@ GATE_EXIT = re.compile(r"^gate exit (?P<code>\d+)", re.M)
 # The commit a run was made on: tools/gate.ps1 prints "gate <slice> @ <sha>[+dirty]" first, and the Playwright globalSetup prints "run @ <sha>[+dirty]".
 HEAD_LINE = re.compile(r"^(?:gate \S+|run) @ (?P<head>[0-9a-f]+(?:\+dirty)?|unknown)\s*$", re.M)
 HEAVY_FINISHED = re.compile(r"^HEAVY_LOCK finished exit (?P<code>-?\d+)\s*$", re.M)
-GATE_STEP =re.compile(r"^== (?P<name>.+?)(?::.*)?$", re.M)
+GATE_STEP = re.compile(r"^== (?P<name>.+?)(?::.*)?$", re.M)
 PW_PASSED = re.compile(r"^\s*(?P<n>\d+) passed \(", re.M)
 PW_FAILED = re.compile(r"^\s*(?P<n>\d+) failed\s*$", re.M)
 PW_NOT_RUN = re.compile(r"^\s*(?P<n>\d+) did not run\s*$", re.M)

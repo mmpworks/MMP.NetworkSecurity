@@ -80,11 +80,12 @@ class HeavyLock(unittest.TestCase):
         self.fail(f"fewer than {count} tickets appeared")
 
     def test_run_takes_the_lock_while_the_command_runs_and_frees_it_after(self):
-        p = self.start_run("long job", *PY, "import time; time.sleep(4)")
+        p, release = self.start_release_holder("long job")
         self.wait_until_held()
         status = self.tool("status")
         self.assertEqual(status.returncode, 2, status.stdout)
         self.assertIn("long job", status.stdout)
+        release.write_text("go", encoding="utf-8")                          # the holder ends only after the status check, however slow the machine is
         p.communicate(timeout=60)
         self.assertEqual(self.tool("status").returncode, 0)
 
@@ -110,9 +111,11 @@ class HeavyLock(unittest.TestCase):
         self.assertEqual(self.tool("status").returncode, 2, "the waiter did not disturb the holder")
 
     def test_a_waiter_gets_the_lock_when_the_holder_ends(self):
-        self.start_run("first", *PY, "import time; time.sleep(4)")
+        _, release = self.start_release_holder("first")
         self.wait_until_held()
         waiter = self.start_run("second", *PY, "print('second ran')", wait=2)
+        self.wait_for_tickets(1)                                            # the waiter is in line before the holder ends, so it must wait
+        release.write_text("go", encoding="utf-8")
         out, _ = waiter.communicate(timeout=90)
         self.assertEqual(waiter.returncode, 0, out)
         self.assertIn("HEAVY_LOCK waiting on 'first'", out)
