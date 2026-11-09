@@ -166,12 +166,19 @@ namespace Acceptance
             return pinned;
         }
 
-        [Clause("A9.cf.same-suite-passes-on-net48-skips-pinned")]
+        // Two full Core suite runs, and the suite grows with every lesson. At 900 s the clause had about 25% headroom (638 s and 696 s on
+        // 2026-11-08), and one test file's growth timed it out (#327). Its own budget is 1800 s, about 2.6 times the slowest measured run;
+        // the report warns at 75% of it (1350 s), so growth shows before a timeout. The detail records each suite run's time.
+        [Clause("A9.cf.same-suite-passes-on-net48-skips-pinned", TimeoutSec = 1800)]
         public static string SameSuiteOnNet48(Ctx c)
         {
             c.RequireProduct();
+            System.Diagnostics.Stopwatch sw10 = System.Diagnostics.Stopwatch.StartNew();
             TrxResult net10 = RunSuite(c, "net10.0", "net10");
+            long s10 = sw10.ElapsedMilliseconds / 1000;
+            System.Diagnostics.Stopwatch sw48 = System.Diagnostics.Stopwatch.StartNew();
             TrxResult net48 = RunSuite(c, "net48", "net48");
+            long s48 = sw48.ElapsedMilliseconds / 1000;
             HashSet<string> pinned = PinnedSkips(c);
             Tally t = new Tally();
             t.Expect("net10.0 run", net10.Failed.Count == 0 && net10.Passed.Count > 0, net10.Failed.Count + " failed, " + net10.Passed.Count + " passed. First failures: " + string.Join("; ", net10.Failed.Take(3).ToArray()));
@@ -181,7 +188,7 @@ namespace Acceptance
             foreach (string n in net10.Passed)
                 if (!net48.Passed.Contains(n) && !pinned.Contains(n))
                     t.Miss("test '" + n + "'", "passes on net10.0 and did not pass on net48, and the skip list does not pin it");
-            return t.Done() + "; net10.0 " + net10.Passed.Count + " passed, net48 " + net48.Passed.Count + " passed, " + net48.Skipped.Count + " skipped (all pinned)";
+            return t.Done() + "; net10.0 " + net10.Passed.Count + " passed, net48 " + net48.Passed.Count + " passed, " + net48.Skipped.Count + " skipped (all pinned); suite runs took " + s10 + " s (net10.0) and " + s48 + " s (net48)";
         }
 
         // ---------------------------------------------------------------- git ls-files

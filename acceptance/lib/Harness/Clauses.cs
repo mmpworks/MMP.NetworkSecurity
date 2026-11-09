@@ -14,6 +14,8 @@ namespace Acceptance
     {
         public readonly string Id;
         public bool PerBuild;
+        /// <summary>This clause's own time budget in seconds; 0 takes the runner's default (900 s, or --timeout). The report warns at 75% of it (#327).</summary>
+        public int TimeoutSec;
         public ClauseAttribute(string id) { Id = id; }
     }
 
@@ -196,11 +198,20 @@ namespace Acceptance
 
         sealed class Result
         {
-            public string Id, Status, Reason, Detail; public long Ms;
+            public string Id, Status, Reason, Detail; public long Ms; public int BudgetSec;
             public Result(string id, string status, string reason, string detail, long ms) { Id = id; Status = status; Reason = reason; Detail = detail; Ms = ms; }
         }
 
-        static Result Execute(string id, MethodInfo m, Ctx c, int timeoutSec)
+        static Result Execute(string id, MethodInfo m, Ctx c, int defaultSec)
+        {
+            ClauseAttribute a = (ClauseAttribute)Attribute.GetCustomAttribute(m, typeof(ClauseAttribute));
+            int timeoutSec = a != null && a.TimeoutSec > 0 ? a.TimeoutSec : defaultSec;
+            Result r = Timed(id, m, c, timeoutSec);
+            r.BudgetSec = timeoutSec;
+            return r;
+        }
+
+        static Result Timed(string id, MethodInfo m, Ctx c, int timeoutSec)
         {
             Stopwatch sw = Stopwatch.StartNew();
             Result result = null;
@@ -257,7 +268,7 @@ namespace Acceptance
             StringBuilder sb = new StringBuilder();
             sb.Append("@@CLAUSE {\"id\":").Append(Q(r.Id)).Append(",\"status\":").Append(Q(r.Status))
               .Append(",\"reason\":").Append(Q(r.Reason)).Append(",\"detail\":").Append(Q(r.Detail))
-              .Append(",\"ms\":").Append(r.Ms).Append('}');
+              .Append(",\"ms\":").Append(r.Ms).Append(",\"budgetSec\":").Append(r.BudgetSec).Append('}');
             Console.Out.WriteLine(sb.ToString());
             Console.Out.Flush();
         }
