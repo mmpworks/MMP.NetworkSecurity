@@ -1,5 +1,5 @@
 <script setup lang="ts">
-import { computed, nextTick, ref, watch } from 'vue'
+import { computed, nextTick, provide, ref, watch } from 'vue'
 import gloss from '../walk-gloss.json'
 import { SPEEDS, useWalkTimeline } from '../useWalkTimeline'
 import { byteAt, cellIndex, cellText, keyWordsOf, letterOf, playGroupOf, stopsOf, textOf, type AesBlockReply, type AesTables, type Stop } from '../walk'
@@ -19,6 +19,8 @@ const ROWS = [0, 1, 2, 3]
 
 // The one clock: every motion and every wait goes through it (design 2.2a). The root element holds all of them.
 const tl = useWalkTimeline()
+// The key schedule panel plays each word's build on this same clock, so Pause, Next and Back reach it too.
+provide('aesWalkTimeline', tl)
 const root = ref<HTMLElement | null>(null)
 watch(() => props.block, () => { stopTimeline(); at.value = 0 })
 
@@ -51,6 +53,12 @@ function next() {
   if (tl.moving()) { tl.finishNow(); return }
   tl.playing.value = false
   void advance()
+}
+
+/** Start over, on the key schedule: back to the key alone, with no motion. */
+function startOver() {
+  stopTimeline()
+  at.value = stops.value.findIndex(s => s.kind === 'keys')
 }
 
 /** Back lands on the stop before, with no motion and no mark left behind. */
@@ -117,6 +125,13 @@ const where = computed(() => {
   return `${s.run === 'encrypt' ? 'Encrypt' : 'Decrypt'}, round ${s.step.round} of ${props.block.rounds}`
 })
 const letter = (r: number, c: number) => { const t = cellText(stop.value, r, c); return t ? letterOf(t) : '' }
+/** The character a cell shows, as the mock's block does: "sp" for a space, the character, or a dot for a byte that is not printable. */
+function charOf(r: number, c: number): string {
+  const t = cellText(stop.value, r, c)
+  if (!t) return ''
+  if (t === '20') return 'sp'
+  return letterOf(t) || '·'
+}
 const canPick = computed(() => isSub.value || isMix.value)
 </script>
 
@@ -136,7 +151,7 @@ const canPick = computed(() => isSub.value || isMix.value)
           :disabled="isEnd && !tl.running.value" :ripple="false" variant="tonal" data-testid="aes-walk-play"
           :prepend-icon="tl.buttonWord.value === 'Pause' ? 'mdi-pause' : 'mdi-play'" @click="playButton"
         >{{ tl.buttonWord.value }}</v-btn>
-        <v-btn color="primary" :disabled="isEnd" :ripple="false" data-testid="aes-walk-next" @click="next">Next</v-btn>
+        <v-btn color="primary" :disabled="isEnd" :ripple="false" data-testid="aes-walk-next" @click="next">{{ stop.kind === 'keys' && stops[at + 1]?.kind === 'keys' ? 'Next word' : 'Next' }}</v-btn>
       </div>
     </div>
     <div class="aw-bench">
@@ -148,9 +163,9 @@ const canPick = computed(() => isSub.value || isMix.value)
             v-for="c in ROWS" :key="c" class="aw-cell" role="gridcell" :data-testid="`aes-walk-cell-${r}-${c}`"
             :class="{ 'aw-picked': canPick && picked === cellIndex(r, c), 'aw-wrap': wrapped(r, c) }"
             :tabindex="canPick ? 0 : undefined"
-            :data-letter="letter(r, c) || undefined" data-hex-byte
+            :data-letter="letter(r, c) || undefined" data-hex-byte :data-hex="cellText(stop, r, c)"
             @click="pick(r, c)" @keydown.enter.prevent="pick(r, c)" @keydown.space.prevent="pick(r, c)"
-          >{{ cellText(stop, r, c) }}</span>
+          ><!-- The hex comes first, so a reader of the cell's text gets the byte first. The index and the character sit in the corners. -->{{ cellText(stop, r, c) }}<span class="aw-idx" :data-testid="`aes-walk-cell-${r}-${c}-index`" aria-hidden="true">{{ cellIndex(r, c) }}</span><span class="aw-ch" :data-testid="`aes-walk-cell-${r}-${c}-char`" aria-hidden="true">{{ charOf(r, c) }}</span></span>
         </div>
       </div>
       <div class="aw-right">
@@ -159,7 +174,7 @@ const canPick = computed(() => isSub.value || isMix.value)
           <p v-else-if="words">{{ words }}</p>
           <p v-if="isEnd" class="aw-readable-line">{{ gloss.end }} <span class="aw-readable" data-testid="aes-walk-readable">{{ textOf(stop.state) }}</span></p>
         </div>
-        <KeySchedulePanel v-if="stop.kind === 'keys'" :block="block" :tables="tables" :nk="nk" :built="stop.built" />
+        <KeySchedulePanel v-if="stop.kind === 'keys'" :block="block" :tables="tables" :nk="nk" :built="stop.built" @start-over="startOver" />
         <SboxView v-else-if="isSub" :table="stepKind === 'SubBytes' ? tables.sbox : tables.inverseSbox" :byte="byteIn" :inverse="stepKind === 'InvSubBytes'" />
         <FieldPanel v-else-if="isMix" :mixed="mixed" :cell="picked" />
       </div>
