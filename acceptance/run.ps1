@@ -15,7 +15,7 @@
 
 .PARAMETER Fresh
   Clone the product (committed state only) into a temp folder that sits beside the sibling MMP.AsyncProxy folder, run the clone's own
-  acceptance\run.ps1 there, and check acceptance\PIN with acceptance\tools\pin.py. A stale or old-form PIN is a FAIL of
+  acceptance\run.ps1 there, and check acceptance\PIN with acceptance\tools\pin.py. A missing, stale or old-form PIN is a FAIL of
   A13.fresh-clone.acceptance-unchanged. Use AsyncProxyRoot (parameter or environment variable) to say where the sibling is.
 
 .PARAMETER Contract
@@ -525,7 +525,8 @@ foreach ($c in @($pending | Where-Object { $_.group -eq 'driver' -and -not $resu
             $pinOut = (python -I (Join-Path $acc 'tools/pin.py') --root $ProductRoot --check 2>&1 | ForEach-Object { "$_" }) -join ' '
             $pinCode = $LASTEXITCODE
             $pinReason = if ($pinOut -match '^(?<code>[A-Z_]+):') { $Matches['code'] } else { 'PIN_CHECK_FAILED' }
-            if ($pinCode -ne 0 -and $pinReason -eq 'PIN_UNSET') { Set-Result $c.id 'NOT RUN' 'PIN_UNSET' $pinOut; break }
+            # Only the committed setting (acceptance/settings.json "pin": false) turns the check off. A missing PIN with the setting on is PIN_MISSING, a FAIL.
+            if ($pinReason -eq 'PIN_OFF') { Set-Result $c.id 'NOT RUN' 'PIN_OFF' $pinOut; break }
             if ($pinCode -ne 0) { Set-Result $c.id 'FAIL' $pinReason $pinOut; break }
             if (-not $productExists) { Set-Result $c.id "NOT RUN" "PRODUCT_MISSING" "$pinOut. The clause waits for a product to clone: src/NetSec.Core is absent." }
             else { Set-Result $c.id "PASS" "" "in this clone, $pinOut (PIN file excluded)" }

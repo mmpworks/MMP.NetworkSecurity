@@ -133,15 +133,15 @@ A cut role is listed in `roles.json`. Its clauses report NOT RUN `ROLE_CUT:<role
 | 11 | Ed25519 SSH keys are written as OpenSSH private key files | ssh.exe 9.5 rejects PKCS#8 |
 | 12 | Welch t uses a common 99th percentile crop | Raw t is dominated by scheduler outliers. Uncropped t is printed beside it |
 | 13 | `-Fresh` clones `HEAD` and runs the clone's own `run.ps1` | The third agent must run the code under review, not the code that launches it |
-| 14 | `PIN` holds `acceptance-tree <hash>`: the git tree hash of `acceptance/` with `PIN` left out. Every PR that changes `acceptance/` runs `python -I acceptance/tools/pin.py --write` and commits `PIN` in the same PR. The gate runs `pin.py --check` on every PR and names a stale `PIN` (`PIN_STALE`). A second gate check in `tools/` refuses a PR that changes `acceptance/` together with any path outside `acceptance/` and `docs/`, so only an acceptance PR moves `PIN` | A PR cannot know the commit it merges as, and a commit cannot name itself. A tree hash is known before the merge. The commit form went stale across many PRs, because only a `-Fresh` run looked |
+| 14 | `PIN` holds `acceptance-tree <hash>`: the git tree hash of `acceptance/` with `PIN` left out. Every PR that changes `acceptance/` runs `python -I acceptance/tools/pin.py --write` and commits `PIN` in the same PR. The gate runs `pin.py --check` on every PR and names a stale `PIN` (`PIN_STALE`). The committed setting `"pin": true` in `acceptance/settings.json` turns the check on, never the presence of `PIN`, so a deleted `PIN` fails by name (`PIN_MISSING`). `"pin": false` reads `PIN_OFF`, and the fresh-clone clause is then NOT RUN. A second gate check in `tools/` refuses a PR that changes `acceptance/` together with any path outside `acceptance/` and `docs/`, so only an acceptance PR moves `PIN` | A PR cannot know the commit it merges as, and a commit cannot name itself. A tree hash is known before the merge. The commit form went stale across many PRs, because only a `-Fresh` run looked |
 | 15 | `A15a` reads `claims [{text, source}]` at the top of each tour file (section 11), and also from a step, and verdict files by lesson | Section 11 names the shape, not the place |
 | 16 | `skiplist.json` is empty | No skip is justified yet |
 
 ## 6. NOT RUN reasons that are not PRODUCT_MISSING
 
 In the run above: `NOT_A_FRESH_RUN` for `A13.fresh-clone.acceptance-unchanged` (1 clause).
+`ACCURACY_READER_PENDING`, `NO_CLAIMS_DECLARED`, `UI_CONTROL_MISSING`, `VECTORS_MISSING`, `SIBLING_MISSING`, `TOOL_MISSING`, `PIN_OFF`, `WIZARD_PART_NOT_BUILT`, `FILE_ROW_NOT_BUILT`.
 These appear later by design, each named in the report: `REFEREE_MISSING`, `REFEREE_VERSION`, `REFEREE_PROTOCOL`, `ROLE_CUT:<role>`, `LESSON_NOT_BUILT`, `NO_LESSON_INSTALLS_KEYS`,
-`ACCURACY_READER_PENDING`, `NO_CLAIMS_DECLARED`, `UI_CONTROL_MISSING`, `VECTORS_MISSING`, `SIBLING_MISSING`, `TOOL_MISSING`, `PIN_UNSET`, `WIZARD_PART_NOT_BUILT`, `FILE_ROW_NOT_BUILT`.
 
 ## 7. Open items
 
