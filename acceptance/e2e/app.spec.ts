@@ -96,13 +96,24 @@ for (let n = 1; n <= 11; n++) {
   });
 }
 
+/**
+ * The first built lesson whose tour has a step bound to an event, of the given type when one is named. A clause picks its lesson by what
+ * it needs, never by its place in GET /api/lessons: #303 put lesson 0 first, a built lesson whose tour binds no event and shows no
+ * secret row, and the clauses that took "the first built lesson" opened it (#338).
+ */
+async function builtLessonWhoseTourBinds(eventType?: string): Promise<any | null> {
+  const lessons = await hostGet('/api/lessons');
+  const rows: any[] = Array.isArray(lessons.body) ? lessons.body : lessons.body?.lessons ?? [];
+  const binds = (n: number) => tourSteps(n).some(s => s?.bind?.kind === 'event' && (!eventType || s.bind.eventType === eventType));
+  return rows.find(r => r.built && binds(Number(r.lesson))) ?? null;
+}
+
 test('[A16.ui.training-only-label-on-glass] the chip reads TRAINING ONLY on a glass-box session', async ({ page }) => {
   requireLive();
   await openApp(page);
-  const lessons = await hostGet('/api/lessons');
-  const rows: any[] = Array.isArray(lessons.body) ? lessons.body : lessons.body?.lessons ?? [];
-  const firstBuilt = rows.find(r => r.built);
-  if (!firstBuilt) throw new NotRun('LESSON_NOT_BUILT', 'no lesson is built, so no glass-box session can start');
+  // A session runs when the tour waits on an event of the run.
+  const firstBuilt = await builtLessonWhoseTourBinds();
+  if (!firstBuilt) throw new NotRun('LESSON_NOT_BUILT', 'no built lesson has a tour step bound to an event of its run, so no glass-box session can start');
   await page.getByTestId(`lesson-item-${firstBuilt.lesson}`).click();
   const start = page.getByRole('button', { name: /start tour/i });
   if (await start.isVisible().catch(() => false)) await start.click();
@@ -139,10 +150,9 @@ test('[A17.ui.show-keys-switch] on by default; off replaces key bytes with finge
   const isOn = async () => (await sw.getAttribute('aria-checked')) === 'true' || (await sw.isChecked().catch(() => false));
   expect(await isOn(), 'the switch reads ON by default').toBe(true);
 
-  const lessons = await hostGet('/api/lessons');
-  const rows: any[] = Array.isArray(lessons.body) ? lessons.body : lessons.body?.lessons ?? [];
-  const built = rows.find(r => r.built);
-  if (!built) throw new NotRun('LESSON_NOT_BUILT', 'no lesson is built, so no secrets panel can fill');
+  // The lesson must put a key in the secrets panel: its tour has a step bound to keys.installed (#338: lesson 0 shows no secret row).
+  const built = await builtLessonWhoseTourBinds('keys.installed');
+  if (!built) throw new NotRun('LESSON_NOT_BUILT', 'no built lesson has a tour step bound to keys.installed, so no secrets panel can fill');
   await page.getByTestId(`lesson-item-${built.lesson}`).click();
   const start = page.getByRole('button', { name: /start tour/i });
   if (await start.isVisible().catch(() => false)) await start.click();
