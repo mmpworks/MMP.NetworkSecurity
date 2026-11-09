@@ -179,10 +179,11 @@ namespace NetSec.Bridge
             b.Close();
         }
 
+        /// <summary>Also stops when the other direction has ended: Join then closes both links, and a link that ignores Close would keep this copy going (issue #308).</summary>
         static IEnumerable<IFuture> Copy(IByteLink from, IByteLink to, Promise ended)
         {
             byte[] buffer = new byte[BufferSize];
-            while (true)
+            while (!ended.Future.IsCompleted)
             {
                 IFuture<int> read = from.Read(buffer, 0, buffer.Length);
                 yield return Futures.Observe(read);
