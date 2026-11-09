@@ -33,6 +33,14 @@ async function openItem(page: Page, item: string, root: string) {
 }
 const openCurve = (page: Page) => openItem(page, 'curve', 'curve-walk-panel')
 
+/** One value of RFC 7748 section 6.1 from the vector file (a_pub, b_pub or k, the shared secret), never from the engine. */
+function rfc7748(name: string): string {
+  const vec = fs.readFileSync(path.join(__dirname, '..', '..', 'acceptance', 'vectors', 'x25519-rfc7748.nsv'), 'utf8')
+  const m = (vec.split(/^\[x25519-dh\]/m)[1] ?? '').match(new RegExp(`^${name}\\s*=\\s*(?<hex>[0-9a-f]+)`, 'm'))
+  if (!m?.groups) throw new Error(`vectors/x25519-rfc7748.nsv has no ${name} in [x25519-dh]`)
+  return m.groups.hex
+}
+
 test('the rail holds "Elliptic curves" above X25519, and both walks have a status line', async ({ page }) => {
   await open(page)
   await page.getByTestId('section-techniques').click()
@@ -124,8 +132,7 @@ test('the nonce-reuse panel shows the engine\'s 2 signatures and the key it reco
 
 test('the X25519 walk shows one ladder row per bit with its swap, and ends on RFC 7748\'s value', async ({ page }) => {
   const x = await reply('/api/walk/x25519?step=alice-public')
-  const vec = fs.readFileSync(path.join(__dirname, '..', '..', 'acceptance', 'vectors', 'x25519-rfc7748.nsv'), 'utf8')
-  const want = (vec.split(/^\[x25519-dh\]/m)[1] ?? '').match(/^a_pub\s*=\s*(?<hex>[0-9a-f]+)/m)!.groups!.hex
+  const want = rfc7748('a_pub')
   await openItem(page, 'x25519', 'x25519-walk-panel')
   expect(await page.locator('[data-testid^="x25519-row-"]').count()).toBe(255)
   for (const i of [0, 1, 100, 254]) {
@@ -139,22 +146,24 @@ test('the X25519 walk shows one ladder row per bit with its swap, and ends on RF
   expect(await text(page.getByTestId('x25519-now-x2'))).toBe(x.rows[1].x2)
 })
 
-test('with Show keys off both walks still show their public teaching numbers', async ({ page }) => {
+/** Sets Show keys through the Host, so the restore in `finally` still runs when the page has closed. The Host keeps the toggle for later specs. */
+const showKeys = (on: boolean) => fetch(`http://127.0.0.1:${PORTS.host}/api/security/show-keys`, {
+  method: 'PUT', headers: { 'Content-Type': 'application/json', Authorization: `Bearer ${TOKEN}`, Origin: 'http://localhost:5173' }, body: JSON.stringify({ on }),
+})
+
+test('with Show keys off both walks still show their public teaching numbers, the RFC 7748 shared secret included', async ({ page }) => {
   const ec = (await reply('/api/walk/toy-curve')).ecdsa
-  await open(page)
-  const sw = page.getByTestId('show-keys-switch')
-  if (await sw.isChecked()) await sw.click()
-  await expect(sw).not.toBeChecked()
+  expect((await showKeys(false)).ok, 'PUT show-keys off').toBe(true)
   try {
+    await open(page)
     await page.getByTestId('section-techniques').click()
     await page.getByTestId('walk-item-curve').click()
     await expect(page.getByTestId('curve-reuse-recovered-d')).toHaveText(String(ec.recovery.privateKey))
     await page.getByTestId('walk-item-x25519').click()
-    await expect(page.getByTestId('x25519-result')).not.toHaveText('')
+    await page.getByTestId('x25519-step-shared').click()
+    await expect(page.getByTestId('x25519-result')).toHaveText(rfc7748('k'))
   } finally {
-    // The Host keeps the toggle for every later spec, so it goes back on.
-    await sw.click()
-    await expect(sw).toBeChecked()
+    await showKeys(true)
   }
 })
 
