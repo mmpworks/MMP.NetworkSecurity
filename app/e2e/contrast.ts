@@ -48,6 +48,28 @@ export async function setTheme(page: Page, theme: 'system' | 'light' | 'dark') {
   await button.dispatchEvent('click')
 }
 
+/**
+ * Waits until the screen is still enough to scan: finite transitions end, so a button caught half-way between disabled and enabled is
+ * not read as its own color. A transition a Vue update starts appears only after the next frames, and under full CPU load those frames
+ * come late. So the check waits 2 frames, and it passes only when 2 checks in a row find no running transition and no aria-busy element
+ * (#323: the light sweep once read 3 wizard buttons in their faded colors).
+ */
+export async function settle(page: Page): Promise<void> {
+  let still = 0
+  for (let i = 0; i < 25 && still < 2; i++) {
+    const moving = await page.evaluate(async () => {
+      await new Promise(r => requestAnimationFrame(() => requestAnimationFrame(r)))
+      const running = document.getAnimations().filter(a => a.playState === 'running' && a.effect?.getComputedTiming().iterations !== Infinity)
+      await Promise.all(running.map(a => a.finished.catch(() => null)))
+      return running.length + document.querySelectorAll('[aria-busy="true"]').length
+    })
+    still = moving === 0 ? still + 1 : 0
+    await page.waitForTimeout(moving === 0 ? 150 : 100)
+  }
+  // The scan reads anyway. A screen still moving can only read lower, so this line explains a fail; it never hides one (Jared on #325).
+  if (still < 2) console.log('settle: the screen did not settle after 25 checks, so the scan reads it while it moves')
+}
+
 export interface ScanFail { where: string; text: string; ratio: number; fg: string; bg: string }
 export interface Scan { checked: number; fails: ScanFail[] }
 

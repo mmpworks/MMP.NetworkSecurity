@@ -1,5 +1,5 @@
 import { expect, test, type Page } from '@playwright/test'
-import { MIN_RATIO, scanPage, setTheme, type ScanFail } from './contrast'
+import { MIN_RATIO, scanPage, setTheme, settle, type ScanFail } from './contrast'
 import { startOwnHost, type OwnHost } from './own-host'
 import { open, walkTourUntil } from './walk'
 
@@ -17,9 +17,7 @@ const all: Record<string, ScanFail[]> = {}
 const log: string[] = []
 
 async function visit(page: Page, theme: string, screen: string) {
-  // Let finite transitions end, so a button caught half-way between disabled and enabled is not read as its own color.
-  await page.evaluate(() => Promise.all(document.getAnimations().filter(a => a.effect?.getComputedTiming().iterations !== Infinity).map(a => a.finished.catch(() => null))))
-  await page.waitForTimeout(400)
+  await settle(page)
   const s = await scanPage(page)
   log.push(`${theme.padEnd(5)} ${screen.padEnd(44)} checked ${String(s.checked).padStart(4)}, failed ${s.fails.length}`)
   for (const f of s.fails) (all[`${theme}`] ??= []).push({ ...f, where: `${screen}: ${f.where}` })
@@ -35,7 +33,9 @@ async function hoverVisit(page: Page, theme: string, testId: string) {
 
 for (const theme of ['dark', 'light'] as const) {
   test(`every screen, tooltip, dialog, banner and chip reads at ${MIN_RATIO} to 1 in the ${theme} theme`, async ({ page }) => {
-    test.setTimeout(480_000)
+    // Measured per theme in full suites on 2026-11-08: 4.2 to 4.8 minutes on a quiet machine, 7.0 to 8.3 under load. 8 minutes was too
+    // close, and one rerun timed out while closing the page (#323).
+    test.setTimeout(720_000)
     await api('PUT', '/api/security/types/token.issuer/mode', { mode: 'BuiltIn' })
     await api('PUT', '/api/security/types/device.enrolment/mode', { mode: 'BuiltIn' })
     await open(page, host)
