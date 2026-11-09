@@ -41,17 +41,31 @@ class ElectronDist(unittest.TestCase):
         (dist / "version").write_text(VERSION, encoding="utf-8")
         (self.pkg / "path.txt").write_text("electron.exe", encoding="utf-8")
 
+    ENTRIES = {"electron.exe": b"MZ", "version": VERSION.encode(), "locales/en-US.pak": b"x", "ffmpeg.dll": b"ffmpeg-bytes", "icudtl.dat": b"icu",
+               "resources.pak": b"pak", "v8_context_snapshot.bin": b"v8", "resources/default_app.asar": b"asar", "vk_swiftshader.dll": b"vk",
+               "vk_swiftshader_icd.json": b"{}", "vulkan-1.dll": b"vulkan"}
+
+    def make_core_dist(self, skip=()):
+        """A dist holding every core file, minus `skip`, plus path.txt."""
+        dist = self.pkg / "dist"
+        for name, data in self.ENTRIES.items():
+            if name in skip:
+                continue
+            target = dist / name
+            target.parent.mkdir(parents=True, exist_ok=True)
+            target.write_bytes(data)
+        (self.pkg / "path.txt").write_text("electron.exe", encoding="utf-8")
+
     def make_cached_zip(self, checksum=None):
         zip_path = self.cache / ZIP_NAME
         with zipfile.ZipFile(zip_path, "w") as z:
-            z.writestr("electron.exe", b"MZ")
-            z.writestr("version", VERSION)
-            z.writestr("locales/en-US.pak", b"x")
+            for name, data in self.ENTRIES.items():
+                z.writestr(name, data)
         digest = checksum or hashlib.sha256(zip_path.read_bytes()).hexdigest()
         (self.pkg / "checksums.json").write_text(json.dumps({ZIP_NAME: digest}), encoding="utf-8")
 
     def test_check_passes_on_a_complete_dist(self):
-        self.make_complete_dist()
+        self.make_core_dist()
         code, out = self.run_tool("check")
         self.assertEqual(code, 0, out)
 
@@ -66,7 +80,7 @@ class ElectronDist(unittest.TestCase):
         self.assertIn("electron_dist.py repair", out)
 
     def test_check_fails_when_the_dist_is_another_version(self):
-        self.make_complete_dist()
+        self.make_core_dist()
         (self.pkg / "dist" / "version").write_text("30.0.0", encoding="utf-8")
         code, out = self.run_tool("check")
         self.assertEqual(code, 1, out)
@@ -96,7 +110,7 @@ class ElectronDist(unittest.TestCase):
         self.assertEqual(self.run_tool("check")[0], 0)
 
     def test_repair_leaves_a_complete_dist_alone(self):
-        self.make_complete_dist()
+        self.make_core_dist()
         marker = self.pkg / "dist" / "marker.txt"
         marker.write_text("keep", encoding="utf-8")
         code, out = self.run_tool("repair")
@@ -124,6 +138,62 @@ class ElectronDist(unittest.TestCase):
         self.assertEqual(code, 0, out)
         self.assertIn("ELECTRON_ZIP_NOT_CACHED", out)
 
+
+    def test_a_dist_with_electron_exe_version_and_path_txt_but_no_ffmpeg_is_incomplete(self):
+        """Jared, #355: an extract that stops after the three named files must not read complete."""
+        self.make_core_dist(skip=("ffmpeg.dll",))
+        code, out = self.run_tool("check")
+        self.assertEqual(code, 1, out)
+        self.assertIn("ELECTRON_DIST_INCOMPLETE", out)
+        self.assertIn("ffmpeg.dll", out)
+
+    def test_with_no_manifest_and_no_cached_zip_a_full_core_list_passes(self):
+        self.make_core_dist()
+        self.assertEqual(self.run_tool("check")[0], 0)
+
+    def test_with_no_manifest_the_cached_zip_names_every_file_that_must_exist(self):
+        self.make_core_dist(skip=("locales/en-US.pak",))           # a file the core list does not name, but the zip does
+        self.make_cached_zip()
+        code, out = self.run_tool("check")
+        self.assertEqual(code, 1, out)
+        self.assertIn("locales/en-US.pak", out)
+
+    def test_with_no_manifest_the_cached_zip_also_checks_sizes(self):
+        self.make_core_dist()
+        self.make_cached_zip()
+        self.assertEqual(self.run_tool("check")[0], 0)
+        (self.pkg / "dist" / "icudtl.dat").write_bytes(b"truncated-longer-than-icu")
+        code, out = self.run_tool("check")
+        self.assertEqual(code, 1, out)
+        self.assertIn("icudtl.dat", out)
+
+    def test_repair_writes_a_manifest_and_check_then_compares_the_dist_with_it(self):
+        (self.pkg / "dist" / "locales").mkdir(parents=True)
+        self.make_cached_zip()
+        self.assertEqual(self.run_tool("repair")[0], 0)
+        manifest = json.loads((self.pkg / "dist-manifest.json").read_text(encoding="utf-8"))
+        self.assertEqual(manifest["files"]["ffmpeg.dll"], len(b"ffmpeg-bytes"))
+        self.assertEqual(self.run_tool("check")[0], 0)
+        (self.pkg / "dist" / "locales" / "en-US.pak").unlink()
+        code, out = self.run_tool("check")
+        self.assertEqual(code, 1, out)
+        self.assertIn("locales/en-US.pak", out)
+
+    def test_check_does_nothing_off_windows(self):
+        """Steve's Mac: the config-load check must not throw there."""
+        code, out = self.run_tool("check", "--platform", "darwin")
+        self.assertEqual(code, 0, out)
+
+    def test_the_parked_dist_gets_a_timestamp_and_its_path_is_printed(self):
+        (self.pkg / "dist" / "locales").mkdir(parents=True)
+        self.make_cached_zip()
+        code, out = self.run_tool("repair")
+        self.assertEqual(code, 0, out)
+        parked = [d.name for d in self.pkg.iterdir() if d.name.startswith("dist-incomplete-")]
+        self.assertEqual(len(parked), 1, parked)
+        self.assertRegex(parked[0], r"^dist-incomplete-\d{8}T\d{6}-\d+$")
+        self.assertIn(parked[0], out)
+        self.assertIn("removal", out.lower())
 
 if __name__ == "__main__":
     unittest.main(verbosity=2)
