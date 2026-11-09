@@ -63,12 +63,15 @@ function play() {
 onBeforeUnmount(stop)
 function pickGroup(g: 'small' | 'group14') { stop(); group.value = g; step.value = null }
 
-/** The caption of a step, with the engine's numbers. */
+/** A long group 14 number in a caption or a row shows its ends, so it stays one line. The whole number is in the value rows below. */
+const short = (n: Num | null) => { const t = show(n); return group.value === 'group14' && t.length > 28 ? `${t.slice(0, 16)}…${t.slice(-8)}` : t }
+
+/** The caption of a step, with the engine's numbers, in the short form on group 14. */
 const caption = computed(() => {
   const v = w.value
   if (!v) return null
-  const n = show(v.prime), g = show(v.generator), a = show(v.client.private), b = show(v.server.private)
-  const A = show(v.client.public.result), B = show(v.server.public.result), s1 = show(v.client.shared.result), s2 = show(v.server.shared.result)
+  const n = short(v.prime), g = short(v.generator), a = short(v.client.private), b = short(v.server.private)
+  const A = short(v.client.public.result), B = short(v.server.public.result), s1 = short(v.client.shared.result), s2 = short(v.server.shared.result)
   const words: [string, string][] = [
     ['Both sides agree on n and g', 'These two numbers are public. Anyone may read them. Often a standard fixes them in advance.'],
     ['The client picks a private number', 'It never leaves the client. Not even the server sees it.'],
@@ -90,8 +93,6 @@ const power = computed<Pow | null>(() => {
   if (!v || step.value === null) return null
   return ({ 3: v.client.public, 4: v.server.public, 7: v.client.shared, 8: v.server.shared } as Record<number, Pow>)[step.value] ?? null
 })
-/** A long group 14 number in a row shows its ends, so a row stays one line. The whole number is in the value rows above. */
-const short = (n: Num | null) => { const t = show(n); return group.value === 'group14' && t.length > 28 ? `${t.slice(0, 16)}…${t.slice(-8)}` : t }
 
 /** This walk's own exponent size, from the length of the engine's private number: 8 bits on the small prime, 32 on group 14. */
 const expBits = computed(() => (w.value ? (w.value.client.private.hex.length / 2) * 8 : 0))
