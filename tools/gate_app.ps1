@@ -42,6 +42,12 @@ function Get-StepStatus([int]$Code, [string[]]$Output) {
     return 'PASS'
 }
 
+function Format-GateFinal([string]$Slice, [int]$Passed, [int]$Ran, [int]$Skipped, [string]$Report) {
+    # The gate's last line, which tools/run_status.py reads. Skipped steps are counted on it, so a step that did not run never hides behind PASSED.
+    $skips = if ($Skipped -gt 0) { ", $Skipped skipped" } else { '' }
+    return "gate ${Slice}: $Passed of $Ran steps passed$skips; report at $Report"
+}
+
 function Get-AppProofPlan([bool]$HasApp, [bool]$SkipApp, [string]$Lesson, [string[]]$AppDiffFiles, [bool]$ToolsPresent = $true) {
     # Mode: none (no app folder), docs (every changed file under app/ is non-code: skipped on its own, the files printed), refuse (code changed
     # and -SkipApp was given; there is no override), skip (-SkipApp, nothing changed), suite, narrowed (suite cut to one lesson),

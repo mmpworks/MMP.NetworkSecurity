@@ -185,6 +185,39 @@ class StepStatus(unittest.TestCase):
         self.assertEqual(step_status(1, "PIN_OFF: x"), "FAIL")
 
 
+class GateFinalLine(unittest.TestCase):
+    """Jared, #358: a SKIPPED step must show on the final line, which run_status.py reads."""
+
+    def final(self, passed, ran, skipped):
+        return ps(f"Format-GateFinal -Slice 'S0' -Passed {passed} -Ran {ran} -Skipped {skipped} -Report 'docs/_runs/x.md'")
+
+    def test_no_skips_keeps_the_old_line(self):
+        self.assertEqual(self.final(42, 42, 0), "gate S0: 42 of 42 steps passed; report at docs/_runs/x.md")
+
+    def test_skips_are_counted_on_the_line(self):
+        self.assertEqual(self.final(42, 42, 1), "gate S0: 42 of 42 steps passed, 1 skipped; report at docs/_runs/x.md")
+
+
+class GateScript(unittest.TestCase):
+    """Facts about tools/gate.ps1 itself, read from its text (Richard's runs, 2026-11-09)."""
+
+    def lines(self):
+        return (TOOLS / "gate.ps1").read_text(encoding="utf-8").splitlines()
+
+    def test_the_ce_device_is_built_by_every_gate_before_the_net48_step(self):
+        """A custom -Slice name skipped the slice-only CeDevice build, so CfBinaryTests ran an old CE binary and the gate read green."""
+        lines = self.lines()
+        build = next((i for i, l in enumerate(lines) if "dotnet build src/NetSec.CeDevice" in l and l.startswith("Step")), None)
+        net48 = next((i for i, l in enumerate(lines) if "dotnet test net48" in l), None)
+        self.assertIsNotNone(build, "no unconditional CeDevice build step at the top level of gate.ps1")
+        self.assertIsNotNone(net48)
+        self.assertLess(build, net48)
+
+    def test_the_pin_step_runs_python_with_warnings_off_so_the_marker_stays_on_line_one(self):
+        pin = next(l for l in self.lines() if "acceptance PIN current" in l)
+        self.assertIn("-W ignore", pin)
+
+
 class RepoFacts(unittest.TestCase):
     def setUp(self):
         self.tmp = tempfile.TemporaryDirectory()

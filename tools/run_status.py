@@ -23,7 +23,7 @@ import sys
 import time
 
 ANSI = re.compile(r"\x1b\[[0-9;]*m")
-GATE_FINAL = re.compile(r"^gate (?P<slice>\S+?): (?P<n>\d+) of (?P<m>\d+) steps passed", re.M)
+GATE_FINAL = re.compile(r"^gate (?P<slice>\S+?): (?P<n>\d+) of (?P<m>\d+) steps passed(?:, (?P<k>\d+) skipped)?", re.M)
 GATE_EXIT = re.compile(r"^gate exit (?P<code>\d+)", re.M)
 # The commit a run was made on: tools/gate.ps1 prints "gate <slice> @ <sha>[+dirty]" first, and the Playwright globalSetup prints "run @ <sha>[+dirty]".
 HEAD_LINE = re.compile(r"^(?:gate \S+|run) @ (?P<head>[0-9a-f]+(?:\+dirty)?|unknown)\s*$", re.M)
@@ -50,7 +50,7 @@ def final_line(text):
         if gate:
             n, m = int(gate["n"]), int(gate["m"])
             ok = n == m and (code is None or code["code"] == "0")
-            return ("PASSED" if ok else "FAILED", f"gate {gate['slice']}: {n} of {m} steps passed" + (f", exit {code['code']}" if code else ""))
+            return ("PASSED" if ok else "FAILED", f"gate {gate['slice']}: {n} of {m} steps passed" + (f", {gate['k']} skipped" if gate["k"] else "") + (f", exit {code['code']}" if code else ""))
         if code:
             return ("PASSED" if code["code"] == "0" else "FAILED", f"gate exit {code['code']}")
         return None
