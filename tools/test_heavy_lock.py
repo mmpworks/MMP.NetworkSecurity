@@ -252,6 +252,32 @@ class HeavyLock(unittest.TestCase):
         self.assertEqual(r.returncode, 0, r.stdout + r.stderr)
         self.assertRegex(r.stdout, r"\d+\.\d+\.\d+")
 
+    # `holds`: does NETSEC_HEAVY_LOCK_HELD name the live holder of a lock that is really held? Callers skip the lock only on exit 0.
+    def holds(self, **extra):
+        env = self.env()
+        env.update(extra)
+        return self.tool("holds", env=env)
+
+    def test_holds_is_false_without_the_variable(self):
+        self.assertEqual(self.holds().returncode, 1)
+
+    def test_holds_is_false_for_a_stale_variable_when_nobody_holds(self):
+        r = self.holds(NETSEC_HEAVY_LOCK_HELD="4000000")
+        self.assertEqual(r.returncode, 1, r.stdout + r.stderr)
+
+    def test_holds_is_false_when_the_variable_names_someone_else_than_the_holder(self):
+        self.start_run("real holder", *SLEEP_60)
+        self.wait_until_held()
+        r = self.holds(NETSEC_HEAVY_LOCK_HELD=str(os.getpid()))               # a live process, but not the holder
+        self.assertEqual(r.returncode, 1, r.stdout + r.stderr)
+
+    def test_holds_is_true_inside_the_real_holder(self):
+        out = pathlib.Path(self.tmp.name) / "holds.txt"
+        child = f"import subprocess, sys; r = subprocess.run([sys.executable, '-I', r'{TOOL}', 'holds', '--lock-dir', r'{self.dir}']); open(r'{out}', 'w').write(str(r.returncode))"
+        p = self.start_run("real holder", *PY, child)
+        p.communicate(timeout=60)
+        self.assertEqual(out.read_text(encoding="utf-8"), "0")
+
     def alive(self, pid):
         out = subprocess.run(["tasklist", "/FI", f"PID eq {pid}", "/NH"], capture_output=True, text=True).stdout
         return str(pid) in out

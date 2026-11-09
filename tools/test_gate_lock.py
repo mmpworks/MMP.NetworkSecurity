@@ -51,6 +51,15 @@ class GateLock(unittest.TestCase):
         self.assertIn("LOCK_TIMEOUT", out)
         self.assertNotIn("== layer_check", out, "no gate step may start while another run holds the lock")
 
+    def test_a_stale_inherited_variable_does_not_bypass_the_lock(self):
+        """A shell that kept NETSEC_HEAVY_LOCK_HELD from an earlier run must still wait behind the real holder."""
+        self.hold("richard hang loop")
+        r = subprocess.run(["pwsh", "-NoProfile", "-File", str(GATE), "-Slice", "LockTest", "-SkipApp"], capture_output=True, text=True,
+                           env=self.env(NETSEC_LOCK_WAIT_MINUTES="0.05", NETSEC_HEAVY_LOCK_HELD="4000000"), timeout=120)
+        out = r.stdout + r.stderr
+        self.assertEqual(r.returncode, 75, out)
+        self.assertNotIn("== layer_check", out, "a stale variable let a gate step start while another run held the lock")
+
     def test_the_gate_script_passes_its_own_parameters_to_the_locked_run(self):
         text = GATE.read_text(encoding="utf-8")
         self.assertIn("heavy_lock.py", text)

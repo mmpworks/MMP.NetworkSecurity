@@ -33,8 +33,10 @@ $ErrorActionPreference = 'Continue'
 $root = Split-Path -Parent $PSScriptRoot
 Set-Location $root
 # A full gate is a heavy run: one at a time on the machine (tools/heavy_lock.py). Re-run this script under the lock, with the same parameters, and pass its
-# exit code through. A run started inside a holder (NETSEC_HEAVY_LOCK_HELD is set) skips this. NETSEC_LOCK_WAIT_MINUTES limits the wait (exit 75).
-if (-not $env:NETSEC_HEAVY_LOCK_HELD) {
+# exit code through. A run started inside a holder skips this, but only when `heavy_lock.py holds` says so (NETSEC_HEAVY_LOCK_HELD names the live
+# holder of a lock that is really held); a stale inherited variable does not count. NETSEC_LOCK_WAIT_MINUTES limits the wait (exit 75).
+python -I (Join-Path $PSScriptRoot 'heavy_lock.py') holds | Out-Null
+if ($LASTEXITCODE -ne 0) {
     $again = foreach ($name in $PSBoundParameters.Keys) {
         $value = $PSBoundParameters[$name]
         if ($value -is [System.Management.Automation.SwitchParameter]) { if ($value.IsPresent) { "-$name" } }
