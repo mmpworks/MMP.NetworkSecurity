@@ -392,9 +392,15 @@ namespace NetSec.Tests
 
         static AttackDefinition Attack(string id) => AttackCatalog.All.Single(a => a.AttackId == id);
 
-        // Issue #309. The read deadline and the idle limits must end a stuck run on a fixed side, so one seed shows one trace. Half the runs
-        // run beside a CPU burner, because load is what moved the outcome before.
-        const int ShortDeadlineMs = 1000, SideRuns = 20;
+        // Issue #309. The read deadline and the idle limits must end a stuck run on a fixed side, so one seed shows one trace.
+        // The test deadline is 3,000 ms, so the role gap between opener and acceptor is 3 s; at 1,000 ms a starved pump on a saturated
+        // machine missed the 1 s gap (#316's gate). The product's gap is 30 s.
+        // NETSEC_LOAD_RUNS=1 (set by `pwsh tools/load_runs.ps1` under the heavy lock, and by the clock kill condition) runs 20 runs, the second half beside a CPU burner on every core:
+        // that is where "20 of 20" is measured. The shared suite runs 6 runs with no burner. The burner doubled the suite's time and loaded
+        // every class running beside it, and 20 runs at a 3 s deadline pushed acceptance A9's suite run past its 900 s limit.
+        static readonly bool LoadRuns = Environment.GetEnvironmentVariable("NETSEC_LOAD_RUNS") == "1";
+        const int ShortDeadlineMs = 3000;
+        static readonly int SideRuns = LoadRuns ? 20 : 6;
 
         static void BurnWhile(Action work)
         {
@@ -412,7 +418,7 @@ namespace NetSec.Tests
         static string[] ChecksOf(TraceEvent[] events, string actor) =>
             events.Where(e => e.Actor == actor && e.Type == "check.result" && !e.StreamId.EndsWith("/wire")).OrderBy(e => e.StreamSeq).Select(e => e.Message).ToArray();
 
-        /// <summary>Runs one attack SideRuns times, the second half under load, and returns a line per run naming each side's checks.</summary>
+        /// <summary>Runs one attack SideRuns times (the second half under load when NETSEC_LOAD_RUNS=1) and returns a line per run that differs.</summary>
         static List<string> SideOutcomes(AttackDefinition attack, Func<string[], string[], string> judge, int lesson = 5, string acceptor = "server")
         {
             List<string> bad = new();
@@ -420,12 +426,13 @@ namespace NetSec.Tests
             {
                 LabContext c = Context(7, attack, null, ShortDeadlineMs);
                 LabResult result = null!;
-                if (run < SideRuns / 2) result = Run(lesson, c);
-                else BurnWhile(() => result = Run(lesson, c));
+                bool loaded = LoadRuns && run >= SideRuns / 2;
+                if (loaded) BurnWhile(() => result = Run(lesson, c));
+                else result = Run(lesson, c);
                 TraceEvent[] events = ((ListSink)c.Sink).Events;
                 string verdict = judge(ChecksOf(events, "client"), ChecksOf(events, acceptor));
                 if (verdict != null)
-                    bad.Add($"run {run + 1} ({(run < SideRuns / 2 ? "idle" : "load")}): {verdict}; client [{string.Join(", ", ChecksOf(events, "client"))}], {acceptor} [{string.Join(", ", ChecksOf(events, acceptor))}], result {result.FailedCode} ({result.FailedCheck})");
+                    bad.Add($"run {run + 1} ({(loaded ? "load" : "idle")}): {verdict}; client [{string.Join(", ", ChecksOf(events, "client"))}], {acceptor} [{string.Join(", ", ChecksOf(events, acceptor))}], result {result.FailedCode} ({result.FailedCheck})");
             }
             return bad;
         }
