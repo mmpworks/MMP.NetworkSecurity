@@ -82,6 +82,7 @@ Other proofs I ran by hand and do not keep in the repo:
 ## 3. How M is built
 
 M is the length of `clauses.json` where `counts` is true. `tools/gen_clauses.py --write` makes the file from the clause code. The file is generated and never committed: `run.ps1` writes it at the start of every run and prints M, so a stale or missing copy cannot change a result, and no PR conflicts on it (#343). `SELF.clauses-json-matches-code` fails when the file and the code differ at the end of a run.
+A PR diff no longer shows M, because the file is not committed. A PR that adds or removes clauses states it in the PR body as "M from X to Y", with both numbers from the `M =` line of a run before and after the change.
 
 | Rule | Example |
 |---|---|
@@ -139,7 +140,7 @@ A cut role is listed in `roles.json`. Its clauses report NOT RUN `ROLE_CUT:<role
 ## 6. NOT RUN reasons that are not PRODUCT_MISSING
 
 In the run above: `NOT_A_FRESH_RUN` for `A13.fresh-clone.acceptance-unchanged` (1 clause).
-These appear later by design, each named in the report: `REFEREE_MISSING`, `REFEREE_VERSION`, `REFEREE_PROTOCOL`, `ROLE_CUT:<role>`, `LESSON_NOT_BUILT`,
+These appear later by design, each named in the report: `REFEREE_MISSING`, `REFEREE_VERSION`, `REFEREE_PROTOCOL`, `ROLE_CUT:<role>`, `LESSON_NOT_BUILT`, `NO_LESSON_INSTALLS_KEYS`,
 `ACCURACY_READER_PENDING`, `NO_CLAIMS_DECLARED`, `UI_CONTROL_MISSING`, `VECTORS_MISSING`, `SIBLING_MISSING`, `TOOL_MISSING`, `PIN_UNSET`, `WIZARD_PART_NOT_BUILT`, `FILE_ROW_NOT_BUILT`.
 
 ## 7. Open items
