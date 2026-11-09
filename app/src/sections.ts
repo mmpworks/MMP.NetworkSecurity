@@ -12,7 +12,9 @@ export const SECTIONS: readonly Section[] = [
   {
     id: 'handshake', label: 'Handshake', items: [
       { id: 'wire', label: 'The wire and the eavesdropper', slice: 'P4' },
-      { id: 'tls13', label: 'TLS 1.3 messages and key schedule', slice: 'P4' },
+      { id: 'tls13', label: 'TLS 1.3 messages and key schedule', slice: 'P4', status: 'The key schedule, step by step' },
+      // R8: RSA key transport beside TLS 1.3's ECDHE (the lead placed it after TLS 1.3).
+      { id: 'tls11', label: 'TLS 1.1 with RSA (the old way)', slice: 'P4b', status: 'Pre-master to the 4 keys' },
       { id: 'chain', label: 'The certificate chain', slice: 'P4' },
     ],
   },
