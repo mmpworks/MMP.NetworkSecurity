@@ -2,7 +2,15 @@
 // Every state and every byte comes from the engine's block reply. Nothing here computes AES.
 
 /** One product in a MixColumns byte: factor times input, as the engine worked it (design section 2.2c). */
-export interface AesTerm { factor: number; input: string; reduced: boolean; result: string }
+export interface AesTerm {
+  factor: number; input: string; reduced: boolean; result: string
+  /** One entry per field doubling: the byte in, the shift as 3 hex digits before the 11b XOR, whether it reduced, and the byte out. */
+  doublings?: AesDoubling[]
+  /** For a factor with more than one part (3, and the inverse factors): the parts picked, and the running sums, low bit first. */
+  picks?: string[]
+  sums?: string[]
+}
+export interface AesDoubling { from: string; shifted: string; reduced: boolean; to: string }
 /** One output byte of a MixColumns step: its 4 products, and their XOR. */
 export interface AesMixedByte { result: string; parts: AesTerm[] }
 export interface AesStepRow { kind: string; round: number; state: string; roundKey?: string; terms?: AesMixedByte[] | null }

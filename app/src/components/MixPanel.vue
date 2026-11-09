@@ -35,14 +35,21 @@ const isPair = (r: number, kk: number) => active.value && r === row.value && kk 
 const term = computed<AesTerm | null>(() => (k.value < 4 ? termAt(v.col, row.value)?.parts[k.value] ?? null : null))
 const total = computed(() => termAt(v.col, row.value)?.result ?? '')
 
-/** The field multiply in words, from the factor and the engine's `reduced` flag. A shifted or doubled value shows when the engine sends one. */
-function how(t: AesTerm & { shifted?: string | null; doubled?: string | null }): string {
+/**
+ * The field multiply in words, from the engine's first doubling: the shift before the 11b XOR, whether it reduced, and the byte it gives.
+ * A factor of 3 is that doubled byte XOR the byte itself, and the sum is the engine's (Richard on #330). The term's own `reduced` covers
+ * any doubling, so the line reads the first doubling's flag.
+ */
+function how(t: AesTerm): string {
   if (t.factor === 1) return 'Times 1 leaves the byte as it is.'
-  const shift = t.shifted ? `Field multiply by 2: shift the bits left by one, to get ${t.shifted}.` : 'Field multiply by 2: shift the bits left by one.'
-  const fit = t.reduced ? ' That is too big for a byte, so it is reduced by 11b.' : ' It fits in a byte.'
+  const d = t.doublings?.[0]
+  const shift = d ? `Field multiply by 2: shift the bits left by one, to get ${d.shifted}.` : 'Field multiply by 2: shift the bits left by one.'
+  const fit = (d ? d.reduced : t.reduced)
+    ? ` That is too big for a byte, so XOR 11b.${d ? ` It gives ${d.to}.` : ''}`
+    : ` It fits in a byte, so it stays ${d ? d.to : t.result}.`
   if (t.factor === 2) return shift + fit
-  const xorLine = t.doubled ? ` ${t.doubled} XOR ${t.input} = ${t.result}.` : ''
-  return `${shift}${fit} Times 3 is times 2, then XOR the byte itself.${xorLine}`
+  const sum = t.sums?.[1] ?? t.result
+  return `${shift}${fit} Times 3 is times 2, then XOR the byte itself${d ? `: ${d.to} XOR ${t.input} = ${sum}` : ''}.`
 }
 const caption = computed(() => {
   if (v.all) return { top: 'All 4 columns are done.', sub: 'The result is the state after MixColumns.' }
@@ -94,7 +101,7 @@ async function flyColumn() {
   if (!tl || !root.value) return
   for (const r of ROWS) {
     const to = root.value.querySelector<HTMLElement>(`[data-testid="aes-walk-mix-strip-${r}"]`)
-    const from = root.value.querySelector<HTMLElement>(`[data-testid="aes-walk-mix-state-cell-${r}-${v.col}"]`)
+    const from = root.value.querySelector<HTMLElement>(`[data-testid="aes-walk-mix-before-${r}-${v.col}"]`)
     if (!to || !from) continue
     const a = from.getBoundingClientRect(), b = to.getBoundingClientRect()
     tl.animate(to, [{ transform: `translate(${a.left - b.left}px, ${a.top - b.top}px)` }, { transform: 'none' }], { duration: 560, delay: r * 90, easing: 'ease-in-out', fill: 'backwards' })
@@ -102,13 +109,13 @@ async function flyColumn() {
 }
 async function pulse() {
   await nextTick()
-  const el = root.value?.querySelector(`[data-testid="aes-walk-mix-after-cell-${row.value}-${v.col}"]`)
+  const el = root.value?.querySelector(`[data-testid="aes-walk-mix-after-${row.value}-${v.col}"]`)
   if (el && tl) tl.animate(el, [{ transform: 'scale(1.25)' }, { transform: 'none' }], { duration: 320, easing: 'ease-out', fill: 'none' })
 }
 </script>
 
 <template>
-  <section ref="root" class="aw-mix" data-testid="aes-walk-mix" aria-labelledby="aw-mix-title">
+  <section ref="root" class="aw-mix" data-testid="aes-walk-mix-panel" aria-labelledby="aw-mix-title">
     <h3 id="aw-mix-title" class="aw-mix-title">How MixColumns multiplies</h3>
     <p class="muted">Each output byte comes from one row of the fixed matrix and one column of the state. Pair them up, multiply each pair in the field, and add the results with XOR.</p>
     <div class="aw-mix-controls">
@@ -132,7 +139,7 @@ async function pulse() {
               <span
                 v-for="kk in ROWS" :key="kk" class="aw-mix-cell aw-mix-factor" :style="{ gridRow: r + 1, gridColumn: kk + 1 }"
                 :data-row="active && r === row ? 'true' : undefined" :data-pair="isPair(r, kk) ? 'true' : undefined"
-                :data-testid="`aes-walk-mix-matrix-cell-${r}-${kk}`"
+                :data-testid="`aes-walk-mix-matrix-${r}-${kk}`"
               >{{ factor(r, kk) }}</span>
             </template>
           </div>
@@ -148,7 +155,7 @@ async function pulse() {
               <span
                 v-for="c in ROWS" :key="c" class="aw-mix-cell" :style="{ gridRow: r + 1, gridColumn: c + 1 }"
                 :data-col="active && c === v.col ? 'true' : undefined" :data-pair="active && c === v.col && r === k ? 'true' : undefined"
-                :data-hex="before(c, r)" :data-testid="`aes-walk-mix-state-cell-${r}-${c}`"
+                :data-hex="before(c, r)" :data-testid="`aes-walk-mix-before-${r}-${c}`"
               >{{ before(c, r) }}</span>
             </template>
           </div>
@@ -164,14 +171,14 @@ async function pulse() {
               <span
                 v-for="c in ROWS" :key="c" class="aw-mix-cell" :class="{ 'aw-mix-empty': !filled(c, r) }" :style="{ gridRow: r + 1, gridColumn: c + 1 }"
                 :data-new="active && c === v.col && r === row && k === 4 ? 'true' : undefined"
-                :data-hex="filled(c, r) ? after(c, r) : ''" :data-testid="`aes-walk-mix-after-cell-${r}-${c}`"
+                :data-hex="filled(c, r) ? after(c, r) : ''" :data-testid="`aes-walk-mix-after-${r}-${c}`"
               >{{ filled(c, r) ? after(c, r) : '' }}</span>
             </template>
           </div>
         </div>
       </div>
     </div>
-    <div class="aw-mix-cap" data-testid="aes-walk-mix-caption" aria-live="polite"><b>{{ caption.top }}</b><span>{{ caption.sub }}</span></div>
+    <div class="aw-mix-cap" data-testid="aes-walk-mix-line" aria-live="polite"><b>{{ caption.top }}</b><span>{{ caption.sub }}</span></div>
     <!-- The bit lines: a product's byte and result, or the XOR of the 4 products, each as 8 bits. -->
     <pre v-if="!v.all && term" class="aw-mix-bits" data-testid="aes-walk-mix-bits"><span class="aw-bits-state">{{ `${term.input}`.padEnd(6) }}{{ nib(term.input) }}</span>
 <span class="aw-bits-result">{{ `×${term.factor} = ${term.result}`.padEnd(10) }}{{ nib(term.result) }}</span></pre>

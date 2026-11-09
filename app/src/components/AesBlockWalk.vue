@@ -179,11 +179,11 @@ const canPick = computed(() => isSub.value || isMix.value || isArk.value)
         </div>
       </div>
       <!-- The round key this AddRoundKey uses, beside the state. On a motion its bytes move to meet the state bytes (walkMotion.ts). -->
-      <div v-if="isArk" class="aw-slot" data-testid="aes-walk-roundkey">
-        <h3 class="aw-slot-title" data-testid="aes-walk-roundkey-title">Round key {{ stop.kind === 'step' ? stop.step.round : '' }}</h3>
+      <div v-if="isArk" class="aw-slot" data-testid="aes-walk-round-key-grid">
+        <h3 class="aw-slot-title" data-testid="aes-walk-round-key-label">Round key {{ stop.kind === 'step' ? stop.step.round : '' }}</h3>
         <div class="aw-grid aw-key-grid" role="grid" :aria-label="`Round key ${stop.kind === 'step' ? stop.step.round : ''}, 4 rows by 4 columns`">
           <div v-for="r in ROWS" :key="r" class="aw-row" role="row">
-            <span v-for="c in ROWS" :key="c" class="aw-cell aw-key-cell" role="gridcell" :data-testid="`aes-walk-roundkey-cell-${r}-${c}`" :data-hex="byteAt(roundKey, cellIndex(r, c))">{{ byteAt(roundKey, cellIndex(r, c)) }}<span class="aw-idx" aria-hidden="true">{{ cellIndex(r, c) }}</span></span>
+            <span v-for="c in ROWS" :key="c" class="aw-cell aw-key-cell" role="gridcell" :data-testid="`aes-walk-round-key-cell-${r}-${c}`" :data-hex="byteAt(roundKey, cellIndex(r, c))">{{ byteAt(roundKey, cellIndex(r, c)) }}<span class="aw-idx" aria-hidden="true">{{ cellIndex(r, c) }}</span></span>
           </div>
         </div>
       </div>
@@ -198,9 +198,9 @@ const canPick = computed(() => isSub.value || isMix.value || isArk.value)
         <FieldPanel v-else-if="isMix" :mixed="mixed" :cell="picked" />
         <div v-else-if="arkBits" class="aw-bits" data-testid="aes-walk-ark-bits">
           <p class="muted">Byte {{ picked }}: the state byte XOR the key byte. Click a byte in the state to pick another.</p>
-          <pre><span class="aw-bits-state" data-testid="aes-walk-ark-bits-state">{{ '    ' + nib(arkBits.state) }}  {{ arkBits.state }}</span>
-<span class="aw-bits-key" data-testid="aes-walk-ark-bits-key">{{ 'XOR ' + nib(arkBits.key) }}  {{ arkBits.key }}</span>
-<span class="aw-bits-result" data-testid="aes-walk-ark-bits-result">{{ '  = ' + nib(arkBits.result) }}  {{ arkBits.result }}</span></pre>
+          <pre><span class="aw-bits-state" data-testid="aes-walk-bits-state">{{ '    ' + nib(arkBits.state) }}  {{ arkBits.state }}</span>
+<span class="aw-bits-key" data-testid="aes-walk-bits-key">{{ 'XOR ' + nib(arkBits.key) }}  {{ arkBits.key }}</span>
+<span class="aw-bits-result" data-testid="aes-walk-bits-result">{{ '  = ' + nib(arkBits.result) }}  {{ arkBits.result }}</span></pre>
         </div>
       </div>
     </div>

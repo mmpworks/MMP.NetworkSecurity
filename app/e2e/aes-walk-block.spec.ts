@@ -37,8 +37,8 @@ test('AddRoundKey of round 0 shows the round key grid titled "Round key 0", and 
   const before = await grid(page, 'aes-walk-cell')
   await toStop(page, FIRST_STEP - FILL_END)
   await expect(page.getByTestId('aes-walk-step-kind')).toHaveText('AddRoundKey')
-  await expect(page.getByTestId('aes-walk-roundkey-title')).toHaveText('Round key 0')
-  const key = await grid(page, 'aes-walk-roundkey-cell'), after = await grid(page, 'aes-walk-cell')
+  await expect(page.getByTestId('aes-walk-round-key-label')).toHaveText('Round key 0')
+  const key = await grid(page, 'aes-walk-round-key-cell'), after = await grid(page, 'aes-walk-cell')
   for (let i = 0; i < 16; i++) {
     expect(key[i], `key byte ${i}`).toMatch(/^[0-9a-f]{2}$/)
     expect(after[i], `byte ${i}: before XOR key`).toBe(xor(before[i], key[i]))
@@ -48,11 +48,11 @@ test('AddRoundKey of round 0 shows the round key grid titled "Round key 0", and 
   const i = 2 + 4 * 1
   const line = await flat(page, 'aes-walk-ark-bits')
   for (const v of [before[i], key[i], after[i]]) expect(line, `the bit lines show ${v}`).toContain(bits(v))
-  for (const part of ['state', 'key', 'result']) await expect(page.getByTestId(`aes-walk-ark-bits-${part}`)).toBeVisible()
+  for (const part of ['state', 'key', 'result']) await expect(page.getByTestId(`aes-walk-bits-${part}`)).toBeVisible()
   // Round 1's AddRoundKey names its own key.
   await toStop(page, 4)
   await expect(page.getByTestId('aes-walk-step-kind')).toHaveText('AddRoundKey')
-  await expect(page.getByTestId('aes-walk-roundkey-title')).toHaveText('Round key 1')
+  await expect(page.getByTestId('aes-walk-round-key-label')).toHaveText('Round key 1')
 })
 
 // Under reduced motion no step plays, so no cell may keep an old byte on its top layer: the learner must see the engine's new byte.
@@ -74,7 +74,7 @@ test('with motion on, the round key bytes move to meet the state bytes on AddRou
   await page.getByTestId('aes-walk-next').click()
   const moving = await page.evaluate(() => document.getAnimations().filter(a => {
     const t = (a.effect as KeyframeEffect | null)?.target as Element | null
-    return !!t?.closest?.('[data-testid="aes-walk-roundkey"]')
+    return !!t?.closest?.('[data-testid="aes-walk-round-key-grid"]')
   }).length)
   expect(moving, 'the key cells animate').toBeGreaterThan(0)
 })
@@ -86,37 +86,44 @@ test('MixColumns shows the multiply panel: the fixed matrix, the state column, e
   await toStop(page, 1)
   await expect(page.getByTestId('aes-walk-step-kind')).toHaveText('MixColumns')
   const after = await grid(page, 'aes-walk-cell')
-  await expect(page.getByTestId('aes-walk-mix')).toBeVisible()
+  await expect(page.getByTestId('aes-walk-mix-panel')).toBeVisible()
   for (let c = 0; c < 4; c++) await expect(page.getByTestId(`aes-walk-mix-col-${c}`)).toHaveText(`Column ${c}`)
   const factors: string[] = []
-  for (let k = 0; k < 4; k++) factors.push(((await page.getByTestId(`aes-walk-mix-matrix-cell-0-${k}`).textContent()) ?? '').trim())
+  for (let k = 0; k < 4; k++) factors.push(((await page.getByTestId(`aes-walk-mix-matrix-0-${k}`).textContent()) ?? '').trim())
   expect(factors, 'row 0 of the fixed matrix').toEqual(['2', '3', '1', '1'])
-  expect(await grid(page, 'aes-walk-mix-state-cell'), 'the panel shows the state before').toEqual(before)
+  expect(await grid(page, 'aes-walk-mix-before'), 'the panel shows the state before').toEqual(before)
   // Position 0: row 0 times byte 0 of column 0, boxed, with its product line.
-  await expect(page.getByTestId('aes-walk-mix-matrix-cell-0-0')).toHaveAttribute('data-pair', 'true')
-  await expect(page.getByTestId('aes-walk-mix-state-cell-0-0')).toHaveAttribute('data-pair', 'true')
-  await expect(page.getByTestId('aes-walk-mix-caption')).toContainText(`2 × ${before[0]} = ${mul(2, before[0])}`)
+  await expect(page.getByTestId('aes-walk-mix-matrix-0-0')).toHaveAttribute('data-pair', 'true')
+  await expect(page.getByTestId('aes-walk-mix-before-0-0')).toHaveAttribute('data-pair', 'true')
+  await expect(page.getByTestId('aes-walk-mix-line')).toContainText(`2 × ${before[0]} = ${mul(2, before[0])}`)
+  // The field multiply's own numbers, from the engine's doubling: the shift before the 11b XOR, and the byte it gives.
+  const shifted = (b: string) => (parseInt(b, 16) << 1).toString(16).padStart(3, '0')
+  const big = (b: string) => (parseInt(b, 16) & 0x80) !== 0
+  await expect(page.getByTestId('aes-walk-mix-line')).toContainText(`to get ${shifted(before[0])}`)
+  await expect(page.getByTestId('aes-walk-mix-line')).toContainText(big(before[0]) ? `XOR 11b. It gives ${mul(2, before[0])}` : `stays ${mul(2, before[0])}`)
   // Step through row 0: 4 products, then the XOR sum, which lands in the state after.
   for (let k = 1; k < 4; k++) {
     await page.getByTestId('aes-walk-mix-next').click()
-    await expect(page.getByTestId('aes-walk-mix-caption')).toContainText(`${factors[k]} × ${before[k]} = ${mul(Number(factors[k]), before[k])}`)
+    await expect(page.getByTestId('aes-walk-mix-line')).toContainText(`${factors[k]} × ${before[k]} = ${mul(Number(factors[k]), before[k])}`)
+    // A factor of 3 is the doubled byte XOR the byte itself.
+    if (factors[k] === '3') await expect(page.getByTestId('aes-walk-mix-line')).toContainText(`${mul(2, before[k])} XOR ${before[k]} = ${mul(3, before[k])}`)
   }
-  await expect(page.getByTestId('aes-walk-mix-after-cell-0-0')).toHaveAttribute('data-hex', '')
+  await expect(page.getByTestId('aes-walk-mix-after-0-0')).toHaveAttribute('data-hex', '')
   await page.getByTestId('aes-walk-mix-next').click()
   const products = [0, 1, 2, 3].map(k => mul(Number(factors[k]), before[k]))
   const sum = products.reduce(xor)
   expect(sum, 'the oracle agrees with the engine').toBe(after[0])
-  await expect(page.getByTestId('aes-walk-mix-after-cell-0-0')).toHaveAttribute('data-hex', after[0])
-  await expect(page.getByTestId('aes-walk-mix-caption')).toContainText(`Output byte 0 = ${after[0]}`)
+  await expect(page.getByTestId('aes-walk-mix-after-0-0')).toHaveAttribute('data-hex', after[0])
+  await expect(page.getByTestId('aes-walk-mix-line')).toContainText(`Output byte 0 = ${after[0]}`)
   const sumBits = await flat(page, 'aes-walk-mix-bits')
   for (const v of [...products, after[0]]) expect(sumBits, `the XOR sum's bit lines show ${v}`).toContain(bits(v))
   // Fill all: the state after equals the step's result.
   await page.getByTestId('aes-walk-mix-fill').click()
-  expect(await grid(page, 'aes-walk-mix-after-cell')).toEqual(after)
+  expect(await grid(page, 'aes-walk-mix-after')).toEqual(after)
   // A column tab starts that column at its first product.
   await page.getByTestId('aes-walk-mix-col-2').click()
-  await expect(page.getByTestId('aes-walk-mix-state-cell-0-2')).toHaveAttribute('data-pair', 'true')
-  await expect(page.getByTestId('aes-walk-mix-caption')).toContainText(`2 × ${before[8]} = ${mul(2, before[8])}`)
+  await expect(page.getByTestId('aes-walk-mix-before-0-2')).toHaveAttribute('data-pair', 'true')
+  await expect(page.getByTestId('aes-walk-mix-line')).toContainText(`2 × ${before[8]} = ${mul(2, before[8])}`)
 })
 
 for (const theme of ['light', 'dark'] as const) {
@@ -145,7 +152,7 @@ test('Play this column fills the column one byte at a time', async ({ page }) =>
   const start = Date.now()
   while (Date.now() - start < 40_000) {
     let n = 0
-    for (let r = 0; r < 4; r++) if (await hexAt(page, 'aes-walk-mix-after-cell', r, 0)) n++
+    for (let r = 0; r < 4; r++) if (await hexAt(page, 'aes-walk-mix-after', r, 0)) n++
     seen.add(n)
     if (n === 4) break
     await page.waitForTimeout(100)

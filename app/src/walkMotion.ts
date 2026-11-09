@@ -71,7 +71,7 @@ export function startMotion({ root, to, tables, nk, animate }: MotionInput) {
     const flash = getComputedStyle(root).getPropertyValue('--k-key').trim() || undefined
     for (let i = 0; i < 16; i++) {
       const r = i % 4, c = Math.floor(i / 4), el = cellOf(root, r, c)
-      const key = root.querySelector<HTMLElement>(`[data-testid="aes-walk-roundkey-cell-${r}-${c}"]`)
+      const key = root.querySelector<HTMLElement>(`[data-testid="aes-walk-round-key-cell-${r}-${c}"]`)
       const delay = 70 * i
       if (key && el) {
         const a = key.getBoundingClientRect(), b = el.getBoundingClientRect()
