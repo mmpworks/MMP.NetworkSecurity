@@ -1,8 +1,8 @@
 # Test weeding survey (garden plan step 1)
 
-Author: Echo. Date: 2026-11-09. Base: main f8e2004. Plan: `docs/test-garden-plan.md`, step 1.
+Author: Echo. Date: 2026-11-09. Base: main f8e2004; follow-ups (section 9, the class sweep in section 6, one row moved to delete) on main 974e46e. Plan: `docs/test-garden-plan.md`, step 1.
 
-Conclusion: **37 candidates of 1,135 tests** in the four suites. 2 are "delete" (one test, and 8 rows of one Theory) and 35 are "fix". No suite has a large set of tests that check nothing. The biggest group is 9 lesson specs that skip, so a lesson that stops being built reads as a skip and never as a fail.
+Conclusion: **39 candidates of 1,172 tests** in six suites. 3 are "delete" (two tests, and 8 rows of one Theory) and 36 are "fix". No suite has a large set of tests that check nothing. The biggest group is 9 lesson specs that skip, so a lesson that stops being built reads as a skip and never as a fail.
 
 Echo proposes. The builder who owns each suite makes the change in its own PR, with the reason from this file. Echo deleted nothing.
 
@@ -24,8 +24,10 @@ Echo proposes. The builder who owns each suite makes the change in its own PR, w
 | `tests/NetSec.Tests` | 591 | 10 | 1 | 9 |
 | `tests/NetSec.Host.Tests` | 173 | 7 | 1 | 6 |
 | `app/e2e` | 216 | 13 | 0 | 13 |
-| `tools/test_*.py` | 155 | 7 | 0 | 7 |
-| **All** | **1,135** | **37** | **2** | **35** |
+| `tools/test_*.py` | 155 | 7 | 1 | 6 |
+| `tools/githooks/test_pre_push_guard.py` | 23 | 2 | 0 | 2 |
+| `acceptance/tools/test_pin.py` | 14 | 0 | 0 | 0 |
+| **All** | **1,172** | **39** | **3** | **36** |
 
 The Host "delete" row removes 8 rows from one Theory and leaves the method, so it counts as 1 candidate. The 9 lesson skips count as 9 candidates (3 specs of 3 tests). The lesson 11 guess test has a second row in section 5, and it counts once.
 
@@ -72,17 +74,25 @@ The Host "delete" row removes 8 rows from one Theory and leaves the method, so i
 | `test_dist_stamp.py::WiredIn.test_the_electron_main_process_checks_the_stamp` | other (source-text check) | `test_dist_stamp.py:168-169` | fix | The same check on `main.cjs` |
 | `test_dist_stamp.py::WiredIn.test_the_launcher_rebuilds_a_stale_dist` | other (source-text check) | `test_dist_stamp.py:171-172` | fix | The same check on `open-app.ps1`. The name says "rebuilds". The body checks a name only |
 | `test_gate_lock.py::GateLock.test_the_gate_script_passes_its_own_parameters_to_the_locked_run` | other (source-text check) | `test_gate_lock.py:63-68` | fix | Four substring checks on `gate.ps1`. The two run tests above it (`:44`, `:54`) prove the lock |
-| `test_run_status.py::RunStatus.test_a_gate_head_line_is_not_mistaken_for_the_summary` | duplicate (twin `test_a_running_gate_log_prints_the_commit_too`) | `test_run_status.py:161-163`, twin `:146-149` | fix | The same input. Move its `startswith("RUNNING")` assertion into the twin, then delete it |
+| `test_run_status.py::RunStatus.test_a_gate_head_line_is_not_mistaken_for_the_summary` | duplicate (twin `test_a_running_gate_log_prints_the_commit_too`) | `test_run_status.py:161-163`, twin `:146-149` | delete | The same input. Move its `startswith("RUNNING")` assertion into the twin, then delete it |
 | `test_run_status.py::RunStatus.test_playwright_running_counts_finished_specs` | weak-assertion | `test_run_status.py:81` | fix | `assertIn("2", out)` matches any 2. Assert the full phrase |
 | `test_heavy_lock.py::HeavyLock.test_a_cmd_shim_such_as_npm_runs` | swallowed-failure | `test_heavy_lock.py:249` | fix | `skipUnless(shutil.which("npm"))`. A machine with no npm on PATH skips the `.cmd` path. Fail when npm is missing, or plant a test `.cmd` |
 
-## 6. Delete proposals overruled
+## 6. Delete proposals overruled, and a class sweep
 
 | Test id | Proposed as | Kept because |
 |---|---|---|
 | `KeysTests.Key_ids_are_the_contract_strings` (`KeysTests.cs:17-26`) | constant re-assertion | The ids are a contract that saved files and routes read. The test fails on an accidental rename |
 | `VaultStoreTests.The_audit_check_names_the_three_changes_it_cannot_see` (`VaultStoreTests.cs:101-108`) | constant re-assertion | Its neighbour pins the field to the app copy file. This test pins the meaning, so an edit of both that drops one limit still fails |
 | `test_dist_stamp.py::DistStamp.test_a_commit_that_adds_a_file_outside_app_does_not_make_dist_stale` (`:127-131`) | duplicate of `:121-125` | It adds a new file in a new folder. The twin edits a tracked file. A stamp that counts new paths fails only this one |
+
+Class sweep of `.catch(() => {})` in `app/e2e` (after Jared on #356). There are 3 sites:
+
+| Site | Disposition | Why |
+|---|---|---|
+| `eavesdropper-sweep.spec.ts:279` (Bytes tab click) | candidate, section 5 | The next assertion reads the tab that the click may have failed to open |
+| `contrast-sweep.spec.ts:97` (Close on `security-needs-banner`) | kept | The click comes after `needs-confirm-no`, which can close the banner first, so the banner can be absent on a healthy build. No later assertion reads the banner. The next step resets the mode through the API and opens setup |
+| `bytes-fit.spec.ts:96` (screenshot on failure) | kept | A diagnostic in a failure path. The test has already failed when it runs |
 
 ## 7. Not candidates, but the garden needs them
 
@@ -94,5 +104,16 @@ The Host "delete" row removes 8 rows from one Theory and leaves the method, so i
 1. The layout and contrast specs depend on Chromium rendering. Whether a threshold was tuned so the spec passes needs a run, and this survey ran nothing.
 2. `ToyCurveWalkTests` has two "lie on their lines" tests (`:167-180`, `:190-207`). They overlap only if `Chord` and `Tangent` repeat the `Samples` entries, which the files do not show.
 3. `test_heavy_lock.py::test_a_lock_file_that_cannot_be_opened_fails_closed` (`:337`) depends on `chmod 0o444` blocking an open on Windows. That needs a run.
+
+## 9. Two suites outside the first four
+
+Both are gate steps. Echo read both in full.
+
+| Test id | Anti-pattern | Evidence | Action | Why |
+|---|---|---|---|---|
+| `test_pre_push_guard.py::PrePushGuard.test_closed_pr_refuses` | weak-assertion | `tools/githooks/test_pre_push_guard.py:103-106` | fix | It checks only a non-zero exit and no remote branch. A hook that crashes also passes. Assert `CLOSED` in stderr, as the MERGED twin does |
+| `test_pre_push_guard.py::PrePushGuard.test_gh_failure_refuses` | weak-assertion | `tools/githooks/test_pre_push_guard.py:129-134` | fix | `assertIn("gh", stderr)` matches any word that holds "gh", for example "through". Assert the guard's own message for a failed `gh` |
+
+`acceptance/tools/test_pin.py`: 0 candidates of 14. Echo wrote these tests, so this review is not independent. Jared reviewed them on #353.
 
 Disposition: the lead routes each suite's rows to its builder. Each builder makes the deletes and fixes in its own PR, red first where a fix makes an assertion stronger. Step 2 (the covers-map spike) can start, because nothing here changes which test units exist.
