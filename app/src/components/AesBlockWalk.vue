@@ -6,6 +6,7 @@ import { byteAt, cellIndex, cellText, keyWordsOf, letterOf, playGroupOf, stopsOf
 import { clearMarks, shiftOf, startMotion } from '../walkMotion'
 import FieldPanel from './FieldPanel.vue'
 import KeySchedulePanel from './KeySchedulePanel.vue'
+import MixPanel from './MixPanel.vue'
 import SboxView from './SboxView.vue'
 
 // Chapter 1 of the AES walk: one block, step by step (design sections 2.2, 2.2a, 2.2b, 2.2c, 2.3, 2.8). Every byte is from the engine's reply.
@@ -97,6 +98,15 @@ function wrapped(r: number, c: number): boolean {
 const stepKind = computed(() => (stop.value.kind === 'step' ? stop.value.step.kind : ''))
 const isSub = computed(() => stepKind.value === 'SubBytes' || stepKind.value === 'InvSubBytes')
 const isMix = computed(() => stepKind.value === 'MixColumns' || stepKind.value === 'InvMixColumns')
+// AddRoundKey (Steve, the mock's block tab): the round key grid beside the state, titled with its round, and the bit lines of the picked byte.
+const isArk = computed(() => stepKind.value === 'AddRoundKey' && !!(stop.value.kind === 'step' && stop.value.step.roundKey))
+const roundKey = computed(() => (stop.value.kind === 'step' ? stop.value.step.roundKey ?? '' : ''))
+const arkBits = computed(() => {
+  if (!isArk.value || stop.value.kind !== 'step') return null
+  const i = picked.value
+  return { state: byteAt(stop.value.prev, i), key: byteAt(roundKey.value, i), result: byteAt(stop.value.state, i) }
+})
+const nib = (h: string) => { const b = parseInt(h, 16).toString(2).padStart(8, '0'); return `${b.slice(0, 4)} ${b.slice(4)}` }
 /** On a substitution step: the byte that went in, from the stop before, at the picked cell. */
 const byteIn = computed(() => (stop.value.kind === 'step' ? byteAt(stop.value.prev, picked.value) : ''))
 const mixed = computed(() => (stop.value.kind === 'step' ? stop.value.step.terms?.[picked.value] ?? null : null))
@@ -132,7 +142,7 @@ function charOf(r: number, c: number): string {
   if (t === '20') return 'sp'
   return letterOf(t) || '·'
 }
-const canPick = computed(() => isSub.value || isMix.value)
+const canPick = computed(() => isSub.value || isMix.value || isArk.value)
 </script>
 
 <template>
@@ -168,6 +178,15 @@ const canPick = computed(() => isSub.value || isMix.value)
           ><!-- The hex comes first, so a reader of the cell's text gets the byte first. The index and the character sit in the corners. -->{{ cellText(stop, r, c) }}<span class="aw-idx" :data-testid="`aes-walk-cell-${r}-${c}-index`" aria-hidden="true">{{ cellIndex(r, c) }}</span><span class="aw-ch" :data-testid="`aes-walk-cell-${r}-${c}-char`" aria-hidden="true">{{ charOf(r, c) }}</span></span>
         </div>
       </div>
+      <!-- The round key this AddRoundKey uses, beside the state. On a motion its bytes move to meet the state bytes (walkMotion.ts). -->
+      <div v-if="isArk" class="aw-slot" data-testid="aes-walk-round-key-grid">
+        <h3 class="aw-slot-title" data-testid="aes-walk-round-key-label">Round key {{ stop.kind === 'step' ? stop.step.round : '' }}</h3>
+        <div class="aw-grid aw-key-grid" role="grid" :aria-label="`Round key ${stop.kind === 'step' ? stop.step.round : ''}, 4 rows by 4 columns`">
+          <div v-for="r in ROWS" :key="r" class="aw-row" role="row">
+            <span v-for="c in ROWS" :key="c" class="aw-cell aw-key-cell" role="gridcell" :data-testid="`aes-walk-round-key-cell-${r}-${c}`" :data-hex="byteAt(roundKey, cellIndex(r, c))">{{ byteAt(roundKey, cellIndex(r, c)) }}<span class="aw-idx" aria-hidden="true">{{ cellIndex(r, c) }}</span></span>
+          </div>
+        </div>
+      </div>
       <div class="aw-right">
         <div class="aw-words">
           <p v-if="stop.kind === 'fill'" data-testid="aes-walk-first-view">{{ words }}</p>
@@ -177,7 +196,14 @@ const canPick = computed(() => isSub.value || isMix.value)
         <KeySchedulePanel v-if="stop.kind === 'keys'" :block="block" :tables="tables" :nk="nk" :built="stop.built" @start-over="startOver" />
         <SboxView v-else-if="isSub" :table="stepKind === 'SubBytes' ? tables.sbox : tables.inverseSbox" :byte="byteIn" :inverse="stepKind === 'InvSubBytes'" />
         <FieldPanel v-else-if="isMix" :mixed="mixed" :cell="picked" />
+        <div v-else-if="arkBits" class="aw-bits" data-testid="aes-walk-ark-bits">
+          <p class="muted">Byte {{ picked }}: the state byte XOR the key byte. Click a byte in the state to pick another.</p>
+          <pre><span class="aw-bits-state" data-testid="aes-walk-bits-state">{{ '    ' + nib(arkBits.state) }}  {{ arkBits.state }}</span>
+<span class="aw-bits-key" data-testid="aes-walk-bits-key">{{ 'XOR ' + nib(arkBits.key) }}  {{ arkBits.key }}</span>
+<span class="aw-bits-result" data-testid="aes-walk-bits-result">{{ '  = ' + nib(arkBits.result) }}  {{ arkBits.result }}</span></pre>
+        </div>
       </div>
     </div>
+    <MixPanel v-if="isMix && stop.kind === 'step' && stop.step.terms" :step="stop.step" :prev="stop.prev" :picked-col="Math.floor(picked / 4)" />
   </div>
 </template>
