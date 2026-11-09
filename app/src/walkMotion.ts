@@ -25,12 +25,14 @@ export function shiftOf(map: number[], i: number, inverse: boolean): { by: numbe
  * and the second half turns the new byte in.
  */
 function flip(animate: Animate, el: HTMLElement, old: string, delay: number, duration: number, flash?: string) {
-  el.dataset.old = old
-  animate(el, [{ opacity: 1 }, { opacity: 1, offset: 0.5 }, { opacity: 0, offset: 0.5 }, { opacity: 0 }], { duration, delay, pseudo: '::after', easing: 'linear' })
   const frames: Keyframe[] = flash
     ? [{ transform: 'rotateX(0deg)' }, { transform: 'rotateX(90deg)', offset: 0.5 }, { transform: 'rotateX(0deg)', backgroundColor: flash, offset: 0.8 }, { transform: 'rotateX(0deg)' }]
     : [{ transform: 'rotateX(0deg)' }, { transform: 'rotateX(90deg)', offset: 0.5 }, { transform: 'rotateX(0deg)' }]
-  animate(el, frames, { duration, delay, fill: 'forwards' })
+  // Under reduced motion the clock starts no animation, so the old byte is never set: an old byte with no animation to hide it would stay
+  // on top of the new one.
+  if (!animate(el, frames, { duration, delay, fill: 'forwards' })) return
+  el.dataset.old = old
+  animate(el, [{ opacity: 1 }, { opacity: 1, offset: 0.5 }, { opacity: 0, offset: 0.5 }, { opacity: 0 }], { duration, delay, pseudo: '::after', easing: 'linear' })
 }
 
 /**
@@ -85,9 +87,9 @@ export function startMotion({ root, to, tables, nk, animate }: MotionInput) {
     for (const c of ROWS) for (const r of ROWS) {
       const el = cellOf(root, r, c)
       if (!el) continue
+      if (!animate(el, [{ transform: 'translateY(0) scale(1)' }, { transform: `translateY(${(1.5 - r) * 18}px) scale(0.86)`, offset: 0.45 }, { transform: 'translateY(0) scale(1)' }], { duration: 520, delay: 360 * c })) continue
       el.dataset.old = old(cellIndex(r, c))
       animate(el, [{ opacity: 1 }, { opacity: 1, offset: 0.45 }, { opacity: 0 }], { duration: 520, delay: 360 * c, pseudo: '::after' })
-      animate(el, [{ transform: 'translateY(0) scale(1)' }, { transform: `translateY(${(1.5 - r) * 18}px) scale(0.86)`, offset: 0.45 }, { transform: 'translateY(0) scale(1)' }], { duration: 520, delay: 360 * c })
     }
     return
   }
@@ -102,7 +104,7 @@ export function startMotion({ root, to, tables, nk, animate }: MotionInput) {
       if (!el) continue
       const { by } = shiftOf(map, cellIndex(r, c), inverse)
       const timing = { duration: 160 * Math.abs(by) + 360, delay: 300 * (r - 1), easing: 'linear' }
-      animate(el, [{ transform: `translateX(${by * pitch}px)` }, { transform: 'translateX(0)' }], timing)
+      if (!animate(el, [{ transform: `translateX(${by * pitch}px)` }, { transform: 'translateX(0)' }], timing)) continue
       if (rollLeaves(c, by)) {
         // The old byte of this column rolls out: it holds still against the moving cell, so it travels from column c to c - by.
         el.dataset.old = old(cellIndex(r, c))

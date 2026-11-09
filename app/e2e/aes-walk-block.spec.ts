@@ -55,6 +55,18 @@ test('AddRoundKey of round 0 shows the round key grid titled "Round key 0", and 
   await expect(page.getByTestId('aes-walk-roundkey-title')).toHaveText('Round key 1')
 })
 
+// Under reduced motion no step plays, so no cell may keep an old byte on its top layer: the learner must see the engine's new byte.
+// Found in this PR's pictures: AddRoundKey showed the bytes before the XOR, under the result (pre-existing on main).
+test('under reduced motion every step lands on its new bytes, with no old byte left on top of a cell', async ({ page }) => {
+  await openPractice(page)
+  await toStop(page, FIRST_STEP)
+  for (let n = 0; n < 5; n++) {
+    const kind = ((await page.getByTestId('aes-walk-step-kind').textContent()) ?? '').trim()
+    expect(await page.locator('[data-testid^="aes-walk-cell-"][data-old]').count(), `${kind}: no old byte on top`).toBe(0)
+    await toStop(page, 1)
+  }
+})
+
 test('with motion on, the round key bytes move to meet the state bytes on AddRoundKey', async ({ page }) => {
   await openPractice(page)
   await toStop(page, FIRST_STEP - 1)
