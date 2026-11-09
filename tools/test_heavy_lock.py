@@ -278,6 +278,17 @@ class HeavyLock(unittest.TestCase):
         p.communicate(timeout=60)
         self.assertEqual(out.read_text(encoding="utf-8"), "0")
 
+    # A false green hid behind a rewritten command line (Git Bash turned `cmd.exe /c` into `cmd.exe C:/`). The log must show the argv that really launches.
+    def test_the_log_names_the_resolved_command_it_launches(self):
+        r = self.tool("run", "--label", "argv", "--", "python", "-I", "-c", "print('marker-7731')")
+        self.assertEqual(r.returncode, 0, r.stdout + r.stderr)
+        line = next((x for x in r.stdout.splitlines() if x.startswith("HEAVY_LOCK launching ")), None)
+        self.assertIsNotNone(line, r.stdout)
+        argv = json.loads(line[len("HEAVY_LOCK launching "):])
+        self.assertEqual(argv[1:], ["-I", "-c", "print('marker-7731')"])
+        self.assertTrue(os.path.isabs(argv[0]), "argv[0] is the resolved path, not the bare name")
+        self.assertLess(r.stdout.index("HEAVY_LOCK launching"), r.stdout.index("marker-7731"), "the line comes before the command's own output")
+
     def alive(self, pid):
         out = subprocess.run(["tasklist", "/FI", f"PID eq {pid}", "/NH"], capture_output=True, text=True).stdout
         return str(pid) in out
