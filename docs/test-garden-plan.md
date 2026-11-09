@@ -18,7 +18,7 @@ A gate runs the tests the change needs. Tests that stayed green for a long time 
 The work ends when both results hold, by 2026-11-30:
 
 1. On 5 consecutive product branches, the median gate time is 10 min or less. Gate time is the wall time in the gate's own log while it held `heavy_lock.py`. The log records the machine's process count at the start, and a run counts only when that count is under a limit. The spike measures the machine's idle process count and sets the limit at that count plus 20.
-2. In the first 14 days of nightly runs, at least 10 PRs merge on a picked run, and the escape count is 0, or each escape has a mapping fix merged with a red-first test. If fewer than 10 picked-run PRs merge, the window extends until 10 do.
+2. In the first 14 days of nightly runs, at least 10 PRs merge on a picked run, and the escape count is 0, or each escape has a mapping fix merged with a red-first test. If fewer than 10 picked-run PRs merge, the window extends until 10 do. If either result is not met on 2026-11-30, the report states N of 10 merges and the escape count, and Steve decides whether to continue.
 
 **Escape.** A nightly red is bisected to the merged PR that caused it (`git bisect` over the merges since the last green nightly, running only the red test units). The red is an escape when that PR merged on a picked run that passed. A red that passes on rerun is a flake. It is still logged, with the rerun result, and it counts as red for the sink streak.
 
@@ -75,7 +75,7 @@ A PR that touches any platform path is a platform PR. The picker prints the kind
 1. All surface tests.
 2. Every changed test unit, at any level.
 3. Each deep test whose `covers` matches a changed file.
-4. Each test unit that the ledger shows red in its latest nightly or release run. A pop takes effect on the next gate, before any move PR merges.
+4. Each popped test unit (see "Popped state"). A pop takes effect on the next gate, before any move PR merges.
 5. All tests, when any changed path is platform.
 6. All tests, when any changed path is on the run-everything list (below).
 7. All tests, when no test unit's `covers` holds a changed file.
@@ -87,12 +87,12 @@ The gate prints one row per skipped test unit as SKIP with its level. A skipped 
 `tests/run-everything.txt` names files that coverage cannot see, because code reads them at run time or build time:
 
 - `app/package.json`, `app/package-lock.json`, `*.csproj`, `Directory.Build.*`, `global.json`
-- `app/playwright.config.ts`, `app/e2e/*.ts` that no spec is named for (`walk.ts`, `contrast.ts`, `ports.ts`)
+- `app/playwright.config.ts`, and the e2e helpers by name: `app/e2e/walk.ts`, `app/e2e/contrast.ts`, `app/e2e/ports.ts`, plus the global setup file if one exists. A `*.spec.ts` file is a test unit, so it is not on this list.
 - `tools/gate.ps1`, `tools/gate_app.ps1`, `tools/heavy_lock.py`
 - `acceptance/vectors/**`
 - `app/src/tours/**` and `app/src/glossary.json`, until the spike shows a tour file maps to the specs that read it
 
-A change to any of these runs everything.
+A change to any of these runs everything. The run-everything list beats the product list when a path is on both.
 
 ### Cross-process coverage
 
@@ -108,11 +108,17 @@ A Playwright spec drives the Release Host in its own process. V8 coverage sees o
 
 `result` is `pass`, `fail` or `skip`. A pass with `retried: true` counts as red for the streak.
 
+### Popped state
+
+One function, `popped(unit, ledger)`, used by both the picker and `tools/move_levels.py`. A unit is popped when the ledger holds a red for it from a nightly or release run, and since that red it has fewer than 10 runs with `result: pass` and `retried: false`, or those runs span less than 7 days. The function reads only the ledger. The manifest level does not change it.
+
+A red on a branch gate belongs to that branch. It pops nothing.
+
 ### Move rules (deterministic)
 
 1. Sink: a surface test sinks after 10 runs in a row with `result: pass` and `retried: false`, across at least 7 days.
-2. Pop: a deep test pops on any red. With it pop the test units whose `covers` holds a file in the red test's `covers` that changed since that test's last green run.
-3. A popped test sinks again only by rule 1, counted from the fix.
+2. Pop: a deep test pops on a nightly or release red. With it pop the test units whose `covers` holds a file in the red test's `covers` that changed since that test's last green run.
+3. A popped test sinks again only by rule 1, counted from the fix. The `popped()` function enforces this.
 4. `tools/move_levels.py` reads the ledger and writes the levels. A pop works at once through picker rule 4. A sink lands in a PR, so the diff shows it.
 
 ### Nightly run
