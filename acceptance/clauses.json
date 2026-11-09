@@ -2938,6 +2938,17 @@
    "counts": true
   },
   {
+   "id": "A19.ui.add-round-key-grid",
+   "base": "A19.ui.add-round-key-grid",
+   "assertion": "A19",
+   "group": "e2e",
+   "build": "host",
+   "slice": "W1",
+   "referee": "FIPS 197 (2001) data, the suite's RefAes, and the .NET library",
+   "roles": [],
+   "counts": true
+  },
+  {
    "id": "A19.ui.attack-index-lists-every-run",
    "base": "A19.ui.attack-index-lists-every-run",
    "assertion": "A19",
@@ -2945,6 +2956,17 @@
    "build": "host",
    "slice": "W1",
    "referee": "the live Host's /api/lessons (lessons 0 to 11) and app/src/attacks.json, read through Playwright",
+   "roles": [],
+   "counts": true
+  },
+  {
+   "id": "A19.ui.bit-lines-for-picked-byte",
+   "base": "A19.ui.bit-lines-for-picked-byte",
+   "assertion": "A19",
+   "group": "e2e",
+   "build": "host",
+   "slice": "W1",
+   "referee": "FIPS 197 (2001) data, the suite's RefAes, and the .NET library",
    "roles": [],
    "counts": true
   },
@@ -3143,6 +3165,28 @@
    "build": "host",
    "slice": "W1",
    "referee": "Playwright, against the Host's /api/walk/aes/long-text reply",
+   "roles": [],
+   "counts": true
+  },
+  {
+   "id": "A19.ui.mix-fill-all",
+   "base": "A19.ui.mix-fill-all",
+   "assertion": "A19",
+   "group": "e2e",
+   "build": "host",
+   "slice": "W1",
+   "referee": "FIPS 197 (2001) data, the suite's RefAes, and the .NET library",
+   "roles": [],
+   "counts": true
+  },
+  {
+   "id": "A19.ui.mix-matrix-pairs-and-line",
+   "base": "A19.ui.mix-matrix-pairs-and-line",
+   "assertion": "A19",
+   "group": "e2e",
+   "build": "host",
+   "slice": "W1",
+   "referee": "FIPS 197 (2001) data, the suite's RefAes, and the .NET library",
    "roles": [],
    "counts": true
   },

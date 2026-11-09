@@ -121,6 +121,8 @@ AES_WALK_IDS = {
     # Steve's AES walk fixes, 2026-11-08: cell index and letter, the key word build in steps with role colors, Key Schedule zoom, the landscape panel.
     "A19.ui.block-cell-shows-index-and-char", "A19.ui.key-word-build-runs-in-steps", "A19.ui.key-roles-have-colors", "A19.ui.key-schedule-zoom",
     "A19.ui.key-panel-landscape-layout", "A19.ui.key-panel-xor-rcon-replay", "A19.ui.key-table-scrolls-in-its-own-box",
+    # Steve's block-walk items, 2026-11-08: the MixColumns matrix panel, the AddRoundKey round-key grid, the bit lines.
+    "A19.ui.mix-matrix-pairs-and-line", "A19.ui.mix-fill-all", "A19.ui.add-round-key-grid", "A19.ui.bit-lines-for-picked-byte",
 }
 
 
