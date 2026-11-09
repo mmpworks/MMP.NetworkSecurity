@@ -1,7 +1,7 @@
 import { expect, test, type Locator, type Page } from '@playwright/test'
 import * as fs from 'node:fs'
 import * as path from 'node:path'
-import { scanPage, setTheme } from './contrast'
+import { scanPage, setTheme, settle } from './contrast'
 import { PORTS } from './ports'
 import { TOKEN, open } from './walk'
 
@@ -163,7 +163,7 @@ for (const theme of ['light', 'dark'] as const) {
     test(`the ${item[0]} walk reads at 4.5 to 1 in the ${theme} theme`, async ({ page }) => {
       await openItem(page, item[0], item[1])
       await setTheme(page, theme)
-      await page.waitForTimeout(300)
+      await settle(page)
       const s = await scanPage(page)
       expect(s.checked).toBeGreaterThan(30)
       expect(s.fails, JSON.stringify(s.fails.slice(0, 5))).toEqual([])

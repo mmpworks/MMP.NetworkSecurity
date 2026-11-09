@@ -34,6 +34,8 @@ import GlossaryPage from './components/GlossaryPage.vue'
 import AesWalkPanel from './components/AesWalkPanel.vue'
 import Tls11SchedulePanel from './components/Tls11SchedulePanel.vue'
 import DhWalkPanel from './components/DhWalkPanel.vue'
+import CurveWalkPanel from './components/CurveWalkPanel.vue'
+import X25519WalkPanel from './components/X25519WalkPanel.vue'
 import Tls13SchedulePanel from './components/Tls13SchedulePanel.vue'
 import AesLongStrip from './components/AesLongStrip.vue'
 import AesLongLink from './components/AesLongLink.vue'
@@ -77,7 +79,9 @@ const hasTab = (id: TabId) => tabs.value.some(t => t.id === id)
 // It opens Techniques at the AES walk, on this run's block.
 const hasAesKey = computed(() => !!active.value && shownEvents.value.some(e => e.secrets.some(s => s.name === 'aes.key')) && shownEvents.value.some(e => e.type === 'aes.message.sent'))
 const aesWalkOpen = computed(() => ui.section === 'techniques' && ui.walkItem.techniques === 'aes')
-const dhWalkOpen = computed(() => ui.section === 'techniques' && ui.walkItem.techniques === 'dh')
+/** The Techniques walk that runs on public practice values and fills walk-root from its own engine route, or null. */
+const TECH_WALKS = ['dh', 'curve', 'x25519'] as const
+const techWalk = computed(() => (ui.section === 'techniques' ? TECH_WALKS.find(w => w === ui.walkItem.techniques) ?? null : null))
 /** The Handshake walk with a screen, or null. The wire and the chain walks have no screen yet, so they keep the placeholder. */
 const handshakeWalk = computed(() => (ui.section === 'handshake' && (ui.walkItem.handshake === 'tls13' || ui.walkItem.handshake === 'tls11') ? ui.walkItem.handshake : null))
 function tabFor(e: TraceEvent): TabId {
@@ -183,14 +187,16 @@ const shortcuts: [string, string][] = [
             <!-- The AES walk mounts here and replaces the panels. Its tips and spec cards go to overlay-layer, outside this clip. -->
             <section v-if="aesWalkOpen" data-testid="walk-root" class="walk-root"><AesWalkPanel /></section>
             <AesLongLink v-if="aesWalkOpen" />
-            <!-- The Diffie-Hellman walk (P7). It runs on practice exponents, so it opens with Show keys off. -->
-            <section v-if="dhWalkOpen" data-testid="walk-root" class="walk-root"><DhWalkPanel /></section>
+            <!-- The Diffie-Hellman walk (P7), the elliptic-curve walk (P8a) and the X25519 ladder (P8). Each runs on public practice values, so each opens with Show keys off. -->
+            <section v-if="techWalk" data-testid="walk-root" class="walk-root">
+              <DhWalkPanel v-if="techWalk === 'dh'" /><CurveWalkPanel v-else-if="techWalk === 'curve'" /><X25519WalkPanel v-else />
+            </section>
             <!-- The Handshake key schedule walks (P4, P4b). Each fills walk-root from one engine route. -->
             <section v-if="handshakeWalk" data-testid="walk-root" class="walk-root">
               <Tls13SchedulePanel v-if="handshakeWalk === 'tls13'" /><Tls11SchedulePanel v-else />
             </section>
             <!-- Handshake and Techniques: the walk screens arrive in their slices. Until then the workspace says which slice brings the picked walk. -->
-            <section v-if="ui.section !== 'lessons' && !aesWalkOpen && !dhWalkOpen && !handshakeWalk" class="section-placeholder" data-testid="section-placeholder">
+            <section v-if="ui.section !== 'lessons' && !aesWalkOpen && !techWalk && !handshakeWalk" class="section-placeholder" data-testid="section-placeholder">
               <h2>{{ sectionOf(ui.section).label }}</h2>
               <p v-if="placeholderItem">{{ placeholderItem.label }}: {{ walkStatus(placeholderItem) }}.</p>
               <p v-else>Pick a walk on the left.</p>
