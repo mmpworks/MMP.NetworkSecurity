@@ -276,7 +276,7 @@ test('lesson 8: the host key is public, and the client\'s verdict on it is not',
 test('lesson 7: the TLS 1.1 certificate crosses in the clear, so the listener sees it, and the screen says it is public', async ({ page }) => {
   await runLesson(page, 7)
   await page.locator('[data-testid^=diagram-message-]', { hasText: 'Certificate' }).first().click({ timeout: 8000 })
-  await page.getByTestId('inspector-tab-bytes').click().catch(() => {})
+  await page.getByTestId('inspector-tab-bytes').click()
   await page.getByTestId('view-eavesdropper').click()
   await expect(page.getByTestId('inspector-public-bytes')).toContainText('Public')
   await expect(page.getByTestId('inspector-after')).toBeVisible()

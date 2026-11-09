@@ -55,6 +55,14 @@ test('an unknown saved value falls back to Dark', async ({ page }) => {
   await expect(page.getByTestId('theme-select')).toHaveValue('dark')
 })
 
+/** The theme a screen shows: the root's data-theme, the Vuetify theme class, and the --bg colour from style.css. */
+const BG = { light: '#eef1f7', dark: '#10141f' } as const
+async function expectTheme(page: import('@playwright/test').Page, theme: 'light' | 'dark') {
+  expect(await themeOf(page)).toBe(theme)
+  await expect(page.locator(`.v-theme--ns${theme === 'light' ? 'Light' : 'Dark'}`).first()).toBeVisible()
+  expect(await page.evaluate(() => getComputedStyle(document.documentElement).getPropertyValue('--bg').trim())).toBe(BG[theme])
+}
+
 for (const theme of ['light', 'dark'] as const) {
   test(`the Security setup screen and a tour step in the ${theme} theme`, async ({ page }) => {
     fs.mkdirSync(OUT, { recursive: true })
@@ -62,12 +70,14 @@ for (const theme of ['light', 'dark'] as const) {
     await setTheme(page, theme)
     await page.getByTestId('security-setup-button').click()
     await expect(page.getByTestId('sec-page')).toBeVisible()
+    await expectTheme(page, theme)
     await page.waitForTimeout(500)
     await page.screenshot({ path: path.join(OUT, `${theme}-security-setup.png`) })
     await page.getByTestId('sec-back').click()
     await page.getByTestId('lesson-item-1').click()
     await page.getByRole('button', { name: /start tour/i }).click()
     await expect(page.getByTestId('tour-step-id')).toBeVisible()
+    await expectTheme(page, theme)
     await page.waitForTimeout(500)
     await page.screenshot({ path: path.join(OUT, `${theme}-tour-step.png`) })
   })
