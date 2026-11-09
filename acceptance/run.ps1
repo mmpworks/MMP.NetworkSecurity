@@ -43,6 +43,29 @@ param(
     [switch]$FreshChild
 )
 
+# Every run takes the machine-wide heavy-run lock first (tools/heavy_lock.py, #320), so acceptance runs queue behind gates and app suites
+# instead of loading a busy machine. A run inside the live holder (a gate, a -Fresh parent, or this wrapper) goes straight on. A missing lock
+# tool fails the run by name; it never skips the lock.
+$lockTool = Join-Path $PSScriptRoot '..\tools\heavy_lock.py'
+if (-not (Test-Path $lockTool)) { Write-Host "[acceptance] LOCK_MISSING: $lockTool is absent, so this run cannot queue behind other heavy runs"; exit 3 }
+# `heavy_lock.py holds` exits 0 only inside the live holder, so a NETSEC_HEAVY_LOCK_HELD left over in a shell does not skip the lock (Jared on
+# #334). A tool from before `holds` (#335) exits 2 on the unknown action; then the variable decides, or every child would wrap again forever.
+python -I $lockTool holds *> $null
+$holdsCode = $LASTEXITCODE
+$insideHolder = $holdsCode -eq 0 -or ($holdsCode -eq 2 -and $env:NETSEC_HEAVY_LOCK_HELD)
+if (-not $insideHolder) {
+    # param() binds every argument, so $args is empty: forward the bound parameters, switches as bare names.
+    $forward = @()
+    foreach ($p in $PSBoundParameters.GetEnumerator()) {
+        if ($p.Value -is [System.Management.Automation.SwitchParameter]) { if ($p.Value.IsPresent) { $forward += "-$($p.Key)" } }
+        else { $forward += "-$($p.Key)"; $forward += (@($p.Value) -join ',') }
+    }
+    $label = 'acceptance ' + (@($Clauses) -join ',')
+    if ($label.Length -gt 80) { $label = $label.Substring(0, 77) + '...' }
+    python -I $lockTool run --label $label -- pwsh -NoProfile -File $PSCommandPath @forward
+    exit $LASTEXITCODE
+}
+
 $ErrorActionPreference = 'Stop'
 Set-StrictMode -Version Latest
 $acc = $PSScriptRoot
