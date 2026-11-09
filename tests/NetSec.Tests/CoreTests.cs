@@ -353,6 +353,28 @@ namespace NetSec.Tests
             Assert.Equal(EngineStatus.Failed, run.Result.Status);
         }
 
+        /// <summary>
+        /// Issue #308: an ended pump took every later command, ran the engine and queued the output with nobody to publish it, and the caller saw a
+        /// success. A relay loop that kept sending into an ended session grew that queue to 83 million outputs. Data after the end now fails by name, and
+        /// a close after the end stays a quiet success, because the link is closed already.
+        /// </summary>
+        [Fact]
+        public void Data_sent_after_the_pump_ended_fails_by_name_and_a_late_close_still_succeeds()
+        {
+            MemoryLink[] links = MemoryLink.Pair();
+            EnginePump client = new EnginePump(EchoEngine.Client(Make.Hello, Make.Stream("client"), null), links[0], null, null, null, 200);
+            Make.Done(client.Run());
+
+            IFuture send = client.Enqueue(new EngineCommand(EngineCommandKind.Send, 0, new byte[] { 1, 2, 3 }, null));
+            Assert.True(send.IsCompleted, "a send after the end must not wait");
+            Assert.True(send.IsFaulted, "a send after the end reported a success");
+            NetSecException refused = Assert.IsType<NetSecException>(send.Exception);
+            Assert.Equal(ErrorCodes.LinkLost, refused.Error.Code);
+
+            IFuture close = client.Enqueue(EngineCommand.Close);
+            Assert.True(close.IsCompleted && !close.IsFaulted, "a close after the end must stay a quiet success");
+        }
+
         static Pair FlippedLength(int serverDeadlineMs, int clientDeadlineMs)
         {
             MemoryLink[] links = MemoryLink.Pair();
