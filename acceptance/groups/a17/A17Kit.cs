@@ -426,29 +426,35 @@ namespace Acceptance
             public override string ToString() { return (Done ? "reached Done" : "stopped at the " + (Flow == null ? "?" : Flow.Kind) + " step") + (Codes.Count == 0 ? "" : " with " + string.Join(",", Codes.ToArray())); }
         }
 
-        /// <summary>
-        /// The Host says WIZARD_PART_NOT_BUILT for a type with no row in FlowParts, so the clause has nothing to judge yet. NOT RUN needs at
-        /// least one WIZARD_PART_NOT_BUILT, and every other code must be owed with it. The only other owed code is WIZARD_TYPE_NOT_IN_FLOW for
-        /// a companion "&lt;type&gt;.key" file: the V4 import layout (CONTRACT.md section 5, ASSUMED) sends one beside each certificate, and the flow
-        /// lists those companions only once certificate import is built (FlowRuns.cs: "{typeId} is not one of the keys this set makes."). The
-        /// same code for any other type, or any other code, stays FAIL (Jared on #339).
-        /// </summary>
+        /// <summary>The Host says WIZARD_PART_NOT_BUILT for a type with no row in FlowParts, so the clause has nothing to judge yet. Only that code reads NOT RUN: one other code in the list, or any other failure, stays FAIL.</summary>
         public static void NotRunIfOnlyPartNotBuilt(List<string> codes, List<string> messages, string what)
         {
-            if (codes.Count == 0 || !codes.Contains("WIZARD_PART_NOT_BUILT")) return;
-            for (int i = 0; i < codes.Count; i++)
-            {
-                if (codes[i] == "WIZARD_PART_NOT_BUILT") continue;
-                if (codes[i] == "WIZARD_TYPE_NOT_IN_FLOW" && i < messages.Count && CompanionKeyNotInFlow.IsMatch(messages[i] ?? "")) continue;
-                return;
-            }
+            if (codes.Count == 0) return;
+            foreach (string code in codes) if (code != "WIZARD_PART_NOT_BUILT") return;
             List<string> owed = new List<string>();
             foreach (string m in messages) if (!owed.Contains(m)) owed.Add(m);
             throw new NotRunException("WIZARD_PART_NOT_BUILT", what + ": the product owes this part. " + string.Join(" ", owed.ToArray()));
         }
 
-        static readonly System.Text.RegularExpressions.Regex CompanionKeyNotInFlow =
-            new System.Text.RegularExpressions.Regex(@"^(?<type>\S+\.key) is not one of the keys this set makes\.$");
+        /// <summary>
+        /// The types among the import's paths that the course cannot import yet: GET /api/security names it per type as parts.canImport (#344).
+        /// A companion "&lt;type&gt;.key" path has no row and is skipped. A Host from before #344 sends no parts, and then nothing is skipped here:
+        /// the file step decides, as before.
+        /// </summary>
+        static List<string> NotImportable(HostProc h, IEnumerable<string> typeIds)
+        {
+            List<string> owed = new List<string>();
+            List<object> types = MiniJson.Arr(Security(h), "types") ?? new List<object>();
+            foreach (string typeId in typeIds)
+                foreach (object o in types)
+                {
+                    Dictionary<string, object> row = MiniJson.AsObject(o);
+                    if (MiniJson.Str(row, "typeId") != typeId) continue;
+                    Dictionary<string, object> parts = MiniJson.Obj(row, "parts");
+                    if (parts != null && !MiniJson.Bool(parts, "canImport", true)) owed.Add(typeId);
+                }
+            return owed;
+        }
 
         static bool Collect(ImportResult r, Reply reply)
         {
@@ -470,6 +476,11 @@ namespace Acceptance
         /// </summary>
         public static ImportResult TryImport(HostProc h, string flowId, Dictionary<string, string> paths)
         {
+            // Slice V4 runs ahead of the build. A type the Host says it cannot import yet reads NOT RUN before any file is sent, so the clause
+            // turns into a real check once import lands, with no edit (#333, #344). A type it can import goes on to the file step.
+            List<string> owed = NotImportable(h, paths.Keys);
+            if (owed.Count > 0)
+                throw new NotRunException("WIZARD_PART_NOT_BUILT", string.Join(", ", owed.ToArray()) + ": import is not built yet (GET /api/security: parts.canImport is false)");
             ImportResult r = new ImportResult();
             r.Flow = Flow.Start(h, flowId);
             Flow f = r.Flow;

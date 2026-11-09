@@ -128,22 +128,10 @@ namespace Acceptance
             try { A17.NotRunIfOnlyPartNotBuilt(new List<string> { Part, Part }, one, "a step"); }
             catch (NotRunException e) { notRun = e.Reason == Part && e.Message.Contains("cannot make x"); }
             Check.True(notRun, "only WIZARD_PART_NOT_BUILT should read NOT RUN and name the owed part");
-            // A companion .key that the flow does not list yet is owed with the unbuilt part (#339).
-            const string NotIn = "WIZARD_TYPE_NOT_IN_FLOW";
-            List<string> companion = new List<string> { "The course cannot read a file for pki.root-ca yet.", "pki.root-ca.key is not one of the keys this set makes." };
-            bool companionNotRun = false;
-            try { A17.NotRunIfOnlyPartNotBuilt(new List<string> { Part, NotIn }, companion, "a file import"); }
-            catch (NotRunException e) { companionNotRun = e.Reason == Part; }
-            Check.True(companionNotRun, "WIZARD_PART_NOT_BUILT with WIZARD_TYPE_NOT_IN_FLOW for a companion .key should read NOT RUN");
-            // Each of these goes on to the clause's own check: a type that is not a companion, another code beside the part, the companion
-            // code alone, a code with no message, any other code, and no code.
-            A17.NotRunIfOnlyPartNotBuilt(new List<string> { Part, NotIn }, new List<string> { companion[0], "tls13.server is not one of the keys this set makes." }, "a file import");
-            A17.NotRunIfOnlyPartNotBuilt(new List<string> { Part, NotIn, "CERT_SIGNATURE" }, new List<string> { companion[0], companion[1], "The signature does not verify." }, "a file import");
-            A17.NotRunIfOnlyPartNotBuilt(new List<string> { NotIn }, new List<string> { companion[1] }, "a file import");
-            A17.NotRunIfOnlyPartNotBuilt(new List<string> { Part, NotIn }, one, "a step");
+            A17.NotRunIfOnlyPartNotBuilt(new List<string> { Part, "WIZARD_TYPE_NOT_IN_FLOW" }, one, "a step");
             A17.NotRunIfOnlyPartNotBuilt(new List<string> { "KEY_FILE_UNREADABLE" }, one, "a step");
             A17.NotRunIfOnlyPartNotBuilt(new List<string>(), one, "a step");
-            return "WIZARD_PART_NOT_BUILT alone, or with WIZARD_TYPE_NOT_IN_FLOW for a companion .key, throws NOT RUN; another type, another code beside them, the companion code alone, a code with no message, another code, and no code each go on to the clause's own check";
+            return "only WIZARD_PART_NOT_BUILT throws NOT RUN; a second code, another code, and no code each go on to the clause's own check";
         }
 
         // One row ran all cases and outgrew the runner's 900 s budget for one clause. The cases now run in 4 rows by area. The last row takes
