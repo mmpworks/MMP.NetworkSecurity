@@ -139,6 +139,11 @@ function Invoke-NpmCiIfStale([string]$Dir, [switch]$Force) {
 function Tail([string]$s, [int]$n = 600) { $s = ($s ?? '').Trim(); if ($s.Length -gt $n) { return $s.Substring($s.Length - $n) } else { return $s } }
 
 # ------------------------------------------------------------------ load the clause list
+# clauses.json is generated, never committed (#343): every run writes it from the clause code first, so a stale or missing file cannot change
+# a result, and no open PR conflicts on it. A failed generation stops the run by name.
+$gen = Invoke-Tool 'python' @('-I', (Join-Path $acc 'tools\gen_clauses.py'), '--write') $acc -TimeoutSec 300
+if ($gen.ExitCode -ne 0) { Write-Host ("[acceptance] GEN_FAILED: tools/gen_clauses.py --write exit $($gen.ExitCode): " + (Tail $gen.Output 600)); exit 2 }
+Say ($gen.Output.Trim() -split "`n" | Select-Object -Last 1)
 $doc = Get-Content (Join-Path $acc 'clauses.json') -Raw | ConvertFrom-Json
 $roles = (Get-Content (Join-Path $acc 'roles.json') -Raw | ConvertFrom-Json).roles
 $all = @($doc.clauses)

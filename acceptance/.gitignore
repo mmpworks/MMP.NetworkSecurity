@@ -8,3 +8,5 @@ e2e/playwright-report/
 .work/
 # Python bytecode from running acceptance/tools/*.py; it would trip the report's uncommitted-files warning (Jared on #334).
 __pycache__/
+# Generated at the start of every run by tools/gen_clauses.py, never committed (#343).
+clauses.json
