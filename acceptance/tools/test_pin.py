@@ -22,6 +22,7 @@ class Pin(unittest.TestCase):
         self.put("acceptance/CONTRACT.md", "row 1\n")
         self.put("acceptance/groups/a1/One.cs", "class One {}\n")
         self.put("app/main.ts", "x\n")
+        self.put("acceptance/settings.json", '{ "pin": true }\n')
         self.commit("base")
 
     def tearDown(self):
@@ -100,10 +101,40 @@ class Pin(unittest.TestCase):
         self.assertEqual(code, 0, out)
         self.assertEqual("acceptance-tree " + real, (self.root / "acceptance/PIN").read_text(encoding="utf-8").strip())
 
-    def test_missing_pin_is_unset(self):
+    def test_missing_pin_fails_by_name_when_the_setting_is_on(self):
         code, out = self.pin("--check")
         self.assertEqual(code, 1, out)
-        self.assertIn("PIN_UNSET", out)
+        self.assertIn("PIN_MISSING", out)
+
+    def test_deleted_pin_fails_by_name_when_the_setting_is_on(self):
+        # The check keys on the committed setting, never on whether PIN exists, so a PR that deletes PIN cannot turn the check off.
+        self.write_and_commit()
+        (self.root / "acceptance/PIN").unlink()
+        self.commit("delete pin")
+        code, out = self.pin("--check")
+        self.assertEqual(code, 1, out)
+        self.assertIn("PIN_MISSING", out)
+
+    def test_setting_off_reports_pin_off(self):
+        self.put("acceptance/settings.json", '{ "pin": false }\n')
+        self.commit("pin off")
+        code, out = self.pin("--check")
+        self.assertEqual(code, 0, out)
+        self.assertIn("PIN_OFF", out)
+
+    def test_missing_setting_fails_by_name(self):
+        (self.root / "acceptance/settings.json").unlink()
+        self.commit("no settings")
+        code, out = self.pin("--check")
+        self.assertEqual(code, 1, out)
+        self.assertIn("PIN_SETTING_MISSING", out)
+
+    def test_setting_that_is_not_true_or_false_fails_by_name(self):
+        self.put("acceptance/settings.json", '{ "pin": "yes" }\n')
+        self.commit("bad setting")
+        code, out = self.pin("--check")
+        self.assertEqual(code, 1, out)
+        self.assertIn("PIN_SETTING_BAD", out)
 
     def test_old_commit_form_is_refused_by_name(self):
         self.put("acceptance/PIN", self.git("rev-parse", "HEAD").strip() + "\n")

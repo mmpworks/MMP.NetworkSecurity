@@ -8,15 +8,22 @@ will merge as, and a commit cannot name itself, so PIN names the tree instead (t
 commit that changes only PIN keeps the id it wrote. The PIN had held a commit, and it went stale across many PRs because only a -Fresh run
 looked at it (2026-11-08); the gate now runs --check on every PR.
 
-Reason codes: PIN_UNSET, PIN_OLD_FORM (a bare commit id), PIN_STALE, UNCOMMITTED (on --write), NO_GIT.
+Whether PIN is checked comes from the committed setting "pin" in acceptance/settings.json (HEAD's copy), never from whether PIN exists.
+With "pin": true a missing or empty PIN is PIN_MISSING, so a PR that deletes PIN fails by name. With "pin": false --check exits 0 and
+says PIN_OFF, and the fresh-clone clause reads NOT RUN PIN_OFF.
+
+Reason codes: PIN_MISSING, PIN_OFF (exit 0), PIN_SETTING_MISSING, PIN_SETTING_BAD, PIN_OLD_FORM (a bare commit id), PIN_STALE,
+UNCOMMITTED (on --write), NO_GIT.
 """
 import argparse
+import json
 import pathlib
 import subprocess
 import sys
 
 PREFIX = "acceptance-tree "
 FIX = "python -I acceptance/tools/pin.py --write, then commit acceptance/PIN"
+SETTINGS = "acceptance/settings.json"
 
 
 def git(root, *args, stdin=None):
@@ -41,10 +48,30 @@ def read_pin(root):
     return path.read_text(encoding="utf-8").strip() if path.exists() else ""
 
 
+def pin_setting(root):
+    """The committed "pin" setting: True, False, or a (code, message) refusal. HEAD's copy, so an uncommitted edit cannot turn it off."""
+    try:
+        text = git(root, "show", f"HEAD:{SETTINGS}")
+    except RuntimeError:
+        return 1, f"PIN_SETTING_MISSING: HEAD has no {SETTINGS}. Commit it with {{ \"pin\": true }}"
+    try:
+        value = json.loads(text).get("pin")
+    except (ValueError, AttributeError):
+        value = None
+    if not isinstance(value, bool):
+        return 1, f"PIN_SETTING_BAD: {SETTINGS} must hold \"pin\": true or \"pin\": false"
+    return value
+
+
 def check(root):
+    setting = pin_setting(root)
+    if isinstance(setting, tuple):
+        return setting
+    if setting is False:
+        return 0, f"PIN_OFF: {SETTINGS} sets \"pin\": false, so acceptance/PIN is not checked"
     have = read_pin(root)
     if not have:
-        return 1, f"PIN_UNSET: acceptance/PIN is missing or empty. Fix: {FIX}"
+        return 1, f"PIN_MISSING: {SETTINGS} sets \"pin\": true and acceptance/PIN is missing or empty. Fix: {FIX}"
     if not have.startswith(PREFIX):
         return 1, f"PIN_OLD_FORM: acceptance/PIN holds '{have[:12]}', a commit id, not '{PREFIX}<hash>'. Fix: {FIX}"
     want = PREFIX + acceptance_tree(root)
