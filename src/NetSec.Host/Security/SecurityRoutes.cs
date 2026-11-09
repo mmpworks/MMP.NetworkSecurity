@@ -88,6 +88,9 @@ public static class SecurityRoutes
             version = e.Binding?.Version ?? 0,
             judge = verified ? e.Judge : null,
             says = verified ? e.Says : null,
+            // What the course has built for this type, from the same checks the wizard refuses with (FlowRuns), so a caller can tell
+            // "not built yet" from a fault (issue #333).
+            parts = new { make = FlowParts.IsBuilt(id), import = FlowParts.CanImport(id) },
         };
     }
 
