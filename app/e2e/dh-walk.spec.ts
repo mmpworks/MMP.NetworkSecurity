@@ -43,6 +43,8 @@ test('each value shows the engine\'s number and its paint chip, n has none, and 
   }
   for (const f of FROM) await expect(page.getByTestId(`dh-chip-${f.name}`)).toHaveAttribute('data-chip', f.colour)
   expect(want['client-shared'].dec).toBe(want['server-shared'].dec)
+  // The walk is built, so its rail line no longer says it comes later.
+  await expect(page.getByTestId('walk-item-dh')).not.toContainText('later update')
 })
 
 test('each chip names its colour for screen readers and shows its DH letter, and the legend pairs colour and letter', async ({ page }) => {
