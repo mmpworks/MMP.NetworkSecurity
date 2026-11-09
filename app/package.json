@@ -8,6 +8,7 @@
     "dev": "concurrently -k \"vite\" \"wait-on http://localhost:5173 && cross-env VITE_DEV_SERVER_URL=http://localhost:5173 electron .\"",
     "build": "vue-tsc --noEmit && vite build && node scripts/dist-stamp.cjs write",
     "start": "npm run build && electron .",
+    "postinstall": "python -I ../tools/electron_dist.py repair --soft",
     "typecheck": "vue-tsc --noEmit && tsc -p e2e/tsconfig.json",
     "e2e": "npm run build && python -I ../tools/heavy_lock.py run --label \"app e2e\" -- node node_modules/@playwright/test/cli.js test"
   },
