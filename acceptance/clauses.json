@@ -3301,6 +3301,72 @@
    "counts": true
   },
   {
+   "id": "A19.ui.tls11-schedule-key-labelled-public",
+   "base": "A19.ui.tls11-schedule-key-labelled-public",
+   "assertion": "A19",
+   "group": "e2e",
+   "build": "host",
+   "slice": "W1",
+   "referee": "Playwright, against the Host's reply",
+   "roles": [],
+   "counts": true
+  },
+  {
+   "id": "A19.ui.tls11-schedule-open-with-show-keys-off",
+   "base": "A19.ui.tls11-schedule-open-with-show-keys-off",
+   "assertion": "A19",
+   "group": "e2e",
+   "build": "host",
+   "slice": "W1",
+   "referee": "Playwright, against the Host's reply",
+   "roles": [],
+   "counts": true
+  },
+  {
+   "id": "A19.ui.tls11-schedule-premaster-to-keys",
+   "base": "A19.ui.tls11-schedule-premaster-to-keys",
+   "assertion": "A19",
+   "group": "e2e",
+   "build": "host",
+   "slice": "W1",
+   "referee": "Playwright, against the Host's reply",
+   "roles": [],
+   "counts": true
+  },
+  {
+   "id": "A19.ui.tls13-schedule-key-labelled-rfc8448",
+   "base": "A19.ui.tls13-schedule-key-labelled-rfc8448",
+   "assertion": "A19",
+   "group": "e2e",
+   "build": "host",
+   "slice": "W1",
+   "referee": "Playwright, against the Host's reply and RFC 8448 in the vector file",
+   "roles": [],
+   "counts": true
+  },
+  {
+   "id": "A19.ui.tls13-schedule-open-with-show-keys-off",
+   "base": "A19.ui.tls13-schedule-open-with-show-keys-off",
+   "assertion": "A19",
+   "group": "e2e",
+   "build": "host",
+   "slice": "W1",
+   "referee": "Playwright, against the Host's reply and RFC 8448 in the vector file",
+   "roles": [],
+   "counts": true
+  },
+  {
+   "id": "A19.ui.tls13-schedule-shows-every-step",
+   "base": "A19.ui.tls13-schedule-shows-every-step",
+   "assertion": "A19",
+   "group": "e2e",
+   "build": "host",
+   "slice": "W1",
+   "referee": "Playwright, against the Host's reply and RFC 8448 in the vector file",
+   "roles": [],
+   "counts": true
+  },
+  {
    "id": "A19.ui.two-run-back-keeps-row",
    "base": "A19.ui.two-run-back-keeps-row",
    "assertion": "A19",
