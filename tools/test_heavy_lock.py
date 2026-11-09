@@ -6,6 +6,7 @@ import importlib.util
 import json
 import os
 import pathlib
+import shutil
 import subprocess
 import sys
 import tempfile
@@ -186,6 +187,70 @@ class HeavyLock(unittest.TestCase):
             r = self.tool("run", "--label", "reader", "--wait-minutes", "0.03", "--", *PY, "print('must not run')")
             self.assertEqual(r.returncode, 75, f"info={partial!r}: {r.stdout + r.stderr}")
             self.assertNotIn("must not run", r.stdout)
+
+    # Ticket order: waiters run in arrival order. The OS lock still decides who holds; a ticket only decides who may try.
+    def test_four_waiters_run_in_arrival_order(self):
+        marks = pathlib.Path(self.tmp.name) / "order.txt"
+        script = "import sys\nopen(sys.argv[1], 'a').write(sys.argv[2] + '\\n')\n"
+        holder = self.start_run("holder", *PY, "import time; time.sleep(5)")
+        self.wait_until_held()
+        waiters = []
+        for name in ("w1", "w2", "w3", "w4"):
+            waiters.append(self.start_run(name, sys.executable, "-I", "-c", script, str(marks), name))
+            time.sleep(0.4)                                                # arrival order is clear: each ticket is 0.4 s later than the last
+        for p in [holder, *waiters]:
+            p.communicate(timeout=120)
+            self.assertEqual(p.returncode, 0)
+        self.assertEqual(marks.read_text(encoding="utf-8").split(), ["w1", "w2", "w3", "w4"])
+
+    def test_the_ticket_of_a_killed_waiter_does_not_block_the_next_one(self):
+        marks = pathlib.Path(self.tmp.name) / "after-kill.txt"
+        script = "import sys\nopen(sys.argv[1], 'a').write(sys.argv[2] + '\\n')\n"
+        holder = self.start_run("holder", *PY, "import time; time.sleep(4)")
+        self.wait_until_held()
+        first = self.start_run("first", sys.executable, "-I", "-c", script, str(marks), "first")
+        time.sleep(0.5)
+        second = self.start_run("second", sys.executable, "-I", "-c", script, str(marks), "second")
+        time.sleep(0.5)
+        subprocess.run(["taskkill", "/PID", str(first.pid), "/F"], capture_output=True)
+        for p in (holder, second):
+            p.communicate(timeout=60)
+            self.assertEqual(p.returncode, 0)
+        self.assertEqual(marks.read_text(encoding="utf-8").split(), ["second"])
+
+    def test_a_live_earlier_ticket_goes_first_even_when_the_lock_is_free(self):
+        folder = self.dir / "tickets"
+        folder.mkdir(parents=True)
+        sleeper = subprocess.Popen(PY + ["import time; time.sleep(60)"])
+        self.procs.append(sleeper)
+        start = heavy_lock.process_start(sleeper.pid)
+        (folder / f"{1:020d}-{sleeper.pid}.json").write_text(json.dumps({"pid": sleeper.pid, "start": start}), encoding="utf-8")
+        r = self.tool("run", "--label", "later", "--wait-minutes", "0.05", "--", *PY, "print('must not run')")
+        self.assertEqual(r.returncode, 75, r.stdout + r.stderr)
+        self.assertNotIn("must not run", r.stdout)
+
+    def test_junk_and_dead_tickets_are_skipped(self):
+        folder = self.dir / "tickets"
+        folder.mkdir(parents=True)
+        (folder / f"{1:020d}-1.json").write_text("not json", encoding="utf-8")
+        (folder / f"{2:020d}-2.json").write_text("", encoding="utf-8")
+        (folder / f"{3:020d}-4000000.json").write_text(json.dumps({"pid": 4000000, "start": "x"}), encoding="utf-8")
+        r = self.tool("run", "--label", "after junk", "--wait-minutes", "0.2", "--", *PY, "print('ran')")
+        self.assertEqual(r.returncode, 0, r.stdout + r.stderr)
+        self.assertIn("ran", r.stdout)
+
+    # A command that cannot be found fails before the lock is touched, so it never costs a turn.
+    def test_an_unknown_command_exits_77_and_leaves_the_lock_free(self):
+        r = self.tool("run", "--label", "typo", "--", "no-such-command-xyz", "--flag")
+        self.assertEqual(r.returncode, 77, r.stdout + r.stderr)
+        self.assertIn("COMMAND_NOT_FOUND", r.stdout)
+        self.assertEqual(self.tool("status").returncode, 0)                 # the lock was never taken
+
+    @unittest.skipUnless(shutil.which("npm"), "npm is not installed")
+    def test_a_cmd_shim_such_as_npm_runs(self):
+        r = self.tool("run", "--label", "npm", "--", "npm", "--version")
+        self.assertEqual(r.returncode, 0, r.stdout + r.stderr)
+        self.assertRegex(r.stdout, r"\d+\.\d+\.\d+")
 
     def alive(self, pid):
         out = subprocess.run(["tasklist", "/FI", f"PID eq {pid}", "/NH"], capture_output=True, text=True).stdout
