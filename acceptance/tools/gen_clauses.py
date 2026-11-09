@@ -69,6 +69,11 @@ S4_PRIMITIVES = ("A1.md5", "A1.sha1", "A1.hmac-md5", "A1.hmac-sha1", "A1.hkdf-sh
 SLICE = {"A2": "S1", "A3": "S2", "A4": "S3", "A5": "S3", "A6": "S3", "A7": "S4", "A8": "S4", "A9": "All", "A10": "S5", "A10a": "S5",
          "A11": "S6", "A12": "S7", "A13": "Each", "A14": "Each", "A15": "Each", "A15a": "Each", "A16": "S8", "A17": "V0", "A18": "Each", "A19": "W1", "SELF": "S0"}
 
+# Clauses whose slice differs from their assertion's default. The A17 certificate clauses test V4, certificate import (docs/modes-design.md, the
+# V4 row of the clause table), not V0 (#333).
+SLICE_BY_ID = {cid: "V4" for cid in ("A17.attacks.hit-named-field", "A17.attacks.unavailable-names-code", "A17.chain.alg-unsupported-named",
+                                      "A17.clock.new-certificate-not-expired", "A17.proof.root-negative-control")}
+
 REFEREE = {"A1": "published vectors", "A2": ".NET 10 BCL oracle", "A3": "x9.org vectors", "A4": "RFC 8448", "A5": "OpenSSL 3.5.7 and Go crypto/tls", "A6": "OpenSSL 3.5.7",
            "A7": "OpenSSL 3.5.7", "A8": "Go x/crypto/ssh and ssh.exe", "A9": "CF references and System.Reflection.Metadata", "A10": "live run, Go referees and taps",
            "A10a": "Go tap", "A11": "Go tokenverify", "A12": "cl.exe and a live run", "A13": "Playwright", "A14": "test over the tour files and a live Host",
@@ -208,6 +213,7 @@ def build():
                 slice_ = "S1"
             if assertion == "A16" and (cid.startswith("A16.type") or cid.startswith("A16.host")):
                 slice_ = "S2" if cid.startswith("A16.type") else "S8"
+            slice_ = SLICE_BY_ID.get(cid, slice_)
             rows.append({
                 "id": full, "base": cid, "assertion": assertion, "group": group, "build": b or "host",
                 "slice": slice_, "referee": referee_of(cid, assertion), "roles": roles_of(cid), "counts": assertion != "SELF",

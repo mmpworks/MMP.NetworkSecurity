@@ -6,3 +6,5 @@ e2e/node_modules/
 e2e/test-results/
 e2e/playwright-report/
 .work/
+# Python bytecode from running acceptance/tools/*.py; it would trip the report's uncommitted-files warning (Jared on #334).
+__pycache__/
