@@ -110,6 +110,7 @@ namespace NetSec.Tests
         public void Junk_is_named_malformed_and_never_a_failed_signature(string token)
         {
             AuthDecision d = Token.Verify(Issuer.CopyPublic(), token, Now);
+            Assert.False(d.Allowed);
             Assert.Equal("TOKEN_MALFORMED", d.Code);
             Assert.Equal("token format", d.CheckName);
         }
