@@ -101,14 +101,22 @@ async function showWord(word: number | null) {
   for (const j of [3, 0]) { const el = cellEl(word, j); if (el) scrollWithin(tableEl.value, el) }
 }
 
+// The boxes follow the workspace's own height and the header's, so a wrapped line or a pane that opens re-sizes them with no window
+// resize (Jared and Richard on #326). Their own heights change neither, so the observer cannot loop.
+let watcher: ResizeObserver | null = null
 onMounted(async () => {
   await nextTick()
   headerToTop()
   measure()
   void showWord(current.value)
   window.addEventListener('resize', measure)
+  const { ws, head } = frame()
+  if (typeof ResizeObserver === 'function') {
+    watcher = new ResizeObserver(() => measure())
+    for (const el of [ws, head]) if (el) watcher.observe(el)
+  }
 })
-onBeforeUnmount(() => window.removeEventListener('resize', measure))
+onBeforeUnmount(() => { window.removeEventListener('resize', measure); watcher?.disconnect() })
 
 /** The finished byte flies from the XOR line into its cell, as in the mock. It lands, and then the cell pulses. */
 async function fly(run: number, r: AesKeyWordRow, j: number) {

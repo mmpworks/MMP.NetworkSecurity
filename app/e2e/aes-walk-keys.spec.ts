@@ -206,6 +206,17 @@ for (const size of [{ width: 1984, height: 1086 }, { width: 1280, height: 640 }]
   })
 }
 
+// Jared and Richard on #326: the boxes follow the workspace's own height, not only a window resize (a wrapped line, a pane opening).
+test('when the workspace gets shorter with no window resize, the round-key box gets shorter too', async ({ page }) => {
+  await page.setViewportSize({ width: 1280, height: 900 })
+  await openPractice(page)
+  await toStop(page, KEYS + 1)
+  const boxH = () => page.getByTestId('aes-walk-ks-table').evaluate(el => el.getBoundingClientRect().height)
+  const before = await boxH()
+  await page.getByTestId('workspace').evaluate(el => { el.style.height = `${el.clientHeight - 200}px` })
+  await expect.poll(boxH, { message: 'the box follows the shorter workspace' }).toBeLessThan(before - 100)
+})
+
 test('when a late word builds, the round-key box scrolls to its cells, and the page stays put', async ({ page }) => {
   await page.setViewportSize({ width: 1280, height: 640 })
   await openPractice(page)
