@@ -380,6 +380,7 @@ Heavy runs stacked on one machine pushed CPU to 100% and made product timing tes
 7. The default wait has no limit. `--wait-minutes M` (or `NETSEC_LOCK_WAIT_MINUTES` for `gate.ps1`) adds one and ends a timed-out wait with exit 75. A limit shorter than a full gate (about 45 minutes) makes a queued run give up while the holder is still working.
 8. Waiters run in arrival order. Each writes a ticket file under `<lock dir>\tickets` named by arrival time and pid. Only the oldest live ticket may try the OS lock. Tickets of dead processes and junk files are skipped. The OS lock still decides who holds it, so a wrong ticket costs fairness and never puts two runs in at once.
 9. `run` resolves the command with `shutil.which` before it does anything else, so `npm` finds `npm.cmd` on Windows. A command that is not found exits 77 (`COMMAND_NOT_FOUND`) before the lock or a ticket is touched, so a typo costs nobody a turn.
+10. Known trade-off of the ticket order: before tickets, a hung waiter could not block anyone. Now a waiter that is alive but stuck (a suspended process, a hung `python`) holds the oldest live ticket and blocks every later waiter until it dies or its `--wait-minutes` limit ends. A killed waiter is skipped at once. If a stuck waiter ever bites, the bound is a ticket the waiter refreshes on each poll, with "not refreshed for 2 minutes" counted as dead. That is not built yet (Jared, #332 review).
 
 ## 10. Open questions, with the default taken
 | # | Question | Default |
