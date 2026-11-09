@@ -968,7 +968,8 @@ test('[A19.ui.inv-mix-line-matches-field-multiply] on the decrypt walk\'s InvMix
     const where = `column 0, pair ${k} (factor ${f}, byte ${before[k]})`;
     expect(new RegExp(`(?<![0-9a-f])${f}\\s*[×x]\\s*${before[k]}\\s*=\\s*${h2(want)}(?![0-9a-f])`, 'i').test(line), `${where}: the line reads ${f} × ${before[k]} = ${h2(want)}, and reads "${line}"`).toBe(true);
     expect(line, `${where}: the breakdown names ${f}'s powers of 2`).toContain(`${f} is ${parts}`);
-    for (const [name, v] of [['x2', d1], ['x4', d2], ['x8', d3]] as const)
+    // The doublings read "×2 = ", with the multiplication sign, never "x2", which can read as a variable name (Jared on #330; #337's text).
+    for (const [name, v] of [['×2', d1], ['×4', d2], ['×8', d3]] as const)
       expect(new RegExp(`${name}\\s*=\\s*${h2(v)}(?![0-9a-f])`, 'i').test(line), `${where}: the doubling ${name} = ${h2(v)} shows, and the line reads "${line}"`).toBe(true);
     if (k < 3) await page.getByTestId('aes-walk-mix-next').click();
   }
