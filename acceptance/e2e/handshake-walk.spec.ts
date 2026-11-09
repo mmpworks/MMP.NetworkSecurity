@@ -69,7 +69,8 @@ function rfc8448(): Map<string, string> {
 /** Shows every TLS 1.3 step, checks its label and output, and returns how many steps matched RFC 8448 directly. */
 async function tls13Steps(page: Page, steps: any[]): Promise<number> {
   const rfc = rfc8448();
-  expect(await page.locator('[data-testid^="tls13-step-"][data-name]').count(), 'one row per engine step').toBe(steps.length);
+  // The panel can draw before its fetch lands, so each read waits for the value (a loaded machine showed 0 rows on a single read, 2026-11-08).
+  await expect(page.locator('[data-testid^="tls13-step-"][data-name]'), 'one row per engine step').toHaveCount(steps.length, { timeout: 30_000 });
   let rfcHits = 0;
   for (let i = 0; i < steps.length; i++) {
     const s = steps[i];
@@ -98,7 +99,7 @@ test('[A19.ui.tls13-schedule-key-labelled-rfc8448] the TLS 1.3 schedule names it
   await openWalk(page, 'walk-item-tls13', 'tls13-schedule-panel');
   const label = page.getByTestId('tls13-key-source');
   await expect(label, 'the screen labels its key').toBeVisible();
-  expect(await label.getAttribute('data-key-source'), 'the label carries the engine\'s keySource').toBe('rfc8448');
+  await expect(label, 'the label carries the engine\'s keySource').toHaveAttribute('data-key-source', 'rfc8448', { timeout: 30_000 });
   const words = ((await label.innerText()) ?? '').toLowerCase();
   expect(words.includes('rfc 8448') && words.includes('test'), `the label names RFC 8448's published test key, and reads "${words}"`).toBe(true);
 });
@@ -126,7 +127,7 @@ const TLS11: [string, (w: any) => string][] = [
 
 /** Checks the 6 values and their order: pre-master, then master, then the 4 keys (R8). */
 async function tls11Values(page: Page, w: any): Promise<void> {
-  for (const [id, pick] of TLS11) expect(await text(page, id), `${id} shows the engine's value`).toBe(String(pick(w)).toLowerCase());
+  for (const [id, pick] of TLS11) await expect.poll(() => text(page, id), { message: `${id} shows the engine's value`, timeout: 30_000 }).toBe(String(pick(w)).toLowerCase());
   const order = await page.evaluate((ids: string[]) => ids.map(id => document.querySelector(`[data-testid="${id}"]`)).every((el, i, all) =>
     i === 0 || !!(all[i - 1] && el && (all[i - 1]!.compareDocumentPosition(el) & Node.DOCUMENT_POSITION_FOLLOWING))), TLS11.map(t => t[0]));
   expect(order, 'the screen reads pre-master, then master, then the 4 keys, in that order').toBe(true);
@@ -145,7 +146,7 @@ test('[A19.ui.tls11-schedule-key-labelled-public] the TLS 1.1 schedule names its
   await openWalk(page, 'walk-item-tls11', 'tls11-schedule-panel');
   const label = page.getByTestId('tls11-key-source');
   await expect(label, 'the screen labels its key').toBeVisible();
-  expect(await label.getAttribute('data-key-source'), 'the label carries the engine\'s keySource').toBe('training');
+  await expect(label, 'the label carries the engine\'s keySource').toHaveAttribute('data-key-source', 'training', { timeout: 30_000 });
   const words = ((await label.innerText()) ?? '').toLowerCase();
   expect(words.includes('training') && words.includes('public'), `the label names a public training key, and reads "${words}"`).toBe(true);
 });
