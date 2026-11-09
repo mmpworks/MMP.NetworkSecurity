@@ -25,7 +25,9 @@ export const SECTIONS: readonly Section[] = [
       { id: 'hmac', label: 'HMAC and chain', slice: 'P6' },
       { id: 'feistel', label: 'Feistel', slice: 'P9' },
       { id: 'dh', label: 'Diffie-Hellman', slice: 'P7', status: 'Agree on a secret in public' },
-      { id: 'x25519', label: 'X25519', slice: 'P8' },
+      // R7: the toy curve and the real-curve picture (P8a) sit above X25519, the lead's call.
+      { id: 'curve', label: 'Elliptic curves', slice: 'P8a', status: 'Add points, then count them' },
+      { id: 'x25519', label: 'X25519', slice: 'P8', status: 'The Montgomery ladder, bit by bit' },
       { id: 'ed25519', label: 'Ed25519', slice: 'P8' },
       { id: 'ecdsa', label: 'ECDSA P-256', slice: 'P8b' },
     ],

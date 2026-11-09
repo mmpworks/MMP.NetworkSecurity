@@ -3,7 +3,7 @@ import { open, runFreePlay } from './walk'
 
 // The section shell (docs/sections-plan.md, slice P1). Kill condition lines 1 and 2: 3 of 3 sections are live, and 12 of 12 lessons are in Lessons with their numbers kept.
 const SECTIONS = ['handshake', 'techniques', 'lessons'] as const
-const TECHNIQUES = ['AES', 'HMAC and chain', 'Feistel', 'Diffie-Hellman', 'X25519', 'Ed25519', 'ECDSA P-256']
+const TECHNIQUES = ['AES', 'HMAC and chain', 'Feistel', 'Diffie-Hellman', 'Elliptic curves', 'X25519', 'Ed25519', 'ECDSA P-256']
 const HANDSHAKE = ['The wire and the eavesdropper', 'TLS 1.3 messages and key schedule', 'TLS 1.1 with RSA (the old way)', 'The certificate chain']
 
 const barRows = (page: Page) => page.getByTestId('top-bar').evaluate(bar => {
@@ -28,7 +28,7 @@ test('Lessons holds 12 of 12 lessons with their numbers kept', async ({ page }) 
   }
 })
 
-test('Techniques lists its 7 items and Handshake its 4 walks, and Lessons comes back as it was', async ({ page }) => {
+test('Techniques lists its 8 items and Handshake its 4 walks, and Lessons comes back as it was', async ({ page }) => {
   await runFreePlay(page, 1)
   await page.getByTestId('section-techniques').click()
   await expect(page.getByTestId('lesson-rail')).toBeHidden()
