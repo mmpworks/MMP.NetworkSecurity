@@ -7,6 +7,7 @@ that noise. Small targeted runs stay unlocked. A load burner or a hang loop coun
 
   python -I tools/heavy_lock.py run --label "gate AppProof" [--wait-minutes M] -- <command> [args]   take the lock, run the command, release
   python -I tools/heavy_lock.py status                                                               exit 0 free, 2 held (names the holder)
+  python -I tools/heavy_lock.py holds                                                                exit 0 only inside the live holder, else 1
 
 The lock is an OS file lock on <lock dir>\\heavy-run.lock, held by the `run` process for as long as it lives (msvcrt.locking on Windows, fcntl.flock
 elsewhere). The OS drops it when that process ends, including a crash or a kill, so nothing is ever stale and nothing needs cleanup: there is no pid
@@ -225,6 +226,30 @@ def earlier_live_tickets(directory, mine):
     return count                                                      # my ticket is gone: do not block on others
 
 
+def names_live_holder(info):
+    """True when NETSEC_HEAVY_LOCK_HELD holds the pid the info file names and that process is alive. The caller must also know the lock is held."""
+    return bool(info) and os.environ.get(ENV_HELD) == str(info.get("pid")) and process_start(info["pid"]) is not None
+
+
+def holds(directory):
+    """Exit 0 only when this process runs inside the live holder: the lock is really held and NETSEC_HEAVY_LOCK_HELD names that holder.
+    Callers (gate.ps1, acceptance/run.ps1) skip taking the lock on 0 and take it on anything else, so a shell with a stale inherited
+    variable cannot bypass the lock."""
+    fd = open_lock(directory)
+    try:
+        if try_os_lock(fd):
+            unlock(fd)
+            print("heavy-run lock: not held, so no run is a holder")
+            return 1
+        if names_live_holder(read_info(directory)):
+            print(f"heavy-run lock: this process runs inside the holder {describe(read_info(directory))}")
+            return 0
+        print("heavy-run lock: held by another run; NETSEC_HEAVY_LOCK_HELD does not name it")
+        return 1
+    finally:
+        os.close(fd)
+
+
 def run(directory, label, wait_minutes, command):
     found = shutil.which(command[0])                                  # finds npm.cmd and .bat on Windows; never shell=True
     if found is None:
@@ -241,7 +266,7 @@ def run(directory, label, wait_minutes, command):
     try:
         while True:
             info = read_info(directory)
-            if info and os.environ.get(ENV_HELD) == str(info.get("pid")) and process_start(info["pid"]) is not None:
+            if names_live_holder(info):
                 print(f"HEAVY_LOCK already held by an ancestor: {describe(info)}", flush=True)
                 break
             ahead = earlier_live_tickets(directory, mine)
@@ -302,16 +327,16 @@ def main(argv):
 
 def dispatch(argv):
     ap = argparse.ArgumentParser(description=__doc__.split("\n")[0])
-    ap.add_argument("action", choices=["status", "run"])
+    ap.add_argument("action", choices=["status", "run", "holds"])
     ap.add_argument("--label", default="heavy run")
     ap.add_argument("--wait-minutes", type=float, default=None, help="give up after this long (default: wait without limit)")
     ap.add_argument("--lock-dir", default=None)
     args, rest = ap.parse_known_args(argv)
     directory = lock_dir(args.lock_dir)
-    if args.action == "status":
+    if args.action in ("status", "holds"):
         if rest:
             ap.error(f"unrecognized arguments: {' '.join(rest)}")
-        return status(directory)
+        return status(directory) if args.action == "status" else holds(directory)
     command = rest[1:] if rest[:1] == ["--"] else rest
     if not command:
         print("usage: heavy_lock.py run --label L [--wait-minutes M] -- <command> [args]")
