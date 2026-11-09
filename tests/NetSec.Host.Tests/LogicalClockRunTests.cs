@@ -24,11 +24,13 @@ public sealed class LogicalClockRunTests
     static readonly bool KillRuns = Environment.GetEnvironmentVariable("NETSEC_CLOCK_RUNS") == "1";
     static int Runs => KillRuns ? 20 : 2;
 
-    /// <summary>The 8 caught forks whose stream tails vary between runs (the plan's survey). They are compared up to the catch.</summary>
+    /// <summary>The caught forks whose stream tails vary between runs: the plan's survey (8) and the kill run (2). They are compared up to the catch.</summary>
     static readonly HashSet<string> VaryingTails =
     [
         "L1-flip-gcm", "L2-flip-hash-message", "L2-flip-hmac-message", "L2-flip-hmac-tag",
         "L2-extend-hmac", "L7-downgrade", "L3-swap-server-share", "L3-flip-mlkem-ciphertext",
+        // Found by the 20-run kill condition, 2026-11-09: tails that the 10-run survey saw as stable.
+        "L4-unknown-ca", "L10-remove-client-cert",
     ];
 
     /// <summary>The plan's 9 cases, then every caught fork not already named.</summary>

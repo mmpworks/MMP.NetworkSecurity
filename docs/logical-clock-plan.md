@@ -14,7 +14,7 @@ Every engine-stream event carries a logical clock. Two runs of one seed give eve
 
 The work ends when this holds, and a reader can check it with no judgement: a Host test runs one seed 20 times per case, 10 of them with the machine under extra load, and every engine-stream event has the same clock in all 20 runs. The cases are lessons 1, 7, 9, 10 and 11, the lesson 7 recording fork (`L7-decrypt-recording`, the attacker stream), a replay fork (`L6-replay-sale`), an inject fork (`L5-clear-close-notify`) and a drop fork (`L5-flip-record-length`). The count is 20 of 20 for each of the 9 cases, recorded in `docs/_runs/` with its date. The drop case reaches 20 of 20 after #309 (decision 3). The test prints the first differing entry per stream for any run that differs, so a rare race names itself.
 
-Amendment (decision 5, "The catch" below): every caught-attack fork joins the cases, 20 runs each, 10 under load. The 45 stable forks are compared whole. The 8 varying forks are compared on the events before the catch plus the catch, and the `trace.catch` frame must name the same `catchEventId` in all 20 runs. A run with no catch is compared whole. The count is 20 of 20 for each case.
+Amendment (decision 5, "The catch" below): every caught-attack fork joins the cases, 20 runs each, 10 under load. The 43 stable forks are compared whole. The 10 varying forks (8 from the survey below, 2 from the first kill run) are compared on the events before the catch plus the catch, and the `trace.catch` frame must name the same `catchEventId` in all 20 runs. A run with no catch is compared whole. The count is 20 of 20 for each case.
 
 ## Prior art and constraints
 
@@ -75,6 +75,15 @@ All 53 caught attacks (`AttackOutcome.Rejected`), seed 3, 10 runs each, 5 of the
    | `L7-downgrade` | 7 of 10 | server/tls11 entry 6: `state.waiting` present or absent |
    | `L3-swap-server-share` | 9 of 10 | client/kex entry 10: `peer stayed until the end` present or absent |
    | `L3-flip-mlkem-ciphertext` | 9 of 10 | client/kex entry 17: the same |
+
+   Added by the first kill run (20 runs, 10 under load, branch `feat/logical-clock` at 51ad050, 2026-11-09). The survey's 10 runs saw these 2 as stable:
+
+   | Attack | Runs equal to run 1 | First difference |
+   |---|---|---|
+   | `L4-unknown-ca` | 19 of 20 | server/tls13 entry 17: `secret.derived` present or absent |
+   | `L10-remove-client-cert` | 13 of 20 | client/auth-mtls entry 40: `tls.alert.received` (level 2, number 116) present or absent |
+
+   Neither entry is a failed check that names a cause, and the catch was the same event in all 20 runs of each. Ranked by the lead, 2026-11-09 (option A): both join the forks compared up to the catch, so the list holds 10. Option B was to compare every caught fork up to the catch. **Falsifier:** a third caught fork that varies in a later run moves this rule to B, because a list that keeps growing is no longer a measured exception.
 
 3. Measured: in every varying fork the differing entries do not come after the catch in arrival order. Inferred, not yet measured: they are not before it causally either, because each sits on its stream after the last message that the catch's backward walk can reach (for `L1-flip-gcm`, the client's sends after TextGcm1, the message the server rejected). So comparing the events before the catch, plus the catch, should give one answer per seed. The kill-condition test measures this.
 
