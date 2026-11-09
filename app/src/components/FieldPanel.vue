@@ -1,6 +1,6 @@
 <script setup lang="ts">
 import gloss from '../walk-gloss.json'
-import type { AesMixedByte } from '../walk'
+import { overflowWords, type AesMixedByte } from '../walk'
 
 // The finite field (design section 2.2c): the 5 definition lines, then one real multiply from the step.
 // The engine returns each product and the XOR of the 4. The panel prints them and computes nothing.
@@ -20,7 +20,9 @@ defineProps<{ mixed: AesMixedByte | null; cell: number | null }>()
         :data-reduced="String(t.reduced)"
       >
         <span>{{ t.factor }} × {{ t.input }} = <b>{{ t.result }}</b></span>
-        <span v-if="t.reduced" class="muted">, {{ gloss.field.reduced }}</span>
+        <!-- A factor with several doublings (the decrypt walk) names which ones overflowed, as the multiply panel does (Richard on #330). -->
+        <span v-if="(t.doublings?.length ?? 0) > 1" class="muted">{{ overflowWords(t) ? `, ${overflowWords(t)}` : '' }}</span>
+        <span v-else-if="t.reduced" class="muted">, {{ gloss.field.reduced }}</span>
       </div>
       <p class="aw-field-sum" data-testid="aes-walk-term-result">XOR of the 4 products: <b>{{ mixed.result }}</b></p>
     </div>

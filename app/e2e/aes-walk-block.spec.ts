@@ -1,4 +1,5 @@
 import { expect, test, type Page } from '@playwright/test'
+import { fieldMultiplyWords } from '../src/walk'
 import { scanPage, setTheme } from './contrast'
 import { open } from './walk'
 
@@ -128,15 +129,32 @@ test('MixColumns shows the multiply panel: the fixed matrix, the state column, e
 })
 
 /** FIPS 197 section 4.2 for any factor: the sum of the doublings its set bits pick. The decrypt walk uses 9, 11, 13 and 14. */
-function mulAny(factor: number, h: string): { result: string; doubles: string[] } {
+function mulAny(factor: number, h: string): { result: string; doubles: string[]; over: string[] } {
   let x = parseInt(h, 16), out = 0
-  const doubles: string[] = []
+  const doubles: string[] = [], over: string[] = []
   for (let bit = 0; 1 << bit <= factor; bit++) {
     if (factor & (1 << bit)) out ^= x
-    if (1 << (bit + 1) <= factor) { x = ((x << 1) ^ (x & 0x80 ? 0x1b : 0)) & 0xff; doubles.push(x.toString(16).padStart(2, '0')) }
+    if (1 << (bit + 1) <= factor) {
+      if (x & 0x80) over.push(`×${1 << (bit + 1)}`)
+      x = ((x << 1) ^ (x & 0x80 ? 0x1b : 0)) & 0xff
+      doubles.push(x.toString(16).padStart(2, '0'))
+    }
   }
-  return { result: out.toString(16).padStart(2, '0'), doubles }
+  return { result: out.toString(16).padStart(2, '0'), doubles, over }
 }
+/** The overflow words both panels use for a factor with several doublings (Richard on #330). */
+const overWords = (over: string[]) => over.length === 0 ? '' : over.length === 1 ? `${over[0]} was too big for a byte, so it got XOR 11b`
+  : `${over.join(' and ')} were too big for a byte, so each got XOR 11b`
+
+// Jared on #330: with no doublings in a reply, the line falls back to words with no numbers, and never prints "Double 0 times".
+test('a term with no doublings gets the general sentence, with no invented numbers', () => {
+  const words = fieldMultiplyWords({ factor: 9, input: '96', reduced: true, result: '4a' })
+  expect(words).toContain('9 is 8 + 1')
+  expect(words).not.toContain('Double 0')
+  expect(words).not.toMatch(/×[248] = [0-9a-f]{2}/)
+  expect(words).toContain('The result is 4a.')
+  expect(words, 'no stray ": =" (Jared on #337)').not.toContain(': =')
+})
 
 // Richard on #330: on the decrypt walk the factors are 14, 11, 13 and 9, and each line must say how that factor is built, not "times 3".
 test('on the decrypt walk, InvMixColumns explains factors 14, 11, 13 and 9 by their doublings', async ({ page }) => {
@@ -155,9 +173,17 @@ test('on the decrypt walk, InvMixColumns explains factors 14, 11, 13 and 9 by th
     await expect(line).toContainText(`${f} × ${before[k]} = ${result}`)
     await expect(line).toContainText(words[f])
     await expect(line).not.toContainText('Times 3')
-    // The 3 doublings, x2, x4 and x8, then the result.
-    await expect(line).toContainText(`x2 = ${doubles[0]}, x4 = ${doubles[1]}, x8 = ${doubles[2]}`)
+    // The 3 doublings, ×2, ×4 and ×8 (Jared: "x2" read as a variable name), then the result.
+    await expect(line).toContainText(`×2 = ${doubles[0]}, ×4 = ${doubles[1]}, ×8 = ${doubles[2]}`)
     await expect(line).toContainText(`= ${result}.`)
+  }
+  // The field panel above names the same overflowed doublings for each term of byte 0, so the 2 panels agree (Richard on #330).
+  await page.getByTestId('aes-walk-cell-0-0').click()
+  for (let j = 0; j < 4; j++) {
+    const { over } = mulAny(factors[j], before[j])
+    const term = page.getByTestId(`aes-walk-term-${j}`)
+    if (over.length) await expect(term, `term ${j}`).toContainText(overWords(over))
+    else await expect(term, `term ${j}`).not.toContainText('too big')
   }
 })
 

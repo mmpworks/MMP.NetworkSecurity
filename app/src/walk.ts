@@ -146,3 +146,50 @@ export function cellText(stop: Stop, r: number, c: number): string {
   if (stop.kind === 'fill' && i >= stop.filled) return ''
   return byteAt(stop.state, i)
 }
+
+/**
+ * The field multiply in words, from the engine's first doubling: the shift before the 11b XOR, whether it reduced, and the byte it gives.
+ * A factor of 3 is that doubled byte XOR the byte itself, and the sum is the engine's (Richard on #330). The term's own `reduced` covers
+ * any doubling, so the line reads the first doubling's flag.
+ */
+export function fieldMultiplyWords(t: AesTerm): string {
+  if (t.factor === 1) return 'Times 1 leaves the byte as it is.'
+  if (t.factor !== 2 && t.factor !== 3) return builtFactorWords(t)
+  const d = t.doublings?.[0]
+  // A byte that overflows shows its 3-digit shift before the 11b XOR. A byte that fits shows the doubled byte itself (Richard on #330).
+  const twice = !d
+    ? `Field multiply by 2: shift the bits left by one.${t.reduced ? ' That is too big for a byte, so XOR 11b.' : ' It fits in a byte.'}`
+    : d.reduced
+      ? `Field multiply by 2: shift the bits left by one, to get ${d.shifted}. That is too big for a byte, so XOR 11b. It gives ${d.to}.`
+      : `Field multiply by 2: shift the bits left by one: ${d.to}. It fits in a byte.`
+  if (t.factor === 2) return twice
+  const sum = t.sums?.[1] ?? t.result
+  return `${twice} Times 3 is times 2, then XOR the byte itself${d ? `: ${d.to} XOR ${t.input} = ${sum}` : ''}.`
+}
+
+/**
+ * A factor with more than one doubling (the decrypt walk's 9, 11, 13 and 14): which powers of 2 make it, each doubling the engine ran,
+ * and the parts its set bits pick, high bit first. Every byte is the engine's (doublings, picks); the split of the factor into powers
+ * of 2 only names its bits (Richard on #330).
+ */
+function builtFactorWords(t: AesTerm): string {
+  const parts = [8, 4, 2, 1].filter(p => (t.factor & p) !== 0)
+  const d = t.doublings ?? []
+  // With no doublings in the reply, the words name the method and invent no number (Jared on #330).
+  if (!d.length) return `${t.factor} is ${parts.join(' + ')}. Double the byte for each power of 2, then XOR the parts the factor picks. The result is ${t.result}.`
+  // "×2", not "x2", which can read as a variable name (Jared on #330).
+  const list = d.map((x, i) => `×${2 << i} = ${x.to}`).join(', ')
+  const over = overflowWords(t)
+  const picked = [...(t.picks ?? [])].reverse()
+  return `${t.factor} is ${parts.join(' + ')}. Double ${d.length} times: ${list}.${over ? ` ${over}.` : ''} Then XOR the parts: ${picked.join(' XOR ')} = ${t.result}.`
+}
+
+/**
+ * Which doublings overflowed, for a factor with more than one: for example "×2 and ×4 were too big for a byte, so each got XOR 11b".
+ * Both the multiply panel and the field panel use it, so they agree (Richard on #330). Empty when none overflowed, or with no doublings.
+ */
+export function overflowWords(t: AesTerm): string {
+  const over = (t.doublings ?? []).map((x, i) => (x.reduced ? `×${2 << i}` : '')).filter(Boolean)
+  if (over.length === 0) return ''
+  return over.length === 1 ? `${over[0]} was too big for a byte, so it got XOR 11b` : `${over.join(' and ')} were too big for a byte, so each got XOR 11b`
+}
