@@ -51,8 +51,12 @@ namespace NetSec.Tests
         public void The_training_keys_do_not_reach_a_server_on_the_learners_keys()
         {
             CredentialSet mine = Learner();
-            Assert.False(Run(mine, null, mine).Completed, "the training user key was accepted by a server that holds the learner's set");
-            Assert.False(Run(mine, mine, new TrainingKeySource()).Completed, "a pin of the training host key accepted the learner's host key");
+            ProbeResult userKey = Run(mine, null, mine), hostKey = Run(mine, mine, new TrainingKeySource());
+            Assert.False(userKey.Completed, "the training user key was accepted by a server that holds the learner's set");
+            Assert.False(hostKey.Completed, "a pin of the training host key accepted the learner's host key");
+            // A timeout or a port clash also ends a probe early, so each refusal must carry its own code.
+            Assert.Equal(SshCodes.AuthRefused, userKey.Code);
+            Assert.Equal(SshCodes.HostKeyChanged, hostKey.Code);
         }
 
         [Fact]
