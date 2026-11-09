@@ -39,7 +39,7 @@ namespace NetSec.CeDevice
         static int Relay(string[] args)
         {
             string pad = Option(args, "--pinpad"), gateway = Option(args, "--gateway");
-            if (pad == null || gateway == null) return Result(false, ErrorCodes.CeLinkNotBuilt, null, "--pinpad and --gateway are required");
+            if (pad == null || gateway == null) return Result(false, ErrorCodes.CeRelayArgsMissing, null, "--pinpad and --gateway are required");
 
             CeRunOptions options = new CeRunOptions();
             options.PinPad = new IPEndPoint(IPAddress.Loopback, int.Parse(pad));

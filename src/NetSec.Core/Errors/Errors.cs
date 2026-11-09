@@ -72,6 +72,8 @@ namespace NetSec.Errors
         public const string CapabilityDenied = "CAPABILITY_DENIED";
         public const string CeTransportUnavailable = "CE_TRANSPORT_UNAVAILABLE";
         public const string CeLinkNotBuilt = "CE_LINK_NOT_BUILT";
+        /// <summary>The CE relay ran without --pinpad or --gateway: a usage error. It never ends in _NOT_BUILT, which acceptance reads as a missing part.</summary>
+        public const string CeRelayArgsMissing = "CE_RELAY_ARGS_MISSING";
         public const string CeDeviceSilent = "CE_DEVICE_SILENT";
         public const string TransportNotBuilt = "TRANSPORT_NOT_BUILT";
         public const string ChannelBufferFull = "CHANNEL_BUFFER_FULL";
