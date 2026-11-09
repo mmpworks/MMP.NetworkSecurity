@@ -195,7 +195,7 @@ public class SecurityLiveTests
 
     /// <summary>
     /// Issue #333: a clause can only tell "not built yet" from a fault if the Host says which parts are built. Each type row carries
-    /// parts.make and parts.import, from the same two checks the wizard refuses with (FlowRuns: "cannot make", "cannot read a file").
+    /// parts.canMake and parts.canImport, from the same two checks the wizard refuses with (FlowRuns: "cannot make", "cannot read a file").
     /// Today pki.root-ca can be made but not imported, and token.issuer can be both.
     /// </summary>
     [Fact]
@@ -209,12 +209,12 @@ public class SecurityLiveTests
         foreach ((string typeId, JsonElement row) in rows)
         {
             Assert.True(row.TryGetProperty("parts", out JsonElement parts), typeId + " has no parts");
-            Assert.True(parts.GetProperty("make").ValueKind is JsonValueKind.True or JsonValueKind.False, typeId + ": parts.make is not a bool");
-            Assert.True(parts.GetProperty("import").ValueKind is JsonValueKind.True or JsonValueKind.False, typeId + ": parts.import is not a bool");
+            Assert.True(parts.GetProperty("canMake").ValueKind is JsonValueKind.True or JsonValueKind.False, typeId + ": parts.canMake is not a bool");
+            Assert.True(parts.GetProperty("canImport").ValueKind is JsonValueKind.True or JsonValueKind.False, typeId + ": parts.canImport is not a bool");
         }
-        Assert.True(rows["pki.root-ca"].GetProperty("parts").GetProperty("make").GetBoolean());
-        Assert.False(rows["pki.root-ca"].GetProperty("parts").GetProperty("import").GetBoolean());
-        Assert.True(rows["token.issuer"].GetProperty("parts").GetProperty("import").GetBoolean());
+        Assert.True(rows["pki.root-ca"].GetProperty("parts").GetProperty("canMake").GetBoolean());
+        Assert.False(rows["pki.root-ca"].GetProperty("parts").GetProperty("canImport").GetBoolean());
+        Assert.True(rows["token.issuer"].GetProperty("parts").GetProperty("canImport").GetBoolean());
     }
 
     /// <summary>

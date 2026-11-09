@@ -90,7 +90,7 @@ public static class SecurityRoutes
             says = verified ? e.Says : null,
             // What the course has built for this type, from the same checks the wizard refuses with (FlowRuns), so a caller can tell
             // "not built yet" from a fault (issue #333).
-            parts = new { make = FlowParts.IsBuilt(id), import = FlowParts.CanImport(id) },
+            parts = new { canMake = FlowParts.IsBuilt(id), canImport = FlowParts.CanImport(id) },
         };
     }
 
