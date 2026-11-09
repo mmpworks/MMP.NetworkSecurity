@@ -32,7 +32,7 @@ Consultation. Gems used: `server-replaces-never-merges`, `fail-soft-must-count`,
 | `app/` | Electron, Vue 3, Vuetify | UI per `ux-design.md`. Tours in `app/src/tours/` |
 | `tests/NetSec.Tests` | net10.0, net48, C# latest | Builder unit suite. net48 uses `HintPath` to CF binaries, as in MMP.AsyncProxy |
 | `acceptance/` | net10.0, net48, pwsh | D11. Separate authors. **Builders never write here.** `run.ps1`, `clauses.json`, pinned skip list, `referees/bcl` (oracle, so net48 reaches `MLKem` with no skip), `referees/go` (`tlspeer`, `sshpeer`, `gogateway`, `tap`, `tokenverify`) |
-| `tools/` | pwsh, python | `gate.ps1`, `layer_check.py`, `tour_lint.py`, `lessons_status.py`, `run_status.py` (section 9.1) |
+| `tools/` | pwsh, python | `gate.ps1`, `layer_check.py`, `tour_lint.py`, `lessons_status.py`, `run_status.py` (section 9.1), `heavy_lock.py` (section 9.2) |
 
 Root `Directory.Build.props`: `ShouldUnsetParentConfigurationAndPlatform=false`, `Nullable=disable`, `ImplicitUsings=disable`, `TreatWarningsAsErrors=true`, `AsyncProxyRoot` (default `..\MMP.AsyncProxy`). `LangVersion` stays per project. `.gitignore` keeps `bin/`, `obj/`, and CF binaries out (A9). MMP.AsyncProxy stays unchanged.
 
@@ -364,6 +364,16 @@ Read the run's log at its expected end. Do not wait for the finish notice. Finis
 3. `RUNNING` past the expected end: check again at half the expected time. `STUCK`: stop only your own processes, keep the log, and report the step it stopped at.
 4. A machine that other agents also load makes runs slower. A slow run that still writes output is `RUNNING`, not stuck. Raise the limit with `--stuck-after <minutes>` (default 10).
 5. Report the result from the log line, with its counts.
+
+### 9.2 Heavy runs take a machine-wide lock
+
+Heavy runs stacked on one machine pushed CPU to 100% and made product timing tests fail in a different place each time (a test-host hang, a CE-READY timeout, a Host with no ready line in 60 s). Ports are partitioned per run (`NETSEC_PORT_BASE`), but CPU is not. One heavy run at a time removes that noise.
+
+1. A heavy run is the full gate, the full app suite, an acceptance run, or any load loop or hang repro. Run it as `python -I tools/heavy_lock.py run --label "<what it is>" -- <command>`. `tools/gate.ps1` and `npm run e2e` do this themselves. A load burner or a hang loop takes the lock the same way.
+2. Small targeted runs stay unlocked: one spec, one test file, one unit test run.
+3. A waiter prints `HEAVY_LOCK waiting on '<label>' (pid N, started HH:MM, M min ago)` at once and every 30 seconds. Use `python -I tools/heavy_lock.py status` to see the holder (exit 2 when held). `--wait-minutes M`, or `NETSEC_LOCK_WAIT_MINUTES` for the gate, ends the wait with `LOCK_TIMEOUT` (exit 75).
+4. The lock is an OS file lock (`%LOCALAPPDATA%\mmp-netsec\locks\heavy-run.lock`) held by the `run` process for as long as it lives. The OS drops it when that process ends, including a crash or a kill, so nothing is ever stale and a crash needs no cleanup. On Windows the `run` process puts itself in a job object that kills all members when it ends, so the command and its children die with a dead runner and the freed lock never hides running heavy work. (POSIX has no equivalent yet: a runner killed with SIGKILL leaves its command running.) An unexpected lock or job error stops the run with `LOCK_ERROR` (exit 76); it is never read as "free". A second file, `heavy-run.info`, holds the holder's pid, label and start time for the waiting message only; it never decides who holds the lock.
+5. A run started inside a holder (the gate's own app suite, acceptance) sees `NETSEC_HEAVY_LOCK_HELD` and proceeds without waiting, but only when that pid is the live holder named in the info file and the lock is really held. A run that claims a holder that does not hold the lock still waits.
 
 ## 10. Open questions, with the default taken
 | # | Question | Default |
