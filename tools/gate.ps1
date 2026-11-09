@@ -105,6 +105,9 @@ Step 'no package-runner calls in tools and app scripts' { python -I tools/no_npx
 Step 'no package-runner check tests' { python -I tools/test_no_npx.py }
 Step 'run_status tests' { python -I tools/test_run_status.py }
 Step 'gate app decision tests' { python -I tools/test_gate_app.py }
+Step 'dist stamp tests' { python -I tools/test_dist_stamp.py }
+Step 'every tools test has a gate step' { python -I tools/check_tests_wired.py }
+Step 'tests-wired check tests' { python -I tools/test_check_tests_wired.py }
 Step 'pre-push guard tests' { python -I tools/githooks/test_pre_push_guard.py }
 Step 'pre-push hook installed and current' { pwsh -NoProfile -File tools/githooks/check-installed.ps1 }
 

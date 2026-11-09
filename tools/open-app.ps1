@@ -80,7 +80,10 @@ try {
         npm ci
         if ($LASTEXITCODE -ne 0) { Fail 'NPM_CI_FAILED' 'npm ci failed.' 'Close every program that holds files in app\node_modules (a running vite or Electron), then run again. EPERM means a file is locked.' }
     } else { Say 'app packages already installed' }
-    if ($Rebuild -or -not (Test-Path 'dist\index.html')) {
+    # A dist built from another commit (a branch switch) is rebuilt, not shown: scripts/dist-stamp.cjs says whether the build matches this tree.
+    $distStale = $false
+    if (Test-Path 'dist\index.html') { node scripts/dist-stamp.cjs check *> $null; $distStale = ($LASTEXITCODE -ne 0) }
+    if ($Rebuild -or $distStale -or -not (Test-Path 'dist\index.html')) {
         Say 'npm run build'
         npm run build
         if ($LASTEXITCODE -ne 0) { Fail 'APP_BUILD_FAILED' 'npm run build failed.' 'Read the TypeScript output above. Run `npm ci` again if packages look wrong.' }
