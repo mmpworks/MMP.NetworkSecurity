@@ -9,9 +9,39 @@ namespace NetSec.Host.Tests;
 /// <summary>Where the security folder goes. A shipped app has no .git above it, so that branch runs on a learner's machine and in no e2e run.</summary>
 public sealed class SecurityRootTests : IDisposable
 {
-    readonly string _top = Directory.CreateTempSubdirectory("ns-root-").FullName;
+    readonly string _top = NoGitTop();
 
     static string? NoEnv(string name) => null;
+
+    /// <summary>
+    /// A fresh folder with no .git above it. The machine temp folder comes first; when TMP sits inside a git checkout (a worktree's
+    /// own scratch folder, say) the next candidates are the user's local temp folder and the temp folder's drive root.
+    /// </summary>
+    static string NoGitTop()
+    {
+        string temp = Path.GetTempPath();
+        string[] candidates =
+        [
+            temp,
+            Path.Combine(Environment.GetFolderPath(Environment.SpecialFolder.LocalApplicationData), "Temp"),
+            Path.GetPathRoot(Path.GetFullPath(temp))!,
+        ];
+        foreach (string root in candidates)
+        {
+            if (!Directory.Exists(root) || GitAbove(root)) continue;
+            string top = Path.Combine(root, "ns-root-" + Guid.NewGuid().ToString("N"));
+            Directory.CreateDirectory(top);
+            return top;
+        }
+        throw new InvalidOperationException("ROOT_TEST_NO_GIT_FREE_TEMP: every candidate temp folder has a .git above it: " + string.Join(", ", candidates));
+    }
+
+    static bool GitAbove(string dir)
+    {
+        for (DirectoryInfo? at = new(dir); at is not null; at = at.Parent)
+            if (Directory.Exists(Path.Combine(at.FullName, ".git")) || File.Exists(Path.Combine(at.FullName, ".git"))) return true;
+        return false;
+    }
 
     string Nested()
     {
@@ -20,18 +50,11 @@ public sealed class SecurityRootTests : IDisposable
         return dir;
     }
 
-    bool AGitSitsAbove(string dir)
-    {
-        for (DirectoryInfo? at = new(dir); at is not null; at = at.Parent)
-            if (Directory.Exists(Path.Combine(at.FullName, ".git")) || File.Exists(Path.Combine(at.FullName, ".git"))) return true;
-        return false;
-    }
-
     [Fact]
     public void With_no_git_above_it_the_folder_sits_beside_the_app()
     {
         string dir = Nested();
-        Assert.False(AGitSitsAbove(dir), "the test needs a temp folder with no .git above it");
+        Assert.False(GitAbove(dir), "the test needs a temp folder with no .git above it");
         Assert.Equal(Path.Combine(dir, ".security"), SecurityStore.ResolveRoot(NoEnv, dir));
     }
 
