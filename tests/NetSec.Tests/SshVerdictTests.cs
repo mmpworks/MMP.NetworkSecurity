@@ -296,6 +296,30 @@ namespace NetSec.Tests
             Assert.True(flood.Taken > stalled, "reading did not resume the target");
         }
 
+        /// <summary>
+        /// Issue #308: the relay read its target until the target said stop, and never asked whether the session had ended. A target that ignores
+        /// Close (this flood, or a socket that stays open) then fed an ended session forever on a pool thread: 1.3 TB taken and a 6 GB heap in one run.
+        /// </summary>
+        [Fact]
+        public void A_tunnel_target_stops_being_read_once_the_session_ends()
+        {
+            FloodLink flood = new FloodLink();
+            MemoryLink[] links = MemoryLink.Pair();
+            GlassSshSession server = new GlassSshSession(SshEngine.Server(ServerOptions(SshAlgorithms.Modern), Stream("server"), null, "client"), links[1], new ListSink(), new FreeRunGate(), null, 30000, new FixedClock(1), (h, p) => Futures.FromResult<IByteLink>(flood));
+            GlassSshSession client = new GlassSshSession(SshEngine.Client(ClientOptions(SshAlgorithms.Modern), Stream("client"), null, "server"), links[0], new ListSink(), new FreeRunGate(), null, 30000, new FixedClock(1), null);
+            server.Run();
+            client.Run();
+            Assert.True(client.Opened.Wait(30000));
+            Assert.True(client.OpenTunnel("allowed", 1).Wait(30000));
+
+            Assert.True(client.Close().Wait(30000), "the client did not close");
+            Assert.True(server.Finished.Wait(30000), "the server session did not end");
+            Thread.Sleep(500);
+            long settled = flood.Taken;
+            Thread.Sleep(1000);
+            Assert.True(flood.Taken == settled, "the relay took " + (flood.Taken - settled) + " more bytes in 1 s after the session ended");
+        }
+
         // ---------------------------------------------------------------- Jared's re-check: relay, sender, ninth channel
 
         sealed class SessionPair
