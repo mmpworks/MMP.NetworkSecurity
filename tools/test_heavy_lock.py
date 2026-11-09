@@ -10,6 +10,7 @@ import shutil
 import subprocess
 import sys
 import tempfile
+import threading
 import time
 import unittest
 
@@ -69,6 +70,23 @@ class HeavyLock(unittest.TestCase):
         script = "import os, sys, time\nwhile not os.path.exists(sys.argv[1]):\n    time.sleep(0.05)\n"
         return self.start_run(label, sys.executable, "-I", "-c", script, str(release)), release
 
+    def read_until(self, proc, text, seconds=60):
+        """Reads the run's output until a line holds `text`. Returns what was read; fails when the line never comes."""
+        lines = []
+        found = threading.Event()
+
+        def pump():
+            for line in proc.stdout:
+                lines.append(line)
+                if text in line:
+                    found.set()
+                    return
+
+        threading.Thread(target=pump, daemon=True).start()
+        if not found.wait(seconds):
+            self.fail(f"never saw {text!r}; output so far: {''.join(lines)}")
+        return "".join(lines)
+
     def wait_for_tickets(self, count, seconds=60):
         """Waits until `count` waiters have written a ticket, so arrival order never rests on a fixed pause."""
         end = time.time() + seconds
@@ -114,9 +132,10 @@ class HeavyLock(unittest.TestCase):
         _, release = self.start_release_holder("first")
         self.wait_until_held()
         waiter = self.start_run("second", *PY, "print('second ran')", wait=2)
-        self.wait_for_tickets(1)                                            # the waiter is in line before the holder ends, so it must wait
+        seen = self.read_until(waiter, "HEAVY_LOCK waiting on 'first'")   # the ticket comes before the first failed lock try; only the printed line proves the waiter waits
         release.write_text("go", encoding="utf-8")
-        out, _ = waiter.communicate(timeout=90)
+        rest, _ = waiter.communicate(timeout=90)
+        out = seen + rest
         self.assertEqual(waiter.returncode, 0, out)
         self.assertIn("HEAVY_LOCK waiting on 'first'", out)
         self.assertIn("second ran", out)
