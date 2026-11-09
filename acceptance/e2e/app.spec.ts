@@ -152,7 +152,7 @@ test('[A17.ui.show-keys-switch] on by default; off replaces key bytes with finge
 
   // The lesson must put a key in the secrets panel: its tour has a step bound to keys.installed (#338: lesson 0 shows no secret row).
   const built = await builtLessonWhoseTourBinds('keys.installed');
-  if (!built) throw new NotRun('LESSON_NOT_BUILT', 'no built lesson has a tour step bound to keys.installed, so no secrets panel can fill');
+  if (!built) throw new NotRun('NO_LESSON_INSTALLS_KEYS', 'no built lesson has a tour step bound to keys.installed, so no secrets panel can fill');
   await page.getByTestId(`lesson-item-${built.lesson}`).click();
   const start = page.getByRole('button', { name: /start tour/i });
   if (await start.isVisible().catch(() => false)) await start.click();
