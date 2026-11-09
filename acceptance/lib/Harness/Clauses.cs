@@ -176,7 +176,8 @@ namespace Acceptance
             string d = AppDomain.CurrentDomain.BaseDirectory;
             while (!string.IsNullOrEmpty(d))
             {
-                if (File.Exists(Path.Combine(d, "clauses.json"))) return d;
+                // run.ps1 marks the folder: clauses.json is generated at run time and is absent in a fresh clone (#343).
+                if (File.Exists(Path.Combine(d, "run.ps1")) && File.Exists(Path.Combine(d, "roles.json"))) return d;
                 d = Path.GetDirectoryName(d.TrimEnd(Path.DirectorySeparatorChar));
             }
             throw new InvalidOperationException("acceptance folder not found; pass --acceptance");

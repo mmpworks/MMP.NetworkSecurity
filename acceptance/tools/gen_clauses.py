@@ -1,8 +1,8 @@
 """Writes acceptance/clauses.json from the clause code, and checks it.
 
-clauses.json is the list that fixes M: the number of clauses every report divides by. The author runs this script after adding,
-renaming or removing a clause, then commits both. run.ps1 runs it with --check on every run: a clause in code that is missing from the
-file, or in the file and missing from code, is a FAIL of SELF.clauses-json-matches-code.
+clauses.json is the list that fixes M: the number of clauses every report divides by. It is generated and never committed (#343):
+run.ps1 runs this script with --write at the start of every run, so the file always matches the clause code, and no open PR conflicts on
+it. --check still compares the file with the code; SELF.clauses-json-matches-code runs it at the end of a run.
 
 Run: python -I gen_clauses.py [--write] [--check]
 """
