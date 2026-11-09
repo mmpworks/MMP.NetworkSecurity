@@ -110,7 +110,12 @@ A Playwright spec drives the Release Host in its own process. V8 coverage sees o
 
 ### Popped state
 
-One function, `popped(unit, ledger)`, used by both the picker and `tools/move_levels.py`. A unit is popped when the ledger holds a red for it from a nightly or release run, and since that red it has fewer than 10 runs with `result: pass` and `retried: false`, or those runs span less than 7 days. The function reads only the ledger. The manifest level does not change it.
+One function, `popped(unit)`, used by both the picker and `tools/move_levels.py`. A qualifying red for `unit` is the latest nightly or release red that is either:
+
+1. a red of `unit` itself, or
+2. a red of another unit R, where `unit`'s `covers` holds a file that is in R's `covers` and changed between R's last green run and that red (move rule 2's companion pop).
+
+`unit` is popped when it has a qualifying red and, since the latest such red, `unit` itself has fewer than 10 runs with `result: pass` and `retried: false`, or those runs span less than 7 days. The function reads the ledger, the manifest's `covers`, and `git diff` between the two commits. The manifest level does not change it.
 
 A red on a branch gate belongs to that branch. It pops nothing.
 
