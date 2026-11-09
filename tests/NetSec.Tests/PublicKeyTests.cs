@@ -488,9 +488,19 @@ namespace NetSec.Tests
         [Fact]
         public void Key_and_sealed_properties_hand_out_copies()
         {
+            // Each property is changed through the array it handed out, then read again from the same object: a shared array would show the change.
             MlKemPair pair = MlKem768.KeyGen(new byte[32], new byte[32]);
+            byte[] ek = (byte[])pair.Ek.Clone(), dk = (byte[])pair.Dk.Clone();
             pair.Ek[0] ^= 1;
-            Assert.Equal(pair.Ek, MlKem768.KeyGen(new byte[32], new byte[32]).Ek);
+            pair.Dk[0] ^= 1;
+            Assert.Equal(ek, pair.Ek);
+            Assert.Equal(dk, pair.Dk);
+            MlKemSealed sealedKey = MlKem768.Encaps(pair.Ek, new byte[32]);
+            byte[] ciphertext = (byte[])sealedKey.Ciphertext.Clone(), secret = (byte[])sealedKey.SharedSecret.Clone();
+            sealedKey.Ciphertext[0] ^= 1;
+            sealedKey.SharedSecret[0] ^= 1;
+            Assert.Equal(ciphertext, sealedKey.Ciphertext);
+            Assert.Equal(secret, sealedKey.SharedSecret);
         }
     }
 

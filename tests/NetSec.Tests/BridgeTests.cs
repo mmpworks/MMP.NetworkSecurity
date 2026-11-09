@@ -266,7 +266,8 @@ namespace NetSec.Tests
         [Fact]
         public void A_flip_at_any_byte_of_the_envelope_is_refused_and_records_no_ksn()
         {
-            byte[] good = Sell().Envelope.Bytes;
+            PadSale sale = Sell();
+            byte[] good = sale.Envelope.Bytes;
             for (int i = 0; i < good.Length; i++)
             {
                 byte[] flipped = (byte[])good.Clone();
@@ -276,6 +277,11 @@ namespace NetSec.Tests
                 Assert.False(d.Ok, "a flip at byte " + i + " passed");
                 Assert.Contains(d.Code, new[] { ErrorCodes.DukptMacMismatch, ErrorCodes.EnvelopeMalformed });
                 Assert.Equal(BankHsmCore.MacCheck, d.Check);
+                // A refused envelope burns no KSN: neither the sale's KSN nor the KSN the flipped bytes name.
+                Assert.False(ledger.Contains(sale.Envelope.Ksn), "a flip at byte " + i + " recorded the sale's KSN");
+                byte[] namedKsn = null;
+                try { namedKsn = PinEnvelope.Parse(flipped).Ksn; } catch (ParseFailure) { }
+                if (namedKsn != null) Assert.False(ledger.Contains(namedKsn), "a flip at byte " + i + " recorded the KSN it names");
             }
             Assert.True(BankHsmCore.Decide(Bdk, new KsnLedger(), good).Ok);
         }

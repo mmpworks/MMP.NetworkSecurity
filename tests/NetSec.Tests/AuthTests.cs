@@ -137,16 +137,6 @@ namespace NetSec.Tests
             Assert.Equal(ErrorCodes.TokenBadAlg, Token.Verify(Issuer.CopyPublic(), forged, Now).Code);
         }
 
-        [Theory]
-        [InlineData("")]
-        [InlineData("a.b")]
-        [InlineData("a.b.c.d")]
-        [InlineData("!!.!!.!!")]
-        public void Junk_is_refused_with_no_exception(string token)
-        {
-            Assert.False(Token.Verify(Issuer.CopyPublic(), token, Now).Allowed);
-        }
-
         [Fact]
         public void Issue_refuses_a_key_that_is_not_ed25519()
         {

@@ -239,6 +239,7 @@ namespace NetSec.Tests
             hello[ServerNameExtensionLengthOffset] = 2;
             EngineOutput output = FeedServer(hello);
             Assert.Equal(EngineStatus.Failed, output.Status);
+            Assert.Equal(ErrorCodes.ParseTruncated, output.Error.Code);
             Assert.NotNull(output.Error.CheckName);
         }
 
@@ -615,7 +616,8 @@ namespace NetSec.Tests
     /// <summary>Jared's verdict on PR 20: mutual TLS gives the record rules new reach on the server, before the client proves anything.</summary>
     public class Tls13MutualServerTests
     {
-        static Tls13Engine ServerWaitingForClient(out byte[] clientHello)
+        /// <summary>A server that asks for a client certificate and trusts the training root.</summary>
+        static Tls13Engine MutualServer()
         {
             Tls13Options s = TlsKit.Common("server", "client", Tls13Group.X25519, 2);
             ITrainingKey key = TlsKit.Keys.Find(KeyIds.ServerTlsEd25519);
@@ -623,7 +625,12 @@ namespace NetSec.Tests
             s.SigningSeed = key.CopyMaterial();
             s.RequireClientCertificate = true;
             s.TrustAnchors = new[] { new TrainingCa(TlsKit.Keys).RootCertificateDer };
-            Tls13Engine server = Tls13Engine.CreateServer(s);
+            return Tls13Engine.CreateServer(s);
+        }
+
+        static Tls13Engine ServerWaitingForClient(out byte[] clientHello)
+        {
+            Tls13Engine server = MutualServer();
             server.Start();
             clientHello = TlsKit.Client(Tls13Group.X25519).Start().Wire;
             Assert.Equal(EngineStatus.Handshaking, server.Feed(clientHello, 0, clientHello.Length).Status);
@@ -652,6 +659,11 @@ namespace NetSec.Tests
             Assert.Equal(ErrorCodes.UnexpectedMessage, output.Error.Code);
         }
 
+        /// <summary>
+        /// A real client presents a certificate whose not_before month reads 9x. The server, not only the parser, names the parse failure and
+        /// throws nothing; the trace fields of that Certificate message still build. The parser alone is pinned by
+        /// Tls13BadInputTests.A_certificate_with_an_invalid_month_is_the_parse_code_and_never_an_exception.
+        /// </summary>
         [Fact]
         public void A_client_certificate_with_a_bad_date_is_named_at_the_server_and_never_a_throw()
         {
@@ -660,11 +672,19 @@ namespace NetSec.Tests
             FieldMark before = Certificate.Parse(good).Marks(0, true).Single(m => m.Name == "cert.not_before");
             byte[] bad = (byte[])good.Clone();
             bad[before.Offset + 4] = (byte)'9';
-            Assert.Equal(DerReader.ParseCode, Assert.Throws<ParseFailure>(() => Certificate.Parse(bad)).Code);
+
+            Tls13Options c = TlsKit.Common("client", "server", Tls13Group.X25519, 1);
+            c.TrustAnchors = new[] { new TrainingCa(TlsKit.Keys).RootCertificateDer };
+            c.CertificateChain = new[] { bad };
+            c.SigningSeed = clientKey.CopyMaterial();
+            Tls13Engine client = Tls13Engine.CreateClient(c), server = MutualServer();
+            EngineDuel.Run(client, server);
+            Assert.Equal(EngineStatus.Failed, server.Status);
+            Assert.Equal(DerReader.ParseCode, server.LastError.Code);
+            Assert.NotNull(server.LastError.CheckName);
 
             byte[] message = Tls13Messages.CertificateMessage(new[] { bad });
-            TraceField[] fields = Tls13Messages.FieldsOf(HandshakeType.Certificate, message, false);
-            Assert.NotEmpty(fields);
+            Assert.NotEmpty(Tls13Messages.FieldsOf(HandshakeType.Certificate, message, false));
         }
     }
 

@@ -71,13 +71,20 @@ namespace NetSec.Tests
             Assert.DoesNotContain("\"beginReceive\":0", result);
         }
 
+        /// <summary>
+        /// The relay mode is built; BridgeLiveTests.A_cf_binary_relays_a_sealed_pin_and_the_bank_recovers_it runs it end to end. This pins the
+        /// refusal when the relay's two ports are missing: exit 1 and one CE-RESULT line that names both options.
+        /// </summary>
         [Fact]
-        public void The_relay_mode_reports_a_named_code_until_it_is_built()
+        public void The_relay_mode_without_its_ports_is_refused_by_name()
         {
             int exit;
             string[] lines = Run("--pool 25", out exit);
             Assert.Equal(1, exit);
-            Assert.Contains("CE_LINK_NOT_BUILT", lines.Last());
+            string result = lines.Last();
+            Assert.StartsWith("CE-RESULT {\"ok\":false", result);
+            Assert.Contains("\"code\":\"CE_LINK_NOT_BUILT\"", result);
+            Assert.Contains("--pinpad and --gateway are required", result);
         }
     }
 }

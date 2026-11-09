@@ -238,6 +238,9 @@ namespace NetSec.Tests
             Assert.Equal(250, managed[0].Ticks.Length);
             Assert.Equal(250, managed[1].Ticks.Length);
             Assert.True(managed[0].TickFrequency > 0);
+            // A timer that records zeros keeps the lengths; each case must hold measured time.
+            Assert.Contains(managed[0].Ticks, t => t > 0);
+            Assert.Contains(managed[1].Ticks, t => t > 0);
         }
 
         [Fact]
@@ -246,6 +249,7 @@ namespace NetSec.Tests
             TimingCase c = TimingLab.Sample(CompareKind.ConstantTime, 256, 50, 0);
             Assert.Equal(50, c.Ticks.Length);
             Assert.True(c.TickFrequency > 0);
+            Assert.Contains(c.Ticks, t => t > 0);
             Assert.Equal(TimingLab.ConstantTimeName, c.Compare);
         }
     }

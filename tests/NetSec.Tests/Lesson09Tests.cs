@@ -66,8 +66,13 @@ namespace NetSec.Tests
         public void Arrows_on_each_hop_name_the_lanes_of_that_hop()
         {
             Run run = Go();
-            Assert.All(run.Events.Where(e => e.Hop == "hop1" && e.Type == "wire.sent"), e => Assert.Contains(e.To, new[] { "ce", "gateway" }));
-            Assert.All(run.Events.Where(e => e.Hop == "hop2" && e.Type == "wire.sent"), e => Assert.Contains(e.To, new[] { "gateway", "server" }));
+            // Assert.All passes on an empty list, so each hop must also hold sends.
+            TraceEvent[] hop1 = run.Events.Where(e => e.Hop == "hop1" && e.Type == "wire.sent").ToArray();
+            TraceEvent[] hop2 = run.Events.Where(e => e.Hop == "hop2" && e.Type == "wire.sent").ToArray();
+            Assert.NotEmpty(hop1);
+            Assert.NotEmpty(hop2);
+            Assert.All(hop1, e => Assert.Contains(e.To, new[] { "ce", "gateway" }));
+            Assert.All(hop2, e => Assert.Contains(e.To, new[] { "gateway", "server" }));
         }
 
         [Fact]
