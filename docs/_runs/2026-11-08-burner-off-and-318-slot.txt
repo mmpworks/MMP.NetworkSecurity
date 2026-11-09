@@ -1,0 +1,14 @@
+HEAD 6cd2dca6cf433b066a2a6bb4698656b0bcd79d7a
+== side tests, default (no burner)
+Passed!  - Failed:     0, Passed:     3, Skipped:     0, Total:     3, Duration: 5 m 16 s - NetSec.Tests.dll (net10.0)
+Passed!  - Failed:     0, Passed:     3, Skipped:     0, Total:     3, Duration: 5 m 17 s - NetSec.Tests.dll (net48)
+== side tests, NETSEC_LOAD_RUNS=1
+Passed!  - Failed:     0, Passed:     3, Skipped:     0, Total:     3, Duration: 6 m 25 s - NetSec.Tests.dll (net10.0)
+Passed!  - Failed:     0, Passed:     3, Skipped:     0, Total:     3, Duration: 6 m 30 s - NetSec.Tests.dll (net48)
+== full Core suite, NETSEC_LOAD_RUNS=1 (burner on)
+Passed!  - Failed:     0, Passed:   852, Skipped:     0, Total:   852, Duration: 8 m 6 s - NetSec.Tests.dll (net10.0)
+Passed!  - Failed:     0, Passed:   852, Skipped:     0, Total:   852, Duration: 9 m 34 s - NetSec.Tests.dll (net48)
+== gate (burner off, the default)
+Result: 29 of 30 steps passed. Skipped: 1.
+| acceptance A9 | FAIL | 1 |
+== done

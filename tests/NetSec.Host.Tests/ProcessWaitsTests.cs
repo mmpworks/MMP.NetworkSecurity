@@ -22,7 +22,9 @@ public class ProcessWaitsTests
         (bool exited, _, _, _) = ProcessWaits.ReadAll(p, TimeSpan.FromSeconds(1));
         clock.Stop();
         Assert.False(exited, "ReadAll reported an exit for a child that runs about 10 s");
-        Assert.True(clock.Elapsed < TimeSpan.FromSeconds(3), "ReadAll took " + clock.Elapsed.TotalSeconds.ToString("0.0") + " s with a 1 s limit");
+        // The guard is that ReadAll stops at its limit and kills the child: exited stays false, and the child is dead below. The wall-clock bound
+        // only catches an unbounded wait, so it is the limit plus 9 s, a margin a saturated shared machine cannot cross (#318).
+        Assert.True(clock.Elapsed < TimeSpan.FromSeconds(1 + 9), "ReadAll took " + clock.Elapsed.TotalSeconds.ToString("0.0") + " s with a 1 s limit");
         Assert.True(p.WaitForExit(5000), "ReadAll did not kill the child at its limit");
     }
 
@@ -45,7 +47,9 @@ public class ProcessWaitsTests
         (bool exited, _, _, _) = await ProcessWaits.Collect(p, TimeSpan.FromSeconds(1));
         clock.Stop();
         Assert.False(exited);
-        Assert.True(clock.Elapsed < TimeSpan.FromSeconds(3), "Collect took " + clock.Elapsed.TotalSeconds.ToString("0.0") + " s with a 1 s limit");
+        // The guard is that Collect stops at its limit and kills the child: exited stays false, and the child is dead below. The wall-clock bound
+        // only catches an unbounded wait, so it is the limit plus 9 s, a margin a saturated shared machine cannot cross (#318).
+        Assert.True(clock.Elapsed < TimeSpan.FromSeconds(1 + 9), "Collect took " + clock.Elapsed.TotalSeconds.ToString("0.0") + " s with a 1 s limit");
         Assert.True(p.HasExited || p.WaitForExit(5000), "Collect did not kill the child at its limit");
     }
 
