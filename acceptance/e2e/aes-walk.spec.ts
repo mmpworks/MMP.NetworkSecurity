@@ -933,3 +933,44 @@ test('[A19.ui.bit-lines-for-picked-byte] on AddRoundKey a picked byte shows stat
   expect(cr, 'the result line has its own color').not.toBe(cs);
   expect(cr, 'the key and result lines differ').not.toBe(ck);
 });
+
+/*
+ * The decrypt walk's InvMixColumns lines (Jared on #329, the lead's follow-up). #330's real bug sat on this path, and only Nancy's own spec
+ * covered it. This clause checks the screen against the suite's own field multiply, so it shares no code with the app or the engine.
+ */
+
+/** Multiply by 2 in GF(2^8) with the AES polynomial 11b (FIPS 197 section 4.2.1). */
+const xtime = (b: number) => ((b << 1) & 0x100 ? (b << 1) ^ 0x11b : b << 1);
+/** f times b in GF(2^8): XOR of the doublings that f's set bits pick (FIPS 197 section 4.2). */
+function gmul(f: number, b: number): number {
+  let r = 0, p = b;
+  for (let i = 0; i < 4; i++) { if (f & (1 << i)) r ^= p; p = xtime(p); }
+  return r;
+}
+const h2 = (n: number) => n.toString(16).padStart(2, '0');
+
+/** Row 0 of the InvMixColumns matrix, FIPS 197 section 5.3.3: 0e 0b 0d 09. Pair k of row 0 meets byte k of the column. */
+const INV_ROW0 = [14, 11, 13, 9];
+
+test('[A19.ui.inv-mix-line-matches-field-multiply] on the decrypt walk\'s InvMixColumns, each of the factors 14, 11, 13 and 9 shows its product, its doublings and its "N is 8 + ..." breakdown as the suite\'s own field multiply gives them', async ({ page }) => {
+  const reply = await openWalk(page);
+  await toFirstStep(page);
+  for (let n = 0; n < 200 && (await kindNow(page)) !== 'InvMixColumns'; n++) await page.getByTestId('aes-walk-next').click();
+  expect(await kindNow(page), 'at the decrypt walk\'s first InvMixColumns').toBe('InvMixColumns');
+  if ((await page.getByTestId('aes-walk-mix-next').count()) === 0) throw new NotRun('UI_CONTROL_MISSING', 'InvMixColumns has no aes-walk-mix-next yet');
+  const idx = reply.inverse.steps.findIndex((s: any) => s.kind === 'InvMixColumns');
+  const before = bytesOf(reply.inverse.steps[idx - 1].state);
+  for (let k = 0; k < 4; k++) {
+    const f = INV_ROW0[k], b = parseInt(before[k], 16);
+    const d1 = xtime(b), d2 = xtime(d1), d3 = xtime(d2), want = gmul(f, b);
+    const parts = [8, 4, 2, 1].filter(p => (f & p) !== 0).join(' + ');
+    const line = ((await page.getByTestId('aes-walk-mix-line').textContent()) ?? '').replace(/\s+/g, ' ');
+    const where = `column 0, pair ${k} (factor ${f}, byte ${before[k]})`;
+    expect(new RegExp(`(?<![0-9a-f])${f}\\s*[×x]\\s*${before[k]}\\s*=\\s*${h2(want)}(?![0-9a-f])`, 'i').test(line), `${where}: the line reads ${f} × ${before[k]} = ${h2(want)}, and reads "${line}"`).toBe(true);
+    expect(line, `${where}: the breakdown names ${f}'s powers of 2`).toContain(`${f} is ${parts}`);
+    // The doublings read "×2 = ", with the multiplication sign, never "x2", which can read as a variable name (Jared on #330; #337's text).
+    for (const [name, v] of [['×2', d1], ['×4', d2], ['×8', d3]] as const)
+      expect(new RegExp(`${name}\\s*=\\s*${h2(v)}(?![0-9a-f])`, 'i').test(line), `${where}: the doubling ${name} = ${h2(v)} shows, and the line reads "${line}"`).toBe(true);
+    if (k < 3) await page.getByTestId('aes-walk-mix-next').click();
+  }
+});

@@ -123,6 +123,7 @@ AES_WALK_IDS = {
     "A19.ui.key-panel-landscape-layout", "A19.ui.key-panel-xor-rcon-replay", "A19.ui.key-table-scrolls-in-its-own-box",
     # Steve's block-walk items, 2026-11-08: the MixColumns matrix panel, the AddRoundKey round-key grid, the bit lines.
     "A19.ui.mix-matrix-pairs-and-line", "A19.ui.mix-fill-all", "A19.ui.add-round-key-grid", "A19.ui.bit-lines-for-picked-byte",
+    "A19.ui.inv-mix-line-matches-field-multiply",
 }
 
 
