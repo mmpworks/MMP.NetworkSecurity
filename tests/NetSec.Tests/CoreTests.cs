@@ -390,6 +390,28 @@ namespace NetSec.Tests
             Assert.StartsWith(detail, run.Result.Error.Message);
         }
 
+        /// <summary>
+        /// Issue #312 (Jared): a probe that dials out is the opener, so a silent peer ends it at twice the read deadline, never three times.
+        /// The peer is a listener that never accepts: the OS completes the connect, and no byte ever comes back.
+        /// </summary>
+        [Fact]
+        public void A_probe_that_dials_a_silent_peer_waits_the_openers_idle_limit()
+        {
+            System.Net.Sockets.TcpListener silent = new System.Net.Sockets.TcpListener(IPAddress.Loopback, 0);
+            silent.Start();
+            try
+            {
+                int port = ((IPEndPoint)silent.LocalEndpoint).Port;
+                IFuture<ProbeResult> probe = Probe.Connect(new ProbeRequest { Protocol = WireProtocol.Tls13, Host = "127.0.0.1", Port = port, Seed = 1, DeadlineMs = 200 });
+                Assert.True(probe.Wait(30000), "the probe did not end in 30 s");
+                ProbeResult r = probe.Result;
+                Assert.False(r.Completed);
+                Assert.Equal(ErrorCodes.LinkIdle, r.Code);
+                Assert.StartsWith("no bytes for 400 ms", r.Detail);
+            }
+            finally { silent.Stop(); }
+        }
+
         static Pair FlippedLength(int serverDeadlineMs, int clientDeadlineMs)
         {
             MemoryLink[] links = MemoryLink.Pair();
