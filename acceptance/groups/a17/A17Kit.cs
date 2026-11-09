@@ -426,15 +426,29 @@ namespace Acceptance
             public override string ToString() { return (Done ? "reached Done" : "stopped at the " + (Flow == null ? "?" : Flow.Kind) + " step") + (Codes.Count == 0 ? "" : " with " + string.Join(",", Codes.ToArray())); }
         }
 
-        /// <summary>The Host says WIZARD_PART_NOT_BUILT for a type with no row in FlowParts, so the clause has nothing to judge yet. Only that code reads NOT RUN: one other code in the list, or any other failure, stays FAIL.</summary>
+        /// <summary>
+        /// The Host says WIZARD_PART_NOT_BUILT for a type with no row in FlowParts, so the clause has nothing to judge yet. NOT RUN needs at
+        /// least one WIZARD_PART_NOT_BUILT, and every other code must be owed with it. The only other owed code is WIZARD_TYPE_NOT_IN_FLOW for
+        /// a companion "&lt;type&gt;.key" file: the V4 import layout (CONTRACT.md section 5, ASSUMED) sends one beside each certificate, and the flow
+        /// lists those companions only once certificate import is built (FlowRuns.cs: "{typeId} is not one of the keys this set makes."). The
+        /// same code for any other type, or any other code, stays FAIL (Jared on #339).
+        /// </summary>
         public static void NotRunIfOnlyPartNotBuilt(List<string> codes, List<string> messages, string what)
         {
-            if (codes.Count == 0) return;
-            foreach (string code in codes) if (code != "WIZARD_PART_NOT_BUILT") return;
+            if (codes.Count == 0 || !codes.Contains("WIZARD_PART_NOT_BUILT")) return;
+            for (int i = 0; i < codes.Count; i++)
+            {
+                if (codes[i] == "WIZARD_PART_NOT_BUILT") continue;
+                if (codes[i] == "WIZARD_TYPE_NOT_IN_FLOW" && i < messages.Count && CompanionKeyNotInFlow.IsMatch(messages[i] ?? "")) continue;
+                return;
+            }
             List<string> owed = new List<string>();
             foreach (string m in messages) if (!owed.Contains(m)) owed.Add(m);
             throw new NotRunException("WIZARD_PART_NOT_BUILT", what + ": the product owes this part. " + string.Join(" ", owed.ToArray()));
         }
+
+        static readonly System.Text.RegularExpressions.Regex CompanionKeyNotInFlow =
+            new System.Text.RegularExpressions.Regex(@"^(?<type>\S+\.key) is not one of the keys this set makes\.$");
 
         static bool Collect(ImportResult r, Reply reply)
         {
