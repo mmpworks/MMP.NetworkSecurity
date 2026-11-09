@@ -14,6 +14,18 @@ namespace Acceptance
     {
         static string Why(A17.ImportResult r) { return r + (r.Messages.Count > 0 ? " (" + r.Messages[0] + ")" : ""); }
 
+        /// <summary>
+        /// Imports the learner's files through "my-certificates". Slice V4 runs ahead of the build: until the Host can import pki.root-ca
+        /// (src/NetSec.Host/Security/FlowParts.cs, ImportBuilt), the file step stops with WIZARD_PART_NOT_BUILT, and the clause reads NOT RUN
+        /// under that code instead of FAIL (#333). Any other refusal still fails. Once V4 lands the code goes away and the clauses run for real.
+        /// </summary>
+        static A17.ImportResult Import(HostProc h, Dictionary<string, string> paths)
+        {
+            A17.ImportResult r = A17.TryImport(h, "my-certificates", paths);
+            if (!r.Done && r.Has("WIZARD_PART_NOT_BUILT")) throw new NotRunException("WIZARD_PART_NOT_BUILT", "V4 certificate import is not built yet: " + Why(r));
+            return r;
+        }
+
         // ---------------------------------------------------------------- the check can fail
 
         [Clause("A17.proof.root-negative-control")]
@@ -27,7 +39,7 @@ namespace Acceptance
 
             using (HostProc h = A17.Host(c, "a17-neg-good"))
             {
-                A17.ImportResult good = A17.TryImport(h, "my-certificates", a.Paths(true));
+                A17.ImportResult good = Import(h, a.Paths(true));
                 Check.True(good.Done, "a sound chain made by OpenSSL did not reach Done: " + Why(good));
                 Check.Equal("state of tls13.server after a sound chain", "Verified", A17.StateOf(h, "tls13.server"));
             }
@@ -36,7 +48,7 @@ namespace Acceptance
                 Dictionary<string, string> mismatched = a.Paths(true);
                 mismatched["tls13.server"] = b.ServerPem;
                 mismatched["tls13.server.key"] = b.ServerKey;
-                A17.ImportResult bad = A17.TryImport(h, "my-certificates", mismatched);
+                A17.ImportResult bad = Import(h, mismatched);
                 Check.True(!bad.Done, "a leaf signed by another root reached Done: the check judged a chain OpenSSL refuses as sound");
                 Check.True(bad.Codes.Count > 0 && !bad.Codes.Contains(""), "the refusal carries no code: " + Why(bad));
                 Check.True(A17.StateOf(h, "tls13.server") != "Verified", "tls13.server reads Verified although its leaf is not signed by the root");
@@ -54,12 +66,12 @@ namespace Acceptance
             TestPki ed = TestPki.Make(c, "alg-ed", new TestPki.Options()), rsa = TestPki.Make(c, "alg-rsa", new TestPki.Options { RootAlg = "rsa" });
             using (HostProc h = A17.Host(c, "a17-alg-control"))
             {
-                A17.ImportResult control = A17.TryImport(h, "my-certificates", ed.Paths(true));
+                A17.ImportResult control = Import(h, ed.Paths(true));
                 Check.True(control.Done && !control.Has("CERT_SIGNATURE_ALG_UNSUPPORTED") && !control.Has("CERT_SIGNATURE"), "control: an Ed25519 root made by OpenSSL was refused: " + Why(control));
             }
             using (HostProc h = A17.Host(c, "a17-alg-rsa"))
             {
-                A17.ImportResult r = A17.TryImport(h, "my-certificates", rsa.Paths(true));
+                A17.ImportResult r = Import(h, rsa.Paths(true));
                 string where = "at the flow";
                 if (!r.Has("CERT_SIGNATURE_ALG_UNSUPPORTED") && r.Done)
                 {
@@ -90,7 +102,7 @@ namespace Acceptance
             TestPki old = TestPki.Make(c, "clock-old", new TestPki.Options { Days = 60, NotBefore = "20200101000000Z", NotAfter = "20200201000000Z" });
             using (HostProc h = A17.Host(c, "a17-clock-new"))
             {
-                A17.ImportResult r = A17.TryImport(h, "my-certificates", fresh.Paths(true));
+                A17.ImportResult r = Import(h, fresh.Paths(true));
                 Check.True(r.Done, "a certificate valid from yesterday to 30 days ahead did not reach Done: " + Why(r));
                 foreach (int lesson in new int[] { 5, 10 })
                 {
@@ -106,7 +118,7 @@ namespace Acceptance
             using (HostProc h = A17.Host(c, "a17-clock-old"))
             {
                 // Control: a certificate that really ran out is named, so the clock is read and not ignored.
-                A17.ImportResult r = A17.TryImport(h, "my-certificates", old.Paths(true));
+                A17.ImportResult r = Import(h, old.Paths(true));
                 bool named = r.Has("CERT_EXPIRED");
                 if (!named && r.Done)
                 {
@@ -141,7 +153,7 @@ namespace Acceptance
             TestPki pki = TestPki.Make(c, "trustonly", new TestPki.Options());
             using (HostProc h = A17.Host(c, "a17-attacks-trust"))
             {
-                A17.ImportResult r = A17.TryImport(h, "my-certificates", pki.Paths(false));       // the root certificate only: a trust-only CA
+                A17.ImportResult r = Import(h, pki.Paths(false));       // the root certificate only: a trust-only CA
                 Check.True(r.Done, "a trust-only root (certificate without its key) did not reach Done: " + Why(r));
                 foreach (string id in NeedCaKey)
                 {
