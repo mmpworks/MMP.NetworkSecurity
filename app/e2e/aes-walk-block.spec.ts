@@ -99,8 +99,9 @@ test('MixColumns shows the multiply panel: the fixed matrix, the state column, e
   // The field multiply's own numbers, from the engine's doubling: the shift before the 11b XOR, and the byte it gives.
   const shifted = (b: string) => (parseInt(b, 16) << 1).toString(16).padStart(3, '0')
   const big = (b: string) => (parseInt(b, 16) & 0x80) !== 0
-  await expect(page.getByTestId('aes-walk-mix-line')).toContainText(`to get ${shifted(before[0])}`)
-  await expect(page.getByTestId('aes-walk-mix-line')).toContainText(big(before[0]) ? `XOR 11b. It gives ${mul(2, before[0])}` : `stays ${mul(2, before[0])}`)
+  // An overflowing byte shows its 3-digit shift; a byte that fits shows the doubled byte itself.
+  if (big(before[0])) await expect(page.getByTestId('aes-walk-mix-line')).toContainText(`to get ${shifted(before[0])}. That is too big for a byte, so XOR 11b. It gives ${mul(2, before[0])}`)
+  else await expect(page.getByTestId('aes-walk-mix-line')).toContainText(`left by one: ${mul(2, before[0])}. It fits in a byte`)
   // Step through row 0: 4 products, then the XOR sum, which lands in the state after.
   for (let k = 1; k < 4; k++) {
     await page.getByTestId('aes-walk-mix-next').click()
@@ -124,6 +125,40 @@ test('MixColumns shows the multiply panel: the fixed matrix, the state column, e
   await page.getByTestId('aes-walk-mix-col-2').click()
   await expect(page.getByTestId('aes-walk-mix-before-0-2')).toHaveAttribute('data-pair', 'true')
   await expect(page.getByTestId('aes-walk-mix-line')).toContainText(`2 × ${before[8]} = ${mul(2, before[8])}`)
+})
+
+/** FIPS 197 section 4.2 for any factor: the sum of the doublings its set bits pick. The decrypt walk uses 9, 11, 13 and 14. */
+function mulAny(factor: number, h: string): { result: string; doubles: string[] } {
+  let x = parseInt(h, 16), out = 0
+  const doubles: string[] = []
+  for (let bit = 0; 1 << bit <= factor; bit++) {
+    if (factor & (1 << bit)) out ^= x
+    if (1 << (bit + 1) <= factor) { x = ((x << 1) ^ (x & 0x80 ? 0x1b : 0)) & 0xff; doubles.push(x.toString(16).padStart(2, '0')) }
+  }
+  return { result: out.toString(16).padStart(2, '0'), doubles }
+}
+
+// Richard on #330: on the decrypt walk the factors are 14, 11, 13 and 9, and each line must say how that factor is built, not "times 3".
+test('on the decrypt walk, InvMixColumns explains factors 14, 11, 13 and 9 by their doublings', async ({ page }) => {
+  await openPractice(page)
+  for (let i = 0; i < 140 && ((await page.getByTestId('aes-walk-step-kind').textContent()) ?? '').trim() !== 'InvMixColumns'; i++) await toStop(page, 1)
+  await expect(page.getByTestId('aes-walk-step-kind')).toHaveText('InvMixColumns')
+  const before = await grid(page, 'aes-walk-mix-before')
+  const factors: number[] = []
+  for (let k = 0; k < 4; k++) factors.push(Number(((await page.getByTestId(`aes-walk-mix-matrix-0-${k}`).textContent()) ?? '').trim()))
+  expect(factors, 'row 0 of the inverse matrix').toEqual([14, 11, 13, 9])
+  const words: Record<number, string> = { 9: '9 is 8 + 1', 11: '11 is 8 + 2 + 1', 13: '13 is 8 + 4 + 1', 14: '14 is 8 + 4 + 2' }
+  for (let k = 0; k < 4; k++) {
+    if (k > 0) await page.getByTestId('aes-walk-mix-next').click()
+    const f = factors[k], { result, doubles } = mulAny(f, before[k])
+    const line = page.getByTestId('aes-walk-mix-line')
+    await expect(line).toContainText(`${f} × ${before[k]} = ${result}`)
+    await expect(line).toContainText(words[f])
+    await expect(line).not.toContainText('Times 3')
+    // The 3 doublings, x2, x4 and x8, then the result.
+    await expect(line).toContainText(`x2 = ${doubles[0]}, x4 = ${doubles[1]}, x8 = ${doubles[2]}`)
+    await expect(line).toContainText(`= ${result}.`)
+  }
 })
 
 for (const theme of ['light', 'dark'] as const) {

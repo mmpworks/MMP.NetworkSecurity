@@ -42,14 +42,33 @@ const total = computed(() => termAt(v.col, row.value)?.result ?? '')
  */
 function how(t: AesTerm): string {
   if (t.factor === 1) return 'Times 1 leaves the byte as it is.'
+  if (t.factor !== 2 && t.factor !== 3) return built(t)
   const d = t.doublings?.[0]
-  const shift = d ? `Field multiply by 2: shift the bits left by one, to get ${d.shifted}.` : 'Field multiply by 2: shift the bits left by one.'
-  const fit = (d ? d.reduced : t.reduced)
-    ? ` That is too big for a byte, so XOR 11b.${d ? ` It gives ${d.to}.` : ''}`
-    : ` It fits in a byte, so it stays ${d ? d.to : t.result}.`
-  if (t.factor === 2) return shift + fit
+  // A byte that overflows shows its 3-digit shift before the 11b XOR. A byte that fits shows the doubled byte itself (Richard on #330).
+  const twice = !d
+    ? `Field multiply by 2: shift the bits left by one.${t.reduced ? ' That is too big for a byte, so XOR 11b.' : ' It fits in a byte.'}`
+    : d.reduced
+      ? `Field multiply by 2: shift the bits left by one, to get ${d.shifted}. That is too big for a byte, so XOR 11b. It gives ${d.to}.`
+      : `Field multiply by 2: shift the bits left by one: ${d.to}. It fits in a byte.`
+  if (t.factor === 2) return twice
   const sum = t.sums?.[1] ?? t.result
-  return `${shift}${fit} Times 3 is times 2, then XOR the byte itself${d ? `: ${d.to} XOR ${t.input} = ${sum}` : ''}.`
+  return `${twice} Times 3 is times 2, then XOR the byte itself${d ? `: ${d.to} XOR ${t.input} = ${sum}` : ''}.`
+}
+
+/**
+ * A factor with more than one doubling (the decrypt walk's 9, 11, 13 and 14): which powers of 2 make it, each doubling the engine ran,
+ * and the parts its set bits pick, high bit first. Every byte is the engine's (doublings, picks); the split of the factor into powers
+ * of 2 only names its bits (Richard on #330).
+ */
+function built(t: AesTerm): string {
+  const parts = [8, 4, 2, 1].filter(p => (t.factor & p) !== 0)
+  const d = t.doublings ?? []
+  const list = d.map((x, i) => `x${2 << i} = ${x.to}`).join(', ')
+  const over = d.map((x, i) => (x.reduced ? `x${2 << i}` : '')).filter(Boolean)
+  const overLine = over.length === 1 ? ` ${over[0]} was too big for a byte, so it got XOR 11b.`
+    : over.length > 1 ? ` ${over.join(' and ')} were too big for a byte, so each got XOR 11b.` : ''
+  const picked = [...(t.picks ?? [])].reverse()
+  return `${t.factor} is ${parts.join(' + ')}. Double ${d.length} times: ${list}.${overLine} Then XOR the parts: ${picked.join(' XOR ')} = ${t.result}.`
 }
 const caption = computed(() => {
   if (v.all) return { top: 'All 4 columns are done.', sub: 'The result is the state after MixColumns.' }
