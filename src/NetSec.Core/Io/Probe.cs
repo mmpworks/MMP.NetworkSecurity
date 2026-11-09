@@ -130,7 +130,7 @@ namespace NetSec.Io
             EnginePump pump = new EnginePump(engine, link, new WatchedSink(events, delegate { watcher[0].OnEvent(); }), new FreeRunGate(), r.Tamper, r.DeadlineMs > 0 ? r.DeadlineMs : DeadlineMs);
             // The probe's client dials out, so it is the opener and waits the shorter idle limit (issue #309). The peer is an outside tool, so no tie
             // was possible; this keeps the role rule the same in every pump.
-            // RED pump.OpenedLink = isClient;
+            pump.OpenedLink = isClient;
             watcher[0] = new CloseWhenDone(pump, engine, isClient && r.Send == null);
             pump.OnApp = delegate(AppChunk chunk)
             {
