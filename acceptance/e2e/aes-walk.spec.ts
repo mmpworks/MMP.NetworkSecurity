@@ -859,7 +859,8 @@ test('[A19.ui.mix-matrix-pairs-and-line] on MixColumns the panel shows the fixed
   expect(frames.length, 'Play this column lights pairs').toBeGreaterThan(0);
   for (let r = 0; r < 4; r++) for (let k = 0; k < 4; k++) {
     const p = step.terms[r + 4 * col].parts[k];
-    const line = new RegExp(`\\b${p.factor}\\s*[×x]\\s*${p.input}\\s*=\\s*${p.result}\\b`, 'i');
+    // The line's text can run straight into the next words ("= 5dRow 0 ..."), so the result ends at the first character that is not hex.
+    const line = new RegExp(`(?<![0-9a-f])${p.factor}\\s*[×x]\\s*${p.input}\\s*=\\s*${p.result}(?![0-9a-f])`, 'i');
     const hit = frames.some(fr => { const [m, b, l] = fr.split('|'); return m === `aes-walk-mix-matrix-${r}-${k}` && b === `aes-walk-mix-before-${k}-${col}` && line.test(l); });
     expect(hit, `row ${r}, pair ${k}: the matrix cell and byte ${k} of column ${col} are lit together, with the line "${p.factor} × ${p.input} = ${p.result}"`).toBe(true);
   }
