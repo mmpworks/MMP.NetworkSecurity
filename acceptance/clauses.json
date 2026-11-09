@@ -2949,6 +2949,17 @@
    "counts": true
   },
   {
+   "id": "A19.ui.block-cell-shows-index-and-char",
+   "base": "A19.ui.block-cell-shows-index-and-char",
+   "assertion": "A19",
+   "group": "e2e",
+   "build": "host",
+   "slice": "W1",
+   "referee": "FIPS 197 (2001) data, the suite's RefAes, and the .NET library",
+   "roles": [],
+   "counts": true
+  },
+  {
    "id": "A19.ui.end-frames-on-all-key-sizes",
    "base": "A19.ui.end-frames-on-all-key-sizes",
    "assertion": "A19",
@@ -3017,6 +3028,72 @@
   {
    "id": "A19.ui.key-band-on-192-and-256",
    "base": "A19.ui.key-band-on-192-and-256",
+   "assertion": "A19",
+   "group": "e2e",
+   "build": "host",
+   "slice": "W1",
+   "referee": "FIPS 197 (2001) data, the suite's RefAes, and the .NET library",
+   "roles": [],
+   "counts": true
+  },
+  {
+   "id": "A19.ui.key-panel-landscape-layout",
+   "base": "A19.ui.key-panel-landscape-layout",
+   "assertion": "A19",
+   "group": "e2e",
+   "build": "host",
+   "slice": "W1",
+   "referee": "FIPS 197 (2001) data, the suite's RefAes, and the .NET library",
+   "roles": [],
+   "counts": true
+  },
+  {
+   "id": "A19.ui.key-panel-xor-rcon-replay",
+   "base": "A19.ui.key-panel-xor-rcon-replay",
+   "assertion": "A19",
+   "group": "e2e",
+   "build": "host",
+   "slice": "W1",
+   "referee": "FIPS 197 (2001) data, the suite's RefAes, and the .NET library",
+   "roles": [],
+   "counts": true
+  },
+  {
+   "id": "A19.ui.key-roles-have-colors",
+   "base": "A19.ui.key-roles-have-colors",
+   "assertion": "A19",
+   "group": "e2e",
+   "build": "host",
+   "slice": "W1",
+   "referee": "FIPS 197 (2001) data, the suite's RefAes, and the .NET library",
+   "roles": [],
+   "counts": true
+  },
+  {
+   "id": "A19.ui.key-schedule-zoom",
+   "base": "A19.ui.key-schedule-zoom",
+   "assertion": "A19",
+   "group": "e2e",
+   "build": "host",
+   "slice": "W1",
+   "referee": "FIPS 197 (2001) data, the suite's RefAes, and the .NET library",
+   "roles": [],
+   "counts": true
+  },
+  {
+   "id": "A19.ui.key-table-scrolls-in-its-own-box",
+   "base": "A19.ui.key-table-scrolls-in-its-own-box",
+   "assertion": "A19",
+   "group": "e2e",
+   "build": "host",
+   "slice": "W1",
+   "referee": "FIPS 197 (2001) data, the suite's RefAes, and the .NET library",
+   "roles": [],
+   "counts": true
+  },
+  {
+   "id": "A19.ui.key-word-build-runs-in-steps",
+   "base": "A19.ui.key-word-build-runs-in-steps",
    "assertion": "A19",
    "group": "e2e",
    "build": "host",
