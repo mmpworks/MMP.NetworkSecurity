@@ -15,16 +15,15 @@ public sealed class SecurityRootTests : IDisposable
 
     /// <summary>
     /// A fresh folder with no .git above it. The machine temp folder comes first; when TMP sits inside a git checkout (a worktree's
-    /// own scratch folder, say) the next candidates are the user's local temp folder and the temp folder's drive root.
+    /// own scratch folder, say) the user's local temp folder is the one other candidate. Never a drive root: an aborted run would leave
+    /// its folder there.
     /// </summary>
     static string NoGitTop()
     {
-        string temp = Path.GetTempPath();
         string[] candidates =
         [
-            temp,
+            Path.GetTempPath(),
             Path.Combine(Environment.GetFolderPath(Environment.SpecialFolder.LocalApplicationData), "Temp"),
-            Path.GetPathRoot(Path.GetFullPath(temp))!,
         ];
         foreach (string root in candidates)
         {
