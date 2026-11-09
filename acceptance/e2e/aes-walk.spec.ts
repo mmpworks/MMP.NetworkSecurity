@@ -820,12 +820,13 @@ async function toStep(page: Page, reply: any, kind: string, round: number): Prom
 
 const dataHex = async (page: Page, testid: string) => ((await page.getByTestId(testid).getAttribute('data-hex')) ?? '').toLowerCase();
 
-/** Per frame while motion runs: the lit matrix cell, the lit state-before cell, and the line, as one string. Ends after 3 s of stillness. */
-async function pairFrames(page: Page, ms: number): Promise<string[]> {
-  return await page.evaluate(ms => new Promise<string[]>(done => {
+/** Per frame: the lit matrix cell, the lit state-before cell, and the line, as one string. Ends when the column's 4 bytes of the state after
+ *  are filled, or at ms. Play can wait between products with nothing animating, so stillness cannot mark the end. */
+async function pairFrames(page: Page, col: number, ms: number): Promise<string[]> {
+  return await page.evaluate(({ col, ms }) => new Promise<string[]>(done => {
     const out: string[] = [];
     const t0 = performance.now();
-    let still = 0;
+    const filled = () => [0, 1, 2, 3].every(r => (document.querySelector(`[data-testid="aes-walk-mix-after-${r}-${col}"]`)?.getAttribute('data-hex') ?? '') !== '');
     const tick = () => {
       const t = performance.now() - t0;
       const m = document.querySelector('[data-testid^="aes-walk-mix-matrix-"][data-pair="true"]')?.getAttribute('data-testid') ?? '';
@@ -833,11 +834,10 @@ async function pairFrames(page: Page, ms: number): Promise<string[]> {
       const line = (document.querySelector('[data-testid="aes-walk-mix-line"]')?.textContent ?? '').replace(/\s+/g, ' ').trim();
       const f = `${m}|${b}|${line}`;
       if (m && out[out.length - 1] !== f) out.push(f);
-      still = document.getAnimations().some(a => a.playState === 'running') ? 0 : still + 1;
-      if (t > ms || (t > 1500 && still > 180)) done(out); else requestAnimationFrame(tick);
+      if (t > ms || filled()) done(out); else requestAnimationFrame(tick);
     };
     tick();
-  }), ms);
+  }), { col, ms });
 }
 
 test('[A19.ui.mix-matrix-pairs-and-line] on MixColumns the panel shows the fixed matrix, the state before, and Play this column lights each pair with its "2 × 21 = 42" line and fills that column', async ({ page }) => {
@@ -855,7 +855,7 @@ test('[A19.ui.mix-matrix-pairs-and-line] on MixColumns the panel shows the fixed
   const col = 2;
   await cell(page, 1, col).click();
   await page.emulateMedia({ reducedMotion: 'no-preference' });
-  const [frames] = await Promise.all([pairFrames(page, 90_000), page.getByTestId('aes-walk-mix-play').click()]);
+  const [frames] = await Promise.all([pairFrames(page, col, 120_000), page.getByTestId('aes-walk-mix-play').click()]);
   expect(frames.length, 'Play this column lights pairs').toBeGreaterThan(0);
   for (let r = 0; r < 4; r++) for (let k = 0; k < 4; k++) {
     const p = step.terms[r + 4 * col].parts[k];
