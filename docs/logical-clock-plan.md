@@ -42,6 +42,10 @@ Amendment (decision 5, "The catch" below): every caught-attack fork joins the ca
 3. The drop fork's tail race: A, fix the race first, in its own issue and PR (#309). Ranked by the lead, 2026-11-08, and Jared voted A. The kill condition then holds 20 of 20 for the drop fork, with no allowance. #309's diagnosis: both sides wait on the same read deadline, so either can time out first, and the deadline failure writes no trace event.
 4. Saved traces written before this change have no clock. The replay orders them by `seq`, as today. No rewrite of old files.
 5. After a caught attack, the end of a run is compared only up to the catch. Ranked by the lead, 2026-11-08 (option A). The tail is true network behaviour: a side that sends without waiting for replies keeps sending until the catch reaches it. The lesson's point is the catch. Option B, making every sender wait for each reply (lockstep), would fix the tail too, but it changes lesson timing, so it stays a later option for Steve. See "The catch" below.
+6. A held engine stream also holds its own `/wire` stream. The wire events still get no clock. This keeps a wire event after the engine event that produced it, so the placement rule in design item 8 never reads a wrong anchor. Ranked by the lead, 2026-11-09.
+7. A connection becomes ambiguous when the third actor's send or receive arrives. Events already written on that connection keep their clocks. From then on, its sends and receives get own + 1 and `"unmatched": true`. Ranked by the lead, 2026-11-09.
+8. A clockless event is "after the catch" when its anchor (its side's last engine event before it) is after the catch. With no anchor, it is before the catch. Ranked by the lead, 2026-11-09.
+9. A replay (`session.load`) sends a saved `trace.catch` line as its own frame under the replay's session id, never wrapped as a trace event. Ranked by the lead, 2026-11-09.
 
 ## The catch (amendment, 2026-11-08)
 
