@@ -289,7 +289,9 @@ def run(directory, label, wait_minutes, command):
             env[ENV_HELD] = str(me)
             print(f"HEAVY_LOCK taken by '{label}' (pid {me})", flush=True)
         print(f"HEAVY_LOCK launching {json.dumps(command)}", flush=True)         # the argv as it reaches the OS, so a rewritten command line shows in the log
-        return subprocess.run(command, env=env).returncode
+        code = subprocess.run(command, env=env).returncode
+        print(f"HEAVY_LOCK finished exit {code}", flush=True)                        # tools/run_status.py reads this to tell an exited run from a running one
+        return code
     finally:
         drop_ticket(mine)
         if held:

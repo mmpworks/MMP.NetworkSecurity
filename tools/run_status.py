@@ -27,7 +27,8 @@ GATE_FINAL = re.compile(r"^gate (?P<slice>\S+?): (?P<n>\d+) of (?P<m>\d+) steps 
 GATE_EXIT = re.compile(r"^gate exit (?P<code>\d+)", re.M)
 # The commit a run was made on: tools/gate.ps1 prints "gate <slice> @ <sha>[+dirty]" first, and the Playwright globalSetup prints "run @ <sha>[+dirty]".
 HEAD_LINE = re.compile(r"^(?:gate \S+|run) @ (?P<head>[0-9a-f]+(?:\+dirty)?|unknown)\s*$", re.M)
-GATE_STEP = re.compile(r"^== (?P<name>.+?)(?::.*)?$", re.M)
+HEAVY_FINISHED = re.compile(r"^HEAVY_LOCK finished exit (?P<code>-?\d+)\s*$", re.M)
+GATE_STEP =re.compile(r"^== (?P<name>.+?)(?::.*)?$", re.M)
 PW_PASSED = re.compile(r"^\s*(?P<n>\d+) passed \(", re.M)
 PW_FAILED = re.compile(r"^\s*(?P<n>\d+) failed\s*$", re.M)
 PW_NOT_RUN = re.compile(r"^\s*(?P<n>\d+) did not run\s*$", re.M)
@@ -73,6 +74,25 @@ def final_line(text):
     return None
 
 
+def finished_line(text):
+    """(FAILED, summary) for a run that has exited with no result line of its own, else None.
+
+    tools/heavy_lock.py prints `HEAVY_LOCK finished exit N` when its command ends. A command that died on a config or startup error (a
+    Playwright config that throws, a missing build) prints a stack trace and no `N passed`, so without this line the log read RUNNING for ever.
+    Exit 0 with no result line is also FAILED: nothing in the log shows a test ran."""
+    done = None
+    for done in HEAVY_FINISHED.finditer(text):               # the last one: a nested run (npm run e2e inside a held lock) prints its own finish line mid-log
+        pass
+    if not done or text[done.end():].strip():                # more output after it means an outer run is still going
+        return None
+    code = done["code"]
+    before = [line.strip() for line in text[:done.start()].splitlines() if line.strip()]
+    error = next((line for line in reversed(before) if line.startswith(("Error", "error", "Traceback", "Exception"))), before[-1] if before else "no output")
+    if code == "0":
+        return ("FAILED", "run exited 0 but the log holds no result line")
+    return ("FAILED", f"run exited {code}: {error[:120]}")
+
+
 def where(text):
     """Where a run that has not finished is: the current gate step, or the Playwright count so far."""
     steps = GATE_STEP.findall(text)
@@ -90,6 +110,7 @@ def where(text):
 
 
 def main(argv):
+    sys.stdout.reconfigure(encoding="utf-8", errors="replace")     # a log line may hold a check mark; a cp1252 console must not crash the tool
     ap = argparse.ArgumentParser(description=__doc__.split("\n")[0])
     ap.add_argument("log")
     ap.add_argument("--stuck-after", type=float, default=10.0, help="minutes without output before the run counts as stuck")
@@ -100,7 +121,7 @@ def main(argv):
     text = ANSI.sub("", open(args.log, encoding="utf-8", errors="replace").read())
     head = HEAD_LINE.search(text)
     commit = f" @ {head['head']}" if head else ""
-    done = final_line(text)
+    done = final_line(text) or finished_line(text)
     if done:
         print(f"{done[0]}  {done[1]}{commit}")
         return 0 if done[0] == "PASSED" else 1

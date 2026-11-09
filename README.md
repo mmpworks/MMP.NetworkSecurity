@@ -30,6 +30,16 @@ pwsh acceptance/run.ps1 -Clauses All
 
 It writes a report under `docs/_runs/`. The suite also uses OpenSSL and Go as referees (see `acceptance/README.md`).
 
+## A fresh worktree
+
+A new worktree has no build output and no `app/node_modules`. Before the app suite (`npm.cmd run e2e` in `app/`) run, from the repo root:
+
+```
+dotnet build src/NetSec.Host -c Release
+```
+
+Without it the suite stops at once with `HOST_DLL_STALE: no Release Host at ...`. That stop is intended: the suite runs the Release Host and never builds one. Run `npm install` in `app/` first (`tools/gate.ps1` never installs and stops with `TOOL_MISSING`).
+
 ## Read this first
 
 1. All keys are made-up training keys. Anyone can read them in the source. Never use this engine with a real secret.

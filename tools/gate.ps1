@@ -72,6 +72,9 @@ function Step([string]$name, [scriptblock]$body) {
     Write-Host "== $name"
     $output = & $body 2>&1 | ForEach-Object { "$_" }
     $code = $LASTEXITCODE
+    # A failing test's name sits above the traceback, outside the last 12 lines: print every FAIL:/ERROR: line so a red names itself.
+    $failedTests = @($output | Where-Object { $_ -match '^(FAIL|ERROR): ' })
+    if ($code -ne 0 -and $failedTests.Count -gt 0) { $failedTests | ForEach-Object { Write-Host $_ } }
     $output | Select-Object -Last 12 | ForEach-Object { Write-Host $_ }
     $rows.Add([pscustomobject]@{ Name = $name; Status = $(if ($code -eq 0) { 'PASS' } else { 'FAIL' }); Exit = $code; Tail = (($output | Select-Object -Last 6) -join "`n") })
     if ($code -ne 0) { $script:failed++ }
