@@ -176,7 +176,7 @@ function builtFactorWords(t: AesTerm): string {
   const parts = [8, 4, 2, 1].filter(p => (t.factor & p) !== 0)
   const d = t.doublings ?? []
   // With no doublings in the reply, the words name the method and invent no number (Jared on #330).
-  if (!d.length) return `${t.factor} is ${parts.join(' + ')}. Double the byte for each power of 2, then XOR the parts the factor picks: = ${t.result}.`
+  if (!d.length) return `${t.factor} is ${parts.join(' + ')}. Double the byte for each power of 2, then XOR the parts the factor picks. The result is ${t.result}.`
   // "×2", not "x2", which can read as a variable name (Jared on #330).
   const list = d.map((x, i) => `×${2 << i} = ${x.to}`).join(', ')
   const over = overflowWords(t)

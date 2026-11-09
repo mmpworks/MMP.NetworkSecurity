@@ -152,7 +152,8 @@ test('a term with no doublings gets the general sentence, with no invented numbe
   expect(words).toContain('9 is 8 + 1')
   expect(words).not.toContain('Double 0')
   expect(words).not.toMatch(/×[248] = [0-9a-f]{2}/)
-  expect(words).toContain('= 4a')
+  expect(words).toContain('The result is 4a.')
+  expect(words, 'no stray ": =" (Jared on #337)').not.toContain(': =')
 })
 
 // Richard on #330: on the decrypt walk the factors are 14, 11, 13 and 9, and each line must say how that factor is built, not "times 3".
