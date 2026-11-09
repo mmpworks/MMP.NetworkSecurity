@@ -16,7 +16,10 @@ A waiter prints "HEAVY_LOCK waiting on '<label>' (pid N, started HH:MM, M min ag
 `run` sets NETSEC_HEAVY_LOCK_HELD=<holder pid> for its command; a run started inside a holder (the gate's own app suite) proceeds without waiting,
 but only when that pid is the live holder named in the info file and the lock is really held.
 Exit codes: the command's own code from `run`; 75 LOCK_TIMEOUT; 76 LOCK_ERROR (an unexpected lock failure: the run stops, fail closed, and `status`
-exits 1 with the same text); 2 from `status` when held.
+exits 1 with the same text); 77 COMMAND_NOT_FOUND (checked before the lock is touched); 2 from `status` when held.
+Waiters run in arrival order: each writes a ticket file under <lock dir>\tickets, and only the oldest live ticket may try the OS lock. The OS lock still
+decides who holds; tickets of dead processes and junk files are skipped.
+The command is resolved with shutil.which first, so `npm` finds npm.cmd on Windows.
 """
 import argparse
 import ctypes
@@ -24,6 +27,7 @@ import errno
 import json
 import os
 import pathlib
+import shutil
 import subprocess
 import sys
 import time
@@ -36,6 +40,8 @@ else:
 
 EXIT_TIMEOUT = 75
 EXIT_LOCK_ERROR = 76
+EXIT_COMMAND_NOT_FOUND = 77
+TICKET_DIR = "tickets"
 POLL_SECONDS = 1.0
 PRINT_EVERY_SECONDS = 30.0
 ENV_HELD = "NETSEC_HEAVY_LOCK_HELD"
@@ -175,26 +181,82 @@ def tie_children_to_this_process():
     # The job handle stays open until this process ends; closing it (at exit or by a kill) is what kills the members.
 
 
+def make_ticket(directory):
+    """A waiter's place in line: a file named by arrival time (nanoseconds, then pid), written under a temporary name and renamed, so a reader never
+    sees a half-written ticket. The ticket only decides who MAY TRY the OS lock. The OS lock alone decides who holds it, so a wrong ticket costs
+    fairness and can never put two runs in at once."""
+    folder = directory / TICKET_DIR
+    me = os.getpid()
+    path = folder / f"{time.time_ns():020d}-{me}.json"
+    try:
+        folder.mkdir(parents=True, exist_ok=True)
+        temp = path.with_suffix(".tmp")
+        temp.write_text(json.dumps({"pid": me, "start": process_start(me)}), encoding="utf-8")
+        os.replace(temp, path)
+    except OSError as e:
+        raise LockError(f"cannot write a ticket in {folder}: {e}") from e
+    return path
+
+
+def drop_ticket(path):
+    try:
+        path.unlink()
+    except OSError:
+        pass
+
+
+def ticket_is_live(path):
+    """True when the ticket names a process that is still the one that wrote it. Unreadable, junk and dead tickets count as not live."""
+    try:
+        data = json.loads(path.read_text(encoding="utf-8"))
+        pid, start = data["pid"], data["start"]
+    except (OSError, ValueError, KeyError, TypeError):
+        return False
+    return process_start(pid) == start
+
+
+def earlier_live_tickets(directory, mine):
+    """How many live waiters hold a ticket older than mine. Zero means it is my turn to try the lock."""
+    count = 0
+    for path in sorted((directory / TICKET_DIR).glob("*.json")):
+        if path == mine:
+            return count
+        count += ticket_is_live(path)
+    return count                                                      # my ticket is gone: do not block on others
+
+
 def run(directory, label, wait_minutes, command):
+    found = shutil.which(command[0])                                  # finds npm.cmd and .bat on Windows; never shell=True
+    if found is None:
+        print(f"COMMAND_NOT_FOUND: '{command[0]}' is not on PATH. Nothing ran and the lock was not touched.", flush=True)
+        return EXIT_COMMAND_NOT_FOUND
+    command = [found, *command[1:]]
     fd = open_lock(directory)
     tie_children_to_this_process()
+    mine = make_ticket(directory)
     deadline = None if wait_minutes is None else time.time() + wait_minutes * 60
     last_print = 0.0
     env = dict(os.environ)
     held = False
     try:
-        while not (held := try_os_lock(fd)):
+        while True:
             info = read_info(directory)
             if info and os.environ.get(ENV_HELD) == str(info.get("pid")) and process_start(info["pid"]) is not None:
                 print(f"HEAVY_LOCK already held by an ancestor: {describe(info)}", flush=True)
                 break
+            ahead = earlier_live_tickets(directory, mine)
+            if ahead == 0 and try_os_lock(fd):
+                held = True
+                break
             if time.time() - last_print >= PRINT_EVERY_SECONDS:
-                print(f"HEAVY_LOCK waiting on {describe(info)}", flush=True)
+                line = f"{ahead} earlier waiting run(s) first, then " if ahead else ""
+                print(f"HEAVY_LOCK waiting on {line}{describe(info)}", flush=True)
                 last_print = time.time()
             if deadline is not None and time.time() >= deadline:
                 print(f"LOCK_TIMEOUT: still held by {describe(read_info(directory))} after {wait_minutes:g} min", flush=True)
                 return EXIT_TIMEOUT
             time.sleep(POLL_SECONDS)
+        drop_ticket(mine)                                             # a holder or ancestor-run is no longer in line
         if held:
             me = os.getpid()
             (directory / INFO_NAME).write_text(json.dumps({"pid": me, "label": label, "started": datetime.now().isoformat(timespec="seconds"),
@@ -203,6 +265,7 @@ def run(directory, label, wait_minutes, command):
             print(f"HEAVY_LOCK taken by '{label}' (pid {me})", flush=True)
         return subprocess.run(command, env=env).returncode
     finally:
+        drop_ticket(mine)
         if held:
             try:
                 (directory / INFO_NAME).write_text("", encoding="utf-8")
