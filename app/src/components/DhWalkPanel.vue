@@ -63,7 +63,7 @@ function play() {
 onBeforeUnmount(stop)
 function pickGroup(g: 'small' | 'group14') { stop(); group.value = g; step.value = null }
 
-/** A long group 14 number in a caption or a row shows its ends, so it stays one line. The whole number is in the value rows below. */
+/** A long group 14 number in a caption or a row shows its ends, so it stays one line. The whole number is in the Client, wire and Server value rows. */
 const short = (n: Num | null) => { const t = show(n); return group.value === 'group14' && t.length > 28 ? `${t.slice(0, 16)}…${t.slice(-8)}` : t }
 
 /** The caption of a step, with the engine's numbers, in the short form on group 14. */
