@@ -3048,6 +3048,17 @@
    "counts": true
   },
   {
+   "id": "A19.ui.inv-mix-line-matches-field-multiply",
+   "base": "A19.ui.inv-mix-line-matches-field-multiply",
+   "assertion": "A19",
+   "group": "e2e",
+   "build": "host",
+   "slice": "W1",
+   "referee": "FIPS 197 (2001) data, the suite's RefAes, and the .NET library",
+   "roles": [],
+   "counts": true
+  },
+  {
    "id": "A19.ui.key-band-on-192-and-256",
    "base": "A19.ui.key-band-on-192-and-256",
    "assertion": "A19",
