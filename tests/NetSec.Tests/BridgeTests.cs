@@ -33,6 +33,44 @@ namespace NetSec.Tests
             return link;
         }
 
+        /// <summary>Always has bytes, takes every write, and ignores Close. It counts what was read from it.</summary>
+        sealed class EndlessLink : IByteLink
+        {
+            long _taken;
+            public long Taken => System.Threading.Interlocked.Read(ref _taken);
+            public IFuture<int> Read(byte[] b, int off, int n) { System.Threading.Interlocked.Add(ref _taken, n); return Futures.FromResult<int>(n); }
+            public IFuture Write(byte[] b, int off, int n) => Futures.Completed;
+            public void Close() { }
+        }
+
+        /// <summary>Ends at once: its first read returns 0, and it takes every write.</summary>
+        sealed class EndedLink : IByteLink
+        {
+            public IFuture<int> Read(byte[] b, int off, int n) => Futures.FromResult<int>(0);
+            public IFuture Write(byte[] b, int off, int n) => Futures.Completed;
+            public void Close() { }
+        }
+
+        /// <summary>
+        /// Issue #308's class sweep: the relay's two copies stopped only on their own link's signal. When one direction ended, Join closed both links, and a
+        /// link that ignores Close kept the other copy running forever. Each copy now also stops when the other direction has ended.
+        /// </summary>
+        // The endless link completes every read at once, so a copy that never stops never yields either: Join runs on its own background thread,
+        // under a bound. The ended link goes first, so its direction ends before the endless one starts.
+        [Fact]
+        public void When_one_direction_of_a_relay_ends_the_other_stops_reading()
+        {
+            EndlessLink endless = new EndlessLink();
+            IFuture joined = null;
+            System.Threading.Thread joiner = new System.Threading.Thread(() => joined = BridgeRelay.Join(new EndedLink(), endless)) { IsBackground = true };
+            joiner.Start();
+            Assert.True(joiner.Join(5000) && joined.Wait(5000), "the relay was still reading after 5 s, with " + endless.Taken + " bytes taken");
+            System.Threading.Thread.Sleep(500);
+            long settled = endless.Taken;
+            System.Threading.Thread.Sleep(1000);
+            Assert.True(endless.Taken == settled, "the relay read " + (endless.Taken - settled) + " more bytes in 1 s after it ended");
+        }
+
         /// <summary>The same rule as the pump's: a wire.sent whose bytes may not have left is followed by an event that says so, and the caller still sees the fault.</summary>
         [Fact]
         public void A_lost_CE_write_says_so_in_the_trace_and_still_faults()
