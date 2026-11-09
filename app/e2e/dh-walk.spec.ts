@@ -114,6 +114,25 @@ test('group 14 shows the real group\'s numbers from the engine', async ({ page }
   await expect(page.getByTestId('dh-real-size')).toContainText('32-bit practice exponent')
 })
 
+test('on group 14 the caption shows a long number in the short form the step rows use', async ({ page }) => {
+  const w = await reply('group14')
+  const shortOf = (hex: string) => `${hex.slice(0, 16)}…${hex.slice(-8)}`.toLowerCase()
+  await openDh(page)
+  await page.getByTestId('dh-group-group14').click()
+  const caption = page.getByTestId('dh-caption')
+  const secret = w.client.shared.result.hex as string
+  await expect(caption).toContainText(secret.slice(-8), { ignoreCase: true })
+  let text = ((await caption.textContent()) ?? '').toLowerCase()
+  expect(text, 'summary caption').toContain(shortOf(secret))
+  expect(text, 'summary caption').not.toContain(secret.toLowerCase())
+  for (let i = 0; i < 4; i++) await page.getByTestId('dh-next').click()
+  const A = w.client.public.result.hex as string
+  await expect(caption).toContainText(A.slice(-8), { ignoreCase: true })
+  text = ((await caption.textContent()) ?? '').toLowerCase()
+  expect(text, 'step caption').toContain(shortOf(A))
+  expect(text, 'step caption').not.toContain(A.toLowerCase())
+})
+
 for (const theme of ['light', 'dark'] as const) {
   test(`every text and chip letter reads at 4.5 to 1 in the ${theme} theme`, async ({ page }) => {
     await openDh(page)
