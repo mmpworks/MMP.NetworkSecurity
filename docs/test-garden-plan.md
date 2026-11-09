@@ -108,6 +108,8 @@ The ledger lives outside every worktree, at the fixed path `E:/dev/ns-state/leve
 
 `result` is `pass`, `fail` or `skip`. A pass with `retried: true` counts as red for the streak.
 
+`run` is `nightly`, `release` or `branch`. Only `nightly` and `release` lines count toward the sink streak and the `popped()` window, because only they test main. `branch` lines are kept for timing only.
+
 ### Popped state
 
 One function, `popped(unit)`, used by both the picker and `tools/move_levels.py`. A qualifying red for `unit` is the latest nightly or release red that is either:
@@ -130,6 +132,7 @@ A red on a branch gate belongs to that branch. It pops nothing.
 
 A Windows scheduled task runs `tools/nightly.ps1` at 02:00, when no agent waits. The script is deterministic end to end: no model runs on a green night.
 
+0. One-time setup, by a human: create `E:/dev/ns-nightly`, run `npm ci` in its `app/`, then run `python -I tools/electron_dist.py check` (from #355). Record that commit in `E:/dev/ns-state/nightly-setup.txt`. It is the "last nightly's commit" for the lockfile check on the first night. Without this step, the first night exits 2 by design.
 1. Fetch `origin/main`. In the dedicated worktree `E:/dev/ns-nightly` (never a builder's worktree), run `git checkout --detach origin/main` and `git clean -fd`. The clean has no `-x`, so `app/node_modules` stays.
 2. If `app/package-lock.json` changed since the last nightly's commit, exit 2: SKIPPED "lockfile changed: run npm ci by hand". The script never installs a package (house rule 8a). If `node_modules` or the Electron binary is missing, exit 2 with the gate's TOOL_MISSING line.
 3. Build the Release Host (`dotnet build src/NetSec.Host -c Release`). This is a build, not an install.
@@ -191,4 +194,4 @@ A Windows scheduled task runs `tools/nightly.ps1` at 02:00, when no agent waits.
 
 ## Anchor
 
-The nightly full run is the anchor. It shares no code with the picker, and it runs every test on the same commit. An escape count above 0 means the picker or a list is wrong. The ledger sits outside every builder's write scope, so a builder cannot edit the evidence that sinks its own tests.
+The nightly full run is the anchor. It shares no code with the picker, and it runs every test on the same commit. An escape count above 0 means the picker or a list is wrong. The ledger sits outside every worktree and is append-only by convention. Any agent on this machine can still write to `E:/dev/ns-state`. Only `nightly` and `release` lines move a test, and only `nightly.ps1` and the release sweep write those kinds.
