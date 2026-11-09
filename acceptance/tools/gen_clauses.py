@@ -161,9 +161,15 @@ def roles_of(cid):
     return sorted(set(r))
 
 
+# A clause's own time budget, from TimeoutSec in its [Clause] (#327). run.ps1 sums the selected clauses' budgets for the group process cap, so a
+# cut-off names the clause; a clause with none takes the runner's 900 s, and clauses.json carries budgetSec only where a clause names one.
+BUDGET_BY_ID = {}
+
+
 def scan_csharp():
     found = []
     pat = re.compile(r'\[Clause\("(?P<id>[^"]+)"(?P<opts>[^\]]*)\)\]')
+    budget = re.compile(r"TimeoutSec\s*=\s*(?P<sec>\d+)")
     for name, g in GROUPS.items():
         if g["kind"] not in ("csharp", "selftest"):
             continue
@@ -171,6 +177,9 @@ def scan_csharp():
         for cs in sorted(glob.glob(os.path.join(folder, "*.cs"))):
             for m in pat.finditer(open(cs, encoding="utf-8").read()):
                 found.append((name, m.group("id"), "PerBuild = true" in m.group("opts")))
+                b = budget.search(m.group("opts"))
+                if b:
+                    BUDGET_BY_ID[m.group("id")] = int(b.group("sec"))
     return found
 
 
@@ -214,10 +223,13 @@ def build():
             if assertion == "A16" and (cid.startswith("A16.type") or cid.startswith("A16.host")):
                 slice_ = "S2" if cid.startswith("A16.type") else "S8"
             slice_ = SLICE_BY_ID.get(cid, slice_)
-            rows.append({
+            row = {
                 "id": full, "base": cid, "assertion": assertion, "group": group, "build": b or "host",
                 "slice": slice_, "referee": referee_of(cid, assertion), "roles": roles_of(cid), "counts": assertion != "SELF",
-            })
+            }
+            if cid in BUDGET_BY_ID:
+                row["budgetSec"] = BUDGET_BY_ID[cid]
+            rows.append(row)
     rows.sort(key=lambda r: (r["assertion"] == "SELF", r["id"]))
     ids = [r["id"] for r in rows]
     dup = sorted({i for i in ids if ids.count(i) > 1})

@@ -217,9 +217,11 @@ Say ("{0} clauses selected of M = {1} (+ {2} self-checks in the file)" -f @($sel
 
 # ------------------------------------------------------------------ results
 $results = @{}
-function Set-Result([string]$id, [string]$status, [string]$reason = '', [string]$detail = '', [long]$ms = 0) {
-    $results[$id] = [pscustomobject]@{ id = $id; status = $status; reason = $reason; detail = $detail; ms = $ms }
+function Set-Result([string]$id, [string]$status, [string]$reason = '', [string]$detail = '', [long]$ms = 0, [int]$budgetSec = 0) {
+    $results[$id] = [pscustomobject]@{ id = $id; status = $status; reason = $reason; detail = $detail; ms = $ms; budgetSec = $budgetSec }
 }
+# A clause line's own time budget (#327). A line from a group that sends none reads 0, which the slow warning takes as 900 s.
+function BudgetOf($line) { $p = $line.PSObject.Properties['budgetSec']; if ($p) { [int]$p.Value } else { 0 } }
 function Set-All($clauseList, [string]$status, [string]$reason, [string]$detail) {
     foreach ($c in $clauseList) { if (-not $results.ContainsKey($c.id)) { Set-Result $c.id $status $reason $detail } }
 }
@@ -358,12 +360,15 @@ function Run-CSharpGroup($name, $g, $build, $ids) {
     $runArgs = @('--build', $build, '--ids', ($ids -join ','), '--acceptance', $acc, '--vectors', (Join-Path $acc 'vectors'), '--root', $ProductRoot, '--work', $work) + (Get-Props $build)
     if ($build -eq 'cf') { $exe = Join-Path $outDir ($g.assembly + '.exe'); $argv = $runArgs }
     else { $exe = 'dotnet'; $argv = @((Join-Path $outDir ($g.assembly + '.dll'))) + $runArgs }
-    $r = Invoke-Tool $exe $argv -TimeoutSec 3000
-    foreach ($line in (Read-ClauseLines $r.Output)) { Set-Result $line.id $line.status $line.reason $line.detail ([long]$line.ms) }
+    # The group process may run as long as its selected clauses' budgets together, plus 300 s to start: each clause then hits its own
+    # budget and fails by name before this cap can stop the group (Jared on #342). A clause row with no budgetSec has the runner's 900 s.
+    $groupCap = 300 + (@($list | ForEach-Object { $p = $_.PSObject.Properties['budgetSec']; if ($p) { [int]$p.Value } else { 900 } }) | Measure-Object -Sum).Sum
+    $r = Invoke-Tool $exe $argv -TimeoutSec $groupCap
+    foreach ($line in (Read-ClauseLines $r.Output)) { Set-Result $line.id $line.status $line.reason $line.detail ([long]$line.ms) (BudgetOf $line) }
     foreach ($c in $list) {
         if (-not $results.ContainsKey($c.id)) {
             $why = if ($r.ExitCode -eq -999) { 'TIMEOUT' } else { 'NO_RESULT' }
-            Set-Result $c.id 'FAIL' $why ("group $name ($build) gave no result line for this clause (exit $($r.ExitCode)). " + (Tail $r.Output 300))
+            Set-Result $c.id 'FAIL' $why ("group $name ($build) gave no result line for this clause (exit $($r.ExitCode); the group cap is $groupCap s, the sum of its clauses' budgets plus 300 s). " + (Tail $r.Output 300))
         }
     }
 }
@@ -571,7 +576,7 @@ function Git-Head([string]$dir) { try { return (git -C $dir rev-parse --short HE
 $counted = @($sel | Where-Object { $_.counts })
 $rows = foreach ($c in $sel) {
     $r = $results[$c.id]
-    [pscustomobject][ordered]@{ id = $c.id; assertion = $c.assertion; slice = $c.slice; group = $c.group; build = $c.build; referee = $c.referee; status = $r.status; reason = $r.reason; detail = $r.detail; ms = $r.ms }
+    [pscustomobject][ordered]@{ id = $c.id; assertion = $c.assertion; slice = $c.slice; group = $c.group; build = $c.build; referee = $c.referee; status = $r.status; reason = $r.reason; detail = $r.detail; ms = $r.ms; budgetSec = $r.budgetSec }
 }
 # One selected clause makes foreach return a single object. The report keeps results as an array, so a reader never has to guess the shape.
 $rows = @($rows)
@@ -586,9 +591,15 @@ $reasons = @($prodRows | Where-Object { $_.status -ne 'PASS' } | Group-Object -P
 # Test settings that change what a run proves, so a reader sees them in the report itself.
 $activeEnv = [ordered]@{}
 foreach ($name in @('ACC_E2E_DEFECT', 'ACC_SELF_ONLY')) { $v = [Environment]::GetEnvironmentVariable($name); if ($v) { $activeEnv[$name] = $v } }
-# A clause near the runner's 900 s budget is a timeout waiting to happen. ACC_SLOW_WARN_SEC lowers the line, for a test of this warning.
-$slowSec = 600; if ($env:ACC_SLOW_WARN_SEC) { $slowSec = [int]$env:ACC_SLOW_WARN_SEC }
-$slow = @($sel | ForEach-Object { $r = $results[$_.id]; if ($r -and $r.ms -and ([double]$r.ms / 1000) -gt $slowSec) { [pscustomobject]@{ id = $_.id; seconds = [math]::Round([double]$r.ms / 1000) } } })
+# A clause near its time budget is a timeout waiting to happen. Each clause has its own budget (900 s unless its [Clause] names another,
+# #327), and the warning line is 75% of it. ACC_SLOW_WARN_SEC sets one line for every clause, for a test of this warning.
+$slowSec = if ($env:ACC_SLOW_WARN_SEC) { [int]$env:ACC_SLOW_WARN_SEC } else { $null }
+$slow = @($sel | ForEach-Object {
+    $r = $results[$_.id]
+    $budget = if ($r -and $r.budgetSec) { [int]$r.budgetSec } else { 900 }
+    $line = if ($slowSec) { $slowSec } else { [int]($budget * 0.75) }
+    if ($r -and $r.ms -and ([double]$r.ms / 1000) -gt $line) { [pscustomobject]@{ id = $_.id; seconds = [math]::Round([double]$r.ms / 1000); line = $line; budget = $budget } }
+})
 
 # Uncommitted changes under a product path mean the commits the report names do not hold all of what ran. The report says so, so no
 # report can pass for a run of a clean commit. The paths are every place a clause runs from: the suite, the engine, the app, the native
@@ -633,7 +644,7 @@ if ($activeEnv.Count -gt 0) {
     $null = $md.AppendLine()
 }
 foreach ($s in $slow) {
-    $null = $md.AppendLine("Warning: ``$($s.id)`` took $($s.seconds) s, past the $slowSec s warning line. The runner stops a clause at 900 s.")
+    $null = $md.AppendLine("Warning: ``$($s.id)`` took $($s.seconds) s, past the $($s.line) s warning line. The runner stops this clause at $($s.budget) s.")
 }
 if ($slow.Count -gt 0) { $null = $md.AppendLine() }
 $null = $md.AppendLine('## N of M per assertion')

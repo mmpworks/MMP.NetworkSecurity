@@ -4957,7 +4957,8 @@
    "slice": "All",
    "referee": "CF references and System.Reflection.Metadata",
    "roles": [],
-   "counts": true
+   "counts": true,
+   "budgetSec": 1800
   },
   {
    "id": "A9.git-ls-files.no-cf-binary",
