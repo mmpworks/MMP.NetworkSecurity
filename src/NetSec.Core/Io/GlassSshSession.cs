@@ -98,7 +98,7 @@ namespace NetSec.Io
         /// <summary>
         /// Empty bytes end the channel: EOF, then close. The future completes when the engine holds the bytes and the channel has room again, so a caller
         /// that waits for each send goes at the peer's speed. Sends on one channel keep their order, whether the caller waits or not. A peer that stops
-        /// granting window holds this future only until the read deadline ends the session.
+        /// granting window holds this future only until the read deadline ends the session. A send after the session ended faults with LINK_LOST.
         /// </summary>
         public IFuture Send(int channel, byte[] bytes)
         {
@@ -122,7 +122,14 @@ namespace NetSec.Io
                 foreach (IFuture wait in RoomFor(channel)) yield return wait;
                 byte[] piece = Piece(bytes, at);
                 at += piece.Length;
-                yield return Futures.Observe(_pump.Enqueue(new EngineCommand(EngineCommandKind.Send, channel, piece, null)));
+                IFuture queued = _pump.Enqueue(new EngineCommand(EngineCommandKind.Send, channel, piece, null));
+                yield return Futures.Observe(queued);
+                if (queued.IsFaulted)
+                {
+                    // The session ended under this send (issue #308): the caller hears it by name instead of a success.
+                    done.TrySetException(queued.Exception);
+                    yield break;
+                }
             }
             while (at < bytes.Length);
             if (bytes.Length > 0)
@@ -329,13 +336,18 @@ namespace NetSec.Io
             AsyncProxy.Run(RelayRead(channel, relay));
         }
 
+        /// <summary>
+        /// Stops on the target's end, on the peer's end, and on the session's end. The last one matters for a target that ignores Close: it
+        /// kept a finished session fed forever (issue #308). A send that fails means the session ended under the read, so the loop stops too.
+        /// </summary>
         IEnumerable<IFuture> RelayRead(int channel, Relay relay)
         {
             byte[] buffer = new byte[RelayBuffer];
             while (true)
             {
-                bool peerDone;
-                lock (_lock) peerDone = relay.PeerDone;
+                bool peerDone, sessionEnded;
+                lock (_lock) { peerDone = relay.PeerDone; sessionEnded = _ended; }
+                if (sessionEnded) yield break;
                 if (peerDone)
                 {
                     Send(channel, new byte[0]);
@@ -350,7 +362,9 @@ namespace NetSec.Io
                 }
                 byte[] chunk = new byte[read.Result];
                 Buffer.BlockCopy(buffer, 0, chunk, 0, chunk.Length);
-                yield return Futures.Observe(Send(channel, chunk));
+                IFuture sent = Send(channel, chunk);
+                yield return Futures.Observe(sent);
+                if (sent.IsFaulted || sent.IsCanceled) yield break;
             }
         }
 

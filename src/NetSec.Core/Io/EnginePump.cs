@@ -170,9 +170,21 @@ namespace NetSec.Io
             return _result.Future;
         }
 
+        /// <summary>
+        /// After the end nothing publishes, so a command would only grow the outbox (issue #308: 83 million outputs behind one relay loop).
+        /// A command that ends the link is done already, so it stays a quiet success. Data, a channel or an exec fails by name.
+        /// </summary>
         public IFuture Enqueue(EngineCommand command)
         {
-            return PublishedThrough(Drive(delegate { return _engine.Command(command); }, false));
+            long ticket = Drive(delegate { return _engine.Command(command); }, false);
+            if (ticket != EndedTicket) return PublishedThrough(ticket);
+            if (EndsTheLink(command.Kind)) return Futures.Completed;
+            return Futures.FromException(new NetSecException(NetSecError.Of(ErrorCodes.LinkLost, "the link has ended, so this " + command.Kind + " was not run")));
+        }
+
+        static bool EndsTheLink(EngineCommandKind kind)
+        {
+            return kind == EngineCommandKind.Close || kind == EngineCommandKind.Abort || kind == EngineCommandKind.PeerClosed || kind == EngineCommandKind.Expire;
         }
 
         /// <summary>Completes when this output is out. It never waits for a quiet moment, because a two-way flow may have none.</summary>
@@ -451,6 +463,8 @@ namespace NetSec.Io
             long ticket;
             lock (_lock)
             {
+                // The end and this check share the lock, so no output can slip in behind the end.
+                if (_ended) return EndedTicket;
                 EngineOutput output = call();
                 int size = fromRead ? SizeOf(output) : 0;
                 _outbox.Enqueue(output);
@@ -514,6 +528,9 @@ namespace NetSec.Io
                 return _drained.Future;
             }
         }
+
+        /// <summary>Drive's answer when the pump has ended: it ran nothing and queued nothing.</summary>
+        const long EndedTicket = -1;
 
         bool IsEnded { get { lock (_lock) return _ended; } }
         bool EngineEnded { get { return _engine.Status == EngineStatus.Closed || _engine.Status == EngineStatus.Failed; } }
