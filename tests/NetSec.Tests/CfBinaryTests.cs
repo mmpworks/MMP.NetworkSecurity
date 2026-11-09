@@ -83,7 +83,8 @@ namespace NetSec.Tests
             Assert.Equal(1, exit);
             string result = lines.Last();
             Assert.StartsWith("CE-RESULT {\"ok\":false", result);
-            Assert.Contains("\"code\":\"CE_LINK_NOT_BUILT\"", result);
+            // A usage error, never a "not built" code: acceptance reads any _NOT_BUILT code as NOT RUN PRODUCT_MISSING.
+            Assert.Contains("\"code\":\"CE_RELAY_ARGS_MISSING\"", result);
             Assert.Contains("--pinpad and --gateway are required", result);
         }
     }
