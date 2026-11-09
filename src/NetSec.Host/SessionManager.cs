@@ -22,6 +22,8 @@ public sealed class LabSession : ITraceSink
     readonly StreamWriter _file;
     readonly Action<string> _broadcast;
     readonly ShowKeysFence _fence;
+    readonly LogicalClock _clock = new();
+    readonly List<Clocked> _written = [];
     long _seq;
 
     public string SessionId { get; }
@@ -61,22 +63,39 @@ public sealed class LabSession : ITraceSink
     /// </summary>
     public void Write(TraceEvent e)
     {
-        lock (_gate)
+        lock (_gate) WriteReady(_clock.Admit(e));
+    }
+
+    /// <summary>Writes the events the logical clock lets go now (docs/logical-clock-plan.md); a held receive's stream waits inside the clock.</summary>
+    void WriteReady(ClockStep step)
+    {
+        foreach (Clocked c in step.Ready) WriteNow(c);
+        foreach (LinkAmbiguity a in step.Ambiguous)
         {
-            long seq = ++_seq;
-            string shown = Stamp(seq, TraceJson.ToLine(e)), hidden = Stamp(seq, TraceJson.ToLine(TraceRedaction.Hide(e)));
-            if (_events.Count < EventCap) _events.Add(new StoredEvent(seq, e.StreamId, e.StreamSeq, e.Type, e.Message, shown, hidden));
-            _fence.Pick(show =>
-            {
-                string line = show ? shown : hidden;
-                if (show && shown != hidden) FileHoldsShownKeys = true;
-                _file.WriteLine(line);
-                _broadcast($"{{\"type\":\"trace\",\"sessionId\":{JsonSerializer.Serialize(SessionId)},\"seq\":{seq},\"event\":{line}}}");
-            });
+            string frame = JsonSerializer.Serialize(new { type = "clock.link-ambiguous", sessionId = SessionId, connection = a.Connection, actors = a.Actors });
+            _fence.Pick(_ => _broadcast(frame));
         }
     }
 
-    string Stamp(long seq, string body) => $"{{\"seq\":{seq},\"seed\":{Seed},{body[1..]}";
+    void WriteNow(Clocked c)
+    {
+        TraceEvent e = c.Event;
+        _written.Add(c);
+        long seq = ++_seq;
+        string shown = Stamp(seq, c, TraceJson.ToLine(e)), hidden = Stamp(seq, c, TraceJson.ToLine(TraceRedaction.Hide(e)));
+        if (_events.Count < EventCap) _events.Add(new StoredEvent(seq, e.StreamId, e.StreamSeq, e.Type, e.Message, shown, hidden));
+        _fence.Pick(show =>
+        {
+            string line = show ? shown : hidden;
+            if (show && shown != hidden) FileHoldsShownKeys = true;
+            _file.WriteLine(line);
+            _broadcast($"{{\"type\":\"trace\",\"sessionId\":{JsonSerializer.Serialize(SessionId)},\"seq\":{seq},\"event\":{line}}}");
+        });
+    }
+
+    /// <summary>seq and seed lead every line; an engine event's clock sits beside them, with "unmatched" when its receive found no send.</summary>
+    string Stamp(long seq, Clocked c, string body) =>
+        $"{{\"seq\":{seq},\"seed\":{Seed},{(c.Clock is { } clock ? $"\"clock\":{clock}," : "")}{(c.Unmatched ? "\"unmatched\":true," : "")}{body[1..]}";
 
     public IReadOnlyList<StoredEvent> After(long seq)
     {
@@ -111,14 +130,33 @@ public sealed class LabSession : ITraceSink
         }
     }
 
+    /// <summary>
+    /// Session end: held receives with no send are written unmatched, then one trace.catch line goes last in the file and out as a frame,
+    /// ahead of session.finished (docs/logical-clock-plan.md, "The catch", item 8).
+    /// </summary>
     public void Finish()
     {
         lock (_gate)
         {
+            WriteReady(_clock.Close());
+            CatchResult k = TraceCatch.Find(_written);
+            string frame = CatchFrame(SessionId, k);
+            _fence.Pick(_ =>
+            {
+                _file.WriteLine(frame);
+                _broadcast(frame);
+            });
             Finished = true;
             _file.Dispose();
         }
     }
+
+    /// <summary>The trace.catch frame. "type" leads, so a replay knows the saved line from its first bytes.</summary>
+    public static string CatchFrame(string sessionId, CatchResult k) =>
+        JsonSerializer.Serialize(new { type = CatchType, sessionId, catchEventId = k.CatchEventId, afterCatch = k.AfterCatch });
+
+    public const string CatchType = "trace.catch";
+    public const string CatchLinePrefix = "{\"type\":\"" + CatchType + "\"";
 }
 
 public sealed record StoredEvent(long Seq, string StreamId, long StreamSeq, string Type, string? Message, string Line, string HiddenLine);
