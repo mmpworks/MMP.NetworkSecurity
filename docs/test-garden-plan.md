@@ -100,7 +100,7 @@ A Playwright spec drives the Release Host in its own process. V8 coverage sees o
 
 ### Ledger
 
-`docs/_runs/levels-ledger.jsonl`, one line per test unit per run:
+The ledger lives outside every worktree, at the fixed path `E:/dev/ns-state/levels-ledger.jsonl`. The picker and `move_levels.py` read it through the setting `NETSEC_STATE_DIR` (default `E:/dev/ns-state`). It is append-only. Only `nightly.ps1` and the gate write to it, and no builder's worktree holds it. One line per test unit per run:
 
 ```json
 { "unit": "app/e2e/dh-walk.spec.ts", "commit": "d1cce14", "run": "nightly", "result": "pass", "retried": false, "at": "2026-11-20T02:41:00Z" }
@@ -130,18 +130,22 @@ A red on a branch gate belongs to that branch. It pops nothing.
 
 A Windows scheduled task runs `tools/nightly.ps1` at 02:00, when no agent waits. The script is deterministic end to end: no model runs on a green night.
 
-1. Fetch `origin/main`, and check out its head in a dedicated worktree (`E:/dev/ns-nightly`). The worktree is reset to that commit each night, and it is never a builder's worktree.
-2. Run the full gate under `heavy_lock.py`, with no wait limit.
-3. Append one ledger line per test unit, and one summary line to `docs/_runs/nightly.md`: date, commit, N of M passed, escapes.
-4. On a red, run the bisect (`tools/bisect_red.py`) over the merges since the last green nightly, with only the red test units. It records the PR that caused each red, and whether that PR merged on a passing picked run (an escape).
-5. Exit codes are fixed: 0 green, 1 red, 2 SKIPPED (lock or fetch failure, with the reason). A run that cannot finish never records PASS.
+1. Fetch `origin/main`. In the dedicated worktree `E:/dev/ns-nightly` (never a builder's worktree), run `git checkout --detach origin/main` and `git clean -fd`. The clean has no `-x`, so `app/node_modules` stays.
+2. If `app/package-lock.json` changed since the last nightly's commit, exit 2: SKIPPED "lockfile changed: run npm ci by hand". The script never installs a package (house rule 8a). If `node_modules` or the Electron binary is missing, exit 2 with the gate's TOOL_MISSING line.
+3. Build the Release Host (`dotnet build src/NetSec.Host -c Release`). This is a build, not an install.
+4. Run the full gate under `heavy_lock.py`, with the wait capped until 06:00. Past that, exit 2: SKIPPED, naming the lock holder. The scheduled task is set to "do not start a new instance", so nights never stack.
+5. Append one ledger line per test unit to the ledger, and one summary line to `E:/dev/ns-state/nightly.md`: date, commit, N of M passed, escapes.
+6. On a red, first rerun the red units once on the same head. A pass there is a flake: it is logged per the escape definition, and there is no bisect. A unit that is red again goes to the bisect (`tools/bisect_red.py`): `git bisect --first-parent` over main's merges since the last green nightly, running only the red units. On the first night, the base is the merge commit of this plan. The bisect records the PR that caused each red, and whether that PR merged on a passing picked run (an escape).
+7. Exit codes are fixed: 0 green, 1 red, 2 SKIPPED (with the reason). A run that cannot finish never records PASS.
 
 **Model on failure only.** When the exit code is 1 or 2, the script hands off to a model, the house rule "deterministic first, model on escalation":
 
 - The model is the `triage-tier` policy in `tools/nightly.json`, set to `haiku` for now (Steve, 2026-11-09). The script resolves the name at run time, so a later change is one line.
 - The script calls `claude -p --model <tier>` with one skill invocation and arguments (`nightly-triage <ledger line> <report path>`), never inline prompt text.
-- The model reads the gate log, the ledger lines and the bisect result. It writes one triage note to `docs/_runs/nightly-triage-<date>.md`: the red test units, the PR that caused each one, and a one-line cause guess labelled as a guess.
-- The model may only read files and write that one note. It has no git push, no merge, no file edits elsewhere, and no package installs. The script passes `--allowedTools` with that read-and-write-one-file set.
+- The model reads the gate log, the ledger lines and the bisect result. It writes one triage note to `E:/dev/ns-state/nightly-triage-<date>.md`: the red test units, the PR that caused each one, and a one-line cause guess labelled as a guess.
+- The model may only read files and write that one note. The script passes `--allowedTools "Read,Grep,Glob,Write(E:/dev/ns-state/nightly-triage-*.md)"` and `--disallowedTools "Bash,Edit,WebFetch,WebSearch"`. It has no git push, no merge, no other file edits, and no package installs.
+- The gate log is untrusted text, because a test can print anything. With no Bash and no outbound tool, an instruction hidden in the log has no way to act.
+- The credential is Steve's subscription login. The scheduled task's environment holds no `ANTHROPIC_API_KEY` (house rule: subscription over API, never fall over to a key).
 - The pop happens without the model, through `popped()`. The model only explains.
 
 ## Decisions
@@ -187,4 +191,4 @@ A Windows scheduled task runs `tools/nightly.ps1` at 02:00, when no agent waits.
 
 ## Anchor
 
-The nightly full run is the anchor. It shares no code with the picker, and it runs every test on the same commit. An escape count above 0 means the picker or a list is wrong.
+The nightly full run is the anchor. It shares no code with the picker, and it runs every test on the same commit. An escape count above 0 means the picker or a list is wrong. The ledger sits outside every builder's write scope, so a builder cannot edit the evidence that sinks its own tests.
