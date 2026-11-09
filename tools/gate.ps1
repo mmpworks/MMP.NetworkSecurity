@@ -76,8 +76,9 @@ function Step([string]$name, [scriptblock]$body) {
     $failedTests = @($output | Where-Object { $_ -match '^(FAIL|ERROR): ' })
     if ($code -ne 0 -and $failedTests.Count -gt 0) { $failedTests | ForEach-Object { Write-Host $_ } }
     $output | Select-Object -Last 12 | ForEach-Object { Write-Host $_ }
-    $rows.Add([pscustomobject]@{ Name = $name; Status = $(if ($code -eq 0) { 'PASS' } else { 'FAIL' }); Exit = $code; Tail = (($output | Select-Object -Last 6) -join "`n") })
-    if ($code -ne 0) { $script:failed++ }
+    $status = Get-StepStatus -Code $code -Output $output          # exit 0 with a first line PIN_OFF or SKIP: reads SKIPPED, not PASS
+    $rows.Add([pscustomobject]@{ Name = $name; Status = $status; Exit = $code; Tail = (($output | Select-Object -Last 6) -join "`n") })
+    if ($status -eq 'FAIL') { $script:failed++ }
 }
 
 function Skip([string]$name, [string]$why) {
@@ -87,7 +88,8 @@ function Skip([string]$name, [string]$why) {
 
 $hasApp = Test-Path 'app/package.json'
 $appDiffFiles = if ($hasApp) { @(Get-AppDiffFiles $root) } else { @() }
-$appPlan = Get-AppProofPlan -HasApp $hasApp -SkipApp ([bool]$SkipApp) -Lesson $Lesson -AppDiffFiles $appDiffFiles
+$toolsPresent = (-not $hasApp) -or (@(Test-AppTools 'app').Count -eq 0)
+$appPlan = Get-AppProofPlan -HasApp $hasApp -SkipApp ([bool]$SkipApp) -Lesson $Lesson -AppDiffFiles $appDiffFiles -ToolsPresent $toolsPresent
 $appWhy = if ($appPlan.Mode -in 'none', 'skip', 'docs') { $appPlan.Why } else { '' }
 
 # One app step, with the gate's rule that it never installs: a missing tool stops with TOOL_MISSING and the command to run yourself.

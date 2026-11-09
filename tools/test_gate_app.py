@@ -30,10 +30,15 @@ DOCS = ["app/README.md", "app/docs/notes.md"]
 SCREENS = ["app/docs/screens/home.png", "app/src/screens/a.svg"]
 
 
-def plan(has_app=True, skip=False, lesson="", files=()):
+def plan(has_app=True, skip=False, lesson="", files=(), tools_present=True):
     names = ",".join(f"'{f}'" for f in files)
     return ps(f"Get-AppProofPlan -HasApp ${str(has_app).lower()} -SkipApp ${str(skip).lower()} -Lesson '{lesson}' "
-              f"-AppDiffFiles @({names})")
+              f"-AppDiffFiles @({names}) -ToolsPresent ${str(tools_present).lower()}")
+
+
+def step_status(code, *lines):
+    shown = ",".join("'" + line.replace("'", "''") + "'" for line in lines)
+    return ps(f"Get-StepStatus -Code {code} -Output @({shown})")
 
 
 def plan_from(files):
@@ -140,6 +145,44 @@ class Plan(unittest.TestCase):
         self.assertTrue(p["Typecheck"])
         self.assertFalse(p["Suite"])
         self.assertIn("no -Lesson given", p["Why"])
+
+
+class NoAppChangeWithoutTools(unittest.TestCase):
+    """Richard, 2026-11-09: a branch with no app/ change went red on `app tools present` and the builder had to pass -SkipApp by hand."""
+
+    def test_no_app_change_and_no_tools_skips_on_its_own_and_names_the_command(self):
+        p = plan(tools_present=False)
+        self.assertEqual(p["Mode"], "skip")
+        self.assertIn("node_modules", p["Why"])
+        self.assertIn("npm ci", p["Why"])
+
+    def test_no_app_change_with_tools_still_runs_the_typecheck(self):
+        self.assertEqual(plan(tools_present=True)["Mode"], "check")
+
+    def test_an_asked_for_lesson_without_tools_still_goes_red_not_skipped(self):
+        self.assertEqual(plan(lesson="2", tools_present=False)["Mode"], "lesson")
+
+    def test_a_code_change_without_tools_still_goes_red_not_skipped(self):
+        self.assertEqual(plan(files=CODE, tools_present=False)["Mode"], "suite")
+
+
+class StepStatus(unittest.TestCase):
+    """The gate row for a step: a step that exits 0 but says it did not run reads SKIPPED, never PASS (Jared, #353)."""
+
+    def test_exit_zero_with_ordinary_output_is_pass(self):
+        self.assertEqual(step_status(0, "acceptance/PIN is current"), "PASS")
+
+    def test_pin_off_with_exit_zero_is_skipped(self):
+        self.assertEqual(step_status(0, 'PIN_OFF: acceptance/settings.json sets "pin": false, so acceptance/PIN is not checked'), "SKIPPED")
+
+    def test_a_skip_line_with_exit_zero_is_skipped(self):
+        self.assertEqual(step_status(0, "SKIP: no changed file against origin/main"), "SKIPPED")
+
+    def test_the_marker_counts_only_on_the_first_line(self):
+        self.assertEqual(step_status(0, "checked 3 files", "SKIP: this line is data, not a verdict"), "PASS")
+
+    def test_a_failing_step_stays_fail_even_with_a_skip_line(self):
+        self.assertEqual(step_status(1, "PIN_OFF: x"), "FAIL")
 
 
 class RepoFacts(unittest.TestCase):
