@@ -1,4 +1,5 @@
 import { expect, test, type Page } from '@playwright/test'
+import { scanPage, setTheme } from './contrast'
 import { open } from './walk'
 
 // Steve's 3 block-walk items from the mock ("The block" tab): the round key grid beside the state on AddRoundKey, the MixColumns multiply
@@ -106,11 +107,27 @@ test('MixColumns shows the multiply panel: the fixed matrix, the state column, e
   await expect(page.getByTestId('aes-walk-mix-caption')).toContainText(`2 × ${before[8]} = ${mul(2, before[8])}`)
 })
 
+for (const theme of ['light', 'dark'] as const) {
+  test(`the round key grid, the bit lines and the multiply panel read at 4.5 to 1 in the ${theme} theme`, async ({ page }) => {
+    await openPractice(page)
+    await setTheme(page, theme)
+    await toStop(page, FIRST_STEP)
+    let s = await scanPage(page)
+    expect(s.fails, `AddRoundKey: ${JSON.stringify(s.fails.slice(0, 5))}`).toEqual([])
+    await toStop(page, 3)
+    await page.getByTestId('aes-walk-mix-next').click()
+    s = await scanPage(page)
+    expect(s.checked, 'the scan read the multiply panel').toBeGreaterThan(80)
+    expect(s.fails, `MixColumns: ${JSON.stringify(s.fails.slice(0, 5))}`).toEqual([])
+  })
+}
+
 test('Play this column fills the column one byte at a time', async ({ page }) => {
   await openPractice(page)
   await toStop(page, FIRST_STEP + 3)
   await page.emulateMedia({ reducedMotion: 'no-preference' })
-  await page.getByTestId('aes-walk-mix-speed-fast').click().catch(() => undefined)
+  // The panel plays on the walk's clock, so the walk's own speed control sets its pace.
+  await page.getByTestId('aes-walk-speed').getByRole('button', { name: 'fast' }).click()
   await page.getByTestId('aes-walk-mix-play').click()
   const seen = new Set<number>()
   const start = Date.now()

@@ -562,6 +562,44 @@ body { overflow: hidden; }
 .aw-ks-rcon-chip { padding: 2px 6px; border-radius: 5px; background: var(--surface2); }
 .aw-ks-rcon-chip[data-lit="true"] { background: var(--text); color: var(--bg); }
 .aw-ks-rcon-unused { opacity: 0.45; }
+/* AddRoundKey (the mock's block tab): the round key grid beside the state, in the key color, and the bit lines of the picked byte.
+   Its grid does not clip, so a key byte can move across to its state byte. */
+.aw-slot { display: grid; gap: 6px; align-content: start; }
+.aw-slot-title { margin: 0; font: 700 13px/1.3 var(--body); letter-spacing: .06em; text-transform: uppercase; color: var(--muted); }
+.aw-key-grid { overflow: visible; }
+.aw-key-cell { background: color-mix(in srgb, var(--k-mac) 18%, var(--surface)); border-color: var(--k-mac); position: relative; z-index: 2; }
+.aw-bits pre, .aw-mix-bits { margin: 0; font: 15px/1.7 var(--mono); white-space: pre; overflow-x: auto; }
+.aw-bits p { margin: 0 0 6px; }
+.aw-bits-key { color: var(--k-key); }
+.aw-bits-result { color: var(--pass); font-weight: 600; }
+/* "How MixColumns multiplies" (the mock's block tab). */
+.aw-mix { flex-basis: 100%; display: grid; gap: 12px; padding: 14px 16px; border: 1px solid var(--line); border-radius: 12px; background: var(--surface); margin-top: 12px; }
+.aw-mix > p { margin: 0; max-width: 80ch; }
+.aw-mix-title { margin: 0; font: 700 18px/1.2 var(--display); }
+.aw-mix-controls { display: flex; flex-wrap: wrap; gap: 8px; align-items: center; }
+.aw-mix-tabs { display: inline-flex; gap: 4px; background: var(--surface2); padding: 4px; border-radius: 10px; }
+.aw-mix-tab { border: 0; background: transparent; padding: 5px 12px; border-radius: 7px; color: var(--text); font: inherit; cursor: pointer; }
+.aw-mix-tab[aria-pressed="true"] { background: var(--surface); font-weight: 700; box-shadow: 0 1px 2px rgba(0, 0, 0, .18); }
+.aw-mix-bench { display: flex; flex-wrap: wrap; gap: 14px 18px; align-items: flex-end; }
+.aw-mix-block { display: grid; gap: 6px; min-width: 0; }
+.aw-mix-label { font: 700 12px/1.3 var(--body); letter-spacing: .06em; text-transform: uppercase; color: var(--muted); }
+.aw-mix-op { font: 600 26px var(--mono); padding-bottom: 72px; color: var(--muted); }
+.aw-mix-strip, .aw-mix-spacer { min-height: 46px; }
+.aw-mix-strip { display: grid; grid-template-columns: repeat(4, 46px); gap: 4px; padding: 0 10px; }
+.aw-mix-bracket { padding: 4px 10px; border-left: 2px solid var(--text); border-right: 2px solid var(--text); border-radius: 8px; }
+.aw-mix-grid { display: grid; grid-template-columns: repeat(4, 46px); grid-auto-rows: 46px; gap: 4px; }
+.aw-mix-cell { display: grid; place-items: center; border-radius: 6px; border: 1px solid transparent; background: var(--surface2); color: var(--text); font: 600 16px var(--mono); }
+.aw-mix-chip { background: var(--accent-soft); border-color: var(--accent); }
+.aw-mix-cell[data-row="true"], .aw-mix-cell[data-col="true"] { background: var(--accent-soft); }
+.aw-mix-cell[data-pair="true"] { background: color-mix(in srgb, var(--k-mac) 22%, var(--surface)); border-color: var(--k-mac); border-width: 2px; }
+.aw-mix-cell.aw-mix-empty { background: transparent; border: 1px dashed var(--line); }
+.aw-mix-cell[data-new="true"] { background: color-mix(in srgb, var(--pass) 24%, var(--surface)); border-color: var(--pass); }
+.aw-mix-cap { display: grid; gap: 4px; min-height: 64px; }
+.aw-mix-cap b { font: 600 22px var(--mono); }
+.aw-mix-cap span { color: var(--muted); max-width: 80ch; }
+.aw-mix-run { font: 15px/1.6 var(--mono); white-space: nowrap; overflow-x: auto; }
+.aw-mix-kb { padding: 0 3px; border-radius: 3px; }
+.aw-mix-kb.aw-mix-pick { background: var(--text); color: var(--bg); }
 /* S-box view (design section 2.3) */
 .aw-sbox { display: flex; flex-wrap: wrap; gap: 12px 28px; align-items: flex-start; }
 .aw-sbox-lookup { flex-basis: 100%; margin: 0; font: 600 16px var(--mono); }

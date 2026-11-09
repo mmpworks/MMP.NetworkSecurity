@@ -65,8 +65,19 @@ export function startMotion({ root, to, tables, nk, animate }: MotionInput) {
     return
   }
   if (kind === 'AddRoundKey') {
+    // Each key byte moves across to its state byte, and the state byte flips to the result as they meet (the mock's block tab).
     const flash = getComputedStyle(root).getPropertyValue('--k-key').trim() || undefined
-    for (let i = 0; i < 16; i++) { const el = cellOf(root, i % 4, Math.floor(i / 4)); if (el) flip(animate, el, old(i), 45 * i, 280, flash) }
+    for (let i = 0; i < 16; i++) {
+      const r = i % 4, c = Math.floor(i / 4), el = cellOf(root, r, c)
+      const key = root.querySelector<HTMLElement>(`[data-testid="aes-walk-roundkey-cell-${r}-${c}"]`)
+      const delay = 70 * i
+      if (key && el) {
+        const a = key.getBoundingClientRect(), b = el.getBoundingClientRect()
+        const to = `translate(${b.left - a.left}px, ${b.top - a.top}px)`
+        animate(key, [{ transform: 'none', opacity: 1 }, { transform: to, opacity: 1, offset: 0.7 }, { transform: to, opacity: 0, offset: 0.85 }, { transform: 'none', opacity: 0, offset: 0.86 }, { transform: 'none', opacity: 1 }], { duration: 640, delay, fill: 'none' })
+      }
+      if (el) flip(animate, el, old(i), delay + 360, 280, flash)
+    }
     return
   }
   if (kind === 'MixColumns' || kind === 'InvMixColumns') {
