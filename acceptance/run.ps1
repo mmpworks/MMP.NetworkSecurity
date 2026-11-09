@@ -360,12 +360,15 @@ function Run-CSharpGroup($name, $g, $build, $ids) {
     $runArgs = @('--build', $build, '--ids', ($ids -join ','), '--acceptance', $acc, '--vectors', (Join-Path $acc 'vectors'), '--root', $ProductRoot, '--work', $work) + (Get-Props $build)
     if ($build -eq 'cf') { $exe = Join-Path $outDir ($g.assembly + '.exe'); $argv = $runArgs }
     else { $exe = 'dotnet'; $argv = @((Join-Path $outDir ($g.assembly + '.dll'))) + $runArgs }
-    $r = Invoke-Tool $exe $argv -TimeoutSec 3000
+    # The group process may run as long as its selected clauses' budgets together, plus 300 s to start: each clause then hits its own
+    # budget and fails by name before this cap can stop the group (Jared on #342). A clause row with no budgetSec has the runner's 900 s.
+    $groupCap = 300 + (@($list | ForEach-Object { $p = $_.PSObject.Properties['budgetSec']; if ($p) { [int]$p.Value } else { 900 } }) | Measure-Object -Sum).Sum
+    $r = Invoke-Tool $exe $argv -TimeoutSec $groupCap
     foreach ($line in (Read-ClauseLines $r.Output)) { Set-Result $line.id $line.status $line.reason $line.detail ([long]$line.ms) (BudgetOf $line) }
     foreach ($c in $list) {
         if (-not $results.ContainsKey($c.id)) {
             $why = if ($r.ExitCode -eq -999) { 'TIMEOUT' } else { 'NO_RESULT' }
-            Set-Result $c.id 'FAIL' $why ("group $name ($build) gave no result line for this clause (exit $($r.ExitCode)). " + (Tail $r.Output 300))
+            Set-Result $c.id 'FAIL' $why ("group $name ($build) gave no result line for this clause (exit $($r.ExitCode); the group cap is $groupCap s, the sum of its clauses' budgets plus 300 s). " + (Tail $r.Output 300))
         }
     }
 }
