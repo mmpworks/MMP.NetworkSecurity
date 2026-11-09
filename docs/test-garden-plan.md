@@ -1,6 +1,6 @@
 # Test garden: plan
 
-Status: DRAFT for Steve's sign-off. Steve picked option A on 2026-11-09 (stability levels plus change-based selection plus a full nightly run). Revision 2 closes Jared's 6 design blockers from the review at `60c8313`. Decision 4 below is open for Steve.
+Status: SIGNED OFF by Steve, 2026-11-09. Steve picked option A (stability levels plus change-based selection plus a full nightly run), approved the regimen rule 2 change, and set the nightly run to a deterministic script with Haiku only on failure.
 
 ## The problem
 
@@ -128,16 +128,30 @@ A red on a branch gate belongs to that branch. It pops nothing.
 
 ### Nightly run
 
-An OS scheduled task runs the full gate at 02:00 under `heavy_lock.py`, when no agent waits. It appends to the ledger, and one summary line to `docs/_runs/nightly.md`: date, commit, N of M passed, escapes. A run that cannot take the lock records SKIPPED with the reason. It never records PASS.
+A Windows scheduled task runs `tools/nightly.ps1` at 02:00, when no agent waits. The script is deterministic end to end: no model runs on a green night.
+
+1. Fetch `origin/main`, and check out its head in a dedicated worktree (`E:/dev/ns-nightly`). The worktree is reset to that commit each night, and it is never a builder's worktree.
+2. Run the full gate under `heavy_lock.py`, with no wait limit.
+3. Append one ledger line per test unit, and one summary line to `docs/_runs/nightly.md`: date, commit, N of M passed, escapes.
+4. On a red, run the bisect (`tools/bisect_red.py`) over the merges since the last green nightly, with only the red test units. It records the PR that caused each red, and whether that PR merged on a passing picked run (an escape).
+5. Exit codes are fixed: 0 green, 1 red, 2 SKIPPED (lock or fetch failure, with the reason). A run that cannot finish never records PASS.
+
+**Model on failure only.** When the exit code is 1 or 2, the script hands off to a model, the house rule "deterministic first, model on escalation":
+
+- The model is the `triage-tier` policy in `tools/nightly.json`, set to `haiku` for now (Steve, 2026-11-09). The script resolves the name at run time, so a later change is one line.
+- The script calls `claude -p --model <tier>` with one skill invocation and arguments (`nightly-triage <ledger line> <report path>`), never inline prompt text.
+- The model reads the gate log, the ledger lines and the bisect result. It writes one triage note to `docs/_runs/nightly-triage-<date>.md`: the red test units, the PR that caused each one, and a one-line cause guess labelled as a guess.
+- The model may only read files and write that one note. It has no git push, no merge, no file edits elsewhere, and no package installs. The script passes `--allowedTools` with that read-and-write-one-file set.
+- The pop happens without the model, through `popped()`. The model only explains.
 
 ## Decisions
 
 1. Option A (Steve, 2026-11-09).
 2. The default kind is platform. Only listed paths are product.
 3. A pop takes effect at once. A sink goes through a PR.
-4. **OPEN for Steve.** The lesson and walk engines live in `src/NetSec.Core/Labs/`. If all of Core is platform, most lesson work runs everything, and kill condition 1 cannot be met.
-   - **A (recommended):** `src/NetSec.Core/Labs/**` is product, with per-lab covers from coverlet. The rest of Core stays platform. This holds only if the spike shows the Labs map is stable across 2 runs.
-   - **B:** all of Core stays platform, and kill condition 1 counts only app and Host branches.
+4. The lesson and walk engines live in `src/NetSec.Core/Labs/`. `src/NetSec.Core/Labs/**` is product, with per-lab covers from coverlet, and the rest of Core stays platform (option A, signed off with the plan). This holds only if the spike shows the Labs map is stable across 2 runs. If it does not, all of Core stays platform, and kill condition 1 counts only app and Host branches (option B). Steve may still pick B outright.
+5. The nightly run is a deterministic script. A model runs only on a red or a SKIPPED night, and only to write a triage note (Steve, 2026-11-09).
+6. Regimen rule 2 changed in `~/.claude/agents/echo.md` (Steve, 2026-11-09).
 
 ## Steps
 
@@ -145,7 +159,8 @@ An OS scheduled task runs the full gate at 02:00 under `heavy_lock.py`, when no 
 2. **Spike: the covers map.** For 5 Playwright specs and 5 C# test classes, build `covers` from V8 coverage, coverlet on the test process, and coverlet on the live Host process. Record whether each map is the same across 2 runs, and whether a Labs file maps to its lab's tests. Measure the machine's idle process count. The output goes in this plan before sign-off, and it settles decision 4 and the Host rule.
 3. **Picker, manifest, lists and ledger**, with SKIP rows in the gate. Red first: a branch that touches a deep test's covered file must pick that test; a branch that touches a run-everything file must run everything; a new folder must run everything.
 4. **Move rules, bisect, and the nightly task.**
-5. **House rule change.** Rule 2 of the test regimen (`~/.claude/agents/echo.md`) changes from "full gate on every change" to "the picked tests on every gate, plus the full run nightly and at release". Steve approves the text.
+5. **House rule change.** Done 2026-11-09: rule 2 of the test regimen (`~/.claude/agents/echo.md`) now reads "the picked tests on every gate, plus the full run nightly and at release", for repos with a picker.
+6. **The `nightly-triage` skill.** A utility skill that the nightly script calls. It holds the triage steps and the note format. It is distilled from the first red nights triaged by hand, never drafted cold; until then the script writes the red list and the bisect result with no model note. Its regression set holds at least 3 past reds, with at least 1 where the right answer is "cause unknown".
 
 ## Accepted risks
 
@@ -161,7 +176,7 @@ An OS scheduled task runs the full gate at 02:00 under `heavy_lock.py`, when no 
 ## Boundary and failure routing
 
 - Free: the picker, the manifest, the lists, the move rules, the nightly ledger, test deletions with reasons (each via PR and review).
-- Needs Steve: decision 4, the regimen rule 2 text, the OS scheduled task, and any change to the release sweep.
+- Needs Steve: creating the Windows scheduled task (registering it on his machine), any widening of the triage model's tools, and any change to the release sweep.
 - A picker that cannot map a file runs everything (picker rule 7). A spike that cannot build a stable map keeps that area platform.
 
 ## Owners
