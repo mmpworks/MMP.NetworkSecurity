@@ -10,6 +10,7 @@ import shutil
 import subprocess
 import sys
 import tempfile
+import threading
 import time
 import unittest
 
@@ -63,12 +64,46 @@ class HeavyLock(unittest.TestCase):
             time.sleep(0.3)
         self.fail("the lock never became held")
 
+    def start_release_holder(self, label):
+        """A holder that ends when the test creates the release file, so no sleep decides how long it holds under load."""
+        release = pathlib.Path(self.tmp.name) / f"release-{label}"
+        script = "import os, sys, time\nwhile not os.path.exists(sys.argv[1]):\n    time.sleep(0.05)\n"
+        return self.start_run(label, sys.executable, "-I", "-c", script, str(release)), release
+
+    def read_until(self, proc, text, seconds=60):
+        """Reads the run's output until a line holds `text`. Returns what was read; fails when the line never comes."""
+        lines = []
+        found = threading.Event()
+
+        def pump():
+            for line in proc.stdout:
+                lines.append(line)
+                if text in line:
+                    found.set()
+                    return
+
+        threading.Thread(target=pump, daemon=True).start()
+        if not found.wait(seconds):
+            self.fail(f"never saw {text!r}; output so far: {''.join(lines)}")
+        return "".join(lines)
+
+    def wait_for_tickets(self, count, seconds=60):
+        """Waits until `count` waiters have written a ticket, so arrival order never rests on a fixed pause."""
+        end = time.time() + seconds
+        folder = self.dir / "tickets"
+        while time.time() < end:
+            if folder.is_dir() and len(list(folder.glob("*.json"))) >= count:
+                return
+            time.sleep(0.1)
+        self.fail(f"fewer than {count} tickets appeared")
+
     def test_run_takes_the_lock_while_the_command_runs_and_frees_it_after(self):
-        p = self.start_run("long job", *PY, "import time; time.sleep(4)")
+        p, release = self.start_release_holder("long job")
         self.wait_until_held()
         status = self.tool("status")
         self.assertEqual(status.returncode, 2, status.stdout)
         self.assertIn("long job", status.stdout)
+        release.write_text("go", encoding="utf-8")                          # the holder ends only after the status check, however slow the machine is
         p.communicate(timeout=60)
         self.assertEqual(self.tool("status").returncode, 0)
 
@@ -94,10 +129,13 @@ class HeavyLock(unittest.TestCase):
         self.assertEqual(self.tool("status").returncode, 2, "the waiter did not disturb the holder")
 
     def test_a_waiter_gets_the_lock_when_the_holder_ends(self):
-        self.start_run("first", *PY, "import time; time.sleep(4)")
+        _, release = self.start_release_holder("first")
         self.wait_until_held()
         waiter = self.start_run("second", *PY, "print('second ran')", wait=2)
-        out, _ = waiter.communicate(timeout=90)
+        seen = self.read_until(waiter, "HEAVY_LOCK waiting on 'first'")   # the ticket comes before the first failed lock try; only the printed line proves the waiter waits
+        release.write_text("go", encoding="utf-8")
+        rest, _ = waiter.communicate(timeout=90)
+        out = seen + rest
         self.assertEqual(waiter.returncode, 0, out)
         self.assertIn("HEAVY_LOCK waiting on 'first'", out)
         self.assertIn("second ran", out)
@@ -192,12 +230,13 @@ class HeavyLock(unittest.TestCase):
     def test_four_waiters_run_in_arrival_order(self):
         marks = pathlib.Path(self.tmp.name) / "order.txt"
         script = "import sys\nopen(sys.argv[1], 'a').write(sys.argv[2] + '\\n')\n"
-        holder = self.start_run("holder", *PY, "import time; time.sleep(5)")
+        holder, release = self.start_release_holder("holder")
         self.wait_until_held()
         waiters = []
-        for name in ("w1", "w2", "w3", "w4"):
+        for count, name in enumerate(("w1", "w2", "w3", "w4"), start=1):
             waiters.append(self.start_run(name, sys.executable, "-I", "-c", script, str(marks), name))
-            time.sleep(0.4)                                                # arrival order is clear: each ticket is 0.4 s later than the last
+            self.wait_for_tickets(count)                                   # the next waiter starts only after this one's ticket exists
+        release.write_text("go", encoding="utf-8")
         for p in [holder, *waiters]:
             p.communicate(timeout=120)
             self.assertEqual(p.returncode, 0)
@@ -206,13 +245,14 @@ class HeavyLock(unittest.TestCase):
     def test_the_ticket_of_a_killed_waiter_does_not_block_the_next_one(self):
         marks = pathlib.Path(self.tmp.name) / "after-kill.txt"
         script = "import sys\nopen(sys.argv[1], 'a').write(sys.argv[2] + '\\n')\n"
-        holder = self.start_run("holder", *PY, "import time; time.sleep(4)")
+        holder, release = self.start_release_holder("holder")
         self.wait_until_held()
         first = self.start_run("first", sys.executable, "-I", "-c", script, str(marks), "first")
-        time.sleep(0.5)
+        self.wait_for_tickets(1)
         second = self.start_run("second", sys.executable, "-I", "-c", script, str(marks), "second")
-        time.sleep(0.5)
+        self.wait_for_tickets(2)
         subprocess.run(["taskkill", "/PID", str(first.pid), "/F"], capture_output=True)
+        release.write_text("go", encoding="utf-8")                          # the holder ends only after the kill, however slow the machine is
         for p in (holder, second):
             p.communicate(timeout=60)
             self.assertEqual(p.returncode, 0)

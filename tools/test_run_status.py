@@ -176,6 +176,36 @@ class RunStatus(unittest.TestCase):
         code, out = self.status("\x1b[32m  190 passed\x1b[39m (23.5m)\n")
         self.assertEqual(code, 0, out)
 
+    def test_a_run_that_exited_nonzero_with_no_result_line_reads_failed_and_names_the_error(self):
+        log = "HEAVY_LOCK launching [\"node\"]\nError: HOST_DLL_STALE: no Release Host at x.dll\n    at Object.<anonymous> (playwright.config.ts:45:11)\nHEAVY_LOCK finished exit 1\n"
+        code, out = self.status(log, age_minutes=1)
+        self.assertEqual(code, 1, out)
+        self.assertTrue(out.startswith("FAILED"), out)
+        self.assertIn("exited 1", out)
+        self.assertIn("HOST_DLL_STALE", out)
+
+    def test_a_run_that_exited_zero_with_no_result_line_is_not_called_passed(self):
+        code, out = self.status("HEAVY_LOCK launching [\"node\"]\nHEAVY_LOCK finished exit 0\n", age_minutes=1)
+        self.assertEqual(code, 1, out)
+        self.assertIn("no result line", out)
+
+    def test_a_nested_run_finish_line_in_the_middle_of_a_running_log_is_still_running(self):
+        code, out = self.status(GATE_START + "HEAVY_LOCK finished exit 0\n== heavy-run lock tests\n", age_minutes=1)
+        self.assertEqual(code, 2, out)
+
+    def test_a_result_line_still_wins_over_the_finished_line(self):
+        code, out = self.status(PLAYWRIGHT_FAIL + "HEAVY_LOCK finished exit 1\n")
+        self.assertEqual(code, 1, out)
+        self.assertIn("playwright: 42 failed", out)
+
+    def test_a_non_ascii_summary_prints_on_a_cp1252_console(self):
+        path = pathlib.Path(self.tmp.name) / "run.log"
+        path.write_text("✓ 697 modules transformed.\n", encoding="utf-8")       # the vite line that crashed the tool
+        env = {**os.environ, "PYTHONIOENCODING": "cp1252", "PYTHONUTF8": "0"}
+        r = subprocess.run([sys.executable, str(SCRIPT), str(path)], capture_output=True, env=env)   # no -I: -I ignores PYTHONIOENCODING, and the test needs the cp1252 console
+        self.assertEqual(r.returncode, 2, r.stderr)
+        self.assertNotIn(b"Traceback", r.stderr)
+
 
 if __name__ == "__main__":
     unittest.main(verbosity=2)
