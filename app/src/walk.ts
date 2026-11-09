@@ -175,10 +175,21 @@ export function fieldMultiplyWords(t: AesTerm): string {
 function builtFactorWords(t: AesTerm): string {
   const parts = [8, 4, 2, 1].filter(p => (t.factor & p) !== 0)
   const d = t.doublings ?? []
-  const list = d.map((x, i) => `x${2 << i} = ${x.to}`).join(', ')
-  const over = d.map((x, i) => (x.reduced ? `x${2 << i}` : '')).filter(Boolean)
-  const overLine = over.length === 1 ? ` ${over[0]} was too big for a byte, so it got XOR 11b.`
-    : over.length > 1 ? ` ${over.join(' and ')} were too big for a byte, so each got XOR 11b.` : ''
+  // With no doublings in the reply, the words name the method and invent no number (Jared on #330).
+  if (!d.length) return `${t.factor} is ${parts.join(' + ')}. Double the byte for each power of 2, then XOR the parts the factor picks: = ${t.result}.`
+  // "×2", not "x2", which can read as a variable name (Jared on #330).
+  const list = d.map((x, i) => `×${2 << i} = ${x.to}`).join(', ')
+  const over = overflowWords(t)
   const picked = [...(t.picks ?? [])].reverse()
-  return `${t.factor} is ${parts.join(' + ')}. Double ${d.length} times: ${list}.${overLine} Then XOR the parts: ${picked.join(' XOR ')} = ${t.result}.`
+  return `${t.factor} is ${parts.join(' + ')}. Double ${d.length} times: ${list}.${over ? ` ${over}.` : ''} Then XOR the parts: ${picked.join(' XOR ')} = ${t.result}.`
+}
+
+/**
+ * Which doublings overflowed, for a factor with more than one: for example "×2 and ×4 were too big for a byte, so each got XOR 11b".
+ * Both the multiply panel and the field panel use it, so they agree (Richard on #330). Empty when none overflowed, or with no doublings.
+ */
+export function overflowWords(t: AesTerm): string {
+  const over = (t.doublings ?? []).map((x, i) => (x.reduced ? `×${2 << i}` : '')).filter(Boolean)
+  if (over.length === 0) return ''
+  return over.length === 1 ? `${over[0]} was too big for a byte, so it got XOR 11b` : `${over.join(' and ')} were too big for a byte, so each got XOR 11b`
 }
