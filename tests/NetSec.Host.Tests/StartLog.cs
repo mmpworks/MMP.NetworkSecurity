@@ -22,8 +22,19 @@ internal sealed class StartLog
 
     void Add(string stream, string? line)
     {
+        if (line == null) return;
+        _lines.Enqueue(stream + ": " + line);
+        while (_lines.Count > Keep) _lines.TryDequeue(out _);
     }
 
     /// <summary>The text a failed start adds to its message: the wait, whether the child exited and with which code, and its last lines.</summary>
-    public string Describe(Process process, TimeSpan waited) => "";
+    public string Describe(Process process, TimeSpan waited)
+    {
+        string state;
+        try { state = process.HasExited ? "the child exited with code " + process.ExitCode : "the child was still running"; }
+        catch (InvalidOperationException) { state = "the child never started"; }
+        string[] lines = _lines.ToArray();
+        string printed = lines.Length == 0 ? "it printed nothing" : "its last lines: " + string.Join(" | ", lines);
+        return "after " + waited.TotalSeconds.ToString("0.0", System.Globalization.CultureInfo.InvariantCulture) + " s; " + state + "; " + printed;
+    }
 }

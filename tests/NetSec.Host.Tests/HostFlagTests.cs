@@ -31,7 +31,7 @@ namespace NetSec.Host.Tests
             return port;
         }
 
-        static Process Start(string args, string envPort, string envToken, DataReceivedEventHandler onLine)
+        static Process Start(string args, string envPort, string envToken, DataReceivedEventHandler onLine, StartLog log = null)
         {
             ProcessStartInfo info = new ProcessStartInfo("dotnet", "\"" + HostDll() + "\" " + args) { UseShellExecute = false, RedirectStandardOutput = true, RedirectStandardError = true, CreateNoWindow = true };
             info.Environment["LOCALAPPDATA"] = Path.GetTempPath();
@@ -42,6 +42,7 @@ namespace NetSec.Host.Tests
             Process process = new Process { StartInfo = info };
             process.OutputDataReceived += onLine;
             process.ErrorDataReceived += onLine;
+            log?.Attach(process);
             process.Start();
             process.BeginOutputReadLine();
             process.BeginErrorReadLine();
@@ -61,13 +62,15 @@ namespace NetSec.Host.Tests
         {
             int flagPort = FreePort(), envPort = FreePort();
             TaskCompletionSource<string> ready = new TaskCompletionSource<string>(TaskCreationOptions.RunContinuationsAsynchronously);
+            StartLog log = new StartLog();
             using Process host = Start($"--port {flagPort} --token flag-token", envPort.ToString(), "env-token", (_, e) =>
             {
                 if (e.Data != null && e.Data.StartsWith("HOST-READY")) ready.TrySetResult(e.Data);
-            });
+            }, log);
             try
             {
-                Assert.True(await Task.WhenAny(ready.Task, Task.Delay(60000)) == ready.Task, "the Host gave no ready line in 60 s");
+                bool started = await Task.WhenAny(ready.Task, Task.Delay(60000)) == ready.Task;
+                Assert.True(started, started ? "" : "the Host gave no ready line in 60 s: " + log.Describe(host, TimeSpan.FromSeconds(60)));
                 Assert.Equal($"HOST-READY port={flagPort}", await ready.Task);
                 Assert.Equal(HttpStatusCode.OK, await Health(flagPort, "flag-token"));
                 Assert.Equal(HttpStatusCode.Unauthorized, await Health(flagPort, "env-token"));
