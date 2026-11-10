@@ -43,6 +43,15 @@ param(
     [switch]$FreshChild
 )
 
+# An explicit -NetCFRefDir that holds no mscorlib.dll stops the run here with one named error, before it queues for the lock.
+# Git Bash strips the backslashes of an unquoted Windows path (E:devtoolsnetcf35-ref), and that path once gave 118
+# PRODUCT_BUILD_FAILED rows. The default path keeps its NOT RUN CF_REFERENCES_MISSING rows, so a machine with no CF
+# references still runs every other clause.
+if ($PSBoundParameters.ContainsKey('NetCFRefDir') -and -not (Test-Path -LiteralPath (Join-Path $NetCFRefDir 'mscorlib.dll'))) {
+    Write-Host "[acceptance] NETCF_REF_DIR_BAD: -NetCFRefDir '$NetCFRefDir' holds no mscorlib.dll. Quote Windows paths in Git Bash ('E:\dev\tools\netcf35-ref'), or omit the flag to use the default."
+    exit 2
+}
+
 # Every run takes the machine-wide heavy-run lock first (tools/heavy_lock.py, #320), so acceptance runs queue behind gates and app suites
 # instead of loading a busy machine. A run inside the live holder (a gate, a -Fresh parent, or this wrapper) goes straight on. A missing lock
 # tool fails the run by name; it never skips the lock.
