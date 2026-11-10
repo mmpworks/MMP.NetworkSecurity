@@ -1,6 +1,7 @@
 <script setup lang="ts">
-import { computed, onBeforeUnmount, ref } from 'vue'
+import { computed, ref } from 'vue'
 import { useWalk } from '../walkFetch'
+import { useStepper } from '../useStepper'
 
 // The Diffie-Hellman walk (slice P7; docs/sections-plan.md section 5; mock v28's DH tab, with Steve's paint chips). The engine runs both
 // sides on a public practice exponent (GET /api/walk/dh), so the walk stays open with Show keys off. Every number is the engine's (R5):
@@ -41,27 +42,9 @@ const LEGEND: { colour: string; letter: string; says: string }[] = [
 
 // ---- The steps, as in the mock: null shows the whole exchange.
 const LAST = 8
-const step = ref<number | null>(null)
+const { at: step, playing, next, all, play, reset } = useStepper({ last: () => LAST, intervalMs: 2200, nextWraps: true, all: 'none' })
 const at = (n: number) => step.value === null || step.value >= n
-let timer = 0
-const playing = ref(false)
-function stop() { playing.value = false; window.clearTimeout(timer) }
-function next() { stop(); step.value = step.value === null || step.value >= LAST ? 0 : step.value + 1 }
-function all() { stop(); step.value = null }
-function play() {
-  if (playing.value) { stop(); return }
-  playing.value = true
-  if (step.value === null || step.value >= LAST) step.value = 0
-  const tick = () => {
-    if (!playing.value) return
-    if ((step.value ?? 0) >= LAST) { playing.value = false; return }
-    step.value = (step.value ?? 0) + 1
-    timer = window.setTimeout(tick, 2200)
-  }
-  timer = window.setTimeout(tick, 2200)
-}
-onBeforeUnmount(stop)
-function pickGroup(g: 'small' | 'group14') { stop(); group.value = g; step.value = null }
+function pickGroup(g: 'small' | 'group14') { reset(); group.value = g }
 
 /** A long group 14 number in a caption or a row shows its ends, so it stays one line. The whole number is in the Client, wire and Server value rows. */
 const short = (n: Num | null) => { const t = show(n); return group.value === 'group14' && t.length > 28 ? `${t.slice(0, 16)}…${t.slice(-8)}` : t }
