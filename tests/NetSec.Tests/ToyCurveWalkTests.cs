@@ -163,6 +163,44 @@ namespace NetSec.Tests
             Assert.Throws<ArgumentOutOfRangeException>(() => ToyCurveWalks.Pick(0, -1));
         }
 
+        /// <summary>
+        /// R' (issue #374) for one step, checked against the reference. An add or a double: R' is on the curve and on the step's line, and R is R'
+        /// reflected, (x, -y mod 17). An opposite: the line is vertical, so R' is O. An identity: one point is O, so no line exists and R' is null.
+        /// </summary>
+        static void CheckRPrime(ToyStep s, string where)
+        {
+            if (s.Kind == "identity") { Assert.True(s.RPrime == null, where + ": an identity step has no R'"); return; }
+            Assert.True(s.RPrime != null, where + ": R' is missing");
+            if (s.Kind == "opposite") { Assert.True(s.RPrime.IsInfinity, where + ": an opposite step's R' is O"); return; }
+            Assert.False(s.RPrime.IsInfinity, where + ": R' is O on a " + s.Kind);
+            Assert.True(M((BigInteger)s.RPrime.Y * s.RPrime.Y - ((BigInteger)s.RPrime.X * s.RPrime.X * s.RPrime.X + 2 * s.RPrime.X + 2), P) == 0,
+                where + ": R' is on the curve");
+            Assert.Equal(M((BigInteger)s.Lambda * (s.RPrime.X - s.P.X) + s.P.Y, P), s.RPrime.Y);
+            Assert.Equal((s.RPrime.X, M(-s.RPrime.Y, P)), Pt(s.Result));
+        }
+
+        [Fact]
+        public void Every_add_and_double_step_carries_R_prime_on_its_line_and_R_is_its_reflection()
+        {
+            ToyPoint[] list = ToyCurveWalks.PickList();
+            for (int i = 0; i < N; i++)
+                for (int j = 0; j < N; j++)
+                    CheckRPrime(ToyCurveWalks.Pick(i, j).Step, "pick " + i + "," + j);
+            CheckRPrime(W.AddExample, "addExample");
+            CheckRPrime(W.DoubleExample, "doubleExample");
+            foreach (ToyHop h in W.Hops) if (h.Step != null) CheckRPrime(h.Step, "hop " + h.K);
+            foreach (ToyDoubleAddRow r in W.DoubleAndAdd)
+            {
+                CheckRPrime(r.DoubleStep, "doubleAndAdd bit " + r.Bit + " double");
+                if (r.AddStep != null) CheckRPrime(r.AddStep, "doubleAndAdd bit " + r.Bit + " add");
+            }
+            foreach (ToyLadderRow r in W.Ladder)
+            {
+                CheckRPrime(r.AddStep, "ladder bit " + r.Bit + " add");
+                CheckRPrime(r.DoubleStep, "ladder bit " + r.Bit + " double");
+            }
+        }
+
         [Fact]
         public void The_real_curve_samples_lie_on_their_lines_and_on_the_curve_inside_the_drawn_range()
         {

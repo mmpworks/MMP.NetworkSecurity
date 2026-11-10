@@ -40,11 +40,14 @@ namespace NetSec.Labs.Teaching
     /// <summary>
     /// One point addition. Kind is "add" (P and Q differ), "double" (P equals Q), "identity" (P or Q is O), or "opposite" (Q is -P, so the sum is O).
     /// Only add and double have a slope: lambda = numerator / denominator, with the denominator's inverse. The other kinds leave Inverse null.
+    /// RPrime is the third point where the line meets the curve, before the flip to Result (issue #374). On add and double it lies on the line,
+    /// and Result is RPrime reflected, (x, -y mod 17). On opposite the line is vertical, so RPrime is O. On identity one point is O, no line
+    /// exists, and RPrime is null.
     /// </summary>
     public sealed class ToyStep
     {
         public string Kind;
-        public ToyPoint P, Q, Result;
+        public ToyPoint P, Q, Result, RPrime;
         public int Numerator, Denominator, Lambda;
         public ToyInverse Inverse;
     }
