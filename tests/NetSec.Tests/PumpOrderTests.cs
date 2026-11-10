@@ -55,21 +55,21 @@ namespace NetSec.Tests
             }
         }
 
-        static int ReadCount(IByteLink link)
+        static async System.Threading.Tasks.Task<int> ReadCount(IByteLink link)
         {
             byte[] two = new byte[2];
             int filled = 0;
             while (filled < 2)
             {
                 IFuture<int> read = link.Read(two, filled, 2 - filled);
-                Assert.True(read.Wait(20000), "no bytes in 20 s");
+                Assert.True(await FutureWaits.Within(read, TimeSpan.FromMilliseconds(20000)), "no bytes in 20 s");
                 filled += read.Result;
             }
             return (two[0] << 8) | two[1];
         }
 
         [Fact]
-        public void Wire_bytes_leave_in_engine_order_when_a_caller_and_the_read_loop_drive_the_engine_together()
+        public async System.Threading.Tasks.Task Wire_bytes_leave_in_engine_order_when_a_caller_and_the_read_loop_drive_the_engine_together()
         {
             const int Rounds = 3000;
             MemoryLink[] links = MemoryLink.Pair();
@@ -96,7 +96,7 @@ namespace NetSec.Tests
                 links[1].Write(new byte[1], 0, 1);
                 for (int k = 0; k < 2; k++)
                 {
-                    int value = ReadCount(links[1]);
+                    int value = await ReadCount(links[1]);
                     if (value != last + 1) misordered++;
                     last = value;
                 }
@@ -104,7 +104,7 @@ namespace NetSec.Tests
             Volatile.Write(ref done, true);
             caller.Join();
             pump.Enqueue(EngineCommand.Close);
-            Assert.True(run.Wait(20000));
+            Assert.True(await FutureWaits.Within(run, TimeSpan.FromMilliseconds(20000)));
             Assert.Equal(0, misordered);
         }
 
@@ -139,7 +139,7 @@ namespace NetSec.Tests
         /// Logged after the write, a reply can be listed ahead of the message it answers: lesson 7 then showed 1 round trip where the run took 2.
         /// </summary>
         [Fact]
-        public void A_reply_is_never_logged_ahead_of_the_message_it_answers()
+        public async System.Threading.Tasks.Task A_reply_is_never_logged_ahead_of_the_message_it_answers()
         {
             MemoryLink[] links = MemoryLink.Pair();
             ListSink sink = new ListSink();
@@ -158,12 +158,12 @@ namespace NetSec.Tests
             server.Enqueue(EngineCommand.Close);
             links[0].Close();
             links[1].Close();
-            clientRun.Wait(20000);
-            serverRun.Wait(20000);
+            await FutureWaits.Within(clientRun, TimeSpan.FromMilliseconds(20000));
+            await FutureWaits.Within(serverRun, TimeSpan.FromMilliseconds(20000));
         }
 
         [Fact]
-        public void A_message_is_in_the_trace_when_its_bytes_go_to_the_link()
+        public async System.Threading.Tasks.Task A_message_is_in_the_trace_when_its_bytes_go_to_the_link()
         {
             MemoryLink[] links = MemoryLink.Pair();
             ListSink sink = new ListSink();
@@ -179,7 +179,7 @@ namespace NetSec.Tests
             Assert.Contains(atWrite, e => e.Type == "wire.sent");
             pump.Enqueue(EngineCommand.Close);
             links[1].Close();
-            run.Wait(20000);
+            await FutureWaits.Within(run, TimeSpan.FromMilliseconds(20000));
         }
 
         /// <summary>The engine has failed, and its last output is the alert.</summary>
@@ -238,20 +238,20 @@ namespace NetSec.Tests
 
         /// <summary>The engine's own failure is the run's error, so a lost alert leaves the result silent. The trace must say that the alert did not leave.</summary>
         [Fact]
-        public void A_lost_alert_write_says_so_in_the_trace()
+        public async System.Threading.Tasks.Task A_lost_alert_write_says_so_in_the_trace()
         {
             ListSink sink = new ListSink();
             FixedWriteLink link = new FixedWriteLink(Futures.FromException(new InvalidOperationException("the peer is gone")));
             IFuture<PumpResult> run = new EnginePump(new AlertEngine(), link, sink, new FreeRunGate(), null, 0).Run();
 
-            Assert.True(run.Wait(20000));
+            Assert.True(await FutureWaits.Within(run, TimeSpan.FromMilliseconds(20000)));
             Assert.Null(run.Result.Error);
             Assert.Equal(0, run.Result.BytesSent);
             AssertSaysNotLeft(sink, ErrorCodes.LinkLost);
         }
 
         [Fact]
-        public void A_lost_write_on_an_open_engine_says_so_in_the_trace_and_the_result()
+        public async System.Threading.Tasks.Task A_lost_write_on_an_open_engine_says_so_in_the_trace_and_the_result()
         {
             ListSink sink = new ListSink();
             FixedWriteLink link = new FixedWriteLink(Futures.FromException(new InvalidOperationException("the peer is gone")));
@@ -259,13 +259,13 @@ namespace NetSec.Tests
             IFuture<PumpResult> run = pump.Run();
 
             pump.Enqueue(new EngineCommand(EngineCommandKind.Send, 0, new byte[1], null));
-            Assert.True(run.Wait(20000));
+            Assert.True(await FutureWaits.Within(run, TimeSpan.FromMilliseconds(20000)));
             Assert.Equal(ErrorCodes.LinkLost, run.Result.Error.Code);
             AssertSaysNotLeft(sink, ErrorCodes.LinkLost);
         }
 
         [Fact]
-        public void A_write_past_its_deadline_says_so_in_the_trace()
+        public async System.Threading.Tasks.Task A_write_past_its_deadline_says_so_in_the_trace()
         {
             ListSink sink = new ListSink();
             FixedWriteLink link = new FixedWriteLink(new Promise<int>().Future);
@@ -273,13 +273,13 @@ namespace NetSec.Tests
             IFuture<PumpResult> run = pump.Run();
 
             pump.Enqueue(new EngineCommand(EngineCommandKind.Send, 0, new byte[1], null));
-            Assert.True(run.Wait(20000));
+            Assert.True(await FutureWaits.Within(run, TimeSpan.FromMilliseconds(20000)));
             Assert.Equal(ErrorCodes.LinkDeadline, run.Result.Error.Code);
             AssertSaysNotLeft(sink, ErrorCodes.LinkDeadline);
         }
 
         [Fact]
-        public void A_write_that_completes_logs_no_failure()
+        public async System.Threading.Tasks.Task A_write_that_completes_logs_no_failure()
         {
             MemoryLink[] links = MemoryLink.Pair();
             ListSink sink = new ListSink();
@@ -287,9 +287,9 @@ namespace NetSec.Tests
             IFuture<PumpResult> run = pump.Run();
 
             pump.Enqueue(new EngineCommand(EngineCommandKind.Send, 0, new byte[1], null));
-            Assert.Equal(1, ReadCount(links[1]));
+            Assert.Equal(1, await ReadCount(links[1]));
             pump.Enqueue(EngineCommand.Close);
-            Assert.True(run.Wait(20000));
+            Assert.True(await FutureWaits.Within(run, TimeSpan.FromMilliseconds(20000)));
             Assert.Null(run.Result.Error);
             Assert.DoesNotContain(sink.Events, e => e.Type == "wire.write.failed");
         }

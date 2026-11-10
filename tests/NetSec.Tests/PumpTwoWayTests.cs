@@ -31,13 +31,13 @@ namespace NetSec.Tests
             return bytes;
         }
 
-        static SocketLink[] SocketPair()
+        static async System.Threading.Tasks.Task<SocketLink[]> SocketPair()
         {
             LinkListener listener = new LinkListener(new IPEndPoint(IPAddress.Loopback, 0));
             IFuture<SocketLink> accepted = listener.Accept();
             IFuture<SocketLink> connected = SocketLink.Connect(new IPEndPoint(IPAddress.Loopback, listener.Port));
-            Assert.True(accepted.Wait(20000));
-            Assert.True(connected.Wait(20000));
+            Assert.True(await FutureWaits.Within(accepted, TimeSpan.FromMilliseconds(20000)));
+            Assert.True(await FutureWaits.Within(connected, TimeSpan.FromMilliseconds(20000)));
             listener.Close();
             return new[] { connected.Result, accepted.Result };
         }
@@ -76,21 +76,22 @@ namespace NetSec.Tests
                 while (true)
                 {
                     IFuture<AppChunk> next = server.Receive();
+                    // blocks: this loop runs on its own dedicated Thread, not a pool thread, so its waits starve no continuation.
                     if (!next.Wait(60000) || next.IsFaulted || next.IsCanceled || next.Result.Bytes.Length == 0) return;
-                    if (!server.Send(next.Result.Channel, next.Result.Bytes).Wait(60000)) return;
+                    if (!server.Send(next.Result.Channel, next.Result.Bytes).Wait(60000)) return; // blocks: the same dedicated Thread as the line above.
                 }
             });
             thread.IsBackground = true;
             thread.Start();
         }
 
-        static void ReadAllInOrder(ISecureChannel client, int channel)
+        static async System.Threading.Tasks.Task ReadAllInOrder(ISecureChannel client, int channel)
         {
             int got = 0;
             while (got < Size)
             {
                 IFuture<AppChunk> next = client.Receive();
-                Assert.True(next.Wait(20000), "no chunk for 20 s, at " + got + " of " + Size + " bytes");
+                Assert.True(await FutureWaits.Within(next, TimeSpan.FromMilliseconds(20000)), "no chunk for 20 s, at " + got + " of " + Size + " bytes");
                 Assert.False(next.IsFaulted, "at " + got + " of " + Size + " bytes: " + next.Exception?.Message);
                 if (next.Result.Channel != channel) continue;
                 byte[] bytes = next.Result.Bytes;
@@ -109,32 +110,32 @@ namespace NetSec.Tests
         [Theory]
         [InlineData(WireProtocol.Tls13)]
         [InlineData(WireProtocol.Tls11)]
-        public void Two_way_traffic_on_tls_reaches_the_end_in_order(WireProtocol protocol)
+        public async System.Threading.Tasks.Task Two_way_traffic_on_tls_reaches_the_end_in_order(WireProtocol protocol)
         {
-            SocketLink[] links = SocketPair();
+            SocketLink[] links = await SocketPair();
             GlassTransportFactory factory = new GlassTransportFactory(new TrainingKeySource());
             IFuture<ISecureChannel> server = factory.Open(new TransportRequest { Protocol = protocol, Role = EngineRole.Server, Group = KexGroup.X25519, Tls11Suite = Tls11Suite.EcdheRsaAes128CbcSha, Link = links[1], Random = new SeededRandom(1), Sink = new NullSink(), PeerName = "localhost" });
             IFuture<ISecureChannel> client = factory.Open(new TransportRequest { Protocol = protocol, Role = EngineRole.Client, Group = KexGroup.X25519, Tls11Suite = Tls11Suite.EcdheRsaAes128CbcSha, Link = links[0], Random = new SeededRandom(2), Sink = new NullSink(), PeerName = "localhost" });
-            Assert.True(server.Wait(20000) && client.Wait(20000));
+            Assert.True(await FutureWaits.Within(server, TimeSpan.FromMilliseconds(20000)) && await FutureWaits.Within(client, TimeSpan.FromMilliseconds(20000)));
             StartEchoApp(server.Result);
             SendAll(client.Result, 0);
-            ReadAllInOrder(client.Result, 0);
+            await ReadAllInOrder(client.Result, 0);
         }
 
         [Fact]
-        public void Two_way_traffic_on_an_ssh_tunnel_reaches_the_end_in_order()
+        public async System.Threading.Tasks.Task Two_way_traffic_on_an_ssh_tunnel_reaches_the_end_in_order()
         {
-            SocketLink[] links = SocketPair();
+            SocketLink[] links = await SocketPair();
             GlassTransportFactory factory = new GlassTransportFactory(new TrainingKeySource());
             int target = StartEchoSocket();
             IFuture<ISecureChannel> server = factory.Open(new TransportRequest { Protocol = WireProtocol.Ssh, Role = EngineRole.Server, Suite = SshSuite.Modern, Link = links[1], Random = new SeededRandom(1), Sink = new NullSink(), AllowTunnel = (h, p) => p == target });
             IFuture<ISecureChannel> client = factory.Open(new TransportRequest { Protocol = WireProtocol.Ssh, Role = EngineRole.Client, Suite = SshSuite.Modern, Link = links[0], Random = new SeededRandom(2), Sink = new NullSink(), PeerName = "h", PeerPort = 22, TrustFirstUse = true });
-            Assert.True(client.Wait(20000));
+            Assert.True(await FutureWaits.Within(client, TimeSpan.FromMilliseconds(20000)));
             ISshChannel channel = Assert.IsAssignableFrom<ISshChannel>(client.Result);
             IFuture<int> tunnel = channel.OpenTunnel("127.0.0.1", target);
-            Assert.True(tunnel.Wait(20000));
+            Assert.True(await FutureWaits.Within(tunnel, TimeSpan.FromMilliseconds(20000)));
             SendAll(channel, tunnel.Result);
-            ReadAllInOrder(channel, tunnel.Result);
+            await ReadAllInOrder(channel, tunnel.Result);
         }
 
         // ---------------------------------------------------------------- the limits that come with reading while writing
@@ -185,51 +186,51 @@ namespace NetSec.Tests
         }
 
         [Fact]
-        public void A_write_the_peer_never_takes_ends_in_a_named_deadline()
+        public async System.Threading.Tasks.Task A_write_the_peer_never_takes_ends_in_a_named_deadline()
         {
             ScriptEngine engine = new ScriptEngine { CommandWireBytes = 100 };
             EnginePump pump = new EnginePump(engine, new ScriptLink(-1, false), new NullSink(), new FreeRunGate(), null, 300);
             IFuture<PumpResult> run = pump.Run();
             pump.Enqueue(new EngineCommand(EngineCommandKind.Send, 0, new byte[1], null));
-            Assert.True(run.Wait(20000), "no deadline ended the blocked write");
+            Assert.True(await FutureWaits.Within(run, TimeSpan.FromMilliseconds(20000)), "no deadline ended the blocked write");
             Assert.Equal(ErrorCodes.LinkDeadline, run.Result.Error?.Code);
             Assert.Equal("write deadline", run.Result.Error?.CheckName);
         }
 
         /// <summary>With reads running during a write, a long upload with no reply must not look like a silent peer.</summary>
         [Fact]
-        public void A_long_upload_with_no_reply_does_not_trip_the_read_deadline()
+        public async System.Threading.Tasks.Task A_long_upload_with_no_reply_does_not_trip_the_read_deadline()
         {
             ScriptEngine engine = new ScriptEngine { CommandWireBytes = 100 };
             EnginePump pump = new EnginePump(engine, new ScriptLink(100, false), new NullSink(), new FreeRunGate(), null, 300);
             IFuture<PumpResult> run = pump.Run();
             IFuture last = null;
             for (int i = 0; i < 20; i++) last = pump.Enqueue(new EngineCommand(EngineCommandKind.Send, 0, new byte[1], null));
-            Assert.True(last.Wait(20000), "the upload did not finish");
+            Assert.True(await FutureWaits.Within(last, TimeSpan.FromMilliseconds(20000)), "the upload did not finish");
             Assert.False(run.IsCompleted, run.IsCompleted ? "ended: " + run.Result.Error?.Code : "");
         }
 
         [Fact]
-        public void Reading_stops_at_the_inbound_limit_while_a_write_is_blocked()
+        public async System.Threading.Tasks.Task Reading_stops_at_the_inbound_limit_while_a_write_is_blocked()
         {
             ScriptEngine engine = new ScriptEngine { StartWireBytes = 100, FeedAppBytes = 1024 * 1024 };
             EnginePump pump = new EnginePump(engine, new ScriptLink(-1, true), new NullSink(), new FreeRunGate(), null, 2000);
             IFuture<PumpResult> run = pump.Run();
             pump.Enqueue(new EngineCommand(EngineCommandKind.Send, 0, new byte[1], null));
-            Assert.True(run.Wait(20000), "no deadline ended the blocked write");
+            Assert.True(await FutureWaits.Within(run, TimeSpan.FromMilliseconds(20000)), "no deadline ended the blocked write");
             Assert.InRange(engine.Feeds, 1, EnginePump.InboundBacklogLimit / (1024 * 1024) + 1);
             Assert.Equal("write deadline", run.Result.Error?.CheckName);
         }
 
         /// <summary>A sender must not wait for a quiet moment, because a two-way flow may have none.</summary>
         [Fact]
-        public void An_enqueue_finishes_when_its_own_output_is_out_while_reads_keep_coming()
+        public async System.Threading.Tasks.Task An_enqueue_finishes_when_its_own_output_is_out_while_reads_keep_coming()
         {
             ScriptEngine engine = new ScriptEngine { CommandWireBytes = 100, FeedAppBytes = 1 };
             EnginePump pump = new EnginePump(engine, new ScriptLink(0, true), new NullSink(), new FreeRunGate(), null, 30000);
             IFuture<PumpResult> run = pump.Run();
             IFuture done = pump.Enqueue(new EngineCommand(EngineCommandKind.Send, 0, new byte[1], null));
-            Assert.True(done.Wait(20000), "the enqueue waited for reads to stop");
+            Assert.True(await FutureWaits.Within(done, TimeSpan.FromMilliseconds(20000)), "the enqueue waited for reads to stop");
             pump.Enqueue(EngineCommand.Close);
         }
     }
