@@ -1,0 +1,14 @@
+{
+  "name": "@mmpworks/netsec-aes",
+  "private": true,
+  "version": "0.1.0",
+  "description": "AES-128/192/256 (FIPS 197) with a step trace for the walk lessons. No dependencies, no DOM, no Node API in src/.",
+  "type": "module",
+  "exports": {
+    ".": "./src/index.ts"
+  },
+  "scripts": {
+    "test": "node --test \"test/**/*.test.ts\"",
+    "typecheck": "node ../../app/node_modules/typescript/bin/tsc -p tsconfig.json && node ../../app/node_modules/typescript/bin/tsc -p tsconfig.test.json"
+  }
+}
