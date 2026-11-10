@@ -166,51 +166,50 @@ namespace NetSec.Tests
 
         // ---------------------------------------------------------------- findings 1 and 2: the login
 
-        static LabResult Login(params string[] nameThenValue)
+        static async System.Threading.Tasks.Task<LabResult> Login(params string[] nameThenValue)
         {
             LabOption[] options = new LabOption[nameThenValue.Length / 2];
             for (int i = 0; i < options.Length; i++) options[i] = new LabOption { Name = nameThenValue[i * 2], Value = nameThenValue[i * 2 + 1] };
             AttackDefinition attack = options.Length == 0 ? null : new AttackDefinition { AttackId = "test", Lesson = 10, Kind = "scenario", Options = options };
             LabContext c = new LabContext { SessionId = "s1", TraceId = "s1", Seed = 7, Gate = new FreeRunGate(), Sink = new ListSink(), Clock = new FixedClock(1), Random = new SeededRandom(7), Attack = attack };
             IFuture<LabResult> run = new Lesson10Auth().Run(c);
-            Assert.True(run.Wait(60000), "the lab did not finish in 60 s");
+            Assert.True(await FutureWaits.Within(run, TimeSpan.FromMilliseconds(60000)), "the lab did not finish in 60 s");
             return run.Result;
         }
 
         [Fact]
-        public void A_signed_answer_to_a_challenge_the_issuer_never_sent_is_refused()
+        public async System.Threading.Tasks.Task A_signed_answer_to_a_challenge_the_issuer_never_sent_is_refused()
         {
-            LabResult r = Login("answer-unissued", "yes");
+            LabResult r = await Login("answer-unissued", "yes");
             Assert.False(r.Completed, "a client that signed 32 zero bytes got a token");
             Assert.Equal("CHALLENGE_NOT_ISSUED", r.FailedCode);
             Assert.Equal("challenge issued", r.FailedCheck);
         }
 
         [Fact]
-        public void A_device_nobody_enrolled_gets_no_token()
+        public async System.Threading.Tasks.Task A_device_nobody_enrolled_gets_no_token()
         {
-            LabResult r = Login("unknown-device", "yes");
+            LabResult r = await Login("unknown-device", "yes");
             Assert.False(r.Completed, "a key nobody enrolled got a token");
             Assert.Equal("DEVICE_NOT_ENROLLED", r.FailedCode);
             Assert.Equal("device enrolled", r.FailedCheck);
         }
 
         [Fact]
-        public void The_small_order_key_with_no_private_half_gets_no_token()
+        public async System.Threading.Tasks.Task The_small_order_key_with_no_private_half_gets_no_token()
         {
-            LabResult r = Login("device-key-hex", "0100000000000000000000000000000000000000000000000000000000000000");
+            LabResult r = await Login("device-key-hex", "0100000000000000000000000000000000000000000000000000000000000000");
             Assert.False(r.Completed, "the small-order key got a token");
             Assert.Equal("DEVICE_NOT_ENROLLED", r.FailedCode);
         }
 
-        static TraceEvent[] Events(AttackDefinition attack, out LabResult result)
+        static async System.Threading.Tasks.Task<(TraceEvent[] Events, LabResult Result)> Events(AttackDefinition attack)
         {
             ListSink sink = new ListSink();
             LabContext c = new LabContext { SessionId = "s1", TraceId = "s1", Seed = 7, Gate = new FreeRunGate(), Sink = sink, Clock = new FixedClock(1), Random = new SeededRandom(7), Attack = attack };
             IFuture<LabResult> run = new Lesson10Auth().Run(c);
-            Assert.True(run.Wait(60000), "the lab did not finish in 60 s");
-            result = run.Result;
-            return sink.Events;
+            Assert.True(await FutureWaits.Within(run, TimeSpan.FromMilliseconds(60000)), "the lab did not finish in 60 s");
+            return (sink.Events, run.Result);
         }
 
         /// <summary>
@@ -218,22 +217,20 @@ namespace NetSec.Tests
         /// same forgery with the enrolled key in the request, so the signature check is what must stop it, end to end.
         /// </summary>
         [Fact]
-        public void A_forged_signature_on_the_enrolled_key_gets_no_token()
+        public async System.Threading.Tasks.Task A_forged_signature_on_the_enrolled_key_gets_no_token()
         {
             byte[] forged = Hex.Decode("5866666666666666666666666666666666666666666666666666666666666666" + "0100000000000000000000000000000000000000000000000000000000000000");
             byte[] anyChallenge = new byte[32];
             Assert.True(Challenge.Verify(Hex.Decode("0100000000000000000000000000000000000000000000000000000000000000"), anyChallenge, "https://pump.training", forged).Allowed);
 
             // The same seed issues the same challenge, so the control run gives the bytes this login will issue.
-            LabResult control;
-            TraceEvent[] seen = Events(null, out control);
+            (TraceEvent[] seen, LabResult control) = await Events(null);
             Assert.True(control.Completed);
             byte[] challengeFrame = seen.First(e => e.Type == "wire.sent" && e.Message == "Challenge").Wire;
             byte[] challenge = challengeFrame.Skip(Frame.HeaderSize).ToArray();
 
             TamperPlan swap = new TamperPlan { Kind = "swap-field", Message = "ChallengeResponse", Replacement = Frame.Build(3, challenge.Concat(forged).ToArray()) };
-            LabResult attacked;
-            TraceEvent[] events = Events(new AttackDefinition { AttackId = "test", Lesson = 10, Kind = "swap-field", Plan = swap, Options = new LabOption[0] }, out attacked);
+            (TraceEvent[] events, LabResult attacked) = await Events(new AttackDefinition { AttackId = "test", Lesson = 10, Kind = "swap-field", Plan = swap, Options = new LabOption[0] });
             Assert.False(attacked.Completed);
             Assert.Equal("CHALLENGE_BAD_SIGNATURE", attacked.FailedCode);
             Assert.Equal("challenge signature", attacked.FailedCheck);
@@ -242,10 +239,9 @@ namespace NetSec.Tests
 
         /// <summary>The tour binds to these names, so a change here must reach the tour.</summary>
         [Fact]
-        public void The_mutual_tls_phase_emits_the_event_types_the_tour_binds_to()
+        public async System.Threading.Tasks.Task The_mutual_tls_phase_emits_the_event_types_the_tour_binds_to()
         {
-            LabResult result;
-            TraceEvent[] events = Events(null, out result);
+            (TraceEvent[] events, LabResult result) = await Events(null);
             Assert.True(result.Completed);
             string[] Sent(string actor) => events.Where(e => e.Type == "tls.handshake.sent" && e.Actor == actor).Select(e => e.Message).ToArray();
             Assert.Equal(new[] { "ServerHello", "EncryptedExtensions", "CertificateRequest", "Certificate", "CertificateVerify", "Finished" }, Sent("server"));
@@ -259,10 +255,9 @@ namespace NetSec.Tests
         [Theory]
         [InlineData("L10-remove-client-cert", "certificate_required alert")]
         [InlineData("L10-corrupt-client-cert", "bad_certificate alert")]
-        public void A_refused_client_certificate_fails_its_check_on_the_server(string attackId, string check)
+        public async System.Threading.Tasks.Task A_refused_client_certificate_fails_its_check_on_the_server(string attackId, string check)
         {
-            LabResult result;
-            TraceEvent[] events = Events(AttackCatalog.All.Where(a => a.Lesson == 10).Single(a => a.AttackId == attackId), out result);
+            (TraceEvent[] events, LabResult result) = await Events(AttackCatalog.All.Where(a => a.Lesson == 10).Single(a => a.AttackId == attackId));
             Assert.False(result.Completed);
             Assert.Contains(events, e => e.Type == "check.result" && e.Actor == "server" && e.Message == check && !e.Check.Passed);
         }
@@ -279,9 +274,9 @@ namespace NetSec.Tests
         // ---------------------------------------------------------------- advisory 1: audience
 
         [Fact]
-        public void A_token_for_another_audience_is_refused_by_the_server()
+        public async System.Threading.Tasks.Task A_token_for_another_audience_is_refused_by_the_server()
         {
-            LabResult r = Login("token-audience", "https://other.training/api");
+            LabResult r = await Login("token-audience", "https://other.training/api");
             Assert.False(r.Completed, "the server took a token written for another audience");
             Assert.Equal("TOKEN_BAD_AUDIENCE", r.FailedCode);
             Assert.Equal("token audience", r.FailedCheck);

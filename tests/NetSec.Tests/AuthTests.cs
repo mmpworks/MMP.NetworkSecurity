@@ -247,12 +247,12 @@ namespace NetSec.Tests
             public string[] Sent(string actor) => Events.Where(e => e.Type == "wire.sent" && e.Actor == actor && !e.StreamId.Contains("auth-mtls")).Select(e => e.Message).ToArray();
         }
 
-        static Run Go(AttackDefinition attack = null, int seed = 7)
+        static async System.Threading.Tasks.Task<Run> Go(AttackDefinition attack = null, int seed = 7)
         {
             ListSink sink = new ListSink();
             LabContext c = new LabContext { SessionId = "s1", TraceId = "s1", Seed = seed, Gate = new FreeRunGate(), Sink = sink, Clock = new FixedClock(1), Random = new SeededRandom(seed), Attack = attack };
             IFuture<LabResult> future = new Lesson10Auth().Run(c);
-            Assert.True(future.Wait(60000), "the lab did not finish in 60 s");
+            Assert.True(await FutureWaits.Within(future, TimeSpan.FromMilliseconds(60000)), "the lab did not finish in 60 s");
             return new Run { Result = future.Result, Events = sink.Events };
         }
 
@@ -264,9 +264,9 @@ namespace NetSec.Tests
         }
 
         [Fact]
-        public void The_control_completes_with_the_named_messages_and_passes_every_check()
+        public async System.Threading.Tasks.Task The_control_completes_with_the_named_messages_and_passes_every_check()
         {
-            Run run = Go();
+            Run run = await Go();
             Assert.True(run.Result.Completed, run.Result.FailedCode + " " + run.Result.FailedCheck);
             Assert.Equal(new[] { "LoginRequest", "ChallengeResponse", "LoginDone", "ReadTotals", "VoidSale", "CallsDone" }, run.Sent("client"));
             Assert.Equal(new[] { "Challenge", "TokenIssued" }, run.Sent("issuer"));
@@ -277,9 +277,9 @@ namespace NetSec.Tests
         }
 
         [Fact]
-        public void Token_fields_add_up_to_the_wire_and_the_claims_show_as_text()
+        public async System.Threading.Tasks.Task Token_fields_add_up_to_the_wire_and_the_claims_show_as_text()
         {
-            Run run = Go();
+            Run run = await Go();
             TraceEvent read = run.Events.First(e => e.Type == "wire.sent" && e.Message == "ReadTotals");
             Assert.Equal(read.Wire.Length, read.Fields.Sum(f => f.Length));
             TraceField claims = read.Fields.Single(f => f.Name == "tokenClaims");
@@ -290,21 +290,21 @@ namespace NetSec.Tests
         }
 
         [Fact]
-        public void A_same_seed_rerun_gives_the_same_engine_bytes()
+        public async System.Threading.Tasks.Task A_same_seed_rerun_gives_the_same_engine_bytes()
         {
             string[] Lines(Run r) => r.Events.Where(e => !e.StreamId.EndsWith("/wire")).OrderBy(e => e.EventId, StringComparer.Ordinal).Select(TraceJson.ToLine).ToArray();
-            Assert.Equal(Lines(Go(null, 21)), Lines(Go(null, 21)));
+            Assert.Equal(Lines(await Go(null, 21)), Lines(await Go(null, 21)));
         }
 
         [Fact]
-        public void Every_row_stops_at_its_named_check_with_one_thing_changed()
+        public async System.Threading.Tasks.Task Every_row_stops_at_its_named_check_with_one_thing_changed()
         {
             AttackDefinition[] rows = AttackCatalog.All.Where(a => a.Lesson == 10).ToArray();
             Assert.Equal(13, rows.Length);
             foreach (AttackDefinition a in rows)
             {
                 Assert.Equal(1, (a.Plan != null ? 1 : 0) + a.Options.Length);
-                Run run = Go(a);
+                Run run = await Go(a);
                 Assert.False(run.Result.Completed, a.AttackId + " ran to the end");
                 Assert.Equal(a.ExpectCode, run.Result.FailedCode);
                 Assert.Equal(a.ExpectCheck, run.Result.FailedCheck);
@@ -316,9 +316,9 @@ namespace NetSec.Tests
         /// Only the device key, the bearer token and the last call (token plus DPoP proof) are listed as secrets.
         /// </summary>
         [Fact]
-        public void The_control_lists_the_device_key_the_token_and_the_last_call_as_its_only_secrets()
+        public async System.Threading.Tasks.Task The_control_lists_the_device_key_the_token_and_the_last_call_as_its_only_secrets()
         {
-            Run run = Go();
+            Run run = await Go();
             Assert.True(run.Result.Completed, run.Result.FailedCode + " " + run.Result.FailedCheck);
             TraceSecret[] secrets = run.Events.Where(e => e.Secrets != null && !e.StreamId.Contains("auth-mtls")).SelectMany(e => e.Secrets).ToArray();
             Assert.Equal(new[] { "client.auth.device-key", "client.auth.token", "client.auth.last-call" }, secrets.Select(s => s.Holder + "." + s.Name).Distinct().ToArray());
@@ -326,12 +326,12 @@ namespace NetSec.Tests
         }
 
         [Fact]
-        public void Every_secrets_row_the_lesson_10_tour_points_at_is_a_secret_the_control_lists()
+        public async System.Threading.Tasks.Task Every_secrets_row_the_lesson_10_tour_points_at_is_a_secret_the_control_lists()
         {
             string tour = System.IO.File.ReadAllText(TourFile(10));
             string[] targets = System.Text.RegularExpressions.Regex.Matches(tour, "\"secrets:row=(?<row>[^\"]+)\"").Cast<System.Text.RegularExpressions.Match>().Select(m => m.Groups["row"].Value).ToArray();
             Assert.NotEmpty(targets);
-            Run run = Go();
+            Run run = await Go();
             string[] listed = run.Events.Where(e => e.Secrets != null && !e.StreamId.Contains("auth-mtls")).SelectMany(e => e.Secrets).Select(s => s.Holder + "." + s.Name).Distinct().ToArray();
             foreach (string row in targets) Assert.True(listed.Contains(row), "lesson-10.json points at secrets row " + row + ", and the control lists only " + string.Join(", ", listed));
         }
@@ -348,11 +348,11 @@ namespace NetSec.Tests
         }
 
         [Fact]
-        public void The_flip_row_aims_inside_the_token_claims()
+        public async System.Threading.Tasks.Task The_flip_row_aims_inside_the_token_claims()
         {
             AttackDefinition change = AttackCatalog.All.Where(a => a.Lesson == 10).Single(a => a.AttackId == "L10-change-token-claim");
             Assert.Equal(Lesson10Auth.ClaimsOffset + 5, change.Plan.Offset);
-            Run control = Go();
+            Run control = await Go();
             TraceEvent read = control.Events.First(e => e.Type == "wire.sent" && e.Message == "ReadTotals");
             Assert.Equal(Lesson10Auth.ClaimsOffset, read.Fields.Single(f => f.Name == "tokenClaims").Offset);
         }
