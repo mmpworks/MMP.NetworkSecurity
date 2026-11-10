@@ -133,7 +133,7 @@ export function mixTerms(before: ArrayLike<number>, inverse: boolean): readonly 
   return Object.freeze(state.map((_, i) => {
     const c = i - (i % 4), r = i % 4
     const terms = [0, 1, 2, 3].map(j => term(row[(j - r + 4) % 4], state[c + j]))
-    const running = terms.reduce<number[]>((acc, t) => [...acc, (acc.at(-1) ?? 0) ^ t.result], [])
+    const running = terms.reduce<number[]>((acc, t) => [...acc, (acc[acc.length - 1] ?? 0) ^ t.result], [])
     return Object.freeze({ terms: Object.freeze(terms), running: frozen(running), result: running[3] })
   }))
 }
