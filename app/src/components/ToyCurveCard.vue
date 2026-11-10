@@ -1,8 +1,9 @@
 <script setup lang="ts">
-import { computed, onBeforeUnmount, ref, watch } from 'vue'
+import { computed, ref, watch } from 'vue'
 import { hostGet } from '../host'
 import { addr } from '../store'
 import { describe } from '../aesWalkState'
+import { useStepper } from '../useStepper'
 import { isO, ptAttrs, ptText, type EnginePoint, type ToyCurve, type ToyPick } from '../curveWalk'
 
 // The same curve over GF(17), as the video draws it next (slice P8a; R7): a scatter of the engine's 18 points plus O. Pick any 2 dots and the
@@ -59,22 +60,7 @@ const pickNote = computed(() => {
 })
 
 // ---- k*G hops: a marker walks from G through each multiple, and the 19th hop lands on O.
-const hop = ref<number | null>(null)
-const playing = ref(false)
-let timer: number | undefined
-const lastHop = computed(() => props.toy.hops.length - 1)
-function stopHops() { playing.value = false; if (timer !== undefined) window.clearTimeout(timer); timer = undefined }
-function nextHop() { stopHops(); hop.value = hop.value === null ? 0 : Math.min(hop.value + 1, lastHop.value) }
-function allHops() { stopHops(); hop.value = lastHop.value }
-function playHops() {
-  if (playing.value) { stopHops(); return }
-  if (hop.value === lastHop.value) hop.value = null
-  playing.value = true
-  const tick = () => { if (!playing.value) return; nextHopKeep(); if (hop.value === lastHop.value) { playing.value = false; return } timer = window.setTimeout(tick, 700) }
-  tick()
-}
-function nextHopKeep() { hop.value = hop.value === null ? 0 : Math.min(hop.value + 1, lastHop.value) }
-onBeforeUnmount(stopHops)
+const { at: hop, playing, next: nextHop, all: allHops, play: playHops } = useStepper({ last: () => props.toy.hops.length - 1, intervalMs: 700, nextWraps: false, all: 'last' })
 const hopPath = computed(() => {
   if (hop.value === null) return ''
   return props.toy.hops.slice(0, hop.value + 1).map((h, i) => { const p = at(h.point); return `${i ? 'L' : 'M'}${p.x},${p.y}` }).join(' ')

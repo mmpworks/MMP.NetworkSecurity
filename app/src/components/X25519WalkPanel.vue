@@ -1,6 +1,7 @@
 <script setup lang="ts">
-import { computed, onBeforeUnmount, ref, watch } from 'vue'
+import { computed, ref, watch } from 'vue'
 import { useWalk, type WalkFetch } from '../walkFetch'
+import { useStepper } from '../useStepper'
 
 // The X25519 walk (slice P8; docs/sections-plan.md section 4): the Montgomery ladder on the real engine, one row per bit, on RFC 7748
 // section 6.1's public test scalars (GET /api/walk/x25519). Each row shows the bit, the swap, and the 2 points R0 = (x2 : z2) and
@@ -21,23 +22,8 @@ const w = computed(() => walk.value.data)
 const stepInfo = computed(() => STEPS.find(s => s.id === stepId.value)!)
 
 // ---- Stepping: Next moves one row; Play moves on by itself.
-const at = ref<number | null>(null)
-const playing = ref(false)
-let timer: number | undefined
-const last = computed(() => (w.value ? w.value.rows.length - 1 : 0))
-function stop() { playing.value = false; if (timer !== undefined) window.clearTimeout(timer); timer = undefined }
-function advance() { at.value = at.value === null ? 0 : Math.min(at.value + 1, last.value) }
-function next() { stop(); advance() }
-function all() { stop(); at.value = last.value }
-function play() {
-  if (playing.value) { stop(); return }
-  if (at.value === last.value) at.value = null
-  playing.value = true
-  const tick = () => { if (!playing.value) return; advance(); if (at.value === last.value) { playing.value = false; return } timer = window.setTimeout(tick, 450) }
-  tick()
-}
-function pick(id: StepId) { stop(); stepId.value = id; at.value = null }
-onBeforeUnmount(stop)
+const { at, playing, next, all, play, reset } = useStepper({ last: () => (w.value ? w.value.rows.length - 1 : 0), intervalMs: 450, nextWraps: false, all: 'last' })
+function pick(id: StepId) { reset(); stepId.value = id }
 const now = computed(() => (w.value && at.value !== null ? w.value.rows[at.value] : null))
 
 const list = ref<HTMLElement | null>(null)
