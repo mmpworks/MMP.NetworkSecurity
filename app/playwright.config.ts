@@ -1,6 +1,7 @@
 // Lesson 0 end to end: the built renderer on `vite preview` and a real NetSec.Host process. One worker, because the Host keeps one session store.
 // NETSEC_HOST_DLL points at NetSec.Host.dll when the Host sits outside this checkout.
 import { defineConfig } from '@playwright/test'
+import { spawnSync } from 'node:child_process'
 import fs from 'node:fs'
 import os from 'node:os'
 import path from 'node:path'
@@ -46,6 +47,14 @@ if (!process.env.NETSEC_HOST_DLL) {
       + 'Rebuild it from the repo root: dotnet build src/NetSec.Host -c Release')
   }
 }
+
+// A fresh `npm install` can leave Electron half-installed (only dist/locales), and the real-Electron specs then fail 24 minutes into the run.
+// tools/electron_dist.py knows what a complete dist is; a broken one stops the run here with ELECTRON_DIST_INCOMPLETE and the repair command.
+// Windows only: the tool knows the Windows binary, and a Mac with no python on PATH must not throw here.
+const electronCheck = process.platform === 'win32'
+  ? spawnSync('python', ['-I', path.resolve(__dirname, '..', 'tools', 'electron_dist.py'), 'check', '--app-dir', __dirname], { encoding: 'utf8' })
+  : { status: 0, stdout: '', stderr: '', error: undefined }
+if (electronCheck.status !== 0) throw new Error((electronCheck.stdout || electronCheck.stderr || String(electronCheck.error) || 'electron_dist.py check failed').trim())
 
 // The Host reads its security folder once at start, and every spec on the Host port shares that Host, so a run has one folder. Without this line the Host
 // falls back to the tree's .security folder, which holds keys from earlier runs. Workers inherit the value, so the config makes one folder per run.

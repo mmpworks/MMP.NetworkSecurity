@@ -124,6 +124,7 @@ Step 'no package-runner check tests' { python -I tools/test_no_npx.py }
 Step 'app names the os transport os' { python -I tools/transport_name_lint.py }
 Step 'transport name lint tests' { python -I tools/test_transport_name_lint.py }
 Step 'run_status tests' { python -I tools/test_run_status.py }
+Step 'electron dist tests' { python -I tools/test_electron_dist.py }
 Step 'gate app decision tests' { python -I tools/test_gate_app.py }
 Step 'dist stamp tests' { python -I tools/test_dist_stamp.py }
 Step 'every tools test has a gate step' { python -I tools/check_tests_wired.py }
