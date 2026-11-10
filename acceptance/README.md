@@ -143,7 +143,7 @@ In the run above: `NOT_A_FRESH_RUN` for `A13.fresh-clone.acceptance-unchanged` (
 These appear later by design, each named in the report: `REFEREE_MISSING`, `REFEREE_VERSION`, `REFEREE_PROTOCOL`, `ROLE_CUT:<role>`, `LESSON_NOT_BUILT`, `NO_LESSON_INSTALLS_KEYS`,
 `ACCURACY_READER_PENDING`, `NO_CLAIMS_DECLARED`, `UI_CONTROL_MISSING`, `VECTORS_MISSING`, `SIBLING_MISSING`, `TOOL_MISSING`, `PIN_OFF`, `WIZARD_PART_NOT_BUILT`, `FILE_ROW_NOT_BUILT`.
 
-`UI_CONTROL_MISSING` is NOT RUN only when `"unbuilt"` in `acceptance/settings.json` names the control key. The list is empty by default. Any other missing control is a FAIL, `UI_CONTROL_MISSING_ON_SHIPPED_SCREEN`, with the same detail (#372). A new screen's clauses go in with their control keys on the list. The PR that runs them green takes the keys off.
+`UI_CONTROL_MISSING` is NOT RUN only when `"unbuilt"` in `acceptance/settings.json` names the control key. The list is empty by default. Any other missing control is a FAIL. The report's reason column says `ASSERTION`, and the detail starts with `UI_CONTROL_MISSING_ON_SHIPPED_SCREEN:`, then the same text (#372). A new screen's clauses go in with their control keys on the list. The PR that runs them green takes the keys off.
 
 ## 7. Open items
 
