@@ -412,6 +412,27 @@ namespace NetSec.Tests
             finally { silent.Stop(); }
         }
 
+        /// <summary>
+        /// ProbeResult.Detail is null only when the session completed (its doc). A probe that dials a closed port fails at the TCP connect, and on
+        /// both the TLS and the SSH route that failure names its message in Detail (Jared, #364 review, issue #366).
+        /// </summary>
+        [Theory]
+        [InlineData(WireProtocol.Tls13)]
+        [InlineData(WireProtocol.Ssh)]
+        public async System.Threading.Tasks.Task A_probe_that_cannot_connect_names_the_failure_in_Detail(WireProtocol protocol)
+        {
+            System.Net.Sockets.TcpListener closed = new System.Net.Sockets.TcpListener(IPAddress.Loopback, 0);
+            closed.Start();
+            int port = ((IPEndPoint)closed.LocalEndpoint).Port;
+            closed.Stop();
+            IFuture<ProbeResult> probe = Probe.Connect(new ProbeRequest { Protocol = protocol, Host = "127.0.0.1", Port = port, Seed = 1, DeadlineMs = 200 });
+            Assert.True(await FutureWaits.Within(probe, TimeSpan.FromMilliseconds(30000)), "the probe did not end in 30 s");
+            ProbeResult r = probe.Result;
+            Assert.False(r.Completed);
+            Assert.Equal(ErrorCodes.LinkLost, r.Code);
+            Assert.False(string.IsNullOrEmpty(r.Detail), protocol + ": Detail is empty on a failed connect");
+        }
+
         static async System.Threading.Tasks.Task<Pair> FlippedLength(int serverDeadlineMs, int clientDeadlineMs)
         {
             MemoryLink[] links = MemoryLink.Pair();
