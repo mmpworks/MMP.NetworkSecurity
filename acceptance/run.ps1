@@ -97,7 +97,9 @@ if ($Fresh -and -not $FreshChild) {
     git clone --quiet $ProductRoot $clone
     if ($LASTEXITCODE -ne 0) { throw "git clone failed" }
     $childArgs = @('-NoProfile', '-File', (Join-Path $clone 'acceptance\run.ps1'), '-Clauses', ($Clauses -join ','), '-ProductRoot', $clone,
-                   '-AsyncProxyRoot', $AsyncProxyRoot, '-NetCFRefDir', $NetCFRefDir, '-OutDir', $OutDir, '-FreshChild')
+                   '-AsyncProxyRoot', $AsyncProxyRoot, '-OutDir', $OutDir, '-FreshChild')
+    # Only an explicit -NetCFRefDir goes to the child. The child's own default then keeps its NOT RUN CF_REFERENCES_MISSING rows (Jared on #385).
+    if ($PSBoundParameters.ContainsKey('NetCFRefDir')) { $childArgs += @('-NetCFRefDir', $NetCFRefDir) }
     if ($SelfTest) { $childArgs += '-SelfTest' }
     & pwsh @childArgs
     $code = $LASTEXITCODE
