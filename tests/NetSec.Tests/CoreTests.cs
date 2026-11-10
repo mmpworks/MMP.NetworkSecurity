@@ -375,6 +375,43 @@ namespace NetSec.Tests
             Assert.True(close.IsCompleted && !close.IsFaulted, "a close after the end must stay a quiet success");
         }
 
+        /// <summary>The idle limit is set by role only (issue #309): the opener waits twice the read deadline, the acceptor three times. The detail names it.</summary>
+        [Theory]
+        [InlineData(true, "no bytes for 400 ms")]
+        [InlineData(false, "no bytes for 600 ms")]
+        public void A_silent_peer_waits_twice_the_deadline_as_opener_and_three_times_as_acceptor(bool opened, string detail)
+        {
+            MemoryLink[] links = MemoryLink.Pair();
+            EnginePump client = new EnginePump(EchoEngine.Client(Make.Hello, Make.Stream("client"), null), links[0], null, null, null, 200);
+            client.OpenedLink = opened;
+            IFuture<PumpResult> run = client.Run();
+            Make.Done(run);
+            Assert.Equal(ErrorCodes.LinkIdle, run.Result.Error.Code);
+            Assert.StartsWith(detail, run.Result.Error.Message);
+        }
+
+        /// <summary>
+        /// Issue #312 (Jared): a probe that dials out is the opener, so a silent peer ends it at twice the read deadline, never three times.
+        /// The peer is a listener that never accepts: the OS completes the connect, and no byte ever comes back.
+        /// </summary>
+        [Fact]
+        public void A_probe_that_dials_a_silent_peer_waits_the_openers_idle_limit()
+        {
+            System.Net.Sockets.TcpListener silent = new System.Net.Sockets.TcpListener(IPAddress.Loopback, 0);
+            silent.Start();
+            try
+            {
+                int port = ((IPEndPoint)silent.LocalEndpoint).Port;
+                IFuture<ProbeResult> probe = Probe.Connect(new ProbeRequest { Protocol = WireProtocol.Tls13, Host = "127.0.0.1", Port = port, Seed = 1, DeadlineMs = 200 });
+                Assert.True(probe.Wait(30000), "the probe did not end in 30 s");
+                ProbeResult r = probe.Result;
+                Assert.False(r.Completed);
+                Assert.Equal(ErrorCodes.LinkIdle, r.Code);
+                Assert.StartsWith("no bytes for 400 ms", r.Detail);
+            }
+            finally { silent.Stop(); }
+        }
+
         static Pair FlippedLength(int serverDeadlineMs, int clientDeadlineMs)
         {
             MemoryLink[] links = MemoryLink.Pair();

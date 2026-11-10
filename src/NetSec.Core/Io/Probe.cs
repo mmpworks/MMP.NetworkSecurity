@@ -37,12 +37,16 @@ namespace NetSec.Io
         public int Seed;
         /// <summary>The learner's keys (modes-design.md section 3.3). Null keeps the training keys. This build reads it on the SSH routes only.</summary>
         public CredentialSet Credentials;
+        /// <summary>The pump's read deadline in milliseconds, on the TLS routes. 0 keeps 20000. A test sets a small one to reach the idle limit fast.</summary>
+        public int DeadlineMs;
     }
 
     public sealed class ProbeResult
     {
         public bool Completed;
         public string Code, CheckName, Version, Suite, Group;
+        /// <summary>The failure's message, beside its Code. Null when the session completed.</summary>
+        public string Detail;
         public int AlertReceived;
         public string[] KeyLog;
         public byte[] Received;
@@ -123,7 +127,10 @@ namespace NetSec.Io
             List<byte> received = new List<byte>();
             CloseWhenDone[] watcher = new CloseWhenDone[1];
             if (r.Send != null) engine.Command(new EngineCommand(EngineCommandKind.Send, 0, r.Send, null));
-            EnginePump pump = new EnginePump(engine, link, new WatchedSink(events, delegate { watcher[0].OnEvent(); }), new FreeRunGate(), r.Tamper, DeadlineMs);
+            EnginePump pump = new EnginePump(engine, link, new WatchedSink(events, delegate { watcher[0].OnEvent(); }), new FreeRunGate(), r.Tamper, r.DeadlineMs > 0 ? r.DeadlineMs : DeadlineMs);
+            // The probe's client dials out, so it is the opener and waits the shorter idle limit (issue #309). The peer is an outside tool, so no tie
+            // was possible; this keeps the role rule the same in every pump.
+            pump.OpenedLink = isClient;
             watcher[0] = new CloseWhenDone(pump, engine, isClient && r.Send == null);
             pump.OnApp = delegate(AppChunk chunk)
             {
@@ -150,6 +157,7 @@ namespace NetSec.Io
             {
                 result.Code = run.Result.Error.Code;
                 result.CheckName = run.Result.Error.CheckName;
+                result.Detail = run.Result.Error.Message;
             }
             ret.Value = result;
         }
