@@ -146,7 +146,7 @@ namespace NetSec.Io
             yield return Futures.Observe(connect);
             if (connect.IsFaulted || connect.IsCanceled)
             {
-                ret.Value = Failed(ErrorCodes.LinkLost, "tcp connect", sink);
+                ret.Value = Failed(ErrorCodes.LinkLost, "tcp connect", connect.IsFaulted ? connect.Exception.Message : "connect canceled", sink);
                 yield break;
             }
 
@@ -181,7 +181,7 @@ namespace NetSec.Io
             socket.Close();
             if (accepted.IsFaulted || accepted.IsCanceled)
             {
-                ret.Value = Failed(ErrorCodes.LinkLost, "tcp accept", sink);
+                ret.Value = Failed(ErrorCodes.LinkLost, "tcp accept", accepted.IsFaulted ? accepted.Exception.Message : "accept canceled", sink);
                 yield break;
             }
             string allowed = r.TunnelTo;
@@ -202,6 +202,7 @@ namespace NetSec.Io
             {
                 result.Code = pump.Error.Code;
                 result.CheckName = pump.Error.CheckName;
+                result.Detail = pump.Error.Message;
             }
             result.Version = session.Info.Protocol;
             result.Suite = session.Info.Suite;
@@ -212,11 +213,12 @@ namespace NetSec.Io
             return result;
         }
 
-        static ProbeResult Failed(string code, string check, ListSink sink)
+        static ProbeResult Failed(string code, string check, string detail, ListSink sink)
         {
             ProbeResult result = new ProbeResult();
             result.Code = code;
             result.CheckName = check;
+            result.Detail = detail;
             result.KeyLog = new string[0];
             result.Events = sink.Events;
             return result;
