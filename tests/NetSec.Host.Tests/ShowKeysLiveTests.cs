@@ -273,6 +273,28 @@ public sealed class ShowKeysLiveTests
     }
 
     /// <summary>
+    /// A saved file whose trace.catch line is cut short (a crash mid-write) still replays to its end. The broken line is not a frame, so the
+    /// replay skips it and sends session.finished (Jared, #377 review: the replay parsed that line with a bare JsonNode.Parse).
+    /// </summary>
+    [Fact]
+    public async Task A_replay_skips_a_cut_short_catch_line_and_still_finishes()
+    {
+        using SecurityLiveTests.Host host = await SecurityLiveTests.Host.StartAsync();
+        string source = StartedFile(await host.Session(1));
+        string[] lines = File.ReadAllLines(source).Where(l => l.Length > 0 && !l.StartsWith(LabSession.CatchLinePrefix, StringComparison.Ordinal)).ToArray();
+        string cut = Path.Combine(Path.GetDirectoryName(source)!, "cut-catch.ndjson");
+        File.WriteAllLines(cut, lines.Append(LabSession.CatchLinePrefix + ",\"sessionId\":\"s"));
+
+        using Ws ws = new(host);
+        await ws.Open();
+        await ws.Send(new { type = "session.load", requestId = "cut", file = Path.GetFileName(cut) });
+        JsonElement finished = await ws.Until("session.finished");
+        Assert.Equal("replay", finished.GetProperty("outcome").GetString());
+        Assert.Equal(lines.Length, ws.Frames.Count(f => f.GetProperty("type").GetString() == "trace"));
+        Assert.DoesNotContain(ws.Frames, f => f.GetProperty("type").GetString() == LabSession.CatchType);
+    }
+
+    /// <summary>
     /// The same class as PR #140, in session.load: a replay must pick each line by the toggle as it is when the line goes out.
     /// A file of 3,000 padded lines keeps the replay running while the flip lands. 3,000 frames stay under the socket queue
     /// of 4,096, so no frame drops and the order the socket sees is the order the Host sent.

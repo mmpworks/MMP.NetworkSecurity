@@ -140,6 +140,9 @@ public sealed class LabSession : ITraceSink
         {
             WriteReady(_clock.Close());
             CatchResult k = TraceCatch.Find(_written);
+            // Find needs every clocked event of the run, so the list has no cap while the run lasts. Nothing reads it after the catch,
+            // so a finished session that stays in the session list keeps no copy of its events here.
+            _written.Clear();
             string frame = CatchFrame(SessionId, k);
             _fence.Pick(_ =>
             {

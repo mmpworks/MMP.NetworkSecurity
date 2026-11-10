@@ -62,6 +62,8 @@ public static class TraceCatch
 /// <summary>
 /// The page's order (design item 8): by (clock, side), and in write order on a tie. A clockless event takes the clock of its side's last engine
 /// event written before it, or 0 with none. Side is the engine stream after the session prefix; a wire event's side is its engine stream.
+/// The seam for the page's order. Today only LogicalClockTests call it, and app/src does not read "clock" yet. When the page orders by
+/// (clock, side), it must give the order this method gives, or the Host sends frames sorted with this method.
 /// </summary>
 public static class TraceOrder
 {
