@@ -291,11 +291,11 @@ namespace NetSec.Tests
         }
 
         [Fact]
-        public void Guess_text_states_the_stretch_and_the_limit_of_a_failed_guess()
+        public async System.Threading.Tasks.Task Guess_text_states_the_stretch_and_the_limit_of_a_failed_guess()
         {
             LabContext c = Context(Row("L11-guess-constant-time"));
             IFuture<LabResult> run = new TimingAttackLab().Run(c);
-            Make.Done(run);
+            await Make.Done(run);
             TraceEvent finished = Array.Find(((ListSink)c.Sink).Events, e => e.Type == "timing.guess.finished");
             Assert.Contains("stretched to 1,024 bytes", finished.Message);
             Assert.Contains("the timer runs in the same process", finished.Message);
@@ -303,11 +303,11 @@ namespace NetSec.Tests
         }
 
         [Fact]
-        public void Control_run_shows_both_histograms_the_verdict_the_guess_and_the_managed_statement()
+        public async System.Threading.Tasks.Task Control_run_shows_both_histograms_the_verdict_the_guess_and_the_managed_statement()
         {
             LabContext c = Context(null);
             IFuture<LabResult> run = new TimingAttackLab().Run(c);
-            Make.Done(run);
+            await Make.Done(run);
             TraceEvent[] events = ((ListSink)c.Sink).Events;
             Assert.True(run.Result.Completed, run.Result.FailedCode + " " + run.Result.FailedCheck);
             Assert.DoesNotContain(events, e => e.Check != null && !e.Check.Passed);
@@ -321,7 +321,7 @@ namespace NetSec.Tests
         }
 
         [Fact]
-        public void Guess_against_the_leaky_compare_recovers_the_secret_and_fails_no_check()
+        public async System.Threading.Tasks.Task Guess_against_the_leaky_compare_recovers_the_secret_and_fails_no_check()
         {
             // The guess loop reads real clock ticks, so a scheduler pause can hide the leak from one run on a loaded machine (the lab then says TimingNotSeparated).
             // One run in a row that recovers the secret proves the leak is readable, so a miss of this one kind gets up to three runs. Any other failure fails at once.
@@ -331,7 +331,7 @@ namespace NetSec.Tests
             {
                 LabContext c = Context(Row("L11-guess-leaky"));
                 IFuture<LabResult> run = new TimingAttackLab().Run(c);
-                Make.Done(run);
+                await Make.Done(run);
                 if (!run.Result.Completed && run.Result.FailedCode == ErrorCodes.TimingNotSeparated)
                 {
                     missed += " [run " + attempt + ": " + run.Result.FailedCode + " " + run.Result.FailedCheck + "]";
@@ -348,11 +348,11 @@ namespace NetSec.Tests
         }
 
         [Fact]
-        public void Guess_against_the_constant_time_compare_is_stopped_by_the_named_check()
+        public async System.Threading.Tasks.Task Guess_against_the_constant_time_compare_is_stopped_by_the_named_check()
         {
             LabContext c = Context(Row("L11-guess-constant-time"));
             IFuture<LabResult> run = new TimingAttackLab().Run(c);
-            Make.Done(run);
+            await Make.Done(run);
             Assert.False(run.Result.Completed);
             Assert.Equal(ErrorCodes.TimingGuessStopped, run.Result.FailedCode);
             Assert.Equal(TimingAttackLab.ConstantTimeCheck, run.Result.FailedCheck);
@@ -361,11 +361,11 @@ namespace NetSec.Tests
         }
 
         [Fact]
-        public void An_unknown_option_on_lesson_11_is_refused_by_name()
+        public async System.Threading.Tasks.Task An_unknown_option_on_lesson_11_is_refused_by_name()
         {
             AttackDefinition bad = new AttackDefinition { AttackId = "L11-nonsense", Lesson = 11, Options = new LabOption[0] };
             IFuture<LabResult> run = new TimingAttackLab().Run(Context(bad));
-            Make.Done(run);
+            await Make.Done(run);
             Assert.True(run.IsFaulted);
             Assert.Contains("L11-nonsense", run.Exception.Message);
         }
