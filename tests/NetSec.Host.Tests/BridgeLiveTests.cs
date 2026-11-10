@@ -88,10 +88,12 @@ namespace NetSec.Host.Tests
             public async Task<string> Line(string prefix, int ms = 30000)
             {
                 DateTime end = DateTime.UtcNow.AddMilliseconds(ms);
-                while (DateTime.UtcNow < end)
+                while (true)
                 {
+                    // Look first, then check the limit: a delay that wakes late still gets one last look (issue #367).
                     string hit = Lines.FirstOrDefault(l => l.StartsWith(prefix));
                     if (hit != null) return hit;
+                    if (DateTime.UtcNow >= end) break;
                     await Task.Delay(20);
                 }
                 throw new TimeoutException("no line starting '" + prefix + "'. Output: " + string.Join(" | ", Lines));
