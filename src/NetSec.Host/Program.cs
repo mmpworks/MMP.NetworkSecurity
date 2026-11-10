@@ -2,6 +2,7 @@ using System.Net.WebSockets;
 using System.Security.Cryptography;
 using System.Text;
 using System.Text.Json;
+using System.Text.Json.Nodes;
 using NetSec.Errors;
 using NetSec.Host;
 using NetSec.Host.OsTransport;
@@ -350,6 +351,14 @@ namespace NetSec.Host
             long seq = 0;
             foreach (string line in lines)
             {
+                // The saved trace.catch line goes out as its own frame under the replay's session id. A file saved before the clock has none.
+                if (line.StartsWith(LabSession.CatchLinePrefix, StringComparison.Ordinal))
+                {
+                    JsonObject catchFrame = JsonNode.Parse(line)!.AsObject();
+                    catchFrame["sessionId"] = sessionId;
+                    sessions.Broadcast(catchFrame.ToJsonString());
+                    continue;
+                }
                 long lineSeq = ++seq;
                 sessions.BroadcastPicked(show => $"{{\"type\":\"trace\",\"sessionId\":{JsonSerializer.Serialize(sessionId)},\"seq\":{lineSeq},\"event\":{(show ? line : TraceLines.HideLine(line))}}}");
             }

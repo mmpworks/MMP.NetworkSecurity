@@ -285,7 +285,8 @@ public sealed class ShowKeysLiveTests
     {
         using SecurityLiveTests.Host host = await SecurityLiveTests.Host.StartAsync();
         string source = StartedFile(await host.Session(1));
-        string[] lines = File.ReadAllLines(source).Where(l => l.Length > 0).ToArray();
+        // Trace lines only: a session file ends with its trace.catch line, which a replay sends as its own frame, not as a trace.
+        string[] lines = File.ReadAllLines(source).Where(l => l.Length > 0 && !l.StartsWith(LabSession.CatchLinePrefix, StringComparison.Ordinal)).ToArray();
         Assert.True(WithHex(SecretsOfText(string.Join("\n", lines))) > 0, "control: the ON file holds no hex");
         string big = Path.Combine(Path.GetDirectoryName(source)!, "replay-race.ndjson");
         var misses = new List<string>();
