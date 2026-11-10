@@ -96,7 +96,7 @@ test('[A19.ui.real-curve-chord-and-reflection] the real-curve picture draws P, Q
 test('[A19.ui.real-curve-tangent-doubling] picking the offered tangent draws the tangent at P, and R\' and R from the engine', async ({ page }) => {
   const real = await walk('/api/walk/real-curve');
   const s = Array.isArray(real.samples) ? real.samples.findIndex((e: any) => e.kind === 'tangent') : -1;
-  if (s < 0) throw new NotRun('PRODUCT_MISSING', '/api/walk/real-curve offers no tangent sample yet');
+  expect(s, '/api/walk/real-curve offers a tangent sample (CONTRACT.md, real-curve row)').toBeGreaterThanOrEqual(0);
   const t = real.samples[s];
   await openCurve(page);
   await page.getByTestId(`curve-real-sample-${s}`).click();
@@ -133,7 +133,7 @@ test('[A19.ui.toy-curve-free-pick] picking any 2 dots shows the engine\'s sum an
 
 test('[A19.ui.real-curve-offered-picks] each offered real-curve pick draws the engine\'s P, Q, R\' and R', async ({ page }) => {
   const real = await walk('/api/walk/real-curve');
-  if (!Array.isArray(real.samples)) throw new NotRun('PRODUCT_MISSING', '/api/walk/real-curve has no samples yet');
+  expect(Array.isArray(real.samples), '/api/walk/real-curve has samples (CONTRACT.md, real-curve row)').toBe(true);
   await openCurve(page);
   for (let s = 0; s < real.samples.length; s++) {
     const e = real.samples[s];
@@ -206,7 +206,6 @@ test('[A19.ui.x25519-ladder-rows-and-rfc-result] the X25519 screen shows one lad
   const x = await walk('/api/walk/x25519?step=alice-public');
   const rows: any[] = x.rows ?? [];
   expect(rows.length, 'the engine gives 255 rows, bit 254 down to 0').toBe(255);
-  if (rows.every(r => !('swap' in r))) throw new NotRun('PRODUCT_MISSING', 'the engine\'s X25519 rows carry no swap field yet');
   // CONTRACT.md's swap row: swap is the clamped key bit k_t (this engine swaps in, steps, swaps back), not RFC 7748's k_t XOR k_(t+1).
   // The Host clause A19.host.x25519-rows-carry-swap checks it against the clamped RFC 7748 scalar.
   for (let i = 0; i < 255; i++) {
