@@ -26,7 +26,7 @@ namespace NetSec.Tests
             });
         }
 
-        static ProbeResult Run(CredentialSet server, CredentialSet client, ITrainingKeySource pinFrom)
+        static async System.Threading.Tasks.Task<ProbeResult> Run(CredentialSet server, CredentialSet client, ITrainingKeySource pinFrom)
         {
             ProbeListener listener = Probe.Listen(new ProbeRequest { Protocol = WireProtocol.Ssh, Host = "127.0.0.1", SshSuite = SshSuite.Modern, Seed = 31, Credentials = server });
             string pin = Path.Combine(Path.GetTempPath(), "netsec-pin-" + Guid.NewGuid().ToString("N"));
@@ -34,24 +34,24 @@ namespace NetSec.Tests
             ProbeRequest connect = new ProbeRequest { Protocol = WireProtocol.Ssh, Host = "127.0.0.1", Port = listener.Port, SshSuite = SshSuite.Modern, Seed = 32,
                 KnownHostsFile = pin, ClientKeyId = KeyIds.SshClient, ExecCommand = "echo hello", Credentials = client };
             ProbeResult result = Probe.Connect(connect).Result;
-            listener.Result.Wait(30000);
+            await FutureWaits.Within(listener.Result, TimeSpan.FromMilliseconds(30000));
             return result;
         }
 
         [Fact]
-        public void A_server_and_a_client_on_the_learners_keys_reach_each_other()
+        public async System.Threading.Tasks.Task A_server_and_a_client_on_the_learners_keys_reach_each_other()
         {
             CredentialSet mine = Learner();
-            ProbeResult r = Run(mine, mine, mine);
+            ProbeResult r = await Run(mine, mine, mine);
             Assert.True(r.Completed, r.CheckName + " [" + r.Code + "]");
             Assert.Contains("hello", Encoding.ASCII.GetString(r.Received));
         }
 
         [Fact]
-        public void The_training_keys_do_not_reach_a_server_on_the_learners_keys()
+        public async System.Threading.Tasks.Task The_training_keys_do_not_reach_a_server_on_the_learners_keys()
         {
             CredentialSet mine = Learner();
-            ProbeResult userKey = Run(mine, null, mine), hostKey = Run(mine, mine, new TrainingKeySource());
+            ProbeResult userKey = await Run(mine, null, mine), hostKey = await Run(mine, mine, new TrainingKeySource());
             Assert.False(userKey.Completed, "the training user key was accepted by a server that holds the learner's set");
             Assert.False(hostKey.Completed, "a pin of the training host key accepted the learner's host key");
             // A timeout or a port clash also ends a probe early, so each refusal must carry its own code.

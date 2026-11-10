@@ -691,30 +691,30 @@ namespace NetSec.Tests
     /// <summary>Through real sockets, so a throw would show as LINK_LOST with no name. Jared's two cases from the verdict on PR 28.</summary>
     public class Tls13LabNamedFlipTests
     {
-        static LabResult Run(int lesson, TamperPlan plan)
+        static async System.Threading.Tasks.Task<LabResult> Run(int lesson, TamperPlan plan)
         {
             AttackDefinition attack = new AttackDefinition { AttackId = "test", Lesson = lesson, Kind = "flip-byte", Plan = plan, Options = new LabOption[0] };
             LabContext c = new LabContext { SessionId = "s1", TraceId = "s1", Seed = 7, Gate = new FreeRunGate(), Sink = new ListSink(), Clock = new FixedClock(1), Random = new SeededRandom(7), Attack = attack, DeadlineMs = 3000 };
             IFuture<LabResult> run = LabCatalog.Find(lesson).Run(c);
-            Assert.True(run.Wait(30000));
+            Assert.True(await FutureWaits.Within(run, TimeSpan.FromMilliseconds(30000)));
             return run.Result;
         }
 
         [Fact]
-        public void A_flipped_certificate_month_digit_names_certificate_parse()
+        public async System.Threading.Tasks.Task A_flipped_certificate_month_digit_names_certificate_parse()
         {
             byte[] leaf = TrainingPki.ServerCertificate(new TrainingCa(TlsKit.Keys), TlsKit.Keys.Find(KeyIds.ServerTlsEd25519));
             FieldMark before = Certificate.Parse(leaf).Marks(0, true).Single(m => m.Name == "cert.not_before");
             const int CertificateStart = 11;
-            LabResult result = Run(4, new TamperPlan { Point = TamperPoint.Plain, Message = "Certificate", Offset = CertificateStart + before.Offset + 4, Xor = 9 });
+            LabResult result = await Run(4, new TamperPlan { Point = TamperPoint.Plain, Message = "Certificate", Offset = CertificateStart + before.Offset + 4, Xor = 9 });
             Assert.Equal(DerReader.ParseCode, result.FailedCode);
             Assert.Equal("certificate parse", result.FailedCheck);
         }
 
         [Fact]
-        public void A_flipped_server_name_length_names_message_parse()
+        public async System.Threading.Tasks.Task A_flipped_server_name_length_names_message_parse()
         {
-            LabResult result = Run(4, new TamperPlan { Point = TamperPoint.Plain, Message = "ClientHello", Offset = 57, Xor = 4 });
+            LabResult result = await Run(4, new TamperPlan { Point = TamperPoint.Plain, Message = "ClientHello", Offset = 57, Xor = 4 });
             Assert.Equal(ErrorCodes.ParseTruncated, result.FailedCode);
             Assert.Equal("message parse", result.FailedCheck);
         }
@@ -727,11 +727,11 @@ namespace NetSec.Tests
         /// Only the shared secret tells the two cases apart: it differs for the key share, and it matches for the random.
         /// </summary>
         [Fact]
-        public void The_key_share_row_differs_from_a_random_flip_only_in_the_shared_secret()
+        public async System.Threading.Tasks.Task The_key_share_row_differs_from_a_random_flip_only_in_the_shared_secret()
         {
             LabContext shareRun = new LabContext { SessionId = "s1", TraceId = "s1", Seed = 7, Gate = new FreeRunGate(), Sink = new ListSink(), Clock = new FixedClock(1), Random = new SeededRandom(7), Attack = AttackCatalog.All.Single(a => a.AttackId == "L5-replace-key-share") };
             IFuture<LabResult> share = LabCatalog.Find(5).Run(shareRun);
-            Assert.True(share.Wait(30000));
+            Assert.True(await FutureWaits.Within(share, TimeSpan.FromMilliseconds(30000)));
             Assert.Equal(Tls13Codes.AeadTag, share.Result.FailedCode);
             TraceSecret[] shareSecrets = Shared(shareRun);
             Assert.Equal(2, shareSecrets.Length);
@@ -741,7 +741,7 @@ namespace NetSec.Tests
             AttackDefinition randomFlip = new AttackDefinition { AttackId = "test", Lesson = 5, Kind = "flip-byte", Options = new LabOption[0], Plan = new TamperPlan { Point = TamperPoint.Plain, Message = "ClientHello", Offset = RandomOffset } };
             LabContext randomRun = new LabContext { SessionId = "s1", TraceId = "s1", Seed = 7, Gate = new FreeRunGate(), Sink = new ListSink(), Clock = new FixedClock(1), Random = new SeededRandom(7), Attack = randomFlip };
             IFuture<LabResult> random = LabCatalog.Find(5).Run(randomRun);
-            Assert.True(random.Wait(30000));
+            Assert.True(await FutureWaits.Within(random, TimeSpan.FromMilliseconds(30000)));
             Assert.Equal(Tls13Codes.AeadTag, random.Result.FailedCode);
             TraceSecret[] randomSecrets = Shared(randomRun);
             Assert.Equal(2, randomSecrets.Length);

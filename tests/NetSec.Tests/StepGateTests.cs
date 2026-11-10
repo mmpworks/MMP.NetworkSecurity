@@ -27,25 +27,25 @@ namespace NetSec.Tests
         }
 
         [Fact]
-        public void A_step_that_releases_a_waiting_event_leaves_nothing_for_the_next_event()
+        public async System.Threading.Tasks.Task A_step_that_releases_a_waiting_event_leaves_nothing_for_the_next_event()
         {
             StepGate gate = new StepGate();
             IFuture first = gate.Pass(null);
             gate.Step();
-            Assert.True(first.Wait(5000));
+            Assert.True(await FutureWaits.Within(first, System.TimeSpan.FromMilliseconds(5000)));
             Assert.False(gate.Pass(null).IsCompleted);
         }
 
         [Fact]
-        public void Events_wait_in_order_and_each_step_releases_the_oldest()
+        public async System.Threading.Tasks.Task Events_wait_in_order_and_each_step_releases_the_oldest()
         {
             StepGate gate = new StepGate();
             IFuture first = gate.Pass(null), second = gate.Pass(null);
             gate.Step();
-            Assert.True(first.Wait(5000));
+            Assert.True(await FutureWaits.Within(first, System.TimeSpan.FromMilliseconds(5000)));
             Assert.False(second.IsCompleted);
             gate.Step();
-            Assert.True(second.Wait(5000));
+            Assert.True(await FutureWaits.Within(second, System.TimeSpan.FromMilliseconds(5000)));
         }
 
         [Fact]

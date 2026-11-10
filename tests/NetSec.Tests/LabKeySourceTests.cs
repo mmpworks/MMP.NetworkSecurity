@@ -58,12 +58,12 @@ namespace NetSec.Tests
             return new CredentialSet(Training, own.ToArray());
         }
 
-        static TraceEvent[] Run(int lesson, CredentialSet set)
+        static async System.Threading.Tasks.Task<TraceEvent[]> Run(int lesson, CredentialSet set)
         {
             ListSink sink = new ListSink();
             LabContext c = new LabContext { SessionId = "own", TraceId = "own", Seed = 7, Gate = new FreeRunGate(), Sink = sink, Clock = new FixedClock(1), Random = new SeededRandom(7), Credentials = set };
             IFuture<LabResult> run = LabCatalog.Find(lesson).Run(c);
-            Assert.True(run.Wait(60000), "the lab did not finish in 60 s");
+            Assert.True(await FutureWaits.Within(run, TimeSpan.FromMilliseconds(60000)), "the lab did not finish in 60 s");
             Assert.True(run.Result.Completed, "lesson " + lesson + " stopped at " + run.Result.FailedCode);
             return sink.Events;
         }
@@ -119,10 +119,10 @@ namespace NetSec.Tests
         [InlineData(8)]
         [InlineData(9)]
         [InlineData(10)]
-        public void A_lab_on_own_keys_shows_no_built_in_key(int lesson)
+        public async System.Threading.Tasks.Task A_lab_on_own_keys_shows_no_built_in_key(int lesson)
         {
             string[] read = RoutedPublicKeys.Where(k => Array.IndexOf(LabCatalog.Needs(lesson), SecurityTypes.OfKey(k)) >= 0).ToArray();
-            string[] hits = KeysInTrace(Run(lesson, AllOwn()), read);
+            string[] hits = KeysInTrace(await Run(lesson, AllOwn()), read);
             Assert.True(hits.Length == 0, "lesson " + lesson + " on own keys shows these built-in keys: " + string.Join(", ", hits));
         }
 
@@ -176,9 +176,9 @@ namespace NetSec.Tests
         }
 
         [Fact]
-        public void The_scan_sees_a_built_in_key_when_one_is_there()
+        public async System.Threading.Tasks.Task The_scan_sees_a_built_in_key_when_one_is_there()
         {
-            string[] hits = KeysInTrace(Run(7, CredentialSet.BuiltIn(Training)), RoutedPublicKeys);
+            string[] hits = KeysInTrace(await Run(7, CredentialSet.BuiltIn(Training)), RoutedPublicKeys);
             Assert.Contains(KeyIds.ServerTlsEd25519, hits);
             Assert.Contains(KeyIds.ServerTls11Rsa, hits);
         }
@@ -194,10 +194,10 @@ namespace NetSec.Tests
         [InlineData(8)]
         [InlineData(9)]
         [InlineData(10)]
-        public void A_lab_reads_only_keys_of_the_types_it_declares(int lesson)
+        public async System.Threading.Tasks.Task A_lab_reads_only_keys_of_the_types_it_declares(int lesson)
         {
             Spy spy = new Spy();
-            Run(lesson, CredentialSet.BuiltIn(spy));
+            await Run(lesson, CredentialSet.BuiltIn(spy));
             string[] needs = LabCatalog.Needs(lesson);
             foreach (string keyId in spy.Asked.Distinct())
             {

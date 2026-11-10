@@ -36,7 +36,7 @@ namespace NetSec.Tests
 
         /// <summary>The frame family runs in the labs only, so its case is a lab: a frame whose length claims 64 KiB more than it holds.</summary>
         [Fact]
-        public void Frame_engine_receiver_of_a_cut_short_frame_is_ended_by_its_read_deadline()
+        public async System.Threading.Tasks.Task Frame_engine_receiver_of_a_cut_short_frame_is_ended_by_its_read_deadline()
         {
             AttackDefinition longer = new AttackDefinition
             {
@@ -45,7 +45,7 @@ namespace NetSec.Tests
             };
             LabContext c = new LabContext { SessionId = "s1", TraceId = "s1", Seed = 7, Gate = new FreeRunGate(), Sink = new ListSink(), Clock = new FixedClock(1), Random = new SeededRandom(7), Attack = longer, DeadlineMs = 1000 };
             IFuture<LabResult> run = LabCatalog.Find(1).Run(c);
-            Assert.True(run.Wait(60000), "the lab did not finish");
+            Assert.True(await FutureWaits.Within(run, TimeSpan.FromMilliseconds(60000)), "the lab did not finish");
             TraceEvent[] events = ((ListSink)c.Sink).Events;
             string[] server = events.Where(e => e.Actor == "server" && e.Type == "check.result").Select(e => e.Message).ToArray();
             string[] client = events.Where(e => e.Actor == "client" && e.Type == "check.result").Select(e => e.Message).ToArray();

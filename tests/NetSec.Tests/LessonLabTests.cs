@@ -24,12 +24,12 @@ namespace NetSec.Tests
             public byte[] Secret(string actor, string name) => Of("kex.secret.computed").Where(e => e.Actor == actor).SelectMany(e => e.Secrets).Single(s => s.Name == name).Bytes;
         }
 
-        static Run Go(int lesson, AttackDefinition attack = null, int seed = 7)
+        static async System.Threading.Tasks.Task<Run> Go(int lesson, AttackDefinition attack = null, int seed = 7)
         {
             ListSink sink = new ListSink();
             LabContext c = new LabContext { SessionId = "s1", TraceId = "s1", Seed = seed, Gate = new FreeRunGate(), Sink = sink, Clock = new FixedClock(1), Random = new SeededRandom(seed), Attack = attack };
             IFuture<LabResult> future = LabCatalog.Find(lesson).Run(c);
-            Assert.True(future.Wait(60000), "the lab did not finish in 60 s");
+            Assert.True(await FutureWaits.Within(future, TimeSpan.FromMilliseconds(60000)), "the lab did not finish in 60 s");
             return new Run { Result = future.Result, Events = sink.Events };
         }
 
@@ -42,9 +42,9 @@ namespace NetSec.Tests
         [InlineData(1)]
         [InlineData(2)]
         [InlineData(3)]
-        public void Each_lesson_completes_and_both_sides_send(int lesson)
+        public async System.Threading.Tasks.Task Each_lesson_completes_and_both_sides_send(int lesson)
         {
-            Run run = Go(lesson);
+            Run run = await Go(lesson);
             Assert.True(run.Result.Completed, run.Result.FailedCode + " " + run.Result.FailedCheck);
             Assert.NotEmpty(run.Sent("client"));
             Assert.NotEmpty(run.Sent("server"));
@@ -55,11 +55,11 @@ namespace NetSec.Tests
         [InlineData(1)]
         [InlineData(2)]
         [InlineData(3)]
-        public void A_same_seed_rerun_gives_the_same_engine_bytes(int lesson)
+        public async System.Threading.Tasks.Task A_same_seed_rerun_gives_the_same_engine_bytes(int lesson)
         {
             string[] Lines(Run r) => r.Events.Where(e => !e.StreamId.EndsWith("/wire")).OrderBy(e => e.EventId, StringComparer.Ordinal).Select(TraceJson.ToLine).ToArray();
-            Assert.Equal(Lines(Go(lesson, null, 21)), Lines(Go(lesson, null, 21)));
-            Assert.NotEqual(Lines(Go(lesson, null, 21)), Lines(Go(lesson, null, 22)));
+            Assert.Equal(Lines(await Go(lesson, null, 21)), Lines(await Go(lesson, null, 21)));
+            Assert.NotEqual(Lines(await Go(lesson, null, 21)), Lines(await Go(lesson, null, 22)));
         }
 
         /// <summary>
@@ -70,9 +70,9 @@ namespace NetSec.Tests
         [InlineData(1, "96aedafa541b5c3eafc972f0b21534dbccd385a3")]
         [InlineData(2, "033931d977ab44f5268abf662084e0de6a75c0a0")]
         [InlineData(3, "7a6fcd9878e6188fcff35ef9e4684ce0e9250b4b")]
-        public void The_engine_bytes_for_a_seed_are_the_same_on_both_builds(int lesson, string pin)
+        public async System.Threading.Tasks.Task The_engine_bytes_for_a_seed_are_the_same_on_both_builds(int lesson, string pin)
         {
-            Run run = Go(lesson, null, 31);
+            Run run = await Go(lesson, null, 31);
             byte[] lines = System.Text.Encoding.UTF8.GetBytes(string.Join("\n", run.Events.Where(e => !e.StreamId.EndsWith("/wire")).OrderBy(e => e.EventId, StringComparer.Ordinal).Select(TraceJson.ToLine).ToArray()));
             NetSec.Crypto.IHash hash = NetSec.Crypto.Hashes.Sha256();
             hash.Update(lines, 0, lines.Length);
@@ -80,9 +80,9 @@ namespace NetSec.Tests
         }
 
         [Fact]
-        public void Lesson_1_sends_the_named_messages_in_order()
+        public async System.Threading.Tasks.Task Lesson_1_sends_the_named_messages_in_order()
         {
-            Run run = Go(1);
+            Run run = await Go(1);
             Assert.Equal(new[] { "TextGcm1", "TextCbc", "PictureEcb", "PictureCbc", "PictureGcm", "TextGcm2" }, run.Sent("client"));
             Assert.Equal(new[] { "AesDone" }, run.Sent("server"));
             Assert.Equal(new[] { "GCM tag", "nonce reuse detector" }, run.PassedChecks);
@@ -90,9 +90,9 @@ namespace NetSec.Tests
         }
 
         [Fact]
-        public void Lesson_1_ecb_shows_repeated_blocks_and_cbc_and_gcm_show_none()
+        public async System.Threading.Tasks.Task Lesson_1_ecb_shows_repeated_blocks_and_cbc_and_gcm_show_none()
         {
-            Run run = Go(1);
+            Run run = await Go(1);
             Assert.True(Number(run.Measure("PictureEcb").Detail, "repeats") > 100, run.Measure("PictureEcb").Detail);
             Assert.Equal(0, Number(run.Measure("PictureCbc").Detail, "repeats"));
             Assert.Equal(0, Number(run.Measure("PictureGcm").Detail, "repeats"));
@@ -100,9 +100,9 @@ namespace NetSec.Tests
         }
 
         [Fact]
-        public void Lesson_1_the_server_sees_the_clear_picture_and_the_wire_does_not_hold_it()
+        public async System.Threading.Tasks.Task Lesson_1_the_server_sees_the_clear_picture_and_the_wire_does_not_hold_it()
         {
-            Run run = Go(1);
+            Run run = await Go(1);
             TraceEvent sent = run.Of("wire.sent").Single(e => e.Message == "PictureGcm");
             TraceEvent got = run.Of("aes.message.received").Single(e => e.Message == "PictureGcm");
             Assert.Equal(64 * 64, got.Plain.Length);
@@ -115,9 +115,9 @@ namespace NetSec.Tests
         }
 
         [Fact]
-        public void Lesson_1_use_ecb_leaks_in_the_text_and_no_check_fires()
+        public async System.Threading.Tasks.Task Lesson_1_use_ecb_leaks_in_the_text_and_no_check_fires()
         {
-            Run run = Go(1, Attack("L1-use-ecb"));
+            Run run = await Go(1, Attack("L1-use-ecb"));
             Assert.True(run.Result.Completed);
             Assert.Contains("TextEcb", run.Sent("client"));
             Assert.DoesNotContain("TextCbc", run.Sent("client"));
@@ -125,9 +125,9 @@ namespace NetSec.Tests
         }
 
         [Fact]
-        public void Lesson_1_cbc_flip_garbles_one_block_and_flips_one_bit_in_the_next_and_no_check_fires()
+        public async System.Threading.Tasks.Task Lesson_1_cbc_flip_garbles_one_block_and_flips_one_bit_in_the_next_and_no_check_fires()
         {
-            Run run = Go(1, Attack("L1-flip-cbc"));
+            Run run = await Go(1, Attack("L1-flip-cbc"));
             Assert.True(run.Result.Completed);
             byte[] clear = run.Of("wire.sent").Single(e => e.Message == "TextCbc").Plain;
             byte[] got = run.Of("aes.message.received").Single(e => e.Message == "TextCbc").Plain;
@@ -137,9 +137,9 @@ namespace NetSec.Tests
         }
 
         [Fact]
-        public void Lesson_2_seals_pass_and_the_avalanche_changes_about_half_the_bits()
+        public async System.Threading.Tasks.Task Lesson_2_seals_pass_and_the_avalanche_changes_about_half_the_bits()
         {
-            Run run = Go(2);
+            Run run = await Go(2);
             Assert.Equal(new[] { "PlainHashSealed", "KeyedHashSealed", "HmacSealed", "CmacSealed" }, run.Sent("client"));
             Assert.Equal(new[] { "SealDone" }, run.Sent("server"));
             Assert.Equal(new[] { "hash compare", "keyed hash compare", "HMAC compare", "CMAC compare" }, run.PassedChecks);
@@ -151,23 +151,23 @@ namespace NetSec.Tests
         }
 
         [Fact]
-        public void Lesson_2_length_extension_forges_the_keyed_hash_and_fails_on_hmac()
+        public async System.Threading.Tasks.Task Lesson_2_length_extension_forges_the_keyed_hash_and_fails_on_hmac()
         {
-            Run keyed = Go(2, Attack("L2-extend-keyed-hash"));
+            Run keyed = await Go(2, Attack("L2-extend-keyed-hash"));
             Assert.True(keyed.Result.Completed, keyed.Result.FailedCode);
             byte[] forged = keyed.Of("seal.message.received").Single(e => e.Message == "KeyedHashSealed").Plain;
             Assert.True(forged.Length > Lesson02Seals.Message.Length, "the server did not read the longer forged message");
             Assert.Contains("keyed hash compare", keyed.PassedChecks);
 
-            Run hmac = Go(2, Attack("L2-extend-hmac"));
+            Run hmac = await Go(2, Attack("L2-extend-hmac"));
             Assert.False(hmac.Result.Completed);
             Assert.Equal("HMAC compare", hmac.Result.FailedCheck);
         }
 
         [Fact]
-        public void Lesson_3_each_round_gives_both_sides_the_same_secret_at_the_named_sizes()
+        public async System.Threading.Tasks.Task Lesson_3_each_round_gives_both_sides_the_same_secret_at_the_named_sizes()
         {
-            Run run = Go(3);
+            Run run = await Go(3);
             foreach ((string name, int size) in new[] { ("x25519.shared", 32), ("mlkem.shared", 32), ("hybrid.shared", 64) })
             {
                 Assert.Equal(size, run.Secret("client", name).Length);
@@ -177,9 +177,9 @@ namespace NetSec.Tests
         }
 
         [Fact]
-        public void Lesson_3_shares_have_the_named_sizes()
+        public async System.Threading.Tasks.Task Lesson_3_shares_have_the_named_sizes()
         {
-            Run run = Go(3);
+            Run run = await Go(3);
             int Size(string message) => run.Of("wire.sent").Single(e => e.Message == message).Wire.Length - Frame.HeaderSize;
             Assert.Equal(32, Size("X25519ClientShare"));
             Assert.Equal(32, Size("X25519ServerShare"));
@@ -192,9 +192,9 @@ namespace NetSec.Tests
         }
 
         [Fact]
-        public void Lesson_3_a_flipped_ciphertext_gives_no_error_and_only_confirmation_catches_it()
+        public async System.Threading.Tasks.Task Lesson_3_a_flipped_ciphertext_gives_no_error_and_only_confirmation_catches_it()
         {
-            Run run = Go(3, Attack("L3-flip-mlkem-ciphertext"));
+            Run run = await Go(3, Attack("L3-flip-mlkem-ciphertext"));
             Assert.Equal("key confirmation MAC", run.Result.FailedCheck);
             Assert.NotEqual(run.Secret("client", "mlkem.shared"), run.Secret("server", "mlkem.shared"));
         }

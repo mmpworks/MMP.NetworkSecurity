@@ -21,16 +21,16 @@ namespace NetSec.Tests
         static readonly byte[] Bdk = new TrainingKeySource().Find(KeyIds.DukptBdk128).CopyMaterial();
 
         static DukptPinPad NewPad() => new DukptPinPad(DukptBank.DeriveInitialKey(Bdk, KeyId), KeyId);
-        static ExternalForwardLink OpenForward(ListSink sink, out System.Net.Sockets.TcpListener listener, out System.Net.Sockets.Socket peer)
+        static async System.Threading.Tasks.Task<(ExternalForwardLink Link, System.Net.Sockets.TcpListener Listener, System.Net.Sockets.Socket Peer)> OpenForward(ListSink sink)
         {
-            listener = new System.Net.Sockets.TcpListener(System.Net.IPAddress.Loopback, 0);
+            System.Net.Sockets.TcpListener listener = new System.Net.Sockets.TcpListener(System.Net.IPAddress.Loopback, 0);
             listener.Start();
             ExternalForwardLink link = new ExternalForwardLink((System.Net.IPEndPoint)listener.LocalEndpoint, sink, "t/ce/local", "t", new FixedClock(1));
             IFuture opened = link.Open();
-            peer = listener.AcceptSocket();
-            Assert.True(opened.Wait(20000));
+            System.Net.Sockets.Socket peer = listener.AcceptSocket();
+            Assert.True(await FutureWaits.Within(opened, TimeSpan.FromMilliseconds(20000)));
             Assert.False(opened.IsFaulted);
-            return link;
+            return (link, listener, peer);
         }
 
         /// <summary>Always has bytes, takes every write, and ignores Close. It counts what was read from it.</summary>
@@ -58,13 +58,13 @@ namespace NetSec.Tests
         // The endless link completes every read at once, so a copy that never stops never yields either: Join runs on its own background thread,
         // under a bound. The ended link goes first, so its direction ends before the endless one starts.
         [Fact]
-        public void When_one_direction_of_a_relay_ends_the_other_stops_reading()
+        public async System.Threading.Tasks.Task When_one_direction_of_a_relay_ends_the_other_stops_reading()
         {
             EndlessLink endless = new EndlessLink();
             IFuture joined = null;
             System.Threading.Thread joiner = new System.Threading.Thread(() => joined = BridgeRelay.Join(new EndedLink(), endless)) { IsBackground = true };
             joiner.Start();
-            Assert.True(joiner.Join(5000) && joined.Wait(5000), "the relay was still reading after 5 s, with " + endless.Taken + " bytes taken");
+            Assert.True(joiner.Join(5000) && await FutureWaits.Within(joined, TimeSpan.FromMilliseconds(5000)), "the relay was still reading after 5 s, with " + endless.Taken + " bytes taken");
             System.Threading.Thread.Sleep(500);
             long settled = endless.Taken;
             System.Threading.Thread.Sleep(1000);
@@ -73,16 +73,14 @@ namespace NetSec.Tests
 
         /// <summary>The same rule as the pump's: a wire.sent whose bytes may not have left is followed by an event that says so, and the caller still sees the fault.</summary>
         [Fact]
-        public void A_lost_CE_write_says_so_in_the_trace_and_still_faults()
+        public async System.Threading.Tasks.Task A_lost_CE_write_says_so_in_the_trace_and_still_faults()
         {
             ListSink sink = new ListSink();
-            System.Net.Sockets.TcpListener listener;
-            System.Net.Sockets.Socket peer;
-            ExternalForwardLink link = OpenForward(sink, out listener, out peer);
-            link.Close().Wait(20000);
+            (ExternalForwardLink link, System.Net.Sockets.TcpListener listener, System.Net.Sockets.Socket peer) = await OpenForward(sink);
+            await FutureWaits.Within(link.Close(), TimeSpan.FromMilliseconds(20000));
 
             IFuture send = link.Send(new byte[] { 1, 2, 3 });
-            Assert.True(send.Wait(20000));
+            Assert.True(await FutureWaits.Within(send, TimeSpan.FromMilliseconds(20000)));
             peer.Close();
             listener.Stop();
 
@@ -98,17 +96,15 @@ namespace NetSec.Tests
         }
 
         [Fact]
-        public void A_CE_write_that_completes_logs_no_failure()
+        public async System.Threading.Tasks.Task A_CE_write_that_completes_logs_no_failure()
         {
             ListSink sink = new ListSink();
-            System.Net.Sockets.TcpListener listener;
-            System.Net.Sockets.Socket peer;
-            ExternalForwardLink link = OpenForward(sink, out listener, out peer);
+            (ExternalForwardLink link, System.Net.Sockets.TcpListener listener, System.Net.Sockets.Socket peer) = await OpenForward(sink);
 
             IFuture send = link.Send(new byte[] { 1, 2, 3 });
-            Assert.True(send.Wait(20000));
+            Assert.True(await FutureWaits.Within(send, TimeSpan.FromMilliseconds(20000)));
             Assert.False(send.IsFaulted);
-            link.Close().Wait(20000);
+            await FutureWaits.Within(link.Close(), TimeSpan.FromMilliseconds(20000));
             peer.Close();
             listener.Stop();
 
@@ -128,7 +124,7 @@ namespace NetSec.Tests
         }
 
         [Fact]
-        public void A_lost_CE_write_ends_the_relay_and_names_the_write()
+        public async System.Threading.Tasks.Task A_lost_CE_write_ends_the_relay_and_names_the_write()
         {
             LinkListener padListener = new LinkListener(new System.Net.IPEndPoint(System.Net.IPAddress.Loopback, 0));
             IFuture<SocketLink> accepted = padListener.Accept();
@@ -140,10 +136,10 @@ namespace NetSec.Tests
             options.Clock = new FixedClock(1);
             IFuture<CeRunResult> run = CeDeviceFlow.Run(options);
 
-            Assert.True(accepted.Wait(20000));
-            Assert.True(FrameIo.WriteFrame(accepted.Result, Sell().Envelope.Bytes).Wait(20000));
+            Assert.True(await FutureWaits.Within(accepted, TimeSpan.FromMilliseconds(20000)));
+            Assert.True(await FutureWaits.Within(FrameIo.WriteFrame(accepted.Result, Sell().Envelope.Bytes), TimeSpan.FromMilliseconds(20000)));
 
-            Assert.True(run.Wait(5000), "the relay read after the lost write");
+            Assert.True(await FutureWaits.Within(run, TimeSpan.FromMilliseconds(5000)), "the relay read after the lost write");
             accepted.Result.Close();
             padListener.Close();
             Assert.False(run.Result.Ok);
@@ -190,26 +186,26 @@ namespace NetSec.Tests
         }
 
         [Fact]
-        public void A_tunnel_with_no_bytes_opens_nothing_on_the_next_hop()
+        public async System.Threading.Tasks.Task A_tunnel_with_no_bytes_opens_nothing_on_the_next_hop()
         {
             int opens = 0;
             FirstWriteOpensLink link = new FirstWriteOpensLink(() => { opens++; return Futures.FromResult<IByteLink>(new OneLink()); });
             IFuture<int> read = link.Read(new byte[4], 0, 4);
             Assert.False(read.IsCompleted);
             link.Close();
-            Assert.True(read.Wait(5000));
+            Assert.True(await FutureWaits.Within(read, TimeSpan.FromMilliseconds(5000)));
             Assert.Equal(0, read.Result);
             Assert.Equal(0, opens);
         }
 
         [Fact]
-        public void The_first_write_opens_the_next_hop_once_and_the_close_reaches_it()
+        public async System.Threading.Tasks.Task The_first_write_opens_the_next_hop_once_and_the_close_reaches_it()
         {
             int opens = 0;
             OneLink inner = new OneLink();
             FirstWriteOpensLink link = new FirstWriteOpensLink(() => { opens++; return Futures.FromResult<IByteLink>(inner); });
-            Assert.True(link.Write(new byte[1], 0, 1).Wait(5000));
-            Assert.True(link.Write(new byte[1], 0, 1).Wait(5000));
+            Assert.True(await FutureWaits.Within(link.Write(new byte[1], 0, 1), TimeSpan.FromMilliseconds(5000)));
+            Assert.True(await FutureWaits.Within(link.Write(new byte[1], 0, 1), TimeSpan.FromMilliseconds(5000)));
             Assert.Equal(1, opens);
             Assert.Equal(2, inner.Writes);
             link.Close();
@@ -352,37 +348,37 @@ namespace NetSec.Tests
         }
 
         [Fact]
-        public void Frames_cross_a_link_and_a_close_at_a_boundary_reads_as_null()
+        public async System.Threading.Tasks.Task Frames_cross_a_link_and_a_close_at_a_boundary_reads_as_null()
         {
             MemoryLink[] links = MemoryLink.Pair();
-            Make.Done(FrameIo.WriteFrame(links[0], new byte[] { 1, 2, 3 }));
+            await Make.Done(FrameIo.WriteFrame(links[0], new byte[] { 1, 2, 3 }));
             IFuture<byte[]> first = FrameIo.ReadFrame(links[1]);
-            Make.Done(first);
+            await Make.Done(first);
             Assert.Equal(new byte[] { 1, 2, 3 }, first.Result);
             links[0].Close();
             IFuture<byte[]> second = FrameIo.ReadFrame(links[1]);
-            Make.Done(second);
+            await Make.Done(second);
             Assert.Null(second.Result);
         }
 
         [Fact]
-        public void A_frame_header_with_a_huge_length_faults_the_read()
+        public async System.Threading.Tasks.Task A_frame_header_with_a_huge_length_faults_the_read()
         {
             MemoryLink[] links = MemoryLink.Pair();
-            Make.Done(links[0].Write(new byte[] { 0x7F, 0xFF, 0xFF, 0xFF }, 0, 4));
+            await Make.Done(links[0].Write(new byte[] { 0x7F, 0xFF, 0xFF, 0xFF }, 0, 4));
             IFuture<byte[]> read = FrameIo.ReadFrame(links[1]);
-            Make.Done(read);
+            await Make.Done(read);
             Assert.True(read.IsFaulted);
         }
 
         [Fact]
-        public void A_close_inside_a_frame_faults_the_read()
+        public async System.Threading.Tasks.Task A_close_inside_a_frame_faults_the_read()
         {
             MemoryLink[] links = MemoryLink.Pair();
-            Make.Done(links[0].Write(new byte[] { 0, 0, 0, 9, 1, 2 }, 0, 6));
+            await Make.Done(links[0].Write(new byte[] { 0, 0, 0, 9, 1, 2 }, 0, 6));
             links[0].Close();
             IFuture<byte[]> read = FrameIo.ReadFrame(links[1]);
-            Make.Done(read);
+            await Make.Done(read);
             Assert.True(read.IsFaulted);
         }
 

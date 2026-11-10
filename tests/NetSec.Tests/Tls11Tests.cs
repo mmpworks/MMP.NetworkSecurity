@@ -316,7 +316,7 @@ namespace NetSec.Tests
         [Theory]
         [InlineData("TLS_RSA_WITH_AES_128_CBC_SHA", "AES128-SHA")]
         [InlineData("TLS_ECDHE_RSA_WITH_AES_128_CBC_SHA", "ECDHE-RSA-AES128-SHA")]
-        public void OpenSsl_default_client_verifies_the_glass_server_and_sends_data(string suite, string openSslName)
+        public async System.Threading.Tasks.Task OpenSsl_default_client_verifies_the_glass_server_and_sends_data(string suite, string openSslName)
         {
             string dir = System.IO.Path.Combine(System.IO.Path.GetTempPath(), "tls11-sclient-" + Guid.NewGuid().ToString("N"));
             TrainingPki.Export(dir);
@@ -337,7 +337,7 @@ namespace NetSec.Tests
                 client.BeginErrorReadLine();
                 client.StandardInput.Write("hello\n");
                 client.StandardInput.Flush();
-                Assert.True(listener.Result.Wait(30000), "the glass server did not finish in 30 s");
+                Assert.True(await FutureWaits.Within(listener.Result, TimeSpan.FromMilliseconds(30000)), "the glass server did not finish in 30 s");
                 client.StandardInput.Close();
                 Assert.True(client.WaitForExit(15000), "s_client did not exit in 15 s");
                 client.WaitForExit();
@@ -511,15 +511,15 @@ namespace NetSec.Tests
         }
 
         [Fact]
-        public void A_lost_alert_write_leaves_the_engines_named_failure()
+        public async System.Threading.Tasks.Task A_lost_alert_write_leaves_the_engines_named_failure()
         {
             IFuture<PumpResult> run = new EnginePump(Client(Tls11CipherSuite.RsaAes128CbcSha), new WriteFailsLink(Hex.Decode("1603027fff")), new NullSink(), new FreeRunGate(), null, 5000).Run();
-            Assert.True(run.Wait(10000), "the pump did not end");
+            Assert.True(await FutureWaits.Within(run, TimeSpan.FromMilliseconds(10000)), "the pump did not end");
             Assert.Equal(Tls11Codes.RecordOverflow, run.Result.Error.Code);
         }
 
         [Fact]
-        public void A_reader_that_stops_reading_gets_a_named_error_past_the_queue_cap()
+        public async System.Threading.Tasks.Task A_reader_that_stops_reading_gets_a_named_error_past_the_queue_cap()
         {
             MemoryLink[] links = MemoryLink.Pair();
             GlassTransportFactory factory = new GlassTransportFactory(Keys);
@@ -530,34 +530,34 @@ namespace NetSec.Tests
             for (int i = 0; i < 40 && caught == null; i++)
             {
                 IFuture sent = client.Send(0, chunk);
-                Assert.True(sent.Wait(60000), "a send did not drain in 60 s");
+                Assert.True(await FutureWaits.Within(sent, TimeSpan.FromMilliseconds(60000)), "a send did not drain in 60 s");
                 System.Threading.Thread.Sleep(i > 16 ? 200 : 0);
-                if (i > 16) caught = Receive(server);
+                if (i > 16) caught = await Receive(server);
             }
             Assert.NotNull(caught);
             Assert.Equal(ErrorCodes.ChannelBufferFull, caught.Error.Code);
         }
 
-        static NetSecException Receive(ISecureChannel channel)
+        static async System.Threading.Tasks.Task<NetSecException> Receive(ISecureChannel channel)
         {
             IFuture<AppChunk> received = channel.Receive();
-            if (!received.Wait(5000) || !received.IsFaulted) return null;
+            if (!await FutureWaits.Within(received, TimeSpan.FromMilliseconds(5000)) || !received.IsFaulted) return null;
             return received.Exception as NetSecException ?? received.Exception.InnerException as NetSecException;
         }
 
         [Fact]
-        public void A_silent_peer_ends_in_the_pump_deadline()
+        public async System.Threading.Tasks.Task A_silent_peer_ends_in_the_pump_deadline()
         {
             MemoryLink[] pair = MemoryLink.Pair();
             IFuture<PumpResult> run = new EnginePump(Client(Tls11CipherSuite.RsaAes128CbcSha), pair[0], new NullSink(), new FreeRunGate(), null, 200).Run();
-            Assert.True(run.Wait(10000), "the pump did not end");
+            Assert.True(await FutureWaits.Within(run, TimeSpan.FromMilliseconds(10000)), "the pump did not end");
             // The peer sent nothing, so no part of a frame waits, and the idle limit ends the run (issue #309).
             Assert.Equal(ErrorCodes.LinkIdle, run.Result.Error.Code);
             Assert.Equal("idle limit", run.Result.Error.CheckName);
         }
 
         [Fact]
-        public void The_glass_factory_opens_tls11_under_the_ce_profile_and_carries_bytes()
+        public async System.Threading.Tasks.Task The_glass_factory_opens_tls11_under_the_ce_profile_and_carries_bytes()
         {
             MemoryLink[] links = MemoryLink.Pair();
             GlassTransportFactory factory = new GlassTransportFactory(Keys);
@@ -565,7 +565,7 @@ namespace NetSec.Tests
             IFuture<ISecureChannel> client = factory.Open(new TransportRequest { Protocol = WireProtocol.Tls11, Role = EngineRole.Client, Tls11Suite = Tls11Suite.RsaAes128CbcSha, Link = links[0], Random = new SeededRandom(1), Sink = new NullSink(), Gate = new FreeRunGate(), Profile = NetSec.Bridge.DeviceProfile.Ce });
             client.Result.Send(0, Encoding.UTF8.GetBytes("ping"));
             IFuture<AppChunk> received = server.Result.Receive();
-            Assert.True(received.Wait(20000), "the server received nothing in 20 s");
+            Assert.True(await FutureWaits.Within(received, TimeSpan.FromMilliseconds(20000)), "the server received nothing in 20 s");
             Assert.Equal("ping", Encoding.UTF8.GetString(received.Result.Bytes));
             Assert.Equal("TLSv1.1", client.Result.Info.Protocol);
             Assert.Equal("TLS_RSA_WITH_AES_128_CBC_SHA", client.Result.Info.Suite);
@@ -574,19 +574,19 @@ namespace NetSec.Tests
 
         // ---------------------------------------------------------------- lesson 7
 
-        static (LabResult result, TraceEvent[] events) RunLab(AttackDefinition attack = null)
+        static async System.Threading.Tasks.Task<(LabResult result, TraceEvent[] events)> RunLab(AttackDefinition attack = null)
         {
             ListSink sink = new ListSink();
             LabContext c = new LabContext { SessionId = "s7", TraceId = "s7", Seed = 7, Gate = new FreeRunGate(), Sink = sink, Clock = new FixedClock(0), Random = new SeededRandom(7), Attack = attack, DeadlineMs = 20000 };
             IFuture<LabResult> future = LabCatalog.Find(7).Run(c);
-            Assert.True(future.Wait(60000), "the lab did not finish in 60 s");
+            Assert.True(await FutureWaits.Within(future, TimeSpan.FromMilliseconds(60000)), "the lab did not finish in 60 s");
             return (future.Result, sink.Events);
         }
 
         [Fact]
-        public void Lesson_7_control_sends_the_named_messages_in_order()
+        public async System.Threading.Tasks.Task Lesson_7_control_sends_the_named_messages_in_order()
         {
-            (LabResult result, TraceEvent[] events) = RunLab();
+            (LabResult result, TraceEvent[] events) = await RunLab();
             Assert.True(result.Completed, result.FailedCode + " " + result.FailedCheck);
             string[] Sent(string actor) => events.Where(e => e.Type == "wire.sent" && e.Actor == actor && e.StreamId.Contains("/tls11")).Select(e => e.Message).ToArray();
             Assert.Equal(new[] { "ClientHello", "ClientKeyExchange", "ChangeCipherSpec", "Finished", "ApplicationData", "Alert" }, Sent("client"));
@@ -598,9 +598,9 @@ namespace NetSec.Tests
         }
 
         [Fact]
-        public void The_downgrade_attack_leaves_downgrd_on_the_wire_and_the_tls13_client_names_it()
+        public async System.Threading.Tasks.Task The_downgrade_attack_leaves_downgrd_on_the_wire_and_the_tls13_client_names_it()
         {
-            (LabResult result, TraceEvent[] events) = RunLab(AttackCatalog.All.Single(a => a.AttackId == "L7-downgrade"));
+            (LabResult result, TraceEvent[] events) = await RunLab(AttackCatalog.All.Single(a => a.AttackId == "L7-downgrade"));
             Assert.Equal("TLS13_DOWNGRADE_SENTINEL", result.FailedCode);
             Assert.Equal("downgrade sentinel", result.FailedCheck);
             TraceEvent hello = events.Single(e => e.Type == "wire.sent" && e.Actor == "server" && e.Message == "ServerHello");
@@ -609,17 +609,17 @@ namespace NetSec.Tests
         }
 
         [Fact]
-        public void The_modern_server_gives_the_old_client_alert_70()
+        public async System.Threading.Tasks.Task The_modern_server_gives_the_old_client_alert_70()
         {
-            (LabResult result, TraceEvent[] events) = RunLab(AttackCatalog.All.Single(a => a.AttackId == "L7-modern-server"));
+            (LabResult result, TraceEvent[] events) = await RunLab(AttackCatalog.All.Single(a => a.AttackId == "L7-modern-server"));
             Assert.Equal(Tls11Codes.AlertProtocolVersion, result.FailedCode);
             Assert.Contains(events, e => e.Type == "check.result" && e.Actor == "client" && !e.Check.Passed && e.Message == "protocol_version alert");
         }
 
         [Fact]
-        public void Each_field_of_a_clear_message_points_inside_its_wire_bytes_and_cipher_is_hidden()
+        public async System.Threading.Tasks.Task Each_field_of_a_clear_message_points_inside_its_wire_bytes_and_cipher_is_hidden()
         {
-            (_, TraceEvent[] events) = RunLab();
+            (_, TraceEvent[] events) = await RunLab();
             foreach (TraceEvent e in events.Where(e => e.Type == "wire.sent"))
                 foreach (TraceField f in e.Fields)
                     Assert.True(f.Offset + f.Length <= e.Wire.Length, e.Message + " " + f.Name);
@@ -631,21 +631,21 @@ namespace NetSec.Tests
         }
 
         [Fact]
-        public void Lesson_7_engine_events_repeat_on_a_same_seed_rerun()
+        public async System.Threading.Tasks.Task Lesson_7_engine_events_repeat_on_a_same_seed_rerun()
         {
             static string Lines(TraceEvent[] events) => string.Join("\n", events.Where(e => !e.StreamId.EndsWith("/wire")).OrderBy(e => e.StreamId, StringComparer.Ordinal).ThenBy(e => e.StreamSeq).Select(TraceJson.ToLine));
-            Assert.Equal(Lines(RunLab().events), Lines(RunLab().events));
+            Assert.Equal(Lines((await RunLab()).events), Lines((await RunLab()).events));
         }
 
         [Fact]
-        public void Attack_rows_of_lesson_7_give_their_code_and_check_beside_the_control()
+        public async System.Threading.Tasks.Task Attack_rows_of_lesson_7_give_their_code_and_check_beside_the_control()
         {
-            Assert.True(RunLab().result.Completed);
+            Assert.True((await RunLab()).result.Completed);
             AttackDefinition[] rows = AttackCatalog.All.Where(a => a.Lesson == 7).ToArray();
             Assert.NotEmpty(rows);
             foreach (AttackDefinition row in rows)
             {
-                (LabResult result, _) = RunLab(row);
+                (LabResult result, _) = await RunLab(row);
                 Assert.Equal(row.ExpectCode, result.FailedCode);
                 Assert.Equal(row.ExpectCheck, result.FailedCheck);
             }

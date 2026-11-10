@@ -27,6 +27,7 @@ namespace NetSec.Tests
                 Attack = AttackCatalog.All.Single(a => a.AttackId == "L7-decrypt-recording"),
             };
             IFuture<LabResult> future = LabCatalog.Find(7).Run(c);
+            // blocks: Run() feeds the static readonly field R, and a static field initializer cannot await.
             Assert.True(future.Wait(60000), "the lab did not finish in 60 s");
             return (future.Result, sink.Events);
         }

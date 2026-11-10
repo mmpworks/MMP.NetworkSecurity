@@ -383,10 +383,10 @@ namespace NetSec.Tests
             return new LabContext { SessionId = "s1", TraceId = "s1", Seed = seed, Gate = gate ?? new FreeRunGate(), Sink = new ListSink(), Clock = new FixedClock(1), Random = new SeededRandom(seed), Attack = attack, DeadlineMs = deadlineMs };
         }
 
-        static LabResult Run(int lesson, LabContext c)
+        static async System.Threading.Tasks.Task<LabResult> Run(int lesson, LabContext c)
         {
             IFuture<LabResult> run = LabCatalog.Find(lesson).Run(c);
-            Assert.True(run.Wait(60000), "the lab did not finish in 60 s");
+            Assert.True(await FutureWaits.Within(run, TimeSpan.FromMilliseconds(60000)), "the lab did not finish in 60 s");
             return run.Result;
         }
 
@@ -402,7 +402,7 @@ namespace NetSec.Tests
         const int ShortDeadlineMs = 3000;
         static readonly int SideRuns = LoadRuns ? 20 : 6;
 
-        static void BurnWhile(Action work)
+        static async System.Threading.Tasks.Task BurnWhile(Func<System.Threading.Tasks.Task> work)
         {
             using System.Threading.CancellationTokenSource stop = new();
             System.Threading.Tasks.Task[] burners = Enumerable.Range(0, Environment.ProcessorCount).Select(_ => System.Threading.Tasks.Task.Factory.StartNew(() =>
@@ -410,7 +410,7 @@ namespace NetSec.Tests
                 double x = 1;
                 while (!stop.IsCancellationRequested) x = Math.Sqrt(x + 1.5);
             }, System.Threading.Tasks.TaskCreationOptions.LongRunning)).ToArray();
-            try { work(); }
+            try { await work(); }
             finally { stop.Cancel(); System.Threading.Tasks.Task.WaitAll(burners); }
         }
 
@@ -419,7 +419,7 @@ namespace NetSec.Tests
             events.Where(e => e.Actor == actor && e.Type == "check.result" && !e.StreamId.EndsWith("/wire")).OrderBy(e => e.StreamSeq).Select(e => e.Message).ToArray();
 
         /// <summary>Runs one attack SideRuns times (the second half under load when NETSEC_LOAD_RUNS=1) and returns a line per run that differs.</summary>
-        static List<string> SideOutcomes(AttackDefinition attack, Func<string[], string[], string> judge, int lesson = 5, string acceptor = "server")
+        static async System.Threading.Tasks.Task<List<string>> SideOutcomes(AttackDefinition attack, Func<string[], string[], string> judge, int lesson = 5, string acceptor = "server")
         {
             List<string> bad = new();
             for (int run = 0; run < SideRuns; run++)
@@ -427,8 +427,8 @@ namespace NetSec.Tests
                 LabContext c = Context(7, attack, null, ShortDeadlineMs);
                 LabResult result = null!;
                 bool loaded = LoadRuns && run >= SideRuns / 2;
-                if (loaded) BurnWhile(() => result = Run(lesson, c));
-                else result = Run(lesson, c);
+                if (loaded) await BurnWhile(async () => result = await Run(lesson, c));
+                else result = await Run(lesson, c);
                 TraceEvent[] events = ((ListSink)c.Sink).Events;
                 string verdict = judge(ChecksOf(events, "client"), ChecksOf(events, acceptor));
                 if (verdict != null)
@@ -438,11 +438,11 @@ namespace NetSec.Tests
         }
 
         [Fact]
-        public void A_record_length_too_long_is_caught_by_the_receivers_read_deadline_in_every_run()
+        public async System.Threading.Tasks.Task A_record_length_too_long_is_caught_by_the_receivers_read_deadline_in_every_run()
         {
             // The server's Finished claims more bytes than it holds, so the client holds part of a record. The guard says the receiver's read
             // deadline ends the wait. The server then sees its peer close mid-handshake.
-            List<string> bad = SideOutcomes(Attack("L5-flip-record-length"), (client, server) =>
+            List<string> bad = await SideOutcomes(Attack("L5-flip-record-length"), (client, server) =>
                 !client.Contains("read deadline") ? "the client shows no read deadline"
                 : client.Contains("peer stayed until the end") ? "the client shows peer stayed until the end"
                 : server.LastOrDefault() != "peer stayed until the end" ? "the server does not end with peer stayed until the end"
@@ -451,7 +451,7 @@ namespace NetSec.Tests
         }
 
         [Fact]
-        public void A_whole_dropped_message_ends_on_the_side_that_opened_the_connection_in_every_run()
+        public async System.Threading.Tasks.Task A_whole_dropped_message_ends_on_the_side_that_opened_the_connection_in_every_run()
         {
             // No catalog attack drops a whole message, so this one is built here: the server's Finished is replaced by nothing, the last
             // message of the server's flight. Neither side holds part of a frame. The client opened the connection, so its shorter idle limit
@@ -461,7 +461,7 @@ namespace NetSec.Tests
                 AttackId = "test-drop-finished", Lesson = 5, Kind = "drop", Options = new LabOption[0],
                 Plan = new TamperPlan { Message = "Finished", Replacement = new byte[0] },
             };
-            List<string> bad = SideOutcomes(drop, OpenerEnds);
+            List<string> bad = await SideOutcomes(drop, OpenerEnds);
             Assert.True(bad.Count == 0, $"{bad.Count} of {SideRuns} runs differ:\n" + string.Join("\n", bad));
         }
 
@@ -472,17 +472,17 @@ namespace NetSec.Tests
         /// Finished the TLS 1.3 client sends application data, so the server fails on that record, not on a wait.)
         /// </summary>
         [Fact]
-        public void A_dropped_message_right_after_a_reply_ends_on_the_side_that_opened_the_connection_in_every_run()
+        public async System.Threading.Tasks.Task A_dropped_message_right_after_a_reply_ends_on_the_side_that_opened_the_connection_in_every_run()
         {
             LabContext control = Context(7, null, null, ShortDeadlineMs);
-            Run(10, control);
+            await Run(10, control);
             TraceEvent answer = ((ListSink)control.Sink).Events.First(e => e.Actor == "client" && e.Message == "ChallengeResponse" && e.Type.EndsWith(".sent") && !e.StreamId.EndsWith("/wire"));
             AttackDefinition drop = new AttackDefinition
             {
                 AttackId = "test-drop-challenge-response", Lesson = 10, Kind = "drop", Options = new LabOption[0],
                 Plan = new TamperPlan { StreamId = answer.StreamId, StreamSeq = answer.StreamSeq, Replacement = new byte[0] },
             };
-            List<string> bad = SideOutcomes(drop, OpenerEnds, 10, "issuer");
+            List<string> bad = await SideOutcomes(drop, OpenerEnds, 10, "issuer");
             Assert.True(bad.Count == 0, $"{bad.Count} of {SideRuns} runs differ:\n" + string.Join("\n", bad));
         }
 
@@ -496,10 +496,10 @@ namespace NetSec.Tests
         [Theory]
         [InlineData(4)]
         [InlineData(5)]
-        public void Each_lesson_completes_and_only_socket_events_carry_wire(int lesson)
+        public async System.Threading.Tasks.Task Each_lesson_completes_and_only_socket_events_carry_wire(int lesson)
         {
             LabContext c = Context(7, null, null);
-            LabResult result = Run(lesson, c);
+            LabResult result = await Run(lesson, c);
             Assert.True(result.Completed, result.FailedCode + " " + result.FailedCheck);
             TraceEvent[] events = ((ListSink)c.Sink).Events;
             Assert.All(events.Where(e => e.Wire != null), e => Assert.StartsWith("wire.", e.Type));
@@ -510,11 +510,11 @@ namespace NetSec.Tests
         }
 
         [Fact]
-        public void Lesson_4_shows_the_ca_and_lesson_5_shows_the_hybrid()
+        public async System.Threading.Tasks.Task Lesson_4_shows_the_ca_and_lesson_5_shows_the_hybrid()
         {
             LabContext four = Context(7, null, null), five = Context(7, null, null);
-            Run(4, four);
-            Run(5, five);
+            await Run(4, four);
+            await Run(5, five);
             Assert.Equal(new[] { "RootCertificate", "ServerCertificate" }, ((ListSink)four.Sink).Events.Where(e => e.Type == "ca.certificate.issued").Select(e => e.Message).ToArray());
             TraceSecret[] secrets = ((ListSink)five.Sink).Events.Where(e => e.Secrets != null && e.Actor == "client").SelectMany(e => e.Secrets).ToArray();
             Assert.Equal(new[] { "mlkem_shared", "x25519_shared", "hybrid_shared", "early_secret", "handshake_secret", "c_hs_traffic", "s_hs_traffic", "master_secret", "c_ap_traffic", "s_ap_traffic", "exp_master" }, secrets.Select(s => s.Name).ToArray());
@@ -524,22 +524,22 @@ namespace NetSec.Tests
         [Theory]
         [InlineData(4)]
         [InlineData(5)]
-        public void A_same_seed_rerun_gives_the_same_engine_bytes(int lesson)
+        public async System.Threading.Tasks.Task A_same_seed_rerun_gives_the_same_engine_bytes(int lesson)
         {
-            string[] Lines(LabContext c)
+            async System.Threading.Tasks.Task<string[]> Lines(LabContext c)
             {
-                Assert.True(Run(lesson, c).Completed);
+                Assert.True((await Run(lesson, c)).Completed);
                 return ((ListSink)c.Sink).Events.Where(e => !e.StreamId.EndsWith("/wire")).OrderBy(e => e.EventId, StringComparer.Ordinal).Select(TraceJson.ToLine).ToArray();
             }
-            Assert.Equal(Lines(Context(21, null, null)), Lines(Context(21, null, null)));
-            Assert.NotEqual(Lines(Context(21, null, null)), Lines(Context(22, null, null)));
+            Assert.Equal(await Lines(Context(21, null, null)), await Lines(Context(21, null, null)));
+            Assert.NotEqual(await Lines(Context(21, null, null)), await Lines(Context(22, null, null)));
         }
 
         [Fact]
-        public void The_tampered_ml_kem_ciphertext_gives_two_secrets_and_no_ml_kem_error()
+        public async System.Threading.Tasks.Task The_tampered_ml_kem_ciphertext_gives_two_secrets_and_no_ml_kem_error()
         {
             LabContext c = Context(7, Attack("L5-flip-mlkem-ciphertext"), null);
-            LabResult result = Run(5, c);
+            LabResult result = await Run(5, c);
             Assert.Equal("AEAD tag", result.FailedCheck);
             TraceSecret[] all = ((ListSink)c.Sink).Events.Where(e => e.Secrets != null).SelectMany(e => e.Secrets).Where(s => s.Name == "mlkem_shared").ToArray();
             Assert.Equal(2, all.Length);
@@ -604,56 +604,56 @@ namespace NetSec.Tests
             public ListSink Sink = new ListSink();
         }
 
-        static Hop Open(IByteLink clientLink, IByteLink serverLink, IRandomSource clientRandom, IRandomSource serverRandom)
+        static async System.Threading.Tasks.Task<Hop> Open(IByteLink clientLink, IByteLink serverLink, IRandomSource clientRandom, IRandomSource serverRandom)
         {
             GlassTransportFactory factory = new GlassTransportFactory(new TrainingKeySource());
             Hop hop = new Hop();
             hop.Server = factory.Open(new TransportRequest { Protocol = WireProtocol.Tls13, Role = EngineRole.Server, Group = KexGroup.X25519MlKem768, Link = serverLink, Random = serverRandom, Sink = hop.Sink, TraceId = "t1", Hop = "hop2", SessionId = "s1", Actor = "server" });
             hop.Client = factory.Open(new TransportRequest { Protocol = WireProtocol.Tls13, Role = EngineRole.Client, Group = KexGroup.X25519MlKem768, Link = clientLink, Random = clientRandom, Sink = hop.Sink, TraceId = "t1", Hop = "hop2", SessionId = "s1", Actor = "gateway", PeerName = "localhost" });
-            Assert.True(hop.Client.Wait(5000));
-            Assert.True(hop.Server.Wait(5000));
+            Assert.True(await FutureWaits.Within(hop.Client, TimeSpan.FromMilliseconds(5000)));
+            Assert.True(await FutureWaits.Within(hop.Server, TimeSpan.FromMilliseconds(5000)));
             return hop;
         }
 
-        static byte[] Get(IFuture<AppChunk> chunk)
+        static async System.Threading.Tasks.Task<byte[]> Get(IFuture<AppChunk> chunk)
         {
-            Assert.True(chunk.Wait(30000), "no data in 30 s");
+            Assert.True(await FutureWaits.Within(chunk, TimeSpan.FromMilliseconds(30000)), "no data in 30 s");
             return chunk.Result.Bytes;
         }
 
-        static void ExchangeAndClose(Hop hop)
+        static async System.Threading.Tasks.Task ExchangeAndClose(Hop hop)
         {
             hop.Client.Result.Send(0, Encoding.UTF8.GetBytes("up"));
-            Assert.Equal("up", Encoding.UTF8.GetString(Get(hop.Server.Result.Receive())));
+            Assert.Equal("up", Encoding.UTF8.GetString(await Get(hop.Server.Result.Receive())));
             hop.Server.Result.Send(0, Encoding.UTF8.GetBytes("down"));
-            Assert.Equal("down", Encoding.UTF8.GetString(Get(hop.Client.Result.Receive())));
+            Assert.Equal("down", Encoding.UTF8.GetString(await Get(hop.Client.Result.Receive())));
             hop.Client.Result.Close();
-            Assert.Empty(Get(hop.Server.Result.Receive()));
+            Assert.Empty(await Get(hop.Server.Result.Receive()));
         }
 
         static byte[] WireSent(Hop hop, string actor) =>
             hop.Sink.Events.Where(e => e.Type == "wire.sent" && e.Actor == actor).SelectMany(e => e.Wire).ToArray();
 
         [Fact]
-        public void A_channel_carries_data_both_ways_and_every_event_names_its_hop_and_trace()
+        public async System.Threading.Tasks.Task A_channel_carries_data_both_ways_and_every_event_names_its_hop_and_trace()
         {
             MemoryLink[] links = MemoryLink.Pair();
-            Hop hop = Open(links[0], links[1], new SeededRandom(1), new SeededRandom(2));
-            ExchangeAndClose(hop);
+            Hop hop = await Open(links[0], links[1], new SeededRandom(1), new SeededRandom(2));
+            await ExchangeAndClose(hop);
             Assert.Equal("X25519MLKEM768", hop.Client.Result.Info.Group);
             Assert.All(hop.Sink.Events, e => { Assert.Equal("hop2", e.Hop); Assert.Equal("t1", e.TraceId); });
             Assert.Contains(hop.Sink.Events, e => e.Actor == "gateway" && e.Type == "wire.sent");
         }
 
         [Fact]
-        public void A_failed_handshake_faults_receive_with_the_named_error()
+        public async System.Threading.Tasks.Task A_failed_handshake_faults_receive_with_the_named_error()
         {
             MemoryLink[] links = MemoryLink.Pair();
             GlassTransportFactory factory = new GlassTransportFactory(new TrainingKeySource());
             IFuture<ISecureChannel> server = factory.Open(new TransportRequest { Protocol = WireProtocol.Tls13, Role = EngineRole.Server, Group = KexGroup.X25519, Link = links[1], Random = new SeededRandom(2), Sink = new ListSink() });
             IFuture<ISecureChannel> client = factory.Open(new TransportRequest { Protocol = WireProtocol.Tls13, Role = EngineRole.Client, Group = KexGroup.X25519, Link = links[0], Random = new SeededRandom(1), Sink = new ListSink(), PeerName = "not-the-name.example" });
             IFuture<AppChunk> chunk = client.Result.Receive();
-            Assert.True(chunk.Wait(30000));
+            Assert.True(await FutureWaits.Within(chunk, TimeSpan.FromMilliseconds(30000)));
             Assert.True(chunk.IsFaulted);
             NetSecException error = Assert.IsType<NetSecException>(chunk.Exception);
             Assert.Equal(ChainCheck.Name, error.Error.Code);
@@ -724,18 +724,18 @@ namespace NetSec.Tests
         }
 
         /// <summary>One TLS 1.3 hop through the Go tap, with OS randomness. Returns the client's first wire bytes, which hold its random.</summary>
-        static byte[] RunThroughTap()
+        static async System.Threading.Tasks.Task<byte[]> RunThroughTap()
         {
             LinkListener listener = new LinkListener(new IPEndPoint(IPAddress.Loopback, 0));
             using (TapRun tap = new TapRun(listener.Port))
             {
                 IFuture<SocketLink> accepted = listener.Accept();
                 IFuture<SocketLink> connected = SocketLink.Connect(new IPEndPoint(IPAddress.Loopback, tap.Port));
-                Assert.True(connected.Wait(5000) && accepted.Wait(5000));
+                Assert.True(await FutureWaits.Within(connected, TimeSpan.FromMilliseconds(5000)) && await FutureWaits.Within(accepted, TimeSpan.FromMilliseconds(5000)));
                 listener.Close();
 
-                Hop hop = Open(connected.Result, accepted.Result, null, null);
-                ExchangeAndClose(hop);
+                Hop hop = await Open(connected.Result, accepted.Result, null, null);
+                await ExchangeAndClose(hop);
 
                 // A pump writes its wire.sent event after the socket write, and the tap logs before it forwards. Either side can lead for a moment, so wait for equal lengths.
                 Stopwatch clock = Stopwatch.StartNew();
@@ -755,9 +755,9 @@ namespace NetSec.Tests
         }
 
         [Fact]
-        public void The_go_tap_sees_the_wire_sent_bytes_each_way_and_two_runs_draw_different_randoms()
+        public async System.Threading.Tasks.Task The_go_tap_sees_the_wire_sent_bytes_each_way_and_two_runs_draw_different_randoms()
         {
-            byte[] first = RunThroughTap(), second = RunThroughTap();
+            byte[] first = await RunThroughTap(), second = await RunThroughTap();
             const int RandomStart = 5 + 4 + 2;
             Assert.NotEqual(first.Skip(RandomStart).Take(32).ToArray(), second.Skip(RandomStart).Take(32).ToArray());
         }

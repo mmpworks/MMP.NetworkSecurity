@@ -22,9 +22,9 @@ namespace NetSec.Tests
         public static TraceStream Stream(string actor) =>
             new TraceStream("s1/" + actor + "/echo", "s1", "t1", null, actor, new FixedClock(7));
 
-        public static void Done(IFuture f)
+        public static async System.Threading.Tasks.Task Done(IFuture f)
         {
-            Assert.True(f.Wait(20000), "the future did not finish in 20 s");
+            Assert.True(await FutureWaits.Within(f, TimeSpan.FromMilliseconds(20000)), "the future did not finish in 20 s");
         }
     }
 
@@ -262,12 +262,12 @@ namespace NetSec.Tests
         }
 
         [Fact]
-        public void Memory_links_run_the_echo_through_the_pump_with_no_port()
+        public async System.Threading.Tasks.Task Memory_links_run_the_echo_through_the_pump_with_no_port()
         {
             MemoryLink[] links = MemoryLink.Pair();
             Pair p = Run(links[0], links[1], null, null, 15000);
-            Make.Done(p.Client);
-            Make.Done(p.Server);
+            await Make.Done(p.Client);
+            await Make.Done(p.Server);
             Assert.Null(p.Client.Result.Error);
             Assert.Equal("hello", p.Delivered);
             Assert.Equal(8, p.Client.Result.BytesSent);
@@ -275,12 +275,12 @@ namespace NetSec.Tests
         }
 
         [Fact]
-        public void Only_socket_events_carry_wire_and_they_join_to_the_bytes_sent()
+        public async System.Threading.Tasks.Task Only_socket_events_carry_wire_and_they_join_to_the_bytes_sent()
         {
             MemoryLink[] links = MemoryLink.Pair();
             Pair p = Run(links[0], links[1], null, null, 15000);
-            Make.Done(p.Client);
-            Make.Done(p.Server);
+            await Make.Done(p.Client);
+            await Make.Done(p.Server);
             TraceEvent[] withWire = p.Sink.Events.Where(e => e.Wire != null).ToArray();
             Assert.True(withWire.All(e => e.Type == "wire.sent" || e.Type == "wire.received"));
             byte[] clientSent = withWire.Where(e => e.Actor == "client" && e.To == "server").SelectMany(e => e.Wire).ToArray();
@@ -290,32 +290,32 @@ namespace NetSec.Tests
         }
 
         [Fact]
-        public void Engine_stream_numbers_stay_fixed_across_runs()
+        public async System.Threading.Tasks.Task Engine_stream_numbers_stay_fixed_across_runs()
         {
-            Func<string> run = () =>
+            Func<System.Threading.Tasks.Task<string>> run = async () =>
             {
                 MemoryLink[] links = MemoryLink.Pair();
                 Pair p = Run(links[0], links[1], null, null, 15000);
-                Make.Done(p.Client);
-                Make.Done(p.Server);
+                await Make.Done(p.Client);
+                await Make.Done(p.Server);
                 return string.Join("|", p.Sink.Events.Where(e => !e.StreamId.EndsWith("/wire")).OrderBy(e => e.EventId, StringComparer.Ordinal).Select(TraceJson.ToLine).ToArray());
             };
-            Assert.Equal(run(), run());
+            Assert.Equal(await run(), await run());
         }
 
         [Fact]
-        public void Sockets_run_the_echo_through_all_four_begin_pairs()
+        public async System.Threading.Tasks.Task Sockets_run_the_echo_through_all_four_begin_pairs()
         {
             LinkListener listener = new LinkListener(new IPEndPoint(IPAddress.Loopback, 0));
             IFuture<SocketLink> accepted = listener.Accept();
             IFuture<SocketLink> connected = SocketLink.Connect(new IPEndPoint(IPAddress.Loopback, listener.Port));
-            Make.Done(accepted);
-            Make.Done(connected);
+            await Make.Done(accepted);
+            await Make.Done(connected);
             listener.Close();
             SocketLink clientLink = connected.Result, serverLink = accepted.Result;
             Pair p = Run(clientLink, serverLink, null, null, 15000);
-            Make.Done(p.Client);
-            Make.Done(p.Server);
+            await Make.Done(p.Client);
+            await Make.Done(p.Server);
             Assert.Null(p.Client.Result.Error);
             Assert.Null(p.Server.Result.Error);
             Assert.Equal("hello", p.Delivered);
@@ -326,13 +326,13 @@ namespace NetSec.Tests
         }
 
         [Fact]
-        public void Wire_tamper_is_caught_and_named_and_the_trace_shows_the_tampered_bytes()
+        public async System.Threading.Tasks.Task Wire_tamper_is_caught_and_named_and_the_trace_shows_the_tampered_bytes()
         {
             MemoryLink[] links = MemoryLink.Pair();
             TamperPlan plan = new TamperPlan { Point = TamperPoint.Wire, Message = EchoEngine.HelloName, Offset = 3, Xor = 1 };
             Pair p = Run(links[0], links[1], null, plan, 15000);
-            Make.Done(p.Client);
-            Make.Done(p.Server);
+            await Make.Done(p.Client);
+            await Make.Done(p.Server);
             Assert.Equal(ErrorCodes.EchoMismatch, p.Client.Result.Error.Code);
             TraceEvent failed = p.Sink.Events.Single(e => e.Check != null && !e.Check.Passed);
             Assert.Equal(ErrorCodes.EchoMismatch, failed.Check.Code);
@@ -341,12 +341,12 @@ namespace NetSec.Tests
         }
 
         [Fact]
-        public void A_silent_peer_hits_the_deadline_by_name()
+        public async System.Threading.Tasks.Task A_silent_peer_hits_the_deadline_by_name()
         {
             MemoryLink[] links = MemoryLink.Pair();
             EnginePump client = new EnginePump(EchoEngine.Client(Make.Hello, Make.Stream("client"), null), links[0], null, null, null, 200);
             IFuture<PumpResult> run = client.Run();
-            Make.Done(run);
+            await Make.Done(run);
             // The client holds no part of a frame, only an unanswered hello, so its idle limit ends the wait (issue #309). This pump has no pair, so it keeps the acceptor role.
             Assert.Equal(ErrorCodes.LinkIdle, run.Result.Error.Code);
             Assert.Equal("idle limit", run.Result.Error.CheckName);
@@ -359,11 +359,11 @@ namespace NetSec.Tests
         /// a close after the end stays a quiet success, because the link is closed already.
         /// </summary>
         [Fact]
-        public void Data_sent_after_the_pump_ended_fails_by_name_and_a_late_close_still_succeeds()
+        public async System.Threading.Tasks.Task Data_sent_after_the_pump_ended_fails_by_name_and_a_late_close_still_succeeds()
         {
             MemoryLink[] links = MemoryLink.Pair();
             EnginePump client = new EnginePump(EchoEngine.Client(Make.Hello, Make.Stream("client"), null), links[0], null, null, null, 200);
-            Make.Done(client.Run());
+            await Make.Done(client.Run());
 
             IFuture send = client.Enqueue(new EngineCommand(EngineCommandKind.Send, 0, new byte[] { 1, 2, 3 }, null));
             Assert.True(send.IsCompleted, "a send after the end must not wait");
@@ -379,13 +379,13 @@ namespace NetSec.Tests
         [Theory]
         [InlineData(true, "no bytes for 400 ms")]
         [InlineData(false, "no bytes for 600 ms")]
-        public void A_silent_peer_waits_twice_the_deadline_as_opener_and_three_times_as_acceptor(bool opened, string detail)
+        public async System.Threading.Tasks.Task A_silent_peer_waits_twice_the_deadline_as_opener_and_three_times_as_acceptor(bool opened, string detail)
         {
             MemoryLink[] links = MemoryLink.Pair();
             EnginePump client = new EnginePump(EchoEngine.Client(Make.Hello, Make.Stream("client"), null), links[0], null, null, null, 200);
             client.OpenedLink = opened;
             IFuture<PumpResult> run = client.Run();
-            Make.Done(run);
+            await Make.Done(run);
             Assert.Equal(ErrorCodes.LinkIdle, run.Result.Error.Code);
             Assert.StartsWith(detail, run.Result.Error.Message);
         }
@@ -395,7 +395,7 @@ namespace NetSec.Tests
         /// The peer is a listener that never accepts: the OS completes the connect, and no byte ever comes back.
         /// </summary>
         [Fact]
-        public void A_probe_that_dials_a_silent_peer_waits_the_openers_idle_limit()
+        public async System.Threading.Tasks.Task A_probe_that_dials_a_silent_peer_waits_the_openers_idle_limit()
         {
             System.Net.Sockets.TcpListener silent = new System.Net.Sockets.TcpListener(IPAddress.Loopback, 0);
             silent.Start();
@@ -403,7 +403,7 @@ namespace NetSec.Tests
             {
                 int port = ((IPEndPoint)silent.LocalEndpoint).Port;
                 IFuture<ProbeResult> probe = Probe.Connect(new ProbeRequest { Protocol = WireProtocol.Tls13, Host = "127.0.0.1", Port = port, Seed = 1, DeadlineMs = 200 });
-                Assert.True(probe.Wait(30000), "the probe did not end in 30 s");
+                Assert.True(await FutureWaits.Within(probe, TimeSpan.FromMilliseconds(30000)), "the probe did not end in 30 s");
                 ProbeResult r = probe.Result;
                 Assert.False(r.Completed);
                 Assert.Equal(ErrorCodes.LinkIdle, r.Code);
@@ -412,13 +412,34 @@ namespace NetSec.Tests
             finally { silent.Stop(); }
         }
 
-        static Pair FlippedLength(int serverDeadlineMs, int clientDeadlineMs)
+        /// <summary>
+        /// ProbeResult.Detail is null only when the session completed (its doc). A probe that dials a closed port fails at the TCP connect, and on
+        /// both the TLS and the SSH route that failure names its message in Detail (Jared, #364 review, issue #366).
+        /// </summary>
+        [Theory]
+        [InlineData(WireProtocol.Tls13)]
+        [InlineData(WireProtocol.Ssh)]
+        public async System.Threading.Tasks.Task A_probe_that_cannot_connect_names_the_failure_in_Detail(WireProtocol protocol)
+        {
+            System.Net.Sockets.TcpListener closed = new System.Net.Sockets.TcpListener(IPAddress.Loopback, 0);
+            closed.Start();
+            int port = ((IPEndPoint)closed.LocalEndpoint).Port;
+            closed.Stop();
+            IFuture<ProbeResult> probe = Probe.Connect(new ProbeRequest { Protocol = protocol, Host = "127.0.0.1", Port = port, Seed = 1, DeadlineMs = 200 });
+            Assert.True(await FutureWaits.Within(probe, TimeSpan.FromMilliseconds(30000)), "the probe did not end in 30 s");
+            ProbeResult r = probe.Result;
+            Assert.False(r.Completed);
+            Assert.Equal(ErrorCodes.LinkLost, r.Code);
+            Assert.False(string.IsNullOrEmpty(r.Detail), protocol + ": Detail is empty on a failed connect");
+        }
+
+        static async System.Threading.Tasks.Task<Pair> FlippedLength(int serverDeadlineMs, int clientDeadlineMs)
         {
             MemoryLink[] links = MemoryLink.Pair();
             TamperPlan plan = new TamperPlan { Point = TamperPoint.Wire, Message = EchoEngine.HelloName, Offset = 1, Xor = 1 };
             Pair p = Run(links[0], links[1], null, plan, serverDeadlineMs, clientDeadlineMs);
-            Make.Done(p.Client);
-            Make.Done(p.Server);
+            await Make.Done(p.Client);
+            await Make.Done(p.Server);
             return p;
         }
 
@@ -431,9 +452,9 @@ namespace NetSec.Tests
         [Theory]
         [InlineData(300, 5000, ErrorCodes.LinkDeadline, ErrorCodes.PeerClosedEarly)]
         [InlineData(5000, 300, ErrorCodes.PeerClosedEarly, ErrorCodes.LinkIdle)]
-        public void A_flipped_length_byte_ends_in_the_named_deadline_on_both_sides(int serverDeadlineMs, int clientDeadlineMs, string serverCode, string clientCode)
+        public async System.Threading.Tasks.Task A_flipped_length_byte_ends_in_the_named_deadline_on_both_sides(int serverDeadlineMs, int clientDeadlineMs, string serverCode, string clientCode)
         {
-            Pair p = FlippedLength(serverDeadlineMs, clientDeadlineMs);
+            Pair p = await FlippedLength(serverDeadlineMs, clientDeadlineMs);
             Assert.Equal(serverCode, p.Server.Result.Error.Code);
             Assert.Equal(clientCode, p.Client.Result.Error.Code);
             NetSecError stuck = serverCode == ErrorCodes.PeerClosedEarly ? p.Client.Result.Error : p.Server.Result.Error;
@@ -445,27 +466,27 @@ namespace NetSec.Tests
         /// client, waiting twice as long as the opener, then reads the close.
         /// </summary>
         [Fact]
-        public void Equal_deadlines_end_on_the_side_that_holds_the_partial_frame()
+        public async System.Threading.Tasks.Task Equal_deadlines_end_on_the_side_that_holds_the_partial_frame()
         {
-            Pair p = FlippedLength(300, 300);
+            Pair p = await FlippedLength(300, 300);
             Assert.Equal(ErrorCodes.LinkDeadline, p.Server.Result.Error.Code);
             Assert.Equal("read deadline", p.Server.Result.Error.CheckName);
             Assert.Equal(ErrorCodes.PeerClosedEarly, p.Client.Result.Error.Code);
         }
 
         [Fact]
-        public void A_peer_that_hangs_up_early_ends_the_run_by_name()
+        public async System.Threading.Tasks.Task A_peer_that_hangs_up_early_ends_the_run_by_name()
         {
             MemoryLink[] links = MemoryLink.Pair();
             EnginePump client = new EnginePump(EchoEngine.Client(Make.Hello, Make.Stream("client"), null), links[0], null, null, null, 15000);
             IFuture<PumpResult> run = client.Run();
             links[1].Close();
-            Make.Done(run);
+            await Make.Done(run);
             Assert.Equal(ErrorCodes.PeerClosedEarly, run.Result.Error.Code);
         }
 
         [Fact]
-        public void Step_gate_releases_one_event_per_step_and_run_opens_it()
+        public async System.Threading.Tasks.Task Step_gate_releases_one_event_per_step_and_run_opens_it()
         {
             MemoryLink[] links = MemoryLink.Pair();
             StepGate gate = new StepGate();
@@ -482,7 +503,7 @@ namespace NetSec.Tests
             gate.Run();
             WaitFor(() => sink.Events.Any(e => e.Type == "wire.sent"));
             links[1].Close();
-            Make.Done(run);
+            await Make.Done(run);
         }
 
         static void WaitFor(Func<bool> condition)
@@ -535,11 +556,11 @@ namespace NetSec.Tests
         };
 
         [Fact]
-        public void Lesson_0_runs_on_loopback_and_shows_wire_events_for_both_actors()
+        public async System.Threading.Tasks.Task Lesson_0_runs_on_loopback_and_shows_wire_events_for_both_actors()
         {
             LabContext c = Context(null);
             IFuture<LabResult> run = LabCatalog.Find(0).Run(c);
-            Make.Done(run);
+            await Make.Done(run);
             Assert.True(run.Result.Completed);
             TraceEvent[] events = ((ListSink)c.Sink).Events;
             Assert.Contains(events, e => e.Type == "wire.sent" && e.Actor == "client");
@@ -547,16 +568,16 @@ namespace NetSec.Tests
         }
 
         [Fact]
-        public void Every_attack_in_the_catalog_is_caught_by_its_named_check_beside_the_control()
+        public async System.Threading.Tasks.Task Every_attack_in_the_catalog_is_caught_by_its_named_check_beside_the_control()
         {
             foreach (AttackDefinition attack in AttackCatalog.All)
             {
                 IFuture<LabResult> control = LabCatalog.Find(attack.Lesson).Run(Context(null));
-                Make.Done(control);
+                await Make.Done(control);
                 Assert.True(control.Result.Completed);
                 LabContext attacked = Context(attack);
                 IFuture<LabResult> run = LabCatalog.Find(attack.Lesson).Run(attacked);
-                Make.Done(run);
+                await Make.Done(run);
                 Assert.Equal(attack.Expect == AttackOutcome.Rejected, !run.Result.Completed);
                 Assert.Equal(attack.ExpectCode, run.Result.FailedCode);
                 Assert.Equal(attack.ExpectCheck, run.Result.FailedCheck);

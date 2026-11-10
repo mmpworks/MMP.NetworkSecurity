@@ -25,12 +25,12 @@ namespace NetSec.Tests
         [InlineData(8)]
         [InlineData(9)]
         [InlineData(10)]
-        public void Every_event_takes_its_time_from_the_labs_clock(int lesson)
+        public async System.Threading.Tasks.Task Every_event_takes_its_time_from_the_labs_clock(int lesson)
         {
             ListSink sink = new ListSink();
             LabContext c = new LabContext { SessionId = "clock", TraceId = "clock", Seed = 7, Gate = new FreeRunGate(), Sink = sink, Clock = new FixedClock(Stamp), Random = new SeededRandom(7) };
             IFuture<LabResult> run = LabCatalog.Find(lesson).Run(c);
-            Assert.True(run.Wait(60000), "the lab did not finish in 60 s");
+            Assert.True(await FutureWaits.Within(run, System.TimeSpan.FromMilliseconds(60000)), "the lab did not finish in 60 s");
 
             TraceEvent[] events = sink.Events;
             Assert.NotEmpty(events);

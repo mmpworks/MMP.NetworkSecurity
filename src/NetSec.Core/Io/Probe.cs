@@ -240,6 +240,7 @@ namespace NetSec.Io
             ProbeResult result = new ProbeResult();
             result.Code = ErrorCodes.LinkLost;
             result.CheckName = detail;
+            result.Detail = detail;
             result.KeyLog = new string[0];
             result.Received = new byte[0];
             result.Events = new TraceEvent[0];
