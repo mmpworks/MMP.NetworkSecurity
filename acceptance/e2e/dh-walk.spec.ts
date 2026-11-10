@@ -1,5 +1,5 @@
 import { expect, test, type Page } from '@playwright/test';
-import { HOST_PORT, NotRun, TOKEN, hostGet, openApp, readState, requireLive } from './support';
+import { HOST_PORT, NotRun, TOKEN, hostGet, openApp, readState, requireLive, controlMissing } from './support';
 
 /**
  * P7, the Diffie-Hellman walk screen (docs/sections-plan.md section 5, "The Diffie-Hellman walk shows paint chips beside the numbers").
@@ -73,14 +73,14 @@ async function openDh(page: Page): Promise<void> {
   requireLive();
   await openApp(page);
   const section = page.getByTestId('section-techniques');
-  if ((await section.count()) === 0) throw new NotRun('UI_CONTROL_MISSING', 'the top bar has no section-techniques');
+  if ((await section.count()) === 0) throw controlMissing('section-techniques', 'the top bar has no section-techniques');
   await section.click();
   const item = page.getByTestId('walk-item-dh');
-  if ((await item.count()) === 0) throw new NotRun('UI_CONTROL_MISSING', 'the Techniques rail has no walk-item-dh');
+  if ((await item.count()) === 0) throw controlMissing('walk-item-dh', 'the Techniques rail has no walk-item-dh');
   await item.click();
   const panel = page.getByTestId('walk-root').getByTestId('dh-walk-panel');
   try { await panel.waitFor({ state: 'visible', timeout: 15_000 }); }
-  catch { throw new NotRun('UI_CONTROL_MISSING', 'walk-item-dh opens no dh-walk-panel inside walk-root yet (slice P7)'); }
+  catch { throw controlMissing('dh-walk-panel', 'walk-item-dh opens no dh-walk-panel inside walk-root yet (slice P7)'); }
 }
 
 /** The small group's walk, which the screen opens on. A Host with no DH route reads NOT RUN. */

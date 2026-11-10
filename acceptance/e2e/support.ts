@@ -24,6 +24,23 @@ export class NotRun extends Error {
   constructor(public reason: string, detail: string) { super(`NOTRUN ${reason}: ${detail}`); }
 }
 
+/** The committed not-yet-built list: "unbuilt" in acceptance/settings.json. Each entry names one control key. Empty by default (#372). */
+export function unbuiltControls(): string[] {
+  const f = path.join(__dirname, '..', 'settings.json');
+  const list = JSON.parse(fs.readFileSync(f, 'utf8')).unbuilt ?? [];
+  if (!Array.isArray(list) || list.some(x => typeof x !== 'string')) throw new Error(`UNBUILT_SETTING_BAD: "unbuilt" in ${f} must be a list of control keys`);
+  return list;
+}
+
+/**
+ * The error for a missing control on a screen. NOT RUN UI_CONTROL_MISSING only when the committed list names the control key;
+ * every other missing control is a FAIL with the same detail, because a shipped screen that loses a control is a defect (#372).
+ */
+export function controlMissing(control: string, detail: string): Error {
+  if (unbuiltControls().includes(control)) return new NotRun('UI_CONTROL_MISSING', `${detail} [${control} is on the unbuilt list]`);
+  return new Error(`UI_CONTROL_MISSING_ON_SHIPPED_SCREEN: ${detail} [${control} is not on the unbuilt list in acceptance/settings.json]`);
+}
+
 export function stateFile(): string { return path.join(OUT, 'state.json'); }
 
 export function readState(): { hostUp: boolean; previewUp: boolean; note: string; reason?: string } {

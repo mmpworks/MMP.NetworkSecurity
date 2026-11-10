@@ -1,7 +1,7 @@
 import { expect, test } from '@playwright/test';
 import * as fs from 'node:fs';
 import * as path from 'node:path';
-import { NotRun, OUT, hostGet, openApp, requireLive, tourSteps } from './support';
+import { NotRun, OUT, hostGet, openApp, requireLive, tourSteps, controlMissing } from './support';
 
 /**
  * A13: the Electron app's renderer starts against a live Host and walks every step of every built lesson. Never a recorded fixture.
@@ -126,7 +126,7 @@ test('[A16.ui.os-transport-label-and-hidden-secrets] the chip reads OS TRANSPORT
   requireLive();
   await openApp(page);
   const sw = page.getByTestId('transport-switch');
-  if ((await sw.count()) === 0) throw new NotRun('UI_CONTROL_MISSING', 'no element with data-testid transport-switch; ux-design.md names no testid for the OS transport switch (CONTRACT.md asks for one)');
+  if ((await sw.count()) === 0) throw controlMissing('transport-switch', 'no element with data-testid transport-switch; ux-design.md names no testid for the OS transport switch (CONTRACT.md asks for one)');
   await sw.click();
   await expect(page.getByTestId('training-only-label')).toContainText(/OS TRANSPORT/);
   const rows = page.locator('[data-testid^="secret-row-"]');
@@ -146,7 +146,7 @@ test('[A17.ui.show-keys-switch] on by default; off replaces key bytes with finge
   expect(host0.body?.on, 'the Host starts with Show keys ON').toBe(true);
   await openApp(page);
   const sw = page.getByTestId('show-keys-switch');
-  if ((await sw.count()) === 0) throw new NotRun('UI_CONTROL_MISSING', 'no element with data-testid show-keys-switch (modes-design.md section 6)');
+  if ((await sw.count()) === 0) throw controlMissing('show-keys-switch', 'no element with data-testid show-keys-switch (modes-design.md section 6)');
   const isOn = async () => (await sw.getAttribute('aria-checked')) === 'true' || (await sw.isChecked().catch(() => false));
   expect(await isOn(), 'the switch reads ON by default').toBe(true);
 
