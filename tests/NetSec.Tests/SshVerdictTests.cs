@@ -131,52 +131,52 @@ namespace NetSec.Tests
         // ---------------------------------------------------------------- blocker 1: no pin
 
         [Fact]
-        public void A_factory_client_with_no_pin_refuses_by_name()
+        public async System.Threading.Tasks.Task A_factory_client_with_no_pin_refuses_by_name()
         {
             MemoryLink[] links = MemoryLink.Pair();
             GlassTransportFactory factory = new GlassTransportFactory(Keys);
             factory.Open(new TransportRequest { Protocol = WireProtocol.Ssh, Role = EngineRole.Server, Suite = SshSuite.Modern, Link = links[1], Random = new SeededRandom(1) });
             IFuture<ISecureChannel> client = factory.Open(new TransportRequest { Protocol = WireProtocol.Ssh, Role = EngineRole.Client, Suite = SshSuite.Modern, Link = links[0], Random = new SeededRandom(2), PeerName = "h", PeerPort = 22 });
-            Assert.True(client.Wait(30000));
+            Assert.True(await FutureWaits.Within(client, TimeSpan.FromMilliseconds(30000)));
             Assert.True(client.IsFaulted, "the client opened with no pin");
             Assert.Equal(SshCodes.HostKeyUnknown, ((NetSecException)client.Exception).Error.Code);
         }
 
         [Fact]
-        public void A_probe_with_no_known_hosts_file_refuses_by_name()
+        public async System.Threading.Tasks.Task A_probe_with_no_known_hosts_file_refuses_by_name()
         {
             ProbeListener listener = Probe.Listen(new ProbeRequest { Protocol = WireProtocol.Ssh, Host = "127.0.0.1", SshSuite = SshSuite.Modern, Seed = 3 });
             IFuture<ProbeResult> result = Probe.Connect(new ProbeRequest { Protocol = WireProtocol.Ssh, Host = "127.0.0.1", Port = listener.Port, SshSuite = SshSuite.Modern, ExecCommand = "echo hello", Seed = 4 });
-            Assert.True(result.Wait(30000));
+            Assert.True(await FutureWaits.Within(result, TimeSpan.FromMilliseconds(30000)));
             Assert.False(result.Result.Completed);
             Assert.Equal(SshCodes.HostKeyUnknown, result.Result.Code);
         }
 
-        static GlassSshSession Connect(SshClientOptions client, ITrainingKey hostKey)
+        static async System.Threading.Tasks.Task<GlassSshSession> Connect(SshClientOptions client, ITrainingKey hostKey)
         {
             MemoryLink[] links = MemoryLink.Pair();
             new GlassSshSession(SshEngine.Server(ServerOptions(SshAlgorithms.Modern, hostKey), Stream("server"), null, "client"), links[1], new ListSink(), new FreeRunGate(), null, 5000, new FixedClock(1), null).Run();
             GlassSshSession session = new GlassSshSession(SshEngine.Client(client, Stream("client"), null, "server"), links[0], new ListSink(), new FreeRunGate(), null, 5000, new FixedClock(1), null);
             session.Run();
-            Assert.True(session.Opened.Wait(30000) || session.Opened.IsFaulted);
+            Assert.True(await FutureWaits.Within(session.Opened, TimeSpan.FromMilliseconds(30000)) || session.Opened.IsFaulted);
             return session;
         }
 
         [Fact]
-        public void Trust_on_first_use_returns_the_key_to_store_and_the_next_connect_holds_to_it()
+        public async System.Threading.Tasks.Task Trust_on_first_use_returns_the_key_to_store_and_the_next_connect_holds_to_it()
         {
-            GlassSshSession first = Connect(ClientOptions(SshAlgorithms.Modern, true, null), Keys.Find(KeyIds.SshHostEd25519));
+            GlassSshSession first = await Connect(ClientOptions(SshAlgorithms.Modern, true, null), Keys.Find(KeyIds.SshHostEd25519));
             Assert.False(first.Opened.IsFaulted);
             string line = first.LearnedKnownHostsLine;
             Assert.NotNull(line);
             Assert.StartsWith("h ssh-ed25519 ", line);
 
-            GlassSshSession same = Connect(ClientOptions(SshAlgorithms.Modern, false, line), Keys.Find(KeyIds.SshHostEd25519));
+            GlassSshSession same = await Connect(ClientOptions(SshAlgorithms.Modern, false, line), Keys.Find(KeyIds.SshHostEd25519));
             Assert.False(same.Opened.IsFaulted);
             Assert.Null(same.LearnedKnownHostsLine);
 
-            GlassSshSession changed = Connect(ClientOptions(SshAlgorithms.Modern, false, line), Keys.Find(KeyIds.AttackerEd25519));
-            Assert.True(changed.Finished.Wait(30000));
+            GlassSshSession changed = await Connect(ClientOptions(SshAlgorithms.Modern, false, line), Keys.Find(KeyIds.AttackerEd25519));
+            Assert.True(await FutureWaits.Within(changed.Finished, TimeSpan.FromMilliseconds(30000)));
             Assert.Equal(SshCodes.HostKeyChanged, changed.Finished.Result.Error.Code);
         }
 
@@ -264,7 +264,7 @@ namespace NetSec.Tests
         }
 
         [Fact]
-        public void A_client_that_does_not_read_stops_the_tunnel_target_and_reading_resumes_it()
+        public async System.Threading.Tasks.Task A_client_that_does_not_read_stops_the_tunnel_target_and_reading_resumes_it()
         {
             FloodLink flood = new FloodLink();
             MemoryLink[] links = MemoryLink.Pair();
@@ -272,9 +272,9 @@ namespace NetSec.Tests
             GlassSshSession client = new GlassSshSession(SshEngine.Client(ClientOptions(SshAlgorithms.Modern), Stream("client"), null, "server"), links[0], new ListSink(), new FreeRunGate(), null, 30000, new FixedClock(1), null);
             server.Run();
             client.Run();
-            Assert.True(client.Opened.Wait(30000));
+            Assert.True(await FutureWaits.Within(client.Opened, TimeSpan.FromMilliseconds(30000)));
             IFuture<int> open = client.OpenTunnel("allowed", 1);
-            Assert.True(open.Wait(30000));
+            Assert.True(await FutureWaits.Within(open, TimeSpan.FromMilliseconds(30000)));
 
             long limit = Window + QueueLimit + 16384;
             long seen = -1;
@@ -290,7 +290,7 @@ namespace NetSec.Tests
             while (read < 4 * Window)
             {
                 IFuture<AppChunk> next = client.Receive();
-                Assert.True(next.Wait(30000), "the stream stopped after " + read + " bytes");
+                Assert.True(await FutureWaits.Within(next, TimeSpan.FromMilliseconds(30000)), "the stream stopped after " + read + " bytes");
                 read += next.Result.Bytes.Length;
             }
             Assert.True(flood.Taken > stalled, "reading did not resume the target");
@@ -301,7 +301,7 @@ namespace NetSec.Tests
         /// Close (this flood, or a socket that stays open) then fed an ended session forever on a pool thread: 1.3 TB taken and a 6 GB heap in one run.
         /// </summary>
         [Fact]
-        public void A_tunnel_target_stops_being_read_once_the_session_ends()
+        public async System.Threading.Tasks.Task A_tunnel_target_stops_being_read_once_the_session_ends()
         {
             FloodLink flood = new FloodLink();
             MemoryLink[] links = MemoryLink.Pair();
@@ -309,11 +309,11 @@ namespace NetSec.Tests
             GlassSshSession client = new GlassSshSession(SshEngine.Client(ClientOptions(SshAlgorithms.Modern), Stream("client"), null, "server"), links[0], new ListSink(), new FreeRunGate(), null, 30000, new FixedClock(1), null);
             server.Run();
             client.Run();
-            Assert.True(client.Opened.Wait(30000));
-            Assert.True(client.OpenTunnel("allowed", 1).Wait(30000));
+            Assert.True(await FutureWaits.Within(client.Opened, TimeSpan.FromMilliseconds(30000)));
+            Assert.True(await FutureWaits.Within(client.OpenTunnel("allowed", 1), TimeSpan.FromMilliseconds(30000)));
 
-            Assert.True(client.Close().Wait(30000), "the client did not close");
-            Assert.True(server.Finished.Wait(30000), "the server session did not end");
+            Assert.True(await FutureWaits.Within(client.Close(), TimeSpan.FromMilliseconds(30000)), "the client did not close");
+            Assert.True(await FutureWaits.Within(server.Finished, TimeSpan.FromMilliseconds(30000)), "the server session did not end");
             Thread.Sleep(500);
             long settled = flood.Taken;
             Thread.Sleep(1000);
@@ -328,7 +328,7 @@ namespace NetSec.Tests
             public int Channel;
         }
 
-        static SessionPair OpenTunnelPair(Func<string, int, IFuture<IByteLink>> target, int deadlineMs = 30000)
+        static async System.Threading.Tasks.Task<SessionPair> OpenTunnelPair(Func<string, int, IFuture<IByteLink>> target, int deadlineMs = 30000)
         {
             MemoryLink[] links = MemoryLink.Pair();
             SessionPair pair = new SessionPair();
@@ -336,9 +336,9 @@ namespace NetSec.Tests
             pair.Client = new GlassSshSession(SshEngine.Client(ClientOptions(SshAlgorithms.Modern), Stream("client"), null, "server"), links[0], new ListSink(), new FreeRunGate(), null, deadlineMs, new FixedClock(1), null);
             pair.Server.Run();
             pair.Client.Run();
-            Assert.True(pair.Client.Opened.Wait(30000));
+            Assert.True(await FutureWaits.Within(pair.Client.Opened, TimeSpan.FromMilliseconds(30000)));
             IFuture<int> open = pair.Client.OpenTunnel("allowed", 1);
-            Assert.True(open.Wait(30000));
+            Assert.True(await FutureWaits.Within(open, TimeSpan.FromMilliseconds(30000)));
             pair.Channel = open.Result;
             return pair;
         }
@@ -378,10 +378,10 @@ namespace NetSec.Tests
 
         /// <summary>SshScript.Tunnel takes this path: read part of a long reply, send EOF, collect to the end.</summary>
         [Fact]
-        public void A_channel_ends_after_the_peers_eof_while_the_relay_waits_for_room()
+        public async System.Threading.Tasks.Task A_channel_ends_after_the_peers_eof_while_the_relay_waits_for_room()
         {
             LongReplyLink target = new LongReplyLink();
-            SessionPair pair = OpenTunnelPair((h, p) => Futures.FromResult<IByteLink>(target));
+            SessionPair pair = await OpenTunnelPair((h, p) => Futures.FromResult<IByteLink>(target));
             long seen = -1;
             for (int i = 0; i < 100 && seen != target.Taken; i++)
             {
@@ -394,7 +394,7 @@ namespace NetSec.Tests
             while (!ended && DateTime.UtcNow < stop)
             {
                 IFuture<AppChunk> next = pair.Client.Receive();
-                if (!next.Wait(10000)) break;
+                if (!await FutureWaits.Within(next, TimeSpan.FromMilliseconds(10000))) break;
                 Assert.False(next.IsFaulted, "the session ended first: " + next.Exception?.Message);
                 ended = next.Result.Bytes.Length == 0;
             }
@@ -407,14 +407,14 @@ namespace NetSec.Tests
         [Theory]
         [InlineData(UploadSize)]
         [InlineData(256 * 1024)]
-        public void A_fast_sender_waits_for_a_slow_target_and_the_session_stays_up(int pieceSize)
+        public async System.Threading.Tasks.Task A_fast_sender_waits_for_a_slow_target_and_the_session_stays_up(int pieceSize)
         {
             SlowLink target = new SlowLink(2);
-            SessionPair pair = OpenTunnelPair((h, p) => Futures.FromResult<IByteLink>(target));
+            SessionPair pair = await OpenTunnelPair((h, p) => Futures.FromResult<IByteLink>(target));
             for (int sent = 0; sent < UploadSize; sent += pieceSize)
             {
                 IFuture send = pair.Client.Send(pair.Channel, Filled(pieceSize));
-                Assert.True(send.Wait(120000), "the send did not finish");
+                Assert.True(await FutureWaits.Within(send, TimeSpan.FromMilliseconds(120000)), "the send did not finish");
                 Assert.False(send.IsFaulted, send.Exception?.Message);
             }
             for (int i = 0; i < 600 && target.Written < UploadSize; i++) Thread.Sleep(100);
@@ -423,7 +423,7 @@ namespace NetSec.Tests
         }
 
         [Fact]
-        public void Sends_that_a_caller_does_not_wait_for_arrive_in_order()
+        public async System.Threading.Tasks.Task Sends_that_a_caller_does_not_wait_for_arrive_in_order()
         {
             MemoryLink[] links = MemoryLink.Pair();
             GlassSshSession server = new GlassSshSession(SshEngine.Server(ServerOptions(SshAlgorithms.Modern), Stream("server"), null, "client"), links[1], new ListSink(), new FreeRunGate(), null, 30000, new FixedClock(1), null);
@@ -432,12 +432,12 @@ namespace NetSec.Tests
             server = new GlassSshSession(SshEngine.Server(ServerOptions(SshAlgorithms.Modern), Stream("server"), null, "client"), links[1], new ListSink(), new FreeRunGate(), null, 30000, new FixedClock(1), (h, p) => Futures.FromResult<IByteLink>(record));
             server.Run();
             client.Run();
-            Assert.True(client.Opened.Wait(30000));
+            Assert.True(await FutureWaits.Within(client.Opened, TimeSpan.FromMilliseconds(30000)));
             IFuture<int> open = client.OpenTunnel("allowed", 1);
-            Assert.True(open.Wait(30000));
+            Assert.True(await FutureWaits.Within(open, TimeSpan.FromMilliseconds(30000)));
             IFuture last = null;
             for (int i = 0; i < 40; i++) last = client.Send(open.Result, Enumerable.Repeat((byte)i, 100 * 1024).ToArray());
-            Assert.True(last.Wait(60000));
+            Assert.True(await FutureWaits.Within(last, TimeSpan.FromMilliseconds(60000)));
             for (int i = 0; i < 300 && record.Count < 40 * 100 * 1024; i++) Thread.Sleep(100);
             Assert.False(client.Finished.IsCompleted, client.Finished.IsCompleted ? "the session ended: " + client.Finished.Result.Error?.Code : "");
             Assert.Equal(40 * 100 * 1024, record.Count);
@@ -469,38 +469,38 @@ namespace NetSec.Tests
 
         /// <summary>A send parked on a full window must not outlive its channel.</summary>
         [Fact]
-        public void A_send_waiting_for_room_ends_when_the_peer_closes_the_channel()
+        public async System.Threading.Tasks.Task A_send_waiting_for_room_ends_when_the_peer_closes_the_channel()
         {
             SlowLink stuck = new SlowLink(0);
-            SessionPair pair = OpenTunnelPair((h, p) => Futures.FromResult<IByteLink>(stuck));
+            SessionPair pair = await OpenTunnelPair((h, p) => Futures.FromResult<IByteLink>(stuck));
             IFuture send = pair.Client.Send(pair.Channel, Filled(UploadSize));
             for (int i = 0; i < 100 && stuck.Written == 0; i++) Thread.Sleep(50);
             Thread.Sleep(500);
             Assert.False(send.IsCompleted, "the send finished while the target took nothing");
             pair.Server.Send(pair.Channel, new byte[0]);
-            Assert.True(send.Wait(20000), "the send never woke");
+            Assert.True(await FutureWaits.Within(send, TimeSpan.FromMilliseconds(20000)), "the send never woke");
             Assert.False(pair.Client.Finished.IsCompleted, "the whole session ended with the channel");
         }
 
         [Fact]
-        public void A_ninth_channel_faults_only_its_own_open_and_the_first_channel_still_works()
+        public async System.Threading.Tasks.Task A_ninth_channel_faults_only_its_own_open_and_the_first_channel_still_works()
         {
             RecordLink[] targets = Enumerable.Range(0, 8).Select(_ => new RecordLink()).ToArray();
             int next = 0;
-            SessionPair pair = OpenTunnelPair((h, p) => Futures.FromResult<IByteLink>(targets[Interlocked.Increment(ref next) - 1]));
+            SessionPair pair = await OpenTunnelPair((h, p) => Futures.FromResult<IByteLink>(targets[Interlocked.Increment(ref next) - 1]));
             for (int i = 1; i < 8; i++)
             {
                 IFuture<int> open = pair.Client.OpenTunnel("allowed", 1);
-                Assert.True(open.Wait(30000));
+                Assert.True(await FutureWaits.Within(open, TimeSpan.FromMilliseconds(30000)));
                 Assert.False(open.IsFaulted);
             }
             IFuture<int> ninth = pair.Client.OpenTunnel("allowed", 1);
-            Assert.True(ninth.Wait(30000));
+            Assert.True(await FutureWaits.Within(ninth, TimeSpan.FromMilliseconds(30000)));
             Assert.True(ninth.IsFaulted, "the ninth channel opened");
             Assert.Equal(SshCodes.ChannelLimit, ((NetSecException)ninth.Exception).Error.Code);
             Assert.False(pair.Client.Finished.IsCompleted, "the whole session ended");
 
-            Assert.True(pair.Client.Send(pair.Channel, new byte[] { 7 }).Wait(30000));
+            Assert.True(await FutureWaits.Within(pair.Client.Send(pair.Channel, new byte[] { 7 }), TimeSpan.FromMilliseconds(30000)));
             for (int i = 0; i < 100 && targets[0].Count == 0; i++) Thread.Sleep(50);
             Assert.Equal(1, targets[0].Count);
         }
