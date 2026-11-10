@@ -5,6 +5,8 @@ namespace NetSec.Host;
 /// under the read side. Every other frame, the flip frame too, goes out under the write side. So a flip frame lands ahead of
 /// or behind a whole line, never between the line's read of the toggle and its send. A line picked while ON reaches each
 /// socket before the flip to OFF, and the UI's reload from /events then replaces it.
+/// Two session frames read no toggle and still go out under the read side (Pick): trace.catch and clock.link-ambiguous. Each one
+/// belongs to the session's trace stream, so it goes out in that stream's order, after the trace lines written before it.
 /// </summary>
 public sealed class ShowKeysFence(Func<bool> showKeys)
 {
