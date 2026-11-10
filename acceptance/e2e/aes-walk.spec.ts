@@ -1,5 +1,5 @@
 import { expect, test, type Page } from '@playwright/test';
-import { HOST_PORT, NotRun, TOKEN, hostGet, openApp, readState, requireLive } from './support';
+import { HOST_PORT, NotRun, TOKEN, hostGet, openApp, readState, requireLive, controlMissing } from './support';
 
 /**
  * A19, chapter 1 of the AES walk in the app (docs/walkthrough-design.md sections 2.2, 2.3, 3.5, slice W1b). Test ids: CONTRACT.md section 6.
@@ -478,7 +478,7 @@ function charOk(hex: string, shown: string): boolean {
 }
 
 async function requireCellParts(page: Page): Promise<void> {
-  if ((await page.getByTestId('aes-walk-cell-0-0-index').count()) === 0) throw new NotRun('UI_CONTROL_MISSING', 'block cells have no aes-walk-cell-{r}-{c}-index yet (Steve fix 1)');
+  if ((await page.getByTestId('aes-walk-cell-0-0-index').count()) === 0) throw controlMissing('aes-walk-cell-0-0-index', 'block cells have no aes-walk-cell-{r}-{c}-index yet (Steve fix 1)');
 }
 
 /** The step panel's title, such as "How w4 is made". */
@@ -550,7 +550,7 @@ test('[A19.ui.key-word-build-runs-in-steps] with motion on, Next on a RotWord wo
   const newCells = [0, 1, 2, 3].map(b => `aes-walk-table-cell-${4 * nk + b}`);
   const [seen] = await Promise.all([firstSeen(page, ids, newCells, 20_000), page.getByTestId('aes-walk-next').click()]);
   const order = ids.map(id => seen.rows[id]);
-  if (order.every(t => t === undefined)) throw new NotRun('UI_CONTROL_MISSING', `Next onto w${nk} showed no aes-walk-build-* row without a tap (Steve fix 2: the build runs by itself)`);
+  if (order.every(t => t === undefined)) throw controlMissing('aes-walk-build', `Next onto w${nk} showed no aes-walk-build-* row without a tap (Steve fix 2: the build runs by itself)`);
   ids.forEach(id => expect(seen.rows[id], `${id} appears during the build of w${nk}`).not.toBeUndefined());
   for (let k = 1; k < ids.length; k++) expect(order[k], `${ids[k]} appears after ${ids[k - 1]} (FIPS 197 order)`).toBeGreaterThanOrEqual(order[k - 1]);
   expect(order[ids.length - 1] - order[0], 'the stages come one after another, not in one frame').toBeGreaterThanOrEqual(300);
@@ -575,7 +575,7 @@ test('[A19.ui.key-roles-have-colors] the word being built, the word before it an
   const nk = tables.body.sizes.find((s: any) => s.keyBits === reply.keyBits).keyWords;
   await page.getByTestId('aes-walk-next').click();
   const roleCell = (role: string) => page.locator(`[data-testid^="aes-walk-table-cell-"][data-role="${role}"]`);
-  if ((await roleCell('new').count()) === 0) throw new NotRun('UI_CONTROL_MISSING', 'no aes-walk-table-cell-* carries data-role yet (Steve fix 2)');
+  if ((await roleCell('new').count()) === 0) throw controlMissing('aes-walk-table-cell[data-role]', 'no aes-walk-table-cell-* carries data-role yet (Steve fix 2)');
   const words: Record<string, string> = { new: `w${nk}`, previous: `w${nk - 1}`, 'key-back': 'w0' };
   const color: Record<string, string> = {};
   for (const [role, word] of Object.entries(words)) {
@@ -610,7 +610,7 @@ test('[A19.ui.key-schedule-zoom] at 1280 px the Key Schedule panel zooms in and 
   await openWalk(page);
   await toKeySchedule(page);
   const zin = page.getByTestId('aes-walk-ks-zoom-in'), zout = page.getByTestId('aes-walk-ks-zoom-out'), zreset = page.getByTestId('aes-walk-ks-zoom-reset');
-  if ((await zin.count()) === 0) throw new NotRun('UI_CONTROL_MISSING', 'the Key Schedule panel has no aes-walk-ks-zoom-in yet (Steve fix 3)');
+  if ((await zin.count()) === 0) throw controlMissing('aes-walk-ks-zoom-in', 'the Key Schedule panel has no aes-walk-ks-zoom-in yet (Steve fix 3)');
   const width = async () => (await tableCell(page, 0).boundingBox())!.width;
   const flat = async (where: string) => {
     const s = await sideScroll(page);
@@ -638,7 +638,7 @@ test('[A19.ui.key-panel-landscape-layout] at 1280 px and up the round-key grid s
   await toKeySchedule(page);
   const tables = await hostGet('/api/walk/aes/tables');
   const nk = tables.body.sizes.find((s: any) => s.keyBits === reply.keyBits).keyWords;
-  if ((await page.getByTestId('aes-walk-ks-build').count()) === 0) throw new NotRun('UI_CONTROL_MISSING', 'the Key Schedule panel has no aes-walk-ks-build step panel yet (Steve fix 4)');
+  if ((await page.getByTestId('aes-walk-ks-build').count()) === 0) throw controlMissing('aes-walk-ks-build', 'the Key Schedule panel has no aes-walk-ks-build step panel yet (Steve fix 4)');
   await page.getByTestId('aes-walk-next').click();
   await expect.poll(() => buildTitle(page), { timeout: 15_000 }).toBe(`How w${nk} is made`);
   const boxes = async () => ({ table: (await page.getByTestId('aes-walk-ks-table').boundingBox())!, build: (await page.getByTestId('aes-walk-ks-build').boundingBox())! });
@@ -709,7 +709,7 @@ test('[A19.ui.key-panel-xor-rcon-replay] the build shows each byte XOR in binary
   const nk = tables.body.sizes.find((s: any) => s.keyBits === reply.keyBits).keyWords;
   const rows: any[] = reply.keyWords.slice().sort((a: any, b: any) => a.i - b.i);
   const row = rows.find(r => r.i === nk);
-  if ((await page.getByTestId('aes-walk-ks-build').count()) === 0) throw new NotRun('UI_CONTROL_MISSING', 'the Key Schedule panel has no aes-walk-ks-build step panel yet (Steve fix 4)');
+  if ((await page.getByTestId('aes-walk-ks-build').count()) === 0) throw controlMissing('aes-walk-ks-build', 'the Key Schedule panel has no aes-walk-ks-build step panel yet (Steve fix 4)');
   // The XOR line, with motion on: for each byte j, one frame shows w(i - Nk) byte j, the value it meets, and the result, each in binary.
   await page.emulateMedia({ reducedMotion: 'no-preference' });
   const [texts] = await Promise.all([textsDuring(page, ['aes-walk-build-xor'], 20_000), page.getByTestId('aes-walk-next').click()]);
@@ -774,7 +774,7 @@ test('[A19.ui.key-table-scrolls-in-its-own-box] on AES-256 the round-key table s
     if (!(await pick.isVisible().catch(() => false))) throw new NotRun('PRODUCT_MISSING', 'no aes-walk-key-size-256');
     await Promise.all([page.waitForResponse(WALK_BLOCK, { timeout: 30_000 }), pick.click()]);
     await toKeySchedule(page);
-    if ((await page.getByTestId('aes-walk-ks-table').count()) === 0) throw new NotRun('UI_CONTROL_MISSING', 'the Key Schedule panel has no aes-walk-ks-table box yet (Steve: a scrollable container)');
+    if ((await page.getByTestId('aes-walk-ks-table').count()) === 0) throw controlMissing('aes-walk-ks-table', 'the Key Schedule panel has no aes-walk-ks-table box yet (Steve: a scrollable container)');
     const where = `${w}x${h}, zoom in x${zoomSteps}`;
     for (let k = 0; k < zoomSteps; k++) await page.getByTestId('aes-walk-ks-zoom-in').click();
     const y0 = await page.evaluate(() => window.scrollY);
@@ -843,7 +843,7 @@ async function pairFrames(page: Page, col: number, ms: number): Promise<string[]
 test('[A19.ui.mix-matrix-pairs-and-line] on MixColumns the panel shows the fixed matrix, the state before, and Play this column lights each pair with its "2 × 21 = 42" line and fills that column', async ({ page }) => {
   const reply = await openWalk(page);
   const idx = await toStep(page, reply, 'MixColumns', 1);
-  if ((await page.getByTestId('aes-walk-mix-panel').count()) === 0) throw new NotRun('UI_CONTROL_MISSING', 'MixColumns has no aes-walk-mix-panel yet (Steve: the matrix panel)');
+  if ((await page.getByTestId('aes-walk-mix-panel').count()) === 0) throw controlMissing('aes-walk-mix-panel', 'MixColumns has no aes-walk-mix-panel yet (Steve: the matrix panel)');
   const step = reply.forward.steps[idx];
   const before = bytesOf(reply.forward.steps[idx - 1].state);
   for (let r = 0; r < 4; r++) for (let c = 0; c < 4; c++) {
@@ -871,7 +871,7 @@ test('[A19.ui.mix-matrix-pairs-and-line] on MixColumns the panel shows the fixed
 test('[A19.ui.mix-fill-all] on MixColumns, Fill all fills every byte of the state after with the engine state', async ({ page }) => {
   const reply = await openWalk(page);
   const idx = await toStep(page, reply, 'MixColumns', 1);
-  if ((await page.getByTestId('aes-walk-mix-fill').count()) === 0) throw new NotRun('UI_CONTROL_MISSING', 'MixColumns has no aes-walk-mix-fill yet (Steve: Fill all)');
+  if ((await page.getByTestId('aes-walk-mix-fill').count()) === 0) throw controlMissing('aes-walk-mix-fill', 'MixColumns has no aes-walk-mix-fill yet (Steve: Fill all)');
   const after = bytesOf(reply.forward.steps[idx].state);
   await page.getByTestId('aes-walk-mix-fill').click();
   await expect.poll(() => running(page), { timeout: 30_000 }).toBe(0);
@@ -882,7 +882,7 @@ test('[A19.ui.mix-fill-all] on MixColumns, Fill all fills every byte of the stat
 test('[A19.ui.add-round-key-grid] AddRoundKey shows a "ROUND KEY n" grid with its number and the engine round key, and the XOR moves with motion on', async ({ page }) => {
   const reply = await openWalk(page);
   await toFirstStep(page);
-  if ((await page.getByTestId('aes-walk-round-key-grid').count()) === 0) throw new NotRun('UI_CONTROL_MISSING', 'AddRoundKey has no aes-walk-round-key-grid yet (Steve: the ROUND KEY n grid)');
+  if ((await page.getByTestId('aes-walk-round-key-grid').count()) === 0) throw controlMissing('aes-walk-round-key-grid', 'AddRoundKey has no aes-walk-round-key-grid yet (Steve: the ROUND KEY n grid)');
   const check = async (idx: number) => {
     const s = reply.forward.steps[idx];
     await expect(page.getByTestId('aes-walk-round-key-label'), `round ${s.round}: the grid names its number`).toHaveText(new RegExp(`round key\\s*${s.round}\\b`, 'i'));
@@ -920,7 +920,7 @@ test('[A19.ui.bit-lines-for-picked-byte] on AddRoundKey a picked byte shows stat
   const s = reply.forward.steps[0];
   const prev = bytesOf(reply.inputHex), key = bytesOf(s.roundKey), out = bytesOf(s.state);
   await cell(page, 0, 0).click();
-  if ((await page.getByTestId('aes-walk-bits-state').count()) === 0) throw new NotRun('UI_CONTROL_MISSING', 'AddRoundKey has no aes-walk-bits-state yet (Steve: the bit lines)');
+  if ((await page.getByTestId('aes-walk-bits-state').count()) === 0) throw controlMissing('aes-walk-bits-state', 'AddRoundKey has no aes-walk-bits-state yet (Steve: the bit lines)');
   for (const [r, c] of [[0, 0], [2, 3]]) {
     await cell(page, r, c).click();
     const i = r + 4 * c;
@@ -957,7 +957,7 @@ test('[A19.ui.inv-mix-line-matches-field-multiply] on the decrypt walk\'s InvMix
   await toFirstStep(page);
   for (let n = 0; n < 200 && (await kindNow(page)) !== 'InvMixColumns'; n++) await page.getByTestId('aes-walk-next').click();
   expect(await kindNow(page), 'at the decrypt walk\'s first InvMixColumns').toBe('InvMixColumns');
-  if ((await page.getByTestId('aes-walk-mix-next').count()) === 0) throw new NotRun('UI_CONTROL_MISSING', 'InvMixColumns has no aes-walk-mix-next yet');
+  if ((await page.getByTestId('aes-walk-mix-next').count()) === 0) throw controlMissing('aes-walk-mix-next', 'InvMixColumns has no aes-walk-mix-next yet');
   const idx = reply.inverse.steps.findIndex((s: any) => s.kind === 'InvMixColumns');
   const before = bytesOf(reply.inverse.steps[idx - 1].state);
   for (let k = 0; k < 4; k++) {

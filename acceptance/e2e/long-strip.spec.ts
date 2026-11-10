@@ -1,5 +1,5 @@
 import { test, expect, Page } from '@playwright/test';
-import { openApp, requireLive, readState, HOST_PORT, TOKEN, NotRun } from './support';
+import { openApp, requireLive, readState, HOST_PORT, TOKEN, NotRun, controlMissing } from './support';
 
 /**
  * R1, "the long text is always visible" (docs/sections-plan.md lines 24, 107 and 112; Q3, Steve: A). In Techniques a pinned strip sits across
@@ -27,10 +27,10 @@ async function setShowKeys(on: boolean): Promise<void> {
 async function openAesTechnique(page: Page): Promise<void> {
   await openApp(page);
   const section = page.getByTestId('section-techniques');
-  if ((await section.count()) === 0) throw new NotRun('UI_CONTROL_MISSING', 'the top bar has no section-techniques');
+  if ((await section.count()) === 0) throw controlMissing('section-techniques', 'the top bar has no section-techniques');
   await section.click();
   const item = page.getByTestId('walk-item-aes');
-  if ((await item.count()) === 0) throw new NotRun('UI_CONTROL_MISSING', 'the Techniques rail has no walk-item-aes');
+  if ((await item.count()) === 0) throw controlMissing('walk-item-aes', 'the Techniques rail has no walk-item-aes');
   await item.click();
   await expect(page.getByTestId('walk-root'), 'the AES walk opens in walk-root').toBeVisible({ timeout: 30_000 });
 }

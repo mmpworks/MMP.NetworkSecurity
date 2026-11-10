@@ -1,7 +1,7 @@
 import { expect, test, type Page } from '@playwright/test';
 import * as fs from 'node:fs';
 import * as path from 'node:path';
-import { NotRun, hostGet, openApp, requireLive } from './support';
+import { NotRun, hostGet, openApp, requireLive, controlMissing } from './support';
 
 /**
  * P3, the attack index and the two-run layout (docs/sections-plan.md section 2 item 3, and Q4 answer A). "Attack runs" opens an index of all
@@ -49,7 +49,7 @@ async function openIndex(page: Page): Promise<void> {
   const section = page.getByTestId('section-lessons');
   if ((await section.count()) > 0) await section.click();
   const open = page.getByTestId('attack-index-open');
-  if ((await open.count()) === 0) throw new NotRun('UI_CONTROL_MISSING', 'the Lessons rail has no attack-index-open yet (slice P3)');
+  if ((await open.count()) === 0) throw controlMissing('attack-index-open', 'the Lessons rail has no attack-index-open yet (slice P3)');
   await open.click();
   await expect(page.getByTestId('attack-index'), 'attack-index-open opens the index').toBeVisible({ timeout: 15_000 });
 }

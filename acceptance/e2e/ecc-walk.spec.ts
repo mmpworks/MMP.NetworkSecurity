@@ -1,7 +1,7 @@
 import { expect, test, type Locator, type Page } from '@playwright/test';
 import * as fs from 'node:fs';
 import * as path from 'node:path';
-import { NotRun, hostGet, openApp, requireLive } from './support';
+import { NotRun, hostGet, openApp, requireLive, controlMissing } from './support';
 
 /**
  * R7, the elliptic-curve walk screens (docs/sections-plan.md R7 and section 4, slices P8a and P8). They teach in the order of video
@@ -45,14 +45,14 @@ async function openWalk(page: Page, item: string, root: string): Promise<void> {
   requireLive();
   await openApp(page);
   const section = page.getByTestId('section-techniques');
-  if ((await section.count()) === 0) throw new NotRun('UI_CONTROL_MISSING', 'the top bar has no section-techniques');
+  if ((await section.count()) === 0) throw controlMissing('section-techniques', 'the top bar has no section-techniques');
   await section.click();
   const rail = page.getByTestId(item);
-  if ((await rail.count()) === 0) throw new NotRun('UI_CONTROL_MISSING', `the Techniques rail has no ${item}`);
+  if ((await rail.count()) === 0) throw controlMissing(item, `the Techniques rail has no ${item}`);
   await rail.click();
   const panel = page.getByTestId('walk-root').getByTestId(root);
   try { await panel.waitFor({ state: 'visible', timeout: 15_000 }); }
-  catch { throw new NotRun('UI_CONTROL_MISSING', `${item} opens no ${root} inside walk-root yet`); }
+  catch { throw controlMissing(root, `${item} opens no ${root} inside walk-root yet`); }
 }
 const openCurve = (page: Page) => openWalk(page, 'walk-item-curve', 'curve-walk-panel');
 

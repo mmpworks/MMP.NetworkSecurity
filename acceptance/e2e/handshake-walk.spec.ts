@@ -1,7 +1,7 @@
 import { expect, test, type Page } from '@playwright/test';
 import * as fs from 'node:fs';
 import * as path from 'node:path';
-import { HOST_PORT, NotRun, TOKEN, hostGet, openApp, readState, requireLive } from './support';
+import { HOST_PORT, NotRun, TOKEN, hostGet, openApp, readState, requireLive, controlMissing } from './support';
 
 /**
  * The Handshake section's key schedule screens (docs/sections-plan.md section 4, slices P4 and P4b; R8).
@@ -36,14 +36,14 @@ async function openWalk(page: Page, item: string, root: string): Promise<void> {
   requireLive();
   await openApp(page);
   const section = page.getByTestId('section-handshake');
-  if ((await section.count()) === 0) throw new NotRun('UI_CONTROL_MISSING', 'the top bar has no section-handshake');
+  if ((await section.count()) === 0) throw controlMissing('section-handshake', 'the top bar has no section-handshake');
   await section.click();
   const rail = page.getByTestId(item);
-  if ((await rail.count()) === 0) throw new NotRun('UI_CONTROL_MISSING', `the Handshake rail has no ${item}`);
+  if ((await rail.count()) === 0) throw controlMissing(item, `the Handshake rail has no ${item}`);
   await rail.click();
   const panel = page.getByTestId('walk-root').getByTestId(root);
   try { await panel.waitFor({ state: 'visible', timeout: 15_000 }); }
-  catch { throw new NotRun('UI_CONTROL_MISSING', `${item} opens no ${root} inside walk-root yet`); }
+  catch { throw controlMissing(root, `${item} opens no ${root} inside walk-root yet`); }
 }
 
 async function walk(route: string): Promise<any> {
