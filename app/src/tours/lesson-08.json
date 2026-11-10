@@ -374,7 +374,7 @@
       "text": [
         "In SSH the server proves itself with a host key the client pinned earlier, and the client proves itself with a signed message. Neither side needs a certificate authority.",
         "The lab shows an old device's SSH suite beside a modern one on the desktop. The code is CF-compiled, run on the desktop CLR, never run on CE. The lab has not touched real CE hardware.",
-        "The old device path has a limit. No peer that lacks the strict KEX marker has run here, and an old device is likely that kind of peer. Our own code ran with the marker off against our own code, on both suites. Against outside code, both sides ran the old rules in two runs. So the old rules hold against outside code, and a real old peer stays unproved. This engine also leaves out rekey and password login. A peer that asks for a new key exchange stops the talk by name. RFC 4253 also lists 3des-cbc, diffie-hellman-group1-sha1 and ssh-dss as required names, and this engine has none of them.",
+        "The old device path has a limit. No peer that lacks the strict KEX marker has run here, and an old device is likely that kind of peer. Our own code ran with the marker off against our own code, on both suites. Against outside code, both sides ran the old rules in two runs. So the old rules hold against outside code, and a real old peer stays unproved. This engine also leaves out rekey and password login. A peer that asks for a new key exchange stops the talk by name. The SSH transport standard also lists 3des-cbc, diffie-hellman-group1-sha1 and ssh-dss as required names, and this engine has none of them.",
         "Built to show the parts. Do not copy."
       ],
       "glossary": [],

@@ -249,7 +249,7 @@
       "text": [
         "A TLS 1.1 device keeps three weak points: the RSA key transport, the MAC-then-encrypt records, and a downgrade attack it cannot detect. RC4, another old option, is banned outright by RFC 7465.",
         "The lab shows these weak points on the desktop. The code is CF-compiled, run on the desktop CLR, never run on CE. The lab has not touched real CE hardware.",
-        "This engine also leaves out the 3DES suite, session resumption, and the client certificate. RFC 4346 names the 3DES suite as the one every TLS 1.1 product must have.",
+        "This engine also leaves out the 3DES suite, session resumption, and the client certificate. The TLS 1.1 standard names the 3DES suite as the one every TLS 1.1 product must have.",
         "Built to show the parts. Do not copy."
       ],
       "glossary": [],
