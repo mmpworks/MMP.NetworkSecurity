@@ -189,15 +189,62 @@ namespace NetSec.Host.Tests
 
     public class ElectronOriginsPinTests
     {
+        /// <summary>
+        /// Loads app/electron/main.cjs under node with electron and child_process stubbed, and reads the env it hands to spawn. A shell value
+        /// of NETSEC_ORIGINS must arrive as an empty string, so a developer who exported it for the test harness cannot widen the desktop
+        /// app's Host. A comment that holds the text, or an env that drops the key, fails here.
+        /// </summary>
+        const string Probe = """
+            const Module = require('node:module');
+            const load = Module._load;
+            const app = { isPackaged: true, whenReady: () => Promise.resolve(), on() {}, exit() {}, quit() {} };
+            Module._load = function (request, parent, isMain) {
+              if (request === 'electron') return { app, BrowserWindow: function () {}, screen: {}, shell: {} };
+              if (request === 'node:child_process' || request === 'child_process') return {
+                execFileSync() {},
+                spawn(cmd, args, opts) {
+                  const env = opts && opts.env ? opts.env : {};
+                  process.stdout.write('SPAWN-ENV ' + JSON.stringify({ has: Object.prototype.hasOwnProperty.call(env, 'NETSEC_ORIGINS'), value: env.NETSEC_ORIGINS }) + '\n');
+                  process.exit(0);
+                },
+              };
+              return load.apply(this, arguments);
+            };
+            require(process.argv[2]);
+            setTimeout(() => { process.stdout.write('NO-SPAWN\n'); process.exit(3); }, 5000);
+            """;
+
         [Fact]
-        public void Electron_blanks_NETSEC_ORIGINS_for_the_Host_it_spawns()
+        public async Task Electron_blanks_NETSEC_ORIGINS_for_the_Host_it_spawns()
         {
-            // A developer who exported NETSEC_ORIGINS for the test harness must not widen the desktop app's Host.
             string dir = AppContext.BaseDirectory;
             while (dir != null && !File.Exists(Path.Combine(dir, "app", "electron", "main.cjs"))) dir = Path.GetDirectoryName(dir);
             Assert.NotNull(dir);
-            string main = File.ReadAllText(Path.Combine(dir!, "app", "electron", "main.cjs"));
-            Assert.Contains("NETSEC_ORIGINS: ''", main);
+            string temp = Path.Combine(Path.GetTempPath(), "netsec-electron-env-" + Guid.NewGuid().ToString("N"));
+            Directory.CreateDirectory(temp);
+            string probe = Path.Combine(temp, "probe.cjs"), fakeDll = Path.Combine(temp, "NetSec.Host.dll");
+            File.WriteAllText(probe, Probe);
+            File.WriteAllText(fakeDll, "");
+            System.Diagnostics.ProcessStartInfo info = new("node", $"\"{probe}\" \"{Path.Combine(dir!, "app", "electron", "main.cjs")}\"")
+            {
+                UseShellExecute = false, RedirectStandardOutput = true, RedirectStandardError = true,
+            };
+            info.Environment["NETSEC_ORIGINS"] = "http://widened.example";
+            info.Environment["NETSEC_HOST_DLL"] = fakeDll;
+            info.Environment.Remove("NETSEC_HOST");
+            bool exited;
+            int code;
+            string output, errors;
+            try
+            {
+                using System.Diagnostics.Process p = System.Diagnostics.Process.Start(info)!;
+                (exited, code, output, errors) = await ProcessWaits.Collect(p, TimeSpan.FromSeconds(30));
+            }
+            finally { Directory.Delete(temp, true); }
+            Assert.True(exited, "node did not finish in 30 s");
+            string line = output.Split('\n').Select(l => l.Trim()).FirstOrDefault(l => l.StartsWith("SPAWN-ENV ", StringComparison.Ordinal));
+            Assert.True(line is not null, $"main.cjs never called spawn (exit {code}): {output} {errors}");
+            Assert.Equal("SPAWN-ENV {\"has\":true,\"value\":\"\"}", line);
         }
     }
 }

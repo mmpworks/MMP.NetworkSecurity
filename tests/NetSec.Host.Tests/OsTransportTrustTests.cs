@@ -55,7 +55,7 @@ public sealed class OsTransportTrustTests
         "other-root" => new(name, false, "UntrustedRoot", "other.pem", LeafFiles + " -cert_chain root.pem", (o, d) => { Root(o, d, "root"); Root(o, d, "other"); Issue(o, d, "leaf", "localhost", "root", Leaf + "extendedKeyUsage=serverAuth\n"); }),
         "via-intermediate-sent" => new(name, true, null, "root.pem", LeafFiles + " -cert_chain inter.pem", (o, d) => { Root(o, d, "root"); Issue(o, d, "inter", "Test Intermediate", "root", Ca); Issue(o, d, "leaf", "localhost", "inter", Leaf + "extendedKeyUsage=serverAuth\n"); }),
         "via-intermediate-not-sent" => new(name, false, "PartialChain", "root.pem", LeafFiles, (o, d) => { Root(o, d, "root"); Issue(o, d, "inter", "Test Intermediate", "root", Ca); Issue(o, d, "leaf", "localhost", "inter", Leaf + "extendedKeyUsage=serverAuth\n"); }),
-        "via-non-ca-issuer-sent" => new(name, false, null, "root.pem", LeafFiles + " -cert_chain inter.pem", (o, d) => { Root(o, d, "root"); Issue(o, d, "inter", "Not A CA", "root", "basicConstraints=CA:FALSE\n"); Issue(o, d, "leaf", "localhost", "inter", Leaf + "extendedKeyUsage=serverAuth\n"); }),
+        "via-non-ca-issuer-sent" => new(name, false, "InvalidBasicConstraints", "root.pem", LeafFiles + " -cert_chain inter.pem", (o, d) => { Root(o, d, "root"); Issue(o, d, "inter", "Not A CA", "root", "basicConstraints=CA:FALSE\n"); Issue(o, d, "leaf", "localhost", "inter", Leaf + "extendedKeyUsage=serverAuth\n"); }),
         "self-signed-leaf-as-trust" => new(name, true, null, "cert.pem", "-cert cert.pem -key key.pem", (o, d) =>
         {
             Key(o, d, "key");
@@ -97,7 +97,7 @@ public sealed class OsTransportTrustTests
         Assert.True(outcome == "caught", name + " was accepted");
         Assert.Equal("OS_TRANSPORT_FAILED", finished.GetProperty("code").GetString());
         Assert.Equal("os.tls.trust", finished.GetProperty("check").GetString());
-        if (c.Status is not null) Assert.Contains("(" + c.Status, detail);
+        if (c.Status is not null) Assert.True(detail.Contains("(" + c.Status), name + " expected (" + c.Status + " in: " + detail);
         if (c.Status == "PartialChain") Assert.Contains("another root", detail);
     }
 

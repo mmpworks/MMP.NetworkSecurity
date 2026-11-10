@@ -25,12 +25,7 @@ public class SecretGuardShapeTests
 
     static (string Name, byte[] Bytes) Shape(string shape) => shape switch
     {
-        "plain" => ("plain.txt", Utf8(Plain())),
-        "enc-trad" => ("enc-trad.txt", Utf8($"{Begin("RSA ")}\nProc-Type: 4,ENCRYPTED\nDEK-Info: AES-256-CBC,00112233445566778899AABBCCDDEEFF\n\n{Lines[0]}\n{Lines[1]}\n{End("RSA ")}\n")),
         "space-name" => ("my key.txt", Utf8(Plain())),
-        "non-ascii-name" => ("caf\u00e9.txt", Utf8(Plain())),
-        "escaped-string" => ("escaped.cs", Utf8("const string K = \"" + Joined("\\n") + "\";\n")),
-        "utf16" => ("utf16.txt", Encoding.Unicode.GetPreamble().Concat(Encoding.Unicode.GetBytes(Plain())).ToArray()),
         "csharp-array" => ("array.cs", Utf8("string[] k = {\n" + string.Join(",\n", new[] { Begin() }.Concat(Lines).Append(End()).Select(l => "    \"" + l + "\"")) + "\n};\n")),
         "xml-10" => ("key.xml", Utf8("<key>" + Joined("&#10;") + "</key>\n")),
         "xml-xa" => ("key-hex.xml", Utf8("<key>" + Joined("&#xA;") + "</key>\n")),
@@ -48,9 +43,6 @@ public class SecretGuardShapeTests
         "go-raw" => ("key.go", Utf8("var k = `" + Plain() + "`\n")),
         "yaml-block" => ("key.yaml", Utf8("key: |\n" + string.Join("\n", Plain().TrimEnd().Split('\n').Select(l => "  " + l)) + "\n")),
         "markdown-indented" => ("indented.md", Utf8(string.Join("\n", Plain().TrimEnd().Split('\n').Select(l => "    " + l)) + "\n")),
-        "prose-then-key" => ("prose-then-key.md", Utf8("A key file starts with " + Begin() + ", as below.\n\n" + Plain())),
-        "placeholder-then-key" => ("placeholder-then-key.txt", Utf8(Begin() + "\n...\n" + End() + "\n" + Plain())),
-        "over-8mib" => ("big.txt", Utf8(new string('x', 9 * 1024 * 1024) + "\n" + Plain())),
         _ => throw new ArgumentException(shape),
     };
 
@@ -65,11 +57,13 @@ public class SecretGuardShapeTests
         _ => throw new ArgumentException(control),
     };
 
+    // plain, enc-trad, non-ascii-name, escaped-string, utf16, prose-then-key, placeholder-then-key and over-8mib live in SecretGuardTests, which
+    // also checks that the refusal names the file (test weeding survey, Host row 1).
     public static TheoryData<string> Shapes => new()
     {
-        "plain", "enc-trad", "space-name", "non-ascii-name", "escaped-string", "utf16", "csharp-array", "xml-10", "xml-xa", "html-br",
+        "space-name", "csharp-array", "xml-10", "xml-xa", "html-br",
         "json-slash", "json-u000a", "json-in-json", "powershell-backtick", "markdown-quote", "hash-comment", "slash-comment", "plus-concat",
-        "csharp-verbatim", "python-bytes", "go-raw", "yaml-block", "markdown-indented", "prose-then-key", "placeholder-then-key", "over-8mib",
+        "csharp-verbatim", "python-bytes", "go-raw", "yaml-block", "markdown-indented",
     };
 
     public static TheoryData<string> Controls => new() { "prose-long", "placeholder", "public" };

@@ -121,6 +121,8 @@ Step 'layer_check' { python tools/layer_check.py src/NetSec.Core }
 Step 'secret_guard' { python -I tools/secret_guard.py }
 Step 'no package-runner calls in tools and app scripts' { python -I tools/no_npx.py }
 Step 'no package-runner check tests' { python -I tools/test_no_npx.py }
+Step 'app names the os transport os' { python -I tools/transport_name_lint.py }
+Step 'transport name lint tests' { python -I tools/test_transport_name_lint.py }
 Step 'run_status tests' { python -I tools/test_run_status.py }
 Step 'gate app decision tests' { python -I tools/test_gate_app.py }
 Step 'dist stamp tests' { python -I tools/test_dist_stamp.py }

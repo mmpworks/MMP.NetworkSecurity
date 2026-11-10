@@ -190,7 +190,12 @@ public class SecurityLiveTests
         File.WriteAllText(Path.Combine(host.SecurityDir, "files", "tls13.server", "v1", "key.pem"), "this is no key");
         (int status, string body) = await host.Get("/api/security");
         Assert.Equal(200, status);
-        Assert.Contains("Broken", body);
+        // The broken key marks its own type Broken and no other: a body that holds "Broken" anywhere is not enough.
+        JsonElement[] rows = JsonDocument.Parse(body).RootElement.GetProperty("types").EnumerateArray().ToArray();
+        JsonElement server = Assert.Single(rows, r => r.GetProperty("typeId").GetString() == "tls13.server");
+        Assert.Equal("Broken", server.GetProperty("state").GetString());
+        Assert.Empty(rows.Where(r => r.GetProperty("typeId").GetString() != "tls13.server" && r.GetProperty("state").GetString() == "Broken")
+            .Select(r => r.GetProperty("typeId").GetString()));
     }
 
     /// <summary>

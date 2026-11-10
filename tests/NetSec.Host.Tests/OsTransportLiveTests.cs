@@ -134,23 +134,6 @@ public sealed class OsTransportLiveTests
 
     static string TypeOf(JsonElement frame) => frame.GetProperty("type").GetString()!;
 
-    /// <summary>The app and the Host use one name for the OS transport, os. The old name, real, must be gone from the app's source.</summary>
-    [Fact]
-    public void The_app_names_the_os_transport_os_and_never_real()
-    {
-        DirectoryInfo dir = new(AppContext.BaseDirectory);
-        while (dir.Parent is not null && !Directory.Exists(Path.Combine(dir.FullName, "app", "src"))) dir = dir.Parent;
-        string src = Path.Combine(dir.FullName, "app", "src");
-        Assert.True(Directory.Exists(src), "no app/src above " + AppContext.BaseDirectory);
-        List<string> hits = Directory.GetFiles(src, "*.*", SearchOption.AllDirectories)
-            .Where(f => f.EndsWith(".ts") || f.EndsWith(".vue"))
-            .SelectMany(f => File.ReadAllLines(f).Select((line, i) => (f, i, line)))
-            .Where(x => Regex.IsMatch(x.line, @"['""]real['""]") || Regex.IsMatch(x.line, @"\bisReal\b"))
-            .Select(x => Path.GetFileName(x.f) + ":" + (x.i + 1) + " " + x.line.Trim()).ToList();
-        Assert.True(hits.Count == 0, "the old transport name is still in the app: " + string.Join(" | ", hits));
-        Assert.Contains("'os'", File.ReadAllText(Path.Combine(src, "types.ts")));
-    }
-
     [Fact]
     public async Task Lesson_5_on_the_os_transport_talks_tls_13_and_shows_no_secret()
     {
