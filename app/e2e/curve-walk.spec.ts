@@ -121,6 +121,16 @@ test('playing the hops moves a marker from dot to dot, and it ends on O', async 
   expect(await shownPt(at)).toBeNull()
 })
 
+test('Play walks every hop by itself, stops on O, and Pause turns back into Play', async ({ page }) => {
+  await openCurve(page)
+  const play = page.getByTestId('curve-hops-play')
+  await play.click()
+  await expect(play).toHaveText(/Pause/)
+  await expect(page.getByTestId('curve-hop-marker')).toHaveAttribute('data-point', 'O', { timeout: 30_000 })
+  await expect(play).toHaveText(/Play the hops/)
+  await expect(page.getByTestId('curve-hop-18')).toHaveAttribute('aria-current', 'true')
+})
+
 test('the nonce-reuse panel shows the engine\'s 2 signatures and the key it recovers', async ({ page }) => {
   const ec = (await reply('/api/walk/toy-curve')).ecdsa
   await openCurve(page)
@@ -156,6 +166,8 @@ test('with Show keys off both walks still show their public teaching numbers, th
   expect((await showKeys(false)).ok, 'PUT show-keys off').toBe(true)
   try {
     await open(page)
+    // The app reads the Host's state: the switch shows off.
+    await expect(page.getByTestId('show-keys-switch')).not.toBeChecked()
     await page.getByTestId('section-techniques').click()
     await page.getByTestId('walk-item-curve').click()
     await expect(page.getByTestId('curve-reuse-recovered-d')).toHaveText(String(ec.recovery.privateKey))
