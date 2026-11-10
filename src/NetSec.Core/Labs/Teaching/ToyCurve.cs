@@ -133,6 +133,7 @@ namespace NetSec.Labs.Teaching
             {
                 step.Kind = "opposite";
                 step.Result = ToyPoint.Infinity;
+                step.RPrime = ToyPoint.Infinity;
                 return step;
             }
             bool doubling = p.SameAs(q);
@@ -142,7 +143,10 @@ namespace NetSec.Labs.Teaching
             step.Inverse = Inverse(step.Denominator, Prime);
             step.Lambda = Mod(step.Numerator * step.Inverse.Value, Prime);
             int x = Mod(step.Lambda * step.Lambda - p.X - q.X, Prime);
-            step.Result = ToyPoint.At(x, Mod(step.Lambda * (p.X - x) - p.Y, Prime));
+            // R' is on the line y = lambda (x - p.x) + p.y. The sum is R' flipped over the x axis.
+            int yPrime = Mod(step.Lambda * (x - p.X) + p.Y, Prime);
+            step.RPrime = ToyPoint.At(x, yPrime);
+            step.Result = ToyPoint.At(x, Mod(-yPrime, Prime));
             return step;
         }
 
