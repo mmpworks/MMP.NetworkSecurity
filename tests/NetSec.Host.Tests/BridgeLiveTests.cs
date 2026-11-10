@@ -26,6 +26,19 @@ namespace NetSec.Host.Tests
 
         public BridgeLiveTests() { Directory.CreateDirectory(_dir); }
 
+        /// <summary>
+        /// Line looks once more after its limit passes. A wait that slept past the limit and then gave up without a last look named a timeout
+        /// whose own output held the line ("no line starting 'READY'. Output: READY port=65416", issue #367). A limit of 0 shows it: the line is
+        /// there before the call, so the first look must find it.
+        /// </summary>
+        [Fact]
+        public async Task Line_looks_once_more_after_its_limit()
+        {
+            using Child child = new Child("cmd", "/c echo READY port=1");
+            Assert.True(await ProcessWaits.ExitedWithin(child.P, TimeSpan.FromSeconds(30)));
+            Assert.Equal("READY port=1", await child.Line("READY", 0));
+        }
+
         public void Dispose()
         {
             foreach (Lab lab in _labs) lab.Dispose();
