@@ -12,7 +12,11 @@ code. A change with no file under acceptance/ passes whatever it touches.
 Note: untracked files count, so a scratch file left at the top of the tree or in tools/ fails the check for an acceptance/ change. That is the safe
 direction, and the message names the path.
 
-Usage: python -I tools/check_acceptance_scope.py [--root REPO]. Exit 0 when in scope, 1 otherwise.
+--base REF names the ref to diff against (default origin/main). Run after a merge, origin/main...HEAD is empty and the check would judge nothing, so
+use the merge's first parent: `--base <merge>^1`. When the file set is empty the check prints a first line starting `SKIP:` (the gate reads that as a
+SKIPPED row, never PASS) and exits 0.
+
+Usage: python -I tools/check_acceptance_scope.py [--root REPO] [--base REF]. Exit 0 when in scope or when nothing changed, 1 otherwise.
 """
 import argparse
 import pathlib
@@ -40,13 +44,13 @@ def git_must(root, *args):
     return out
 
 
-def changed_files(root):
-    """The set of paths in the change, or None when origin/main is unknown. Raises GitFailed when a git call fails."""
-    code, _, _ = git(root, "rev-parse", "--verify", "-q", BASE)
+def changed_files(root, base=BASE):
+    """The set of paths in the change, or None when the base ref is unknown. Raises GitFailed when a git call fails."""
+    code, _, _ = git(root, "rev-parse", "--verify", "-q", base)
     if code != 0:
         return None
     names = set()
-    out = git_must(root, "diff", "--name-only", "--no-renames", f"{BASE}...HEAD")
+    out = git_must(root, "diff", "--name-only", "--no-renames", f"{base}...HEAD")
     names.update(line.strip() for line in out.splitlines() if line.strip())
     out = git_must(root, "status", "--porcelain", "--no-renames", "--untracked-files=all")   # all: name the file, not its untracked folder
     for line in out.splitlines():
@@ -58,15 +62,19 @@ def changed_files(root):
 def main(argv):
     ap = argparse.ArgumentParser()
     ap.add_argument("--root", default=str(pathlib.Path(__file__).resolve().parent.parent))
+    ap.add_argument("--base", default=BASE, help="ref to diff against; after a merge use <merge>^1")
     args = ap.parse_args(argv)
     try:
-        files = changed_files(args.root)
+        files = changed_files(args.root, args.base)
     except GitFailed as e:
         print(f"ACCEPTANCE_SCOPE_GIT_FAILED: {e}. The change cannot be judged, so the check fails closed.")
         return 1
     if files is None:
-        print(f"ACCEPTANCE_SCOPE: {BASE} is unknown here, so the change cannot be judged and the check fails closed. Run: git fetch origin")
+        print(f"ACCEPTANCE_SCOPE: {args.base} is unknown here, so the change cannot be judged and the check fails closed. Run: git fetch origin")
         return 1
+    if not files:
+        print(f"SKIP: no changed file against {args.base}, so the scope rule judged nothing (after a merge, pass --base <merge>^1)")
+        return 0
     if not any(f.startswith("acceptance/") for f in files):
         print("no file under acceptance/ changed, so the scope rule does not apply")
         return 0

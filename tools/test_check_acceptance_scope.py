@@ -43,9 +43,27 @@ class AcceptanceScope(unittest.TestCase):
         git("add", *rels, cwd=self.repo)
         git("commit", "-q", "-m", "change " + ",".join(rels), cwd=self.repo)
 
-    def check(self):
-        r = subprocess.run([sys.executable, "-I", str(SCRIPT), "--root", str(self.repo)], capture_output=True, text=True)
+    def check(self, *extra):
+        r = subprocess.run([sys.executable, "-I", str(SCRIPT), "--root", str(self.repo), *extra], capture_output=True, text=True)
         return r.returncode, r.stdout + r.stderr
+
+    def test_nothing_changed_against_the_base_reads_skip_not_a_quiet_pass(self):
+        """Run after a merge, origin/main...HEAD is empty and the check judged nothing (Jared, #353)."""
+        code, out = self.check()
+        self.assertEqual(code, 0, out)
+        self.assertTrue(out.startswith("SKIP:"), out)
+
+    def test_a_base_ref_judges_the_merge_that_origin_main_already_holds(self):
+        self.commit("acceptance/run.ps1", "tools/x.py")
+        git("update-ref", "refs/remotes/origin/main", "HEAD", cwd=self.repo)         # the merge landed: origin/main now equals HEAD
+        code, out = self.check("--base", "HEAD~1")
+        self.assertEqual(code, 1, out)
+        self.assertIn("tools/x.py", out)
+
+    def test_an_unknown_base_ref_fails_closed(self):
+        code, out = self.check("--base", "no-such-ref")
+        self.assertEqual(code, 1, out)
+        self.assertIn("ACCEPTANCE_SCOPE", out)
 
     def test_acceptance_and_docs_pass(self):
         self.commit("acceptance/run.ps1", "docs/a.md")

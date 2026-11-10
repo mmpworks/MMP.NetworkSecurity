@@ -207,5 +207,18 @@ class RunStatus(unittest.TestCase):
         self.assertNotIn(b"Traceback", r.stderr)
 
 
+    def test_a_gate_summary_with_skipped_steps_stays_passed_and_shows_the_skip(self):
+        log = GATE_START + "gate Slice: 42 of 42 steps passed, 1 skipped; report at docs/_runs/x.md\ngate exit 0\n"
+        code, out = self.status(log)
+        self.assertEqual(code, 0, out)
+        self.assertTrue(out.startswith("PASSED"), out)
+        self.assertIn("42 of 42 steps passed, 1 skipped", out)
+
+    def test_a_failed_gate_with_skipped_steps_still_reads_failed(self):
+        log = GATE_START + "gate Slice: 40 of 42 steps passed, 2 skipped; report at docs/_runs/x.md\ngate exit 1\n"
+        code, out = self.status(log)
+        self.assertEqual(code, 1, out)
+        self.assertIn("2 skipped", out)
+
 if __name__ == "__main__":
     unittest.main(verbosity=2)

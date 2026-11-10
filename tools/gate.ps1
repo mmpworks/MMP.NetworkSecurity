@@ -76,8 +76,9 @@ function Step([string]$name, [scriptblock]$body) {
     $failedTests = @($output | Where-Object { $_ -match '^(FAIL|ERROR): ' })
     if ($code -ne 0 -and $failedTests.Count -gt 0) { $failedTests | ForEach-Object { Write-Host $_ } }
     $output | Select-Object -Last 12 | ForEach-Object { Write-Host $_ }
-    $rows.Add([pscustomobject]@{ Name = $name; Status = $(if ($code -eq 0) { 'PASS' } else { 'FAIL' }); Exit = $code; Tail = (($output | Select-Object -Last 6) -join "`n") })
-    if ($code -ne 0) { $script:failed++ }
+    $status = Get-StepStatus -Code $code -Output $output          # exit 0 with a first line PIN_OFF or SKIP: reads SKIPPED, not PASS
+    $rows.Add([pscustomobject]@{ Name = $name; Status = $status; Exit = $code; Tail = (($output | Select-Object -Last 6) -join "`n") })
+    if ($status -eq 'FAIL') { $script:failed++ }
 }
 
 function Skip([string]$name, [string]$why) {
@@ -87,7 +88,8 @@ function Skip([string]$name, [string]$why) {
 
 $hasApp = Test-Path 'app/package.json'
 $appDiffFiles = if ($hasApp) { @(Get-AppDiffFiles $root) } else { @() }
-$appPlan = Get-AppProofPlan -HasApp $hasApp -SkipApp ([bool]$SkipApp) -Lesson $Lesson -AppDiffFiles $appDiffFiles
+$toolsPresent = (-not $hasApp) -or (@(Test-AppTools 'app').Count -eq 0)
+$appPlan = Get-AppProofPlan -HasApp $hasApp -SkipApp ([bool]$SkipApp) -Lesson $Lesson -AppDiffFiles $appDiffFiles -ToolsPresent $toolsPresent
 $appWhy = if ($appPlan.Mode -in 'none', 'skip', 'docs') { $appPlan.Why } else { '' }
 
 # One app step, with the gate's rule that it never installs: a missing tool stops with TOOL_MISSING and the command to run yourself.
@@ -105,7 +107,6 @@ function Step-App([string]$name, [scriptblock]$body) {
 switch ($Slice) {
     'S0' {
         Step 'dotnet build src/NetSec.Host' { dotnet build src/NetSec.Host -c Release --nologo -v q }
-        Step 'dotnet build src/NetSec.CeDevice' { dotnet build src/NetSec.CeDevice -c Release --nologo -v q $cf }
         if ($appWhy) { Skip 'npm run build (app)' $appWhy }
         else { Step-App 'npm run build (app)' { npm run build } }
     }
@@ -129,7 +130,7 @@ Step 'tests-wired check tests' { python -I tools/test_check_tests_wired.py }
 Step 'acceptance scope (acceptance/ and docs/ only)' { python -I tools/check_acceptance_scope.py }
 Step 'acceptance scope check tests' { python -I tools/test_check_acceptance_scope.py }
 # A PR that changes acceptance/ bumps acceptance/PIN in the same PR (python -I acceptance/tools/pin.py --write).
-Step 'acceptance PIN current' { python -I acceptance/tools/pin.py --check }
+Step 'acceptance PIN current' { python -W ignore -I acceptance/tools/pin.py --check }       # -W ignore keeps a Python warning off line 1, where PIN_OFF must stay
 Step 'acceptance PIN tests' { python -I acceptance/tools/test_pin.py }
 Step 'heavy-run lock tests' { python -I tools/test_heavy_lock.py }
 Step 'gate lock tests' { python -I tools/test_gate_lock.py }
@@ -160,6 +161,8 @@ else {
 Step 'dotnet build src/NetSec.Core' { dotnet build src/NetSec.Core -c Release --nologo -v q }
 Step 'dotnet build src/NetSec.Core.NetCF' { dotnet build src/NetSec.Core.NetCF -c Release --nologo -v q $cf }
 Step 'dotnet test net10.0' { dotnet test tests/NetSec.Tests -c Release -f net10.0 $cf --nologo --logger trx --results-directory "$trx-net10" @hang }
+# Every gate builds the CE device first: a custom -Slice name used to skip the slice-only build, and CfBinaryTests then ran an old CE binary.
+Step 'dotnet build src/NetSec.CeDevice' { dotnet build src/NetSec.CeDevice -c Release --nologo -v q $cf }
 Step 'dotnet test net48 (CF binaries)' { dotnet test tests/NetSec.Tests -c Release -f net48 $cf --nologo --logger trx --results-directory "$trx-cf" @hang }
 Step 'dotnet test Host (live process)' { dotnet test tests/NetSec.Host.Tests -c Release $cf --nologo --logger trx --results-directory "$trx-host" @hang }
 Step "acceptance $($Clauses -join ',')" { pwsh -NoProfile -File acceptance/run.ps1 -Clauses ($Clauses -join ',') -NetCFRefDir $NetCFRefDir }
@@ -226,5 +229,8 @@ foreach ($row in $rows) {
     $lines.Add('')
 }
 Set-Content -Path $report -Value ($lines -join "`n") -Encoding utf8
-Write-Host "gate $Slice`: $(@($rows | Where-Object Status -eq 'PASS').Count) of $(@($rows | Where-Object Status -ne 'SKIPPED').Count) steps passed; report at $report"
+$passedCount = @($rows | Where-Object Status -eq 'PASS').Count
+$ranCount = @($rows | Where-Object Status -ne 'SKIPPED').Count
+$skippedCount = @($rows | Where-Object Status -eq 'SKIPPED').Count
+Write-Host (Format-GateFinal -Slice $Slice -Passed $passedCount -Ran $ranCount -Skipped $skippedCount -Report $report)
 exit $(if ($failed -gt 0) { 1 } else { 0 })

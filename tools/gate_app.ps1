@@ -34,7 +34,21 @@ function Test-NonCodeAppFile([string]$Path) {
     return ($p -match '/screens/' -and $p -match '\.(png|jpe?g|gif|svg|webp)$')
 }
 
-function Get-AppProofPlan([bool]$HasApp, [bool]$SkipApp, [string]$Lesson, [string[]]$AppDiffFiles) {
+function Get-StepStatus([int]$Code, [string[]]$Output) {
+    # The row a gate step gets. A step that exits 0 but says on its FIRST line that it did not run (PIN_OFF, or SKIP:) reads SKIPPED, never PASS.
+    if ($Code -ne 0) { return 'FAIL' }
+    $first = @($Output | Where-Object { $_ -and $_.Trim() } | Select-Object -First 1)
+    if ($first.Count -gt 0 -and $first[0] -match '^(PIN_OFF\b|SKIP:)') { return 'SKIPPED' }
+    return 'PASS'
+}
+
+function Format-GateFinal([string]$Slice, [int]$Passed, [int]$Ran, [int]$Skipped, [string]$Report) {
+    # The gate's last line, which tools/run_status.py reads. Skipped steps are counted on it, so a step that did not run never hides behind PASSED.
+    $skips = if ($Skipped -gt 0) { ", $Skipped skipped" } else { '' }
+    return "gate ${Slice}: $Passed of $Ran steps passed$skips; report at $Report"
+}
+
+function Get-AppProofPlan([bool]$HasApp, [bool]$SkipApp, [string]$Lesson, [string[]]$AppDiffFiles, [bool]$ToolsPresent = $true) {
     # Mode: none (no app folder), docs (every changed file under app/ is non-code: skipped on its own, the files printed), refuse (code changed
     # and -SkipApp was given; there is no override), skip (-SkipApp, nothing changed), suite, narrowed (suite cut to one lesson),
     # lesson (no app change, one lesson spec, typecheck and build first), check (no app change: typecheck only).
@@ -62,6 +76,9 @@ function Get-AppProofPlan([bool]$HasApp, [bool]$SkipApp, [string]$Lesson, [strin
     } elseif ($Lesson) {
         # Build too: the preview serves app/dist, so a stale dist could otherwise pass a lesson spec.
         $plan.Mode = 'lesson'; $plan.Typecheck = $true; $plan.Build = $true; $plan.Lesson = $Lesson; $plan.Label = "playwright lesson $Lesson"
+    } elseif (-not $ToolsPresent) {
+        # Nothing under app/ changed and nobody asked for a lesson, so absent tools are not a red. A lesson or a code change still goes red.
+        $plan.Mode = 'skip'; $plan.Why = 'no app/ change, no -Lesson, and app/node_modules is absent; to include the typecheck run: cd app; npm ci'
     } else {
         $plan.Mode = 'check'; $plan.Typecheck = $true; $plan.Why = 'no -Lesson given'
     }
