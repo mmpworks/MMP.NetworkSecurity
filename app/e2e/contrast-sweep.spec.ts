@@ -94,7 +94,9 @@ for (const theme of ['dark', 'light'] as const) {
     await page.getByTestId('needs-use-builtin').click()
     await visit(page, theme, 'refusal banner, confirm')
     await page.getByTestId('needs-confirm-no').click()
-    await page.getByTestId('security-needs-banner').getByRole('button', { name: 'Close' }).click().catch(() => {})
+    // "No" only closes the confirm line; the banner stays until Close (NeedsBanner.vue, dismissNeeds).
+    await page.getByTestId('security-needs-banner').getByRole('button', { name: 'Close' }).click()
+    await expect(page.getByTestId('security-needs-banner')).toBeHidden()
     await api('PUT', '/api/security/types/token.issuer/mode', { mode: 'BuiltIn' })
     await page.getByTestId('security-setup-button').click()
     await visit(page, theme, 'security setup, all built-in')

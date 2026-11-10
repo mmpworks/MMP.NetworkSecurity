@@ -32,8 +32,13 @@ test('the top bar shows the keys chip, the security button, the Show keys switch
 
 test('the Show keys switch is on by default and can be used', async ({ page }) => {
   await open(page, host)
-  await expect(page.getByTestId('show-keys-switch')).toBeChecked()
-  await expect(page.getByTestId('show-keys-switch')).toBeEnabled()
+  const sw = page.getByTestId('show-keys-switch')
+  await expect(sw).toBeChecked()
+  // "Can be used": a click turns it off and a second click turns it back on, which also leaves the Host as later tests expect.
+  await sw.click()
+  await expect(sw).not.toBeChecked()
+  await sw.click()
+  await expect(sw).toBeChecked()
   await page.getByTestId('security-setup-button').click()
   await expect(page.getByTestId('sec-test-keys-line')).toHaveText('Use test keys only. This course shows your keys on screen and in saved files.')
   await expect(page.getByTestId('sec-show-keys-switch')).toBeEnabled()

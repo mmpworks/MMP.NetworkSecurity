@@ -65,9 +65,9 @@ test('a term in a tour step opens its glossary entry', async ({ page }) => {
   await expect(page.getByTestId('tour-step-id')).toBeVisible()
 })
 
-// Real Electron: shell.openExternal is replaced in the main process, so the test opens no browser. A listed source goes out, an unlisted link
-// goes nowhere, and the app never gets a second window or leaves its page.
-test('real Electron opens a glossary source in the outside browser, refuses an unlisted link, and keeps one window', async () => {
+// Real Electron: shell.openExternal is replaced in the main process, so the test opens no browser. A listed source goes out, and the app never
+// gets a second window or leaves its page. links.spec.ts owns the refusal of an unlisted link.
+test('real Electron opens a glossary source in the outside browser and keeps one window', async () => {
   const dir = fs.mkdtempSync(path.join(os.tmpdir(), 'ns-e2e-links-'))
   const app = await electron.launch({ args: ['.'], cwd: path.join(__dirname, '..'), env: { ...process.env, NETSEC_PORT: String(PORTS.electron), NETSEC_TOKEN: 'links-token', NETSEC_SECURITY_DIR: dir } })
   try {
@@ -82,10 +82,6 @@ test('real Electron opens a glossary source in the outside browser, refuses an u
     await win.getByTestId(`glossary-detail-${first.id}`).getByTestId('glossary-source-link').first().click()
     await expect.poll(() => app.evaluate(() => (globalThis as any).opened.length)).toBe(1)
     expect(await app.evaluate(() => (globalThis as any).opened[0])).toBe(g.sources[first.sources[0]].url)
-    await win.evaluate(() => { window.open('https://evil.example/', '_blank') })
-    await win.evaluate(() => { const a = document.createElement('a'); a.href = 'https://evil.example/'; document.body.appendChild(a); a.click(); a.remove() })
-    await win.waitForTimeout(800)
-    expect(await app.evaluate(() => (globalThis as any).opened.length), 'an unlisted link went out').toBe(1)
     expect(await app.evaluate(({ BrowserWindow }) => BrowserWindow.getAllWindows().length), 'windows').toBe(1)
     expect(win.url(), 'the app left its page').toBe(page)
   } finally { await app.close() }
