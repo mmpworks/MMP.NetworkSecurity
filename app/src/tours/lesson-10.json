@@ -457,7 +457,7 @@
       "text": [
         "A thief who records one call could send the same proof again. The server defends in two ways. It rejects proofs dated more than 60 seconds from now, in either direction, which is the check named proof age. It also remembers each proof's one-time id.",
         "A real server must keep those used ids for the whole 60-second window, or an old proof could slip back in. This lab keeps them for one run only.",
-        "The lab also issues no DPoP nonce. A server may add a nonce to shorten a proof's life, and RFC 9449 makes it optional.",
+        "The lab also issues no DPoP nonce. A server may add a nonce to shorten a proof's life, and RFC 9449 makes it optional. This lab does not run every DPoP check in RFC 9449. It runs only part of them, in one fixed order, and it takes EdDSA signatures only. The check itself keeps no memory, so the caller is what stops a replay.",
         "Try it: send ReadTotals again with the same proof. The server has seen that id, so the check named jti already used fails."
       ],
       "glossary": [],
@@ -484,6 +484,11 @@
           "id": "L10-C21",
           "text": "An authorization server may supply a nonce to be included in the DPoP proof to limit the lifetime of proofs; the mechanism is optional.",
           "source": "RFC 9449, section 8 (Authorization Server-Provided Nonce)"
+        },
+        {
+          "id": "L10-C29",
+          "text": "The lab runs a subset of the RFC 9449 section 4.3 proof checks, in one stated order, and accepts only the EdDSA algorithm. The rule keeps no state; the caller records each jti and refuses a repeat with the check named jti already used.",
+          "source": "docs/conformance-matrix.md, row 13 (Signed tokens and DPoP), Gap column; src/NetSec.Core/Auth/Auth.cs (AuthDecision summary: the caller records a jti; the alg check accepts EdDSA only); RFC 9449, section 4.3 (Checking DPoP Proofs)"
         }
       ],
       "unlock": { "mode": "action", "ref": "L10-S19-T1" }
