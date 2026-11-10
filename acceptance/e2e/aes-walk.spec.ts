@@ -300,7 +300,8 @@ test('[A19.ui.word-build-lights-its-two-words] Next adds one word, the lit cells
   const hex = expandedHex(rows);
   /** Every lit cell, as word name to its bytes in position order. So lighting extra cells, or the wrong cells, fails. */
   const litWords = async () => {
-    const lit = page.locator('[data-testid^="aes-walk-table-cell-"][data-lit="true"]');
+    // The two source words carry data-role previous and key-back (the role colors, #326), so those cells are the lit ones.
+    const lit = page.locator('[data-testid^="aes-walk-table-cell-"]:is([data-role="previous"], [data-role="key-back"])');
     const words: Record<string, string> = {};
     for (let k = 0; k < await lit.count(); k++) {
       const name = (await lit.nth(k).getAttribute('data-word')) ?? '?';
