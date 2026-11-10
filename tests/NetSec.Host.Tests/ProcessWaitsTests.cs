@@ -29,6 +29,23 @@ public class ProcessWaitsTests
     }
 
     [Fact]
+    public async System.Threading.Tasks.Task A_start_log_names_the_exit_code_and_the_last_lines_of_both_streams()
+    {
+        StartLog log = new();
+        using Process p = new() { StartInfo = new ProcessStartInfo("cmd", "/c echo to-out & echo to-err 1>&2 & exit 3") { UseShellExecute = false, RedirectStandardOutput = true, RedirectStandardError = true, CreateNoWindow = true } };
+        log.Attach(p);
+        p.Start();
+        p.BeginOutputReadLine();
+        p.BeginErrorReadLine();
+        Assert.True(await ProcessWaits.ExitedWithin(p, TimeSpan.FromSeconds(30)));
+        string text = log.Describe(p, TimeSpan.FromSeconds(60));
+        Assert.Contains("after 60.0 s", text);
+        Assert.Contains("exited with code 3", text);
+        Assert.Contains("out: to-out", text);
+        Assert.Contains("err: to-err", text);
+    }
+
+    [Fact]
     public void ReadAll_returns_both_streams_of_a_child_that_ends_in_time()
     {
         using Process p = EchoBoth();

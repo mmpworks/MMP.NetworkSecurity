@@ -56,6 +56,8 @@ namespace NetSec.Host.Tests
             TaskCompletionSource<string> ready = new TaskCompletionSource<string>(TaskCreationOptions.RunContinuationsAsynchronously);
             bool collecting = true;
             _process = new Process { StartInfo = info };
+            StartLog log = new StartLog();
+            log.Attach(_process);
             _process.OutputDataReceived += (_, e) =>
             {
                 if (e.Data == null) return;
@@ -74,8 +76,9 @@ namespace NetSec.Host.Tests
             catch (TimeoutException) { }
             if (line == null || !line.StartsWith("HOST-READY port=" + Port))
             {
+                string why = log.Describe(_process, TimeSpan.FromSeconds(60));
                 _process.Kill(entireProcessTree: true);
-                throw new InvalidOperationException("the Host gave no ready line in 60 s");
+                throw new InvalidOperationException("the Host gave no ready line in 60 s: " + why);
             }
         }
 

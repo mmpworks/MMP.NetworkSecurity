@@ -30,6 +30,7 @@ public class SecurityLiveTests
         public string SecurityDir => Path.Combine(Root, "security");
 
         readonly TaskCompletionSource<bool> _ready = new(TaskCreationOptions.RunContinuationsAsynchronously);
+        readonly StartLog _log = new();
 
         /// <summary>Starts a Host and waits for its ready line without holding a pool thread (ProcessWaits).</summary>
         public static async Task<Host> StartAsync(Dictionary<string, string>? env = null)
@@ -41,8 +42,9 @@ public class SecurityLiveTests
                 try { await ProcessWaits.Within(host._ready.Task, TimeSpan.FromSeconds(60)); }
                 catch (TimeoutException)
                 {
+                    string why = host._log.Describe(host._process, TimeSpan.FromSeconds(60));
                     host.Dispose();
-                    Assert.Fail("the Host gave no ready line in 60 s");
+                    Assert.Fail("the Host gave no ready line in 60 s: " + why);
                 }
                 return host;
             }
@@ -63,6 +65,7 @@ public class SecurityLiveTests
             info.Environment["NETSEC_SECURITY_DIR"] = SecurityDir;
             foreach (KeyValuePair<string, string> pair in env ?? []) info.Environment[pair.Key] = pair.Value;
             _process = new Process { StartInfo = info };
+            _log.Attach(_process);
             _process.OutputDataReceived += (_, e) => { if (e.Data != null && e.Data.StartsWith("HOST-READY")) _ready.TrySetResult(true); };
             _process.Start();
             _process.BeginOutputReadLine();
