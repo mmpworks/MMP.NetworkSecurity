@@ -194,6 +194,30 @@ public class SecurityLiveTests
     }
 
     /// <summary>
+    /// Issue #333: a clause can only tell "not built yet" from a fault if the Host says which parts are built. Each type row carries
+    /// parts.canMake and parts.canImport, from the same two checks the wizard refuses with (FlowRuns: "cannot make", "cannot read a file").
+    /// Today pki.root-ca can be made but not imported, and token.issuer can be both.
+    /// </summary>
+    [Fact]
+    public async Task Each_security_type_says_whether_the_course_can_make_it_and_read_it_from_a_file()
+    {
+        using Host host = await Host.StartAsync();
+        (int status, string body) = await host.Get("/api/security");
+        Assert.Equal(200, status);
+        Dictionary<string, JsonElement> rows = JsonDocument.Parse(body).RootElement.GetProperty("types").EnumerateArray()
+            .ToDictionary(t => t.GetProperty("typeId").GetString()!, t => t);
+        foreach ((string typeId, JsonElement row) in rows)
+        {
+            Assert.True(row.TryGetProperty("parts", out JsonElement parts), typeId + " has no parts");
+            Assert.True(parts.GetProperty("canMake").ValueKind is JsonValueKind.True or JsonValueKind.False, typeId + ": parts.canMake is not a bool");
+            Assert.True(parts.GetProperty("canImport").ValueKind is JsonValueKind.True or JsonValueKind.False, typeId + ": parts.canImport is not a bool");
+        }
+        Assert.True(rows["pki.root-ca"].GetProperty("parts").GetProperty("canMake").GetBoolean());
+        Assert.False(rows["pki.root-ca"].GetProperty("parts").GetProperty("canImport").GetBoolean());
+        Assert.True(rows["token.issuer"].GetProperty("parts").GetProperty("canImport").GetBoolean());
+    }
+
+    /// <summary>
     /// Opens modes.json the way an antivirus scan can: read and write sharing, no delete sharing. The store's save then cannot replace the
     /// file (issue #292), and the route must answer with the named code rather than a bare 500.
     /// </summary>
