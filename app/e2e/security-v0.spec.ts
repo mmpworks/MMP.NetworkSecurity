@@ -4,6 +4,7 @@ import * as os from 'node:os'
 import * as path from 'node:path'
 import { generateKeyPairSync } from 'node:crypto'
 import { startOwnHost, type OwnHost } from './own-host'
+import { PORTS } from './ports'
 import { open } from './walk'
 
 // V0 UI against a real Host: the keys chip, the Security setup screen, the five-screen path of the sign-in flow (token.issuer and the device key),
@@ -12,6 +13,11 @@ const OUT = path.join(__dirname, '..', 'test-results', 'security-v0')
 const shot = async (page: Page, name: string) => { fs.mkdirSync(OUT, { recursive: true }); await page.screenshot({ path: path.join(OUT, `${name}.png`) }) }
 const api = (method: string, p: string, body?: unknown) =>
   fetch(`http://127.0.0.1:${host.port}${p}`, { method, headers: { Authorization: `Bearer ${host.token}`, 'Content-Type': 'application/json' }, body: body === undefined ? undefined : JSON.stringify(body) })
+
+/** Sets Show keys through the Host, so a restore in `finally` runs even when the page has closed. */
+const showKeys = (on: boolean) => fetch(`http://127.0.0.1:${host.port}/api/security/show-keys`, {
+  method: 'PUT', headers: { 'Content-Type': 'application/json', Authorization: `Bearer ${host.token}`, Origin: `http://localhost:${PORTS.preview}` }, body: JSON.stringify({ on }),
+})
 
 test.describe.configure({ mode: 'serial' })
 
@@ -34,11 +40,16 @@ test('the Show keys switch is on by default and can be used', async ({ page }) =
   await open(page, host)
   const sw = page.getByTestId('show-keys-switch')
   await expect(sw).toBeChecked()
-  // "Can be used": a click turns it off and a second click turns it back on, which also leaves the Host as later tests expect.
-  await sw.click()
-  await expect(sw).not.toBeChecked()
-  await sw.click()
-  await expect(sw).toBeChecked()
+  // "Can be used": a click turns it off and a second click turns it back on. The Host keeps the setting for the later tests, so the finally
+  // puts it back on through the Host even when the test stops between the clicks.
+  try {
+    await sw.click()
+    await expect(sw).not.toBeChecked()
+    await sw.click()
+    await expect(sw).toBeChecked()
+  } finally {
+    expect((await showKeys(true)).ok, 'PUT show-keys on').toBe(true)
+  }
   await page.getByTestId('security-setup-button').click()
   await expect(page.getByTestId('sec-test-keys-line')).toHaveText('Use test keys only. This course shows your keys on screen and in saved files.')
   await expect(page.getByTestId('sec-show-keys-switch')).toBeEnabled()
