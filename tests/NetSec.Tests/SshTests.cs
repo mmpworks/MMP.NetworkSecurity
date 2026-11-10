@@ -31,12 +31,12 @@ namespace NetSec.Tests
             public TraceEvent FirstFailure => Of("check.result").First(e => !e.Check.Passed);
         }
 
-        static Run Go(AttackDefinition attack = null, int seed = 7)
+        static async System.Threading.Tasks.Task<Run> Go(AttackDefinition attack = null, int seed = 7)
         {
             ListSink sink = new ListSink();
             LabContext c = new LabContext { SessionId = "s8", TraceId = "s8", Seed = seed, Gate = new FreeRunGate(), Sink = sink, Clock = new FixedClock(1), Random = new SeededRandom(seed), Attack = attack };
             IFuture<LabResult> future = LabCatalog.Find(8).Run(c);
-            Assert.True(future.Wait(120000), "the lab did not finish in 120 s");
+            Assert.True(await FutureWaits.Within(future, TimeSpan.FromMilliseconds(120000)), "the lab did not finish in 120 s");
             return new Run { Result = future.Result, Events = sink.Events };
         }
 
@@ -276,9 +276,9 @@ namespace NetSec.Tests
         // ---------------------------------------------------------------- the lab
 
         [Fact]
-        public void The_lab_completes_both_rounds_with_the_names_the_tour_binds_to()
+        public async System.Threading.Tasks.Task The_lab_completes_both_rounds_with_the_names_the_tour_binds_to()
         {
-            Run run = Go();
+            Run run = await Go();
             Assert.True(run.Result.Completed, run.Result.FailedCode + " " + run.Result.FailedCheck);
 
             string[] client = run.Sent("client"), server = run.Sent("server");
@@ -301,9 +301,9 @@ namespace NetSec.Tests
         }
 
         [Fact]
-        public void Each_side_derives_the_same_keys_and_field_offsets_cover_the_wire()
+        public async System.Threading.Tasks.Task Each_side_derives_the_same_keys_and_field_offsets_cover_the_wire()
         {
-            Run run = Go();
+            Run run = await Go();
             foreach (string name in new[] { "ssh.shared.K", "ssh.exchange.H", "ssh.key.c2s", "ssh.mac.s2c" })
             {
                 string[] values = run.Of("secret.derived").Where(e => e.StreamId.EndsWith("/ssh")).SelectMany(e => e.Secrets).Where(s => s.Name == name).Select(s => Hex.Encode(s.Bytes)).ToArray();
@@ -324,14 +324,14 @@ namespace NetSec.Tests
         }
 
         [Fact]
-        public void The_lab_completes_through_a_step_gate_that_runs()
+        public async System.Threading.Tasks.Task The_lab_completes_through_a_step_gate_that_runs()
         {
             ListSink sink = new ListSink();
             StepGate gate = new StepGate();
             gate.Run();
             LabContext c = new LabContext { SessionId = "s8", TraceId = "s8", Seed = 3, Gate = gate, Sink = sink, Clock = new FixedClock(1), Random = new SeededRandom(3) };
             IFuture<LabResult> future = LabCatalog.Find(8).Run(c);
-            Assert.True(future.Wait(120000), "the lab did not finish in 120 s");
+            Assert.True(await FutureWaits.Within(future, TimeSpan.FromMilliseconds(120000)), "the lab did not finish in 120 s");
             Assert.True(future.Result.Completed, future.Result.FailedCode);
         }
 
@@ -360,22 +360,22 @@ namespace NetSec.Tests
         }
 
         [Fact]
-        public void The_ce_profile_may_open_ssh_and_a_silent_peer_ends_in_a_named_deadline()
+        public async System.Threading.Tasks.Task The_ce_profile_may_open_ssh_and_a_silent_peer_ends_in_a_named_deadline()
         {
             MemoryLink[] links = MemoryLink.Pair();
             ListSink sink = new ListSink();
             SshClientOptions options = new SshClientOptions { Algorithms = SshAlgorithms.Legacy, Random = new SeededRandom(2), Host = "h", Port = 22, User = "training", UserKey = new TrainingKeySource().Find(KeyIds.SshClient) };
             GlassSshSession session = new GlassSshSession(SshEngine.Client(options, new TraceStream("c", "c", "c", null, "client", new FixedClock(1)), null, "server"), links[0], sink, new FreeRunGate(), null, 200, new FixedClock(1), null);
             session.Run();
-            Assert.True(session.Finished.Wait(30000), "the deadline did not end the wait");
+            Assert.True(await FutureWaits.Within(session.Finished, TimeSpan.FromMilliseconds(30000)), "the deadline did not end the wait");
             Assert.Equal(NetSec.Errors.ErrorCodes.LinkIdle, session.Finished.Result.Error.Code); // the peer sent nothing, so no part of a frame waits (#309)
             Assert.True(session.Opened.IsFaulted);
         }
 
         [Fact]
-        public void The_server_decides_a_refused_tunnel_and_stays_open_to_answer()
+        public async System.Threading.Tasks.Task The_server_decides_a_refused_tunnel_and_stays_open_to_answer()
         {
-            Run run = Go(Attack("L8-refused-tunnel"));
+            Run run = await Go(Attack("L8-refused-tunnel"));
             TraceEvent refusal = run.Of("check.result").Single(e => !e.Check.Passed && e.Message == SshChecks.TunnelAllowList);
             Assert.Equal("server", refusal.Actor);
             Assert.Equal(SshCodes.TunnelRefused, refusal.Check.Code);
@@ -385,7 +385,7 @@ namespace NetSec.Tests
         }
 
         [Fact]
-        public void A_silent_peer_ends_in_a_named_deadline_through_a_step_gate_too()
+        public async System.Threading.Tasks.Task A_silent_peer_ends_in_a_named_deadline_through_a_step_gate_too()
         {
             MemoryLink[] links = MemoryLink.Pair();
             StepGate gate = new StepGate();
@@ -393,7 +393,7 @@ namespace NetSec.Tests
             SshClientOptions options = new SshClientOptions { Algorithms = SshAlgorithms.Modern, Random = new SeededRandom(2), Host = "h", Port = 22, User = "training", UserKey = new TrainingKeySource().Find(KeyIds.SshClient) };
             GlassSshSession session = new GlassSshSession(SshEngine.Client(options, new TraceStream("c", "c", "c", null, "client", new FixedClock(1)), null, "server"), links[0], new ListSink(), gate, null, 200, new FixedClock(1), null);
             session.Run();
-            Assert.True(session.Finished.Wait(30000), "the deadline did not end the wait");
+            Assert.True(await FutureWaits.Within(session.Finished, TimeSpan.FromMilliseconds(30000)), "the deadline did not end the wait");
             Assert.Equal(NetSec.Errors.ErrorCodes.LinkIdle, session.Finished.Result.Error.Code); // the peer sent nothing, so no part of a frame waits (#309)
         }
 
@@ -406,10 +406,10 @@ namespace NetSec.Tests
         [InlineData("L8-wrong-user-key")]
         [InlineData("L8-refused-tunnel")]
         [InlineData("L8-legacy-flip-signature")]
-        public void Each_attack_gets_its_named_check(string id)
+        public async System.Threading.Tasks.Task Each_attack_gets_its_named_check(string id)
         {
             AttackDefinition attack = Attack(id);
-            Run run = Go(attack);
+            Run run = await Go(attack);
             Assert.False(run.Result.Completed, id + " completed");
             Assert.Equal(attack.ExpectCode, run.Result.FailedCode);
             Assert.Equal(attack.ExpectCheck, run.Result.FailedCheck);
@@ -418,18 +418,18 @@ namespace NetSec.Tests
         }
 
         [Fact]
-        public void A_same_seed_rerun_gives_the_same_engine_bytes()
+        public async System.Threading.Tasks.Task A_same_seed_rerun_gives_the_same_engine_bytes()
         {
             string[] Lines(Run r) => r.Events.Where(e => !e.StreamId.EndsWith("/wire")).OrderBy(e => e.EventId, StringComparer.Ordinal).Select(TraceJson.ToLine).ToArray();
-            Assert.Equal(Lines(Go(null, 21)), Lines(Go(null, 21)));
-            Assert.NotEqual(Lines(Go(null, 21)), Lines(Go(null, 22)));
+            Assert.Equal(Lines(await Go(null, 21)), Lines(await Go(null, 21)));
+            Assert.NotEqual(Lines(await Go(null, 21)), Lines(await Go(null, 22)));
         }
 
         /// <summary>A pinned digest of every engine event. Both builds run this test, so net10.0 and the CF binaries give the same bytes for a seed.</summary>
         [Fact]
-        public void Both_builds_give_the_pinned_trace()
+        public async System.Threading.Tasks.Task Both_builds_give_the_pinned_trace()
         {
-            string[] lines = Go(null, 7).Events.Where(e => !e.StreamId.EndsWith("/wire")).OrderBy(e => e.EventId, StringComparer.Ordinal).Select(TraceJson.ToLine).ToArray();
+            string[] lines = (await Go(null, 7)).Events.Where(e => !e.StreamId.EndsWith("/wire")).OrderBy(e => e.EventId, StringComparer.Ordinal).Select(TraceJson.ToLine).ToArray();
             using (SHA1 sha = SHA1.Create())
                 Assert.Equal("0242260d8ae2a3366256605cfdf2713c72ff34e3", Hex.Encode(sha.ComputeHash(Encoding.UTF8.GetBytes(string.Join("\n", lines)))));
         }
