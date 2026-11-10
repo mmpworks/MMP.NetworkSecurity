@@ -65,6 +65,7 @@ public static class TeachingCurveRoutes
         kind = s.Kind,
         p = Point(s.P),
         q = Point(s.Q),
+        rPrime = Point(s.RPrime),
         result = Point(s.Result),
         numerator = s.Inverse is null ? (int?)null : s.Numerator,
         denominator = s.Inverse is null ? (int?)null : s.Denominator,

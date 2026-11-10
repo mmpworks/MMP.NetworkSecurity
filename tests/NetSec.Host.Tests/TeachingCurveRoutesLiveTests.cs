@@ -54,9 +54,14 @@ public class TeachingCurveRoutesLiveTests
         Assert.Contains("no-store", cache);
         Assert.Equal("double", twice.GetProperty("step").GetProperty("kind").GetString());
         Assert.True(twice.GetProperty("step").GetProperty("inverse").GetProperty("rows").GetArrayLength() > 0);
+        // R' (#374): same x as the sum, and the sum is R' flipped, y' + y = 0 mod 17.
+        JsonElement rPrime = twice.GetProperty("step").GetProperty("rPrime"), sum = twice.GetProperty("step").GetProperty("result");
+        Assert.Equal(sum.GetProperty("x").GetInt32(), rPrime.GetProperty("x").GetInt32());
+        Assert.Equal(0, (rPrime.GetProperty("y").GetInt32() + sum.GetProperty("y").GetInt32()) % 17);
 
         (_, JsonElement withO, _) = await Get(host, "/api/walk/toy-curve/add?p=18&q=3");
         Assert.Equal("identity", withO.GetProperty("step").GetProperty("kind").GetString());
+        Assert.Equal(JsonValueKind.Null, withO.GetProperty("step").GetProperty("rPrime").ValueKind);
         Assert.Equal(3, withO.GetProperty("resultIndex").GetInt32());
 
         foreach (string bad in new[] { "p=19&q=0", "p=-1&q=0", "p=abc&q=0", "q=0", "p=0" })
