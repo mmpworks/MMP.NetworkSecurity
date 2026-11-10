@@ -149,20 +149,20 @@ namespace Acceptance
     {
         public static bool WaitPort(int port, int timeoutMs)
         {
-            DateTime end = DateTime.UtcNow.AddMilliseconds(timeoutMs);
-            while (DateTime.UtcNow < end)
+            return Poll.Until(delegate { return Answers(port); }, timeoutMs, 50);
+        }
+
+        static bool Answers(int port)
+        {
+            try
             {
-                try
+                using (TcpClient c = new TcpClient())
                 {
-                    using (TcpClient c = new TcpClient())
-                    {
-                        IAsyncResult ar = c.BeginConnect(IPAddress.Loopback, port, null, null);
-                        if (ar.AsyncWaitHandle.WaitOne(300) && c.Connected) { c.EndConnect(ar); return true; }
-                    }
+                    IAsyncResult ar = c.BeginConnect(IPAddress.Loopback, port, null, null);
+                    if (ar.AsyncWaitHandle.WaitOne(300) && c.Connected) { c.EndConnect(ar); return true; }
                 }
-                catch (SocketException) { }
-                Thread.Sleep(50);
             }
+            catch (SocketException) { }
             return false;
         }
     }
