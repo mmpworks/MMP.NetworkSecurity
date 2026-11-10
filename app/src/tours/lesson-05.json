@@ -322,7 +322,7 @@
       "text": [
         "The hybrid protects the key exchange. An attacker who records this talk today cannot read it after quantum computers arrive, as long as ML-KEM stays secure.",
         "Certificates stay classical. The signatures on the server's card use classical math, so a future quantum attacker could forge them. The hybrid does not change that.",
-        "This engine has no key update and no limit on records per key. A long run stops by name at a peer's KeyUpdate. A real endpoint limits the records sent under one key.",
+        "This engine has no key update and no limit on records per key. A long run stops by name at a peer's KeyUpdate. A real endpoint limits the records sent under one key. This engine also leaves out HelloRetryRequest, the P-256 group, RSA and ECDSA signatures, and ChaCha20. RFC 8446 asks a full TLS 1.3 product to have the first four, and it advises the last.",
         "Built to show the parts. Do not copy."
       ],
       "glossary": [],
@@ -337,6 +337,11 @@
           "id": "L5-C16",
           "text": "The lab's TLS 1.3 engine has no KeyUpdate and no record count limit; a long run stops by name at a peer's KeyUpdate. RFC 8446 says implementations should do a key update before the cryptographic limits on the plaintext encrypted under one key.",
           "source": "docs/lessons-4-5-names.md, What the lessons must state (branch fix/s3-tls-blockers, local at b5d6641), item 5; RFC 8446, section 5.5 (Limits on Key Usage)"
+        },
+        {
+          "id": "L5-C18",
+          "text": "The lab's TLS 1.3 engine has no HelloRetryRequest (and so no cookie), no secp256r1 key exchange, no rsa_pkcs1_sha256, rsa_pss_rsae_sha256 or ecdsa_secp256r1_sha256 signatures, and no TLS_CHACHA20_POLY1305_SHA256. RFC 8446 section 9.1 makes the secp256r1 group and those three signature schemes a MUST, section 9.2 makes the cookie a MUST, and section 9.1 makes the ChaCha20 suite a SHOULD.",
+          "source": "docs/conformance-matrix.md, row 4 (TLS 1.3 message order and records), Gap column; RFC 8446, section 9.1 (Mandatory-to-Implement Cipher Suites) and section 9.2 (Mandatory-to-Implement Extensions)"
         }
       ],
       "unlock": { "mode": "ack" }

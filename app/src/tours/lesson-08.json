@@ -374,7 +374,7 @@
       "text": [
         "In SSH the server proves itself with a host key the client pinned earlier, and the client proves itself with a signed message. Neither side needs a certificate authority.",
         "The lab shows an old device's SSH suite beside a modern one on the desktop. The code is CF-compiled, run on the desktop CLR, never run on CE. The lab has not touched real CE hardware.",
-        "The old device path has a limit. No peer that lacks the strict KEX marker has run here, and an old device is likely that kind of peer. Our own code ran with the marker off against our own code, on both suites. Against outside code, both sides ran the old rules in two runs. So the old rules hold against outside code, and a real old peer stays unproved.",
+        "The old device path has a limit. No peer that lacks the strict KEX marker has run here, and an old device is likely that kind of peer. Our own code ran with the marker off against our own code, on both suites. Against outside code, both sides ran the old rules in two runs. So the old rules hold against outside code, and a real old peer stays unproved. This engine also leaves out rekey and password login. A peer that asks for a new key exchange stops the talk by name. The SSH transport standard also lists 3des-cbc, diffie-hellman-group1-sha1 and ssh-dss as required names, and this engine has none of them.",
         "Built to show the parts. Do not copy."
       ],
       "glossary": [],
@@ -389,6 +389,11 @@
           "id": "L8-C24",
           "text": "No peer without the strict KEX marker has run in the lab, and nothing has run on CE. Our own code ran with the marker off against our own code on both suites. Against outside code (Windows ssh.exe against our server, and our client against Go), both sides ran the old rules. A real old peer stays unproved.",
           "source": "docs/lesson-ssh-names.md (branch fix/ssh-relay-room, PR #77), What the tour must state, item 10"
+        },
+        {
+          "id": "L8-C25",
+          "text": "The lab's SSH engine has no key re-exchange, which stops by the code SSH_REKEY_UNSUPPORTED, and its only user login method is publickey. RFC 4253 lists 3des-cbc, diffie-hellman-group1-sha1 and ssh-dss as REQUIRED, and the engine has none of them.",
+          "source": "docs/conformance-matrix.md, row 9 (SSH transport), Gap column; src/NetSec.Core/Ssh/SshCodes.cs (RekeyUnsupported); src/NetSec.Core/Ssh/SshClientRules.cs and SshServerRules.cs (MethodPublicKey); RFC 4253, section 6.3 (Encryption), section 6.6 (Public Key Algorithms), section 8 (Diffie-Hellman Key Exchange) and section 9 (Key Re-Exchange)"
         }
       ],
       "unlock": { "mode": "ack" }

@@ -100,7 +100,8 @@
       "text": [
         "With the RSA suite, the client invents a secret, locks it with the server's RSA public key, and sends it in ClientKeyExchange. The server unlocks it with its private key.",
         "That method is called RSA key transport. It has a long-term cost. An attacker can record the whole session today. If the server's key is stolen years later, the attacker can open the recording. This is record now, decrypt later.",
-        "The key exchange in lessons 3 and 5 does not have this problem, because each session uses fresh keys that nobody stores."
+        "The key exchange in lessons 3 and 5 does not have this problem, because each session uses fresh keys that nobody stores.",
+        "The RSA class in this lab says false when the padding is bad. That answer is not quiet, so the TLS 1.1 server hides it: on bad padding it goes on with a random secret. Do not copy this class."
       ],
       "glossary": [],
       "bind": { "kind": "event", "eventType": "tls11.message.sent", "match": { "actor": "client", "message": "ClientKeyExchange" } },
@@ -115,6 +116,11 @@
           "id": "L7-C06",
           "text": "In TLS 1.1 the RSA-encrypted premaster secret is sent in ClientKeyExchange.",
           "source": "RFC 4346, section 7.4.7.1 (RSA Encrypted Premaster Secret Message)"
+        },
+        {
+          "id": "L7-C16",
+          "text": "The lab's PKCS#1 v1.5 class returns false on bad padding. A TLS server must not reveal whether padding was valid, so the lab's TLS 1.1 server uses a random premaster secret when the padding or the version is wrong. RFC 8017 warns that telling a padding failure apart from other errors helps an attacker.",
+          "source": "src/NetSec.Core/Crypto/Rsa.cs, class Pkcs1 (class comment); src/NetSec.Core/Tls11/Tls11Rules.cs, the RSA branch of the ClientKeyExchange rule (filler premaster); docs/conformance-matrix.md, row 29; RFC 8017, section 7.2.2 (RSAES-PKCS1-v1_5 Decryption, the note on errors); RFC 4346, section 7.4.7.1"
         }
       ],
       "unlock": { "mode": "event" }
@@ -243,11 +249,17 @@
       "text": [
         "A TLS 1.1 device keeps three weak points: the RSA key transport, the MAC-then-encrypt records, and a downgrade attack it cannot detect. RC4, another old option, is banned outright by RFC 7465.",
         "The lab shows these weak points on the desktop. The code is CF-compiled, run on the desktop CLR, never run on CE. The lab has not touched real CE hardware.",
+        "This engine also leaves out the 3DES suite, session resumption, and the client certificate. The TLS 1.1 standard names the 3DES suite as the one every TLS 1.1 product must have.",
         "Built to show the parts. Do not copy."
       ],
       "glossary": [],
       "bind": { "kind": "concept" },
       "claims": [
+        {
+          "id": "L7-C17",
+          "text": "The lab's TLS 1.1 engine has no TLS_RSA_WITH_3DES_EDE_CBC_SHA, no session resumption and no client certificate. In the absence of an application profile standard, a TLS 1.1 application must implement TLS_RSA_WITH_3DES_EDE_CBC_SHA.",
+          "source": "docs/conformance-matrix.md, row 7 (TLS 1.1 messages and checks), Gap column; RFC 4346, section 9 (Mandatory Cipher Suites)"
+        },
         {
           "id": "L7-C13",
           "text": "RC4 cipher suites are prohibited in TLS.",
