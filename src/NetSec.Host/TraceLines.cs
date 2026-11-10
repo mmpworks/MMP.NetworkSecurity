@@ -35,7 +35,8 @@ public static class TraceLines
         return copy;
     }
 
-    static JsonNode? Parse(string line)
+    /// <summary>One saved line as JSON, or null when the line is not JSON (a file cut short by a crash, for example).</summary>
+    public static JsonNode? Parse(string line)
     {
         try { return JsonNode.Parse(line); }
         catch (JsonException) { return null; }

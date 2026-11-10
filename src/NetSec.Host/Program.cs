@@ -352,9 +352,10 @@ namespace NetSec.Host
             foreach (string line in lines)
             {
                 // The saved trace.catch line goes out as its own frame under the replay's session id. A file saved before the clock has none.
+                // A catch line that is not a JSON object (cut short by a crash) is no frame, so the replay skips it and goes on.
                 if (line.StartsWith(LabSession.CatchLinePrefix, StringComparison.Ordinal))
                 {
-                    JsonObject catchFrame = JsonNode.Parse(line)!.AsObject();
+                    if (TraceLines.Parse(line) is not JsonObject catchFrame) continue;
                     catchFrame["sessionId"] = sessionId;
                     sessions.Broadcast(catchFrame.ToJsonString());
                     continue;
