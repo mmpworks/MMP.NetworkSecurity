@@ -63,6 +63,24 @@ namespace Acceptance
         [Clause("AO-5.keccak.net10")] public static string Keccak(Ctx c) { return HashUpdate(c, "Sha3_256 (Keccak)", Hashes.Sha3_256, 136); }
 
         /// <summary>
+        /// One whole hash of a fixed 1024-byte message: the factory, one Update, Finish. Every byte counts, the digest too (lead, 2026-11-11:
+        /// the padding and digest arrays are garbage on every message). FAIL until S3 adds a Finish that writes into a caller buffer; the op
+        /// moves to that API at S3.
+        /// </summary>
+        static string HashMessage(Ctx c, string what, Func<IHash> make)
+        {
+            AoSubject.Make(c);
+            byte[] msg = new Rng(0xA05D1).Bytes(1024);
+            return Judge(what + " whole message (factory, Update, Finish)", PerUnit(delegate { IHash h = make(); h.Update(msg, 0, msg.Length); GC.KeepAlive(h.Finish()); }, -1, 1), "message");
+        }
+
+        [Clause("AO-5.md5-message.net10")] public static string Md5Message(Ctx c) { return HashMessage(c, "Md5", Hashes.Md5); }
+        [Clause("AO-5.sha1-message.net10")] public static string Sha1Message(Ctx c) { return HashMessage(c, "Sha1", Hashes.Sha1); }
+        [Clause("AO-5.sha256-message.net10")] public static string Sha256Message(Ctx c) { return HashMessage(c, "Sha256", Hashes.Sha256); }
+        [Clause("AO-5.sha512-message.net10")] public static string Sha512Message(Ctx c) { return HashMessage(c, "Sha512", Hashes.Sha512); }
+        [Clause("AO-5.keccak-message.net10")] public static string KeccakMessage(Ctx c) { return HashMessage(c, "Sha3_256 (Keccak)", Hashes.Sha3_256); }
+
+        /// <summary>
         /// PRD AO-5: 0 B per message for HMAC through HmacKey.Compute with a caller-owned work object and output buffer (S3). Until the type
         /// exists the suite measures the wrapper Hmac.Compute, which allocates by design (7.3 item 14), so the row is FAIL until S3.
         /// </summary>
@@ -90,7 +108,8 @@ namespace Acceptance
         {
             AoSubject.Make(c);
             byte[] bdk = new Rng(0xA05F).Bytes(16);
-            byte[] ksn = Hex.Concat(new Rng(0xA060).Bytes(8), new byte[] { 0, 0, 0x10, 0x01 });
+            // Counter 0x00000F0F: 8 one bits, so the walk down runs 8 steps. The bench uses the same counter (agreed with Richard, 2026-11-11).
+            byte[] ksn = Hex.Concat(new Rng(0xA060).Bytes(8), new byte[] { 0, 0, 0x0F, 0x0F });
             return Judge("DukptBank.DeriveWorkingKey (AES-128 PIN key)", PerUnit(delegate { DukptBank.DeriveWorkingKey(bdk, ksn, DukptKeyUsage.PinEncryption, DukptKeyType.Aes128); }, 16, 1), "derivation");
         }
     }

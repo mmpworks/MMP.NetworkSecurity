@@ -94,6 +94,11 @@ AO-5.sha1.net10	-	-	S0	suite
 AO-5.sha256.net10	-	-	S0	suite
 AO-5.sha512.net10	-	-	S0	suite
 AO-5.keccak.net10	FAIL	AO5_ALLOCATES	S3	suite
+AO-5.md5-message.net10	FAIL	AO5_ALLOCATES	S3	suite
+AO-5.sha1-message.net10	FAIL	AO5_ALLOCATES	S3	suite
+AO-5.sha256-message.net10	FAIL	AO5_ALLOCATES	S3	suite
+AO-5.sha512-message.net10	FAIL	AO5_ALLOCATES	S3	suite
+AO-5.keccak-message.net10	FAIL	AO5_ALLOCATES	S3	suite
 AO-5.hmac.net10	FAIL	AO5_ALLOCATES	S3	suite
 AO-5.tdes.net10	-	-	S0	suite
 AO-5.dukpt-derive.net10	FAIL	AO5_ALLOCATES	S4	suite
