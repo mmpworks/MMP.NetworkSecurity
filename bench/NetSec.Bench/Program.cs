@@ -41,7 +41,11 @@ static class Program
         if (mode == "footprint") return Footprint.Run(a, run);
         string filter = a.TryGetValue("filter", out string f) ? f : "";
 
-        List<BenchCase> original = Cases.All(new Files.FrozenCode()), current = Cases.All(new Files.ProductCode());
+        // --swap true times the product as "original" and the frozen copy as "new": a harness symmetry check. A bias that follows the
+        // position is the harness; a bias that follows the copy is the code or its placement.
+        bool swap = a.TryGetValue("swap", out string sw) && sw == "true";
+        List<BenchCase> original = Cases.All(swap ? (IBlockCases)new Files.ProductCode() : new Files.FrozenCode()), current = Cases.All(swap ? (IBlockCases)new Files.FrozenCode() : new Files.ProductCode());
+        if (swap) Console.WriteLine("BENCH_SWAP original = product, new = frozen copy (symmetry check; not a publishable run)");
         List<int> picked = Enumerable.Range(0, current.Count).Where(i => current[i].Id.Contains(filter)).ToList();
         Measure.PreWarm(picked.Select(i => new[] { original[i].Op, current[i].Op }), PreWarmEach);
         if (!MachineLoad.Settle()) return MachineLoad.BusyExit;
