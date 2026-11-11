@@ -293,6 +293,22 @@ namespace NetSec.Tests
             Assert.Equal(BankHsmCore.ReplayCheck, again.Check);
         }
 
+        /// <summary>Two sales from one pad. The bank takes the second, then refuses the first: its counter is below the pad's mark, though the bank never saw it.</summary>
+        [Fact]
+        public void An_older_envelope_the_bank_never_saw_is_refused_below_the_mark()
+        {
+            KsnLedger ledger = new KsnLedger();
+            DukptPinPad pad = NewPad();
+            byte[] first = Sell(pad).Envelope.Bytes;
+            byte[] second = Sell(pad).Envelope.Bytes;
+            Assert.True(BankHsmCore.Decide(Bdk, ledger, second).Ok);
+
+            BankDecision late = BankHsmCore.Decide(Bdk, ledger, first);
+
+            Assert.Equal(ErrorCodes.DukptKsnStale, late.Code);
+            Assert.Equal(BankHsmCore.StaleCheck, late.Check);
+        }
+
         /// <summary>The MAC holds and the block is bad, so only the format check refuses it. The real sale under the same KSN must still pass.</summary>
         [Fact]
         public void An_envelope_refused_at_the_format_check_does_not_burn_its_ksn()
