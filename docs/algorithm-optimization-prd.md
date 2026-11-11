@@ -35,6 +35,7 @@ Echo writes these. Builders never write `acceptance/`.
 | AO-6 | Speed. Baseline at 5c5d4a4 and the new code, same machine, same run. | the report shows both numbers; AES target is 5 times baseline or better. The report line "CF ARM speed: UNMEASURED" stays until a run on a CE device exists |
 | AO-7 | The lesson walks still agree with the product path. | no `AES_WALK_DIVERGED`; golden files unchanged. The byte-level helpers the walk uses today move into `AesKey.Walk.cs` unchanged. The walk calls word-path code only through `EncryptBlock` and `DecryptBlock` for the last compare |
 | AO-8 | The CF build compiles, and the CF golden labs pass. | gate green |
+| AO-9 | File benchmark (ordered by Steve on 2026-11-11). Real files go through the frozen 5c5d4a4 code and the new code in one run: seal and open with GCM, encrypt and decrypt with CBC and CTR, SHA-256 and HMAC. Each row records time, bytes allocated, peak memory and garbage collection counts. | the output bytes of the two codes are equal for each file; the report shows both number sets side by side; section 3.3 gives the rules |
 
 Limit of the anchor: AO-2 uses our own old code as the reference. AO-1 (public vectors) is the independent check.
 
@@ -56,6 +57,18 @@ Limit of the anchor: AO-2 uses our own old code as the reference. AO-1 (public v
 14. Each run records its seed and prints it in the report. A failed case prints the seed and the case number.
 15. AO-2 runs on .NET 10 with the net10 binaries, and on .NET Framework 4.8 with the CF binaries. The second referee (rule 2) runs on .NET 10 only. After S6, the .NET 10 run covers the portable path and the hardware path (rule 7.1.13).
 16. AO-4 matches each result to its payload by a payload ID, because the pool does not keep order.
+
+### 3.3 File benchmark rules (AO-9)
+
+1. The test files are in the repository, in one folder, with a list that gives each file's name, size and SHA-256. The run fails when a file differs from the list.
+2. The set has one file of each kind: a PDF, a PNG image, a plain text file, a CSV file, a JSON file, a small binary file of 1 KB, and one large file of 4 MB or more. Small and large sizes are both present, because a pump message is small and a document is large.
+3. Each file is made by us or is already in this repository under its licence (for example a PNG from `docs/screens`). A script makes the PDF, the CSV and the large file from a fixed seed. No file comes from a third party.
+4. For each file and each operation, the run measures the frozen 5c5d4a4 code and the new code in the same process, on the same machine, after a warm-up. It gives the median of 15 runs or more, and the spread.
+5. Each row records: megabytes for each second, bytes allocated for each call, peak working set, and the count of generation 0, 1 and 2 collections.
+6. The run also records the cost for a small message: time and bytes for one key setup plus one 64-byte seal.
+7. The same measurement runs with the CF binaries on .NET Framework 4.8, as a second desktop number. CF ARM speed stays UNMEASURED.
+8. A second measurement repeats the run with 25 pool threads that share one key, and records total megabytes for each second and peak memory.
+9. The report is one file in `docs/_runs/`, with one table: file, operation, original, new, ratio. A styled page for Steve shows the same numbers.
 
 ### 3.2 Limits of the anchor
 
@@ -94,7 +107,7 @@ The work ends when one head of `Algorithm-Optimization` shows the result below a
 | AO-2 row for the hardware path on .NET 10 | NOT RUN, PRODUCT_MISSING | S6, outside the kill condition; it reads NOT RUN at the kill head |
 | Rows for the big-number paths | NOT RUN, PRODUCT_MISSING | S5, outside the kill condition; they read NOT RUN at the kill head |
 
-AO-6 is a record at S0: the run stores the baseline numbers and judges nothing. The AES target of 5 times baseline is judged from S1.
+AO-6 and AO-9 are records at S0: the run stores the baseline numbers and judges nothing. From S1, the AO-9 report compares the frozen code with the new code. The AES target of 5 times baseline is judged from S1.
 
 S0 is done when the row-list check reads M of M for slice S0.
 
