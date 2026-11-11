@@ -115,9 +115,3 @@ static class Report
         return q.Append('"').ToString();
     }
 }
-
-/// <summary>The facts of one bench process that every report names.</summary>
-sealed class Run
-{
-    public string Build, Head, Priority, CfLine;
-}
