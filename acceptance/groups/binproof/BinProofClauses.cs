@@ -95,6 +95,7 @@ namespace Acceptance
         public static string BinariesReferenceCfMscorlib(Ctx c)
         {
             c.RequireProduct();
+            RefDir(c);   // no CF references means no CF build: name that cause, not a missing binary (#390)
             string[] cfBinaries = new string[]
             {
                 Path.Combine(c.RepoRoot, "src", "NetSec.Core.NetCF", "bin", "Release", "net35", "NetSec.Core.dll"),

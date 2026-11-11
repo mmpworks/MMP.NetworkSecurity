@@ -2,6 +2,7 @@
 using System;
 using System.IO;
 using NetSec.Host.Security;
+using NetSec.TestSupport;
 using Xunit;
 
 namespace NetSec.Host.Tests;
@@ -90,5 +91,5 @@ public sealed class SecurityRootTests : IDisposable
         Assert.Equal(Path.Combine(_top, ".security"), SecurityStore.ResolveRoot(n => "", dir));
     }
 
-    public void Dispose() => Directory.Delete(_top, true);
+    public void Dispose() => TempTree.Delete(_top);
 }

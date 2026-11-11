@@ -6,6 +6,7 @@ using System.Linq;
 using System.Text.Json;
 using NetSec.Host.Security;
 using NetSec.Keys;
+using NetSec.TestSupport;
 using Xunit;
 
 namespace NetSec.Host.Tests;
@@ -80,7 +81,7 @@ public class WizardMachineTests
 
         public void Dispose()
         {
-            if (Directory.Exists(Root)) Directory.Delete(Root, true);
+            if (Directory.Exists(Root)) TempTree.Delete(Root);
         }
     }
 

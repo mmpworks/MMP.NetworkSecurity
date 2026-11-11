@@ -10,8 +10,10 @@ import pathlib
 import shutil
 import subprocess
 import sys
-import tempfile
 import unittest
+
+sys.path.insert(0, str(pathlib.Path(__file__).resolve().parent.parent))  # tools/, for the shared temp folder (#400)
+from tempdir import TempDir  # noqa: E402
 
 HOOKS = pathlib.Path(__file__).resolve().parent
 
@@ -47,7 +49,7 @@ class RepoFixture(unittest.TestCase):
         return subprocess.run(["git", "show", f"{ref}:tools/githooks/{file}"], cwd=self.work, capture_output=True, check=True).stdout
 
     def setUp(self):
-        self.tmp = tempfile.TemporaryDirectory()
+        self.tmp = TempDir()
         base = pathlib.Path(self.tmp.name)
         self.remote, self.work, self.fake = base / "remote.git", base / "work", base / "fakebin"
         self.fake.mkdir()

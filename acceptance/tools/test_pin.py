@@ -5,15 +5,17 @@ Each test builds a throwaway git repo with an acceptance/ folder, so no test rea
 import pathlib
 import subprocess
 import sys
-import tempfile
 import unittest
+
+sys.path.insert(0, str(pathlib.Path(__file__).resolve().parents[2] / "tools"))  # the repo's tools/, for the shared temp folder (#400)
+from tempdir import TempDir  # noqa: E402
 
 SCRIPT = pathlib.Path(__file__).resolve().parent / "pin.py"
 
 
 class Pin(unittest.TestCase):
     def setUp(self):
-        self.tmp = tempfile.TemporaryDirectory()
+        self.tmp = TempDir()
         self.root = pathlib.Path(self.tmp.name)
         self.git("init", "-q")
         self.git("config", "user.email", "t@example.invalid")

@@ -2,15 +2,17 @@
 import pathlib
 import subprocess
 import sys
-import tempfile
 import unittest
+
+sys.path.insert(0, str(pathlib.Path(__file__).resolve().parent))  # tools/, for the shared temp folder (#400)
+from tempdir import TempDir  # noqa: E402
 
 SCRIPT = pathlib.Path(__file__).resolve().parent / "no_npx.py"
 
 
 class NoNpx(unittest.TestCase):
     def setUp(self):
-        self.tmp = tempfile.TemporaryDirectory()
+        self.tmp = TempDir()
         self.root = pathlib.Path(self.tmp.name)
         for folder in ("tools", "app/scripts"):
             (self.root / folder).mkdir(parents=True)

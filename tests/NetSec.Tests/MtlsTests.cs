@@ -9,6 +9,7 @@ using NetSec.Pki;
 using NetSec.Platform;
 using NetSec.Tls13;
 using NetSec.Trace;
+using NetSec.TestSupport;
 using Xunit;
 
 namespace NetSec.Tests
@@ -161,7 +162,7 @@ namespace NetSec.Tests
                 Assert.True(File.Exists(Path.Combine(dir, "client.pem")));
                 Assert.True(File.Exists(Path.Combine(dir, "client.key")));
             }
-            finally { Directory.Delete(dir, true); }
+            finally { TempTree.Delete(dir); }
         }
     }
 }

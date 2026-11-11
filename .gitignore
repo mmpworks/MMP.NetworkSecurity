@@ -13,3 +13,6 @@ docs/_runs/lessons.json
 *.pfx
 *.p12
 *.db
+
+# Python writes this folder when a tool test imports a helper (tools/tempdir.py).
+__pycache__/
