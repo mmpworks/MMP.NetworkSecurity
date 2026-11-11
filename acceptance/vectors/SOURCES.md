@@ -26,7 +26,7 @@ Each `.nsv` group carries a `# source:` line, and `SELF.vector-provenance` fails
 | `dh-group14-openssl.nsv` | Diffie-Hellman group 14 public values and shared secrets for fixed 512-bit private values | produced by the OpenSSL 3.5.7 referee (openssl pkey, openssl pkeyutl -derive); command list is the header of the file | extract_openssl.py | python pow() against RFC 3526 |
 | `rsa-openssl.nsv` | RSA PKCS#1 v1.5 signatures (SHA-1, SHA-256) and decryption known answers, 1024 and 2048 bit keys | produced by the OpenSSL 3.5.7 referee (openssl genpkey, dgst -sign, pkeyutl -encrypt) | extract_openssl.py | python cryptography (verify, recover primes, decrypt) |
 | `tls13-rfc8448.nsv` | TLS 1.3 key schedule trace, simple 1-RTT handshake | RFC 8448 section 3 | text parse, every value's octet count checked against the RFC | an RFC 8446 section 7.1 key schedule on BCL HKDF in SELF.kschedule-rfc8448-pass; transcript hashes recomputed |
-| `x9-24-3-aes-dukpt.nsv (made at run time, not committed)` | AES DUKPT initial keys, derivation keys, PIN, MAC and data keys for 17 counters in three families, all usages for 9 counters, 9 format 4 PIN blocks | ANSI X9.24-3-2017 supplement, X9.24-3-2017-Test-Vectors-20180129-1.pdf from x9.org (fetch-x9.ps1) | extract_x9.py: every value is recomputed with an AES-ECB key derivation and must also appear in the PDF text (four consecutive words, or each word of a column-split PIN block). A value the PDF lacks stops the script | BCL AES (SELF.dukpt-vectors-pass) |
+| `x9-24-3-aes-dukpt.nsv` | AES DUKPT initial keys, derivation keys, PIN, MAC and data keys for 17 counters in three families, all usages for 9 counters, 9 format 4 PIN blocks (PIN, random number, PIN key, encrypted block). Inputs and expected outputs only. Committed on Steve's decision of 2026-11-11 | ANSI X9.24-3-2017 supplement section 2.2, X9.24-3-2017-Test-Vectors-20180129-1.pdf from x9.org (fetch-x9.ps1). The file header names the PDF, its date, SHA-256 and URL | extract_x9.py: every value is recomputed with an AES-ECB key derivation and must also appear in the PDF text (four consecutive words, or each word of a column-split PIN block). A value the PDF lacks stops the script | BCL AES (SELF.dukpt-vectors-pass). With the PDF in `_cache`, SELF.x9-vectors-true-copy checks that the committed file equals a fresh extraction |
 
 ## Downloaded documents
 
@@ -45,6 +45,7 @@ A different hash stops the fetch with SOURCE_CHANGED. A person reads the new doc
 | `rfc4231.txt` | `72178527ce93500e730bc8eb182b857e583096d652b64ece0879c52ba1df973b` | 17,725 | https://www.rfc-editor.org/rfc/rfc4231.txt |
 | `rfc4493.txt` | `252850ac038a44e931fdce6cb02b444a18ed1da0c9e212bfdd1da0ed3366fc1c` | 38,751 | https://www.rfc-editor.org/rfc/rfc4493.txt |
 | `rfc5869.txt` | `7a40eb3835b35fc947eb12a2ed614db079d43b26e50dbc537c31fba16397089c` | 25,854 | https://www.rfc-editor.org/rfc/rfc5869.txt |
+| `rfc6979.txt` | `456e8f17558fdbd206f968b96fc6f1b4a71ea331ab30ad17f711ab3adaa7d701` | 140,386 | https://www.rfc-editor.org/rfc/rfc6979.txt |
 | `rfc7748.txt` | `279ca0ecc5e92e2962e27b846986aeb74729d9dd34bd4a04a362f80dcb596ad3` | 39,298 | https://www.rfc-editor.org/rfc/rfc7748.txt |
 | `rfc8032.txt` | `ed63657ff389301282b169b0abde9b5dd2c7e4d524fdfa5da6ff3094fc93c4c3` | 103,210 | https://www.rfc-editor.org/rfc/rfc8032.txt |
 | `rfc8448.txt` | `6564d1376d1ec744fc7a9993da15ebc1b9be361908b166091f47ef605c537fba` | 159,343 | https://www.rfc-editor.org/rfc/rfc8448.txt |
@@ -68,5 +69,9 @@ python -I vectors/tools/selfcheck_vectors.py vectors
 ## Licence
 
 RFC text: IETF Trust. NIST publications and CAVP files: US government work. OpenSSL output: produced here.
-The X9.24-3 supplement is copyrighted by ASC X9 and free to download. The PDF and the vector file made from it stay out of git (prd.md licence checklist item 1).
-Dave decides if the vector file may ever be committed.
+The X9.24-3 supplement is copyrighted by ASC X9 and free to download. The PDF, its extracted text and its internal-state traces (section 2.3) stay out of git.
+`x9-24-3-aes-dukpt.nsv` is committed (Steve's decision of 2026-11-11, prd.md licence checklist item 1). It holds only the inputs and expected outputs the clauses read, in this repository's own format, with a source line for each group.
+Its header names the PDF, its date, SHA-256 and URL, says ASC X9 has not reviewed or endorsed this project, and says the values are test data and the keys protect nothing.
+Dave's memo of 2026-11-11 recommends this middle route, and an IP attorney review before it is adopted. Steve chose to commit before that review and accepted the risk.
+The memo is guidance from an in-house advisor, not legal advice.
+To make the file again: `pwsh vectors/fetch-x9.ps1`, then `python -I vectors/tools/extract_x9.py vectors/_cache/X9.24-3-2017-Test-Vectors-20180129-1.pdf vectors/x9-24-3-aes-dukpt.nsv`.

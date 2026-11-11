@@ -250,20 +250,8 @@ foreach ($c in $sel) {
 }
 $pending = @($sel | Where-Object { -not $results.ContainsKey($_.id) })
 
-# ------------------------------------------------------------------ vectors made at run time
-# The X9.24-3 test vectors stay out of git (prd.md licence checklist item 1). fetch-x9.ps1 downloads the PDF into the ignored _cache folder and
-# records its SHA-256; extract_x9.py writes the vector file next to it. If either step fails, the clauses that need the file say VECTORS_MISSING.
-$needX9 = @($sel | Where-Object { $_.id -like 'A3.vec.*' -or $_.id -like 'A3.pinblock.*' -or $_.id -like 'A3.sales1000.*' -or $_.id -like 'A3.erasure.*' -or $_.id -eq 'A17.payment.known-answer-vectors-through-flow-code' -or $_.id -eq 'SELF.dukpt-vectors-pass' -or $_.id -eq 'SELF.a17-clauses-pass-and-bite-rest' -or $_.id -eq 'SELF.vector-provenance' }).Count -gt 0
-$x9Out = Join-Path $acc 'vectors\_cache\x9-24-3-aes-dukpt.nsv'
-if ($needX9 -and -not (Test-Path $x9Out)) {
-    Say "fetching the X9.24-3 test vectors (ignored by git) and extracting them"
-    $f = Invoke-Tool 'pwsh' @('-NoProfile', '-File', (Join-Path $acc 'vectors\fetch-x9.ps1')) -TimeoutSec 300
-    $pdf = Join-Path $acc 'vectors\_cache\X9.24-3-2017-Test-Vectors-20180129-1.pdf'
-    if ($f.ExitCode -eq 0 -and (Test-Path $pdf)) {
-        $x = Invoke-Tool 'python' @('-I', (Join-Path $acc 'vectors\tools\extract_x9.py'), $pdf, $x9Out) -TimeoutSec 300
-        if ($x.ExitCode -ne 0) { Say ("X9 extraction failed: " + (Tail $x.Output 300)) }
-    } else { Say ("X9 fetch failed: " + (Tail $f.Output 300)) }
-}
+# The X9.24-3 test vectors are committed (vectors/x9-24-3-aes-dukpt.nsv, Steve's decision of 2026-11-11), so a run downloads nothing.
+# The PDF stays out of git. With the PDF in vectors/_cache (fetch-x9.ps1), SELF.x9-vectors-true-copy compares the committed file with a fresh extraction.
 
 # ------------------------------------------------------------------ prepare: product pieces, sibling, referees
 $productExists = Test-Path (Join-Path $ProductRoot 'src\NetSec.Core\NetSec.Core.csproj')
@@ -573,6 +561,19 @@ foreach ($c in @($pending | Where-Object { $_.group -eq 'driver' -and -not $resu
         'SELF.vectors-python' {
             $r = Invoke-Tool 'python' @('-I', (Join-Path $acc 'vectors\tools\selfcheck_vectors.py'), (Join-Path $acc 'vectors')) -TimeoutSec 300
             Set-Result $c.id $(if ($r.ExitCode -eq 0) { 'PASS' } else { 'FAIL' }) $(if ($r.ExitCode -eq 0) { '' } else { 'ASSERTION' }) (Tail $r.Output 400)
+        }
+        'SELF.x9-vectors-true-copy' {
+            # The second check on the committed X9.24-3 file. It needs the PDF, which stays out of git. ACC_HIDE_VECTOR_CACHE=1 hides vectors/_cache
+            # from the suite, so a run on a machine that holds the PDF can show what a fresh clone sees.
+            $pdf = Join-Path $acc 'vectors\_cache\X9.24-3-2017-Test-Vectors-20180129-1.pdf'
+            if ($env:ACC_HIDE_VECTOR_CACHE -eq '1') { Set-Result $c.id 'NOT RUN' 'SOURCE_NOT_FETCHED' 'ACC_HIDE_VECTOR_CACHE=1 hides vectors/_cache from the suite' }
+            elseif (-not (Test-Path $pdf)) { Set-Result $c.id 'NOT RUN' 'SOURCE_NOT_FETCHED' 'the X9.24-3 PDF is not in vectors/_cache. Run pwsh acceptance/vectors/fetch-x9.ps1 to add the second check' }
+            else {
+                $r = Invoke-Tool 'python' @('-I', (Join-Path $acc 'vectors\tools\extract_x9.py'), '--check', $pdf, (Join-Path $acc 'vectors\x9-24-3-aes-dukpt.nsv')) -TimeoutSec 300
+                if ($r.ExitCode -eq 0) { Set-Result $c.id 'PASS' '' (Tail $r.Output 400) }
+                elseif ($r.ExitCode -eq 3) { Set-Result $c.id 'NOT RUN' 'TOOL_MISSING' (Tail $r.Output 400) }
+                else { Set-Result $c.id 'FAIL' 'ASSERTION' (Tail $r.Output 400) }
+            }
         }
         default { Set-Result $c.id 'FAIL' 'NO_RESULT' 'driver has no code for this clause' }
     }

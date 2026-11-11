@@ -22,6 +22,7 @@ FILES = [
     ("hmac-rfc4231.nsv", "HMAC-SHA-256, SHA-384, SHA-512 test cases 1 to 7", "RFC 4231 section 4", "text parse, byte counts checked against the RFC's own '(N bytes)'; case 5 is the truncated one", "BCL HMAC"),
     ("cmac-rfc4493.nsv", "AES-CMAC examples 1 to 4", "RFC 4493 section 4", "text parse, message length checked", "a CMAC written for the self-test"),
     ("hkdf-rfc5869.nsv", "HKDF test cases 1 to 7 (SHA-256 and SHA-1)", "RFC 5869 appendix A", "text parse", "BCL HKDF"),
+    ("ecdsa-rfc6979.nsv", "ECDSA P-256 with SHA-256: the key pair, and k, r and s for the messages \"sample\" and \"test\"", "RFC 6979 appendix A.2.5, rfc6979.txt", "text parse; each of the 12 values checked against the RFC text by a script (2026-11-08)", "P-256 arithmetic on .NET's own curve parameters, .NET ECDsa verify, and OpenSSL `dgst -verify` (A19.host.ecdsa-walk-open-and-rfc6979)"),
     ("x25519-rfc7748.nsv", "X25519 scalar multiplication, 1 and 1,000 iterations, Diffie-Hellman", "RFC 7748 sections 5.2 and 6.1", "text parse (the 1,000,000 iteration value is not used)", "python cryptography X25519"),
     ("ed25519-rfc8032.nsv", "Ed25519 tests 1, 2, 3, 1024 and SHA(abc)", "RFC 8032 section 7.1", "text parse, message length checked", "python cryptography Ed25519"),
     ("dh-group14-rfc3526.nsv", "MODP group 14 prime and generator", "RFC 3526 section 3", "text parse, 512 hex digits", "python pow() with the DH vectors"),
@@ -30,10 +31,10 @@ FILES = [
     ("tls13-rfc8448.nsv", "TLS 1.3 key schedule trace, simple 1-RTT handshake", "RFC 8448 section 3", "text parse, every value's octet count checked against the RFC", "an RFC 8446 section 7.1 key schedule on BCL HKDF in SELF.kschedule-rfc8448-pass; transcript hashes recomputed"),
 ]
 
-X9 = ("x9-24-3-aes-dukpt.nsv (made at run time, not committed)", "AES DUKPT initial keys, derivation keys, PIN, MAC and data keys for 17 counters in three families, all usages for 9 counters, 9 format 4 PIN blocks",
-      "ANSI X9.24-3-2017 supplement, X9.24-3-2017-Test-Vectors-20180129-1.pdf from x9.org (fetch-x9.ps1)",
+X9 = ("x9-24-3-aes-dukpt.nsv", "AES DUKPT initial keys, derivation keys, PIN, MAC and data keys for 17 counters in three families, all usages for 9 counters, 9 format 4 PIN blocks (PIN, random number, PIN key, encrypted block). Inputs and expected outputs only. Committed on Steve's decision of 2026-11-11",
+      "ANSI X9.24-3-2017 supplement section 2.2, X9.24-3-2017-Test-Vectors-20180129-1.pdf from x9.org (fetch-x9.ps1). The file header names the PDF, its date, SHA-256 and URL",
       "extract_x9.py: every value is recomputed with an AES-ECB key derivation and must also appear in the PDF text (four consecutive words, or each word of a column-split PIN block). A value the PDF lacks stops the script",
-      "BCL AES (SELF.dukpt-vectors-pass)")
+      "BCL AES (SELF.dukpt-vectors-pass). With the PDF in `_cache`, SELF.x9-vectors-true-copy checks that the committed file equals a fresh extraction")
 
 
 def main():
@@ -62,8 +63,12 @@ def main():
             "```", "",
             "## Licence", "",
             "RFC text: IETF Trust. NIST publications and CAVP files: US government work. OpenSSL output: produced here.",
-            "The X9.24-3 supplement is copyrighted by ASC X9 and free to download. The PDF and the vector file made from it stay out of git (prd.md licence checklist item 1).",
-            "Dave decides if the vector file may ever be committed.", ""]
+            "The X9.24-3 supplement is copyrighted by ASC X9 and free to download. The PDF, its extracted text and its internal-state traces (section 2.3) stay out of git.",
+            "`x9-24-3-aes-dukpt.nsv` is committed (Steve's decision of 2026-11-11, prd.md licence checklist item 1). It holds only the inputs and expected outputs the clauses read, in this repository's own format, with a source line for each group.",
+            "Its header names the PDF, its date, SHA-256 and URL, says ASC X9 has not reviewed or endorsed this project, and says the values are test data and the keys protect nothing.",
+            "Dave's memo of 2026-11-11 recommends this middle route, and an IP attorney review before it is adopted. Steve chose to commit before that review and accepted the risk.",
+            "The memo is guidance from an in-house advisor, not legal advice.",
+            "To make the file again: `pwsh vectors/fetch-x9.ps1`, then `python -I vectors/tools/extract_x9.py vectors/_cache/X9.24-3-2017-Test-Vectors-20180129-1.pdf vectors/x9-24-3-aes-dukpt.nsv`.", ""]
     open(os.path.join(HERE, "SOURCES.md"), "w", encoding="utf-8", newline="\n").write("\n".join(out))
     print("wrote SOURCES.md")
 

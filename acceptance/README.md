@@ -74,6 +74,7 @@ Self-checks (full text in the report): 22 of 22 PASS.
 | `SELF.openssl-referee-smoke`, `SELF.openssh-key-format`, `SELF.wire-parsers`, `SELF.binproof-detector` | The process control and the parsers read real OpenSSL, ssh.exe, the Go `tap` and CF binaries: group, protocol, key log, SSH clear packets, TLS hellos, tap log with and without a flip, CF mscorlib token |
 | `SELF.referee-protocols` | The harness speaks the real referee programs: the BCL oracle JSON lines (including an unknown algorithm), `tokenverify` result events, and the `tlspeer` port line and handshake event |
 | `SELF.vector-provenance`, `SELF.clauses-json-matches-code` | Every vector group names its source. `clauses.json` equals the clause code |
+| `SELF.x9-vectors-true-copy` | The committed X9.24-3 file equals a fresh extraction from the PDF (added 2026-11-11). With no PDF in `vectors/_cache`, or with `ACC_HIDE_VECTOR_CACHE=1`, it is NOT RUN `SOURCE_NOT_FETCHED`. `pwsh acceptance/vectors/fetch-x9.ps1` adds the PDF |
 | `SELF.waits-look-after-the-limit` | Each harness wait looks one last time after its limit (`lib/Harness/Poll.cs`). With a 0 ms limit and the answer already there, `Net.WaitPort` and `Poll.Until` see it |
 
 Other proofs I ran by hand and do not keep in the repo:
@@ -104,7 +105,7 @@ A cut role is listed in `roles.json`. Its clauses report NOT RUN `ROLE_CUT:<role
 |---|---|
 | A1 | Published vectors only (`vectors/SOURCES.md`). Hashes run one-shot and in 1, 7, 64 and 65 byte pieces. GCM has tamper cases and the NIST FAIL records. Ed25519 has flipped-signature and altered-message controls. DH refuses a peer value of 0, 1 or p-1 |
 | A2 | The BCL oracle runs in a separate process. 10,000 seeded inputs per primitive. The seed makes a failing round repeatable |
-| A3 | X9 vectors are fetched at run time and cross-checked by recomputation. PIN block decrypt under another PAN must not return the PIN. The erasure check searches every register for every earlier working key |
+| A3 | X9 vectors are committed and cross-checked by recomputation. With the PDF in `vectors/_cache`, `SELF.x9-vectors-true-copy` checks that the committed file equals a fresh extraction. PIN block decrypt under another PAN must not return the PIN. The erasure check searches every register for every earlier working key |
 | A4 | RFC 8448 values through `Tls13KeySchedule.Derive` (section 11). Keys, IVs and Finished keys come from the secrets `Derive` returned. The resumption secrets need `Tls13KeySchedule.Resume` (ASSUMED, asked of Richard). Until it exists, `A4.rfc8448.exporter-and-resumption` is NOT RUN DERIVE_LACKS_RESUMPTION. The engine route is not usable: the glass client sends its own ClientHello, so its transcript differs |
 | A5, A6 | The group is the referee's word (`Peer Temp Key`, the Go `handshake` event). The certificates come from `TrainingPki.Export`, and `openssl verify` checks the leaf (wrong name and rogue-certificate controls). A6 compares the four labels that Go and OpenSSL both write, for the client random in `ProbeResult.KeyLog` |
 | A7 | Alert 70 only counts beside a control: the same client passes against the TLS 1.1 server, and `ProbeResult.AlertReceived` is 70 for the TLS 1.3-only server. The sentinel needs `OfferOnlyTls11`, a failed `TLS13_DOWNGRADE_SENTINEL`, and `DOWNGRD 00` in the server random, read from the `tap` log. The control run offers TLS 1.3 |
@@ -126,7 +127,7 @@ A cut role is listed in `roles.json`. Its clauses report NOT RUN `ROLE_CUT:<role
 | 3 | A clause that passes while `src/NetSec.Core` is absent is FAIL `SUITE_BUG_VACUOUS_PASS` | Keeps "no product, no PASS" true by test and not by hope |
 | 4 | Ids end `.net10` or `.cf`, one clause per build | The PRD says "on both builds" |
 | 5 | A4 runs on `Tls13KeySchedule.Derive` and not through the engine | RFC 8448's ClientHello differs from ours |
-| 6 | X9.24-3 vectors are made at run time and stay out of git | Licence checklist item 1. Dave decides if they may ever be committed |
+| 6 | X9.24-3 vectors are committed (`vectors/x9-24-3-aes-dukpt.nsv`, inputs and expected outputs only). The PDF stays out of git | Steve's decision of 2026-11-11, licence checklist item 1, on Dave's memo (the middle route). Until that date they were made at run time |
 | 7 | SP 800-38A F.2.5 (CBC-AES256) left out | The PDF text scrambles that block. CBC with 128 and 192 bit keys, and AES-256 in ECB, CTR, GCM and FIPS 197, cover the core |
 | 8 | RSA and DH group 14 known answers come from OpenSSL 3.5.7, with python cross-checks | No free published RSA PKCS#1 vector set was at hand. The PRD names OpenSSL a referee |
 | 9 | TDES single-key CAVP files use one DES key three times. I added the 2-key and 3-key multi-block files | The KAT set alone would not test the EDE chain |
@@ -142,7 +143,7 @@ A cut role is listed in `roles.json`. Its clauses report NOT RUN `ROLE_CUT:<role
 
 In the run above: `NOT_A_FRESH_RUN` for `A13.fresh-clone.acceptance-unchanged` (1 clause).
 These appear later by design, each named in the report: `REFEREE_MISSING`, `REFEREE_VERSION`, `REFEREE_PROTOCOL`, `ROLE_CUT:<role>`, `LESSON_NOT_BUILT`, `NO_LESSON_INSTALLS_KEYS`,
-`ACCURACY_READER_PENDING`, `NO_CLAIMS_DECLARED`, `UI_CONTROL_MISSING`, `VECTORS_MISSING`, `SIBLING_MISSING`, `TOOL_MISSING`, `PIN_OFF`, `WIZARD_PART_NOT_BUILT`, `FILE_ROW_NOT_BUILT`.
+`ACCURACY_READER_PENDING`, `NO_CLAIMS_DECLARED`, `UI_CONTROL_MISSING`, `VECTORS_MISSING`, `SOURCE_NOT_FETCHED`, `SIBLING_MISSING`, `TOOL_MISSING`, `PIN_OFF`, `WIZARD_PART_NOT_BUILT`, `FILE_ROW_NOT_BUILT`.
 
 `UI_CONTROL_MISSING` is NOT RUN only when `"unbuilt"` in `acceptance/settings.json` names the control key. The list is empty by default. Any other missing control is a FAIL. The report's reason column says `ASSERTION`, and the detail starts with `UI_CONTROL_MISSING_ON_SHIPPED_SCREEN:`, then the same text (#372). A new screen's clauses go in with their control keys on the list. The PR that runs them green takes the keys off.
 
@@ -152,7 +153,7 @@ These appear later by design, each named in the report: `REFEREE_MISSING`, `REFE
 2. **Contract.** `CONTRACT.md` lists the ASSUMED members, the process contract and the UI test ids. Send it to Richard and Nancy. A change goes back to the acceptance author.
 3. **Not run against real code.** The live protocol groups (A5 to A8), the bridge (A10), the Host (A16) and the Playwright specs have compiled and have run only in the no-product state. They could not meet a real engine, Go referee or UI. Expect a first red run to show a contract mismatch, not a bug in the product.
 4. **PIN.** After the last `acceptance/` commit of a branch, run `python -I acceptance/tools/pin.py --write` and commit `acceptance/PIN`.
-5. **Dave.** Ask if the X9 vector file may be committed. Until then it is made at run time.
+5. **X9 vectors.** Committed on 2026-11-11 by Steve's decision. Dave's memo recommends an IP attorney review of that route. The review is still open.
 
 ## 8. Layout
 
@@ -164,7 +165,7 @@ These appear later by design, each named in the report: `REFEREE_MISSING`, `REFE
 | `contract/` | The stub that holds the public signatures |
 | `selftest/` | BCL stand-ins and the `SELF.*` clauses |
 | `checks/docs_checks.py`, `tools/gen_clauses.py` | Text clauses and the clause list generator |
-| `vectors/` | `.nsv` vectors, `SOURCES.md`, fetch scripts, extractors (`fetch-x9.ps1` downloads the X9.24-3 PDF to `_cache` with a recorded SHA-256) |
+| `vectors/` | `.nsv` vectors (all committed), `SOURCES.md`, fetch scripts, extractors (`fetch-x9.ps1` downloads the X9.24-3 PDF to `_cache` with a recorded SHA-256, for the true-copy check) |
 | `e2e/` | Playwright specs for A13 and the UI half of A16 (`run.ps1` runs `npm ci` when `node_modules` is missing, then `tsc` and Playwright from that folder's own `node_modules` under node, never through npx) |
 | `CONTRACT.md` | What the suite needs from the build. The referees are described in `referees/README.md` |
 
