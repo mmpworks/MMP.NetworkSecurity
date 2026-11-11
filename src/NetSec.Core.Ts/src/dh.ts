@@ -46,11 +46,21 @@ export interface DhWalk {
   readonly server: DhSideWalk
   /** The secret both sides now hold. Equal to client.shared.result and server.shared.result. */
   readonly secret: bigint
+  /**
+   * The exponent size that the app's legacy SSH exchange draws, in bits (SshKex.DhPrivateSize = 64 bytes).
+   * The walk's own exponents are short practice values, so a screen can say how far they are from the real ones.
+   */
+  readonly realExponentBits: number
 }
 
+/** The real exponent size of the app's legacy exchange: SshKex.DhPrivateSize (64 bytes) as bits. */
+export const REAL_EXPONENT_BITS = 64 * 8
+
+export type DhErrorCode = 'DH_BAD_PRIME' | 'DH_BAD_EXPONENT' | 'DH_BAD_VALUE' | 'DH_WALK_DIVERGED'
+
 export class DhError extends Error {
-  readonly code: string
-  constructor(code: string, message: string) {
+  readonly code: DhErrorCode
+  constructor(code: DhErrorCode, message: string) {
     super(message)
     this.name = 'DhError'
     this.code = code
@@ -73,7 +83,11 @@ export const GROUP14_GENERATOR = 2n
  */
 export const GROUP14_PRACTICE = Object.freeze({ client: 0xe5494e98n, server: 0xbf4f55efn })
 
-/** Left-to-right square and multiply. The rows read the exponent from its top set bit down to bit 0. */
+/**
+ * Left-to-right square and multiply. The rows read the exponent from its top set bit down to bit 0.
+ * The exponent must be 1 or more. (The C# walk gives zero rows and the result 1 for exponent 0.
+ * A key exchange never uses exponent 0, so this port refuses it with DH_BAD_EXPONENT.)
+ */
 export function powWalk(base: bigint, exponent: bigint, p: bigint): DhPowWalk {
   if (p < 3n) throw new DhError('DH_BAD_PRIME', 'The modulus must be 3 or more.')
   if (exponent < 1n) throw new DhError('DH_BAD_EXPONENT', 'The exponent must be 1 or more.')
@@ -110,7 +124,15 @@ function exchange(group: DhGroupName, p: bigint, g: bigint, a: bigint, b: bigint
   if (client.shared.result !== server.shared.result) {
     throw new DhError('DH_WALK_DIVERGED', 'The two sides made different secrets.')
   }
-  return Object.freeze({ group, prime: p, generator: g, client, server, secret: client.shared.result })
+  return Object.freeze({
+    group,
+    prime: p,
+    generator: g,
+    client,
+    server,
+    secret: client.shared.result,
+    realExponentBits: REAL_EXPONENT_BITS,
+  })
 }
 
 /** The small exchange: p = 467, g = 5, private values 153 and 197. */
@@ -125,6 +147,7 @@ export function dhGroup14(): DhWalk {
 
 /** A bigint as big-endian bytes, left-padded to `width` bytes when given. */
 export function toBytes(value: bigint, width = 0): Uint8Array {
+  if (value < 0n) throw new DhError('DH_BAD_VALUE', 'A negative number has no byte form here.')
   let hex = value.toString(16)
   if (hex.length % 2 === 1) hex = `0${hex}`
   const n = Math.max(width, hex.length / 2)

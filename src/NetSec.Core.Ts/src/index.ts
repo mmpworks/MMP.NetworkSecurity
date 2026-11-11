@@ -7,3 +7,7 @@ export { SHIFT_ROWS_MAP, INVERSE_SHIFT_ROWS_MAP, expandKey, encryptBlock, decryp
 export type { KeySchedule } from './cipher.ts'
 export { walkKeyExpansion, walkEncrypt, walkDecrypt, mixTerms, roundConstants, roundConstantSteps } from './walk.ts'
 export type { AesBlockWalk, AesColumnByte, AesDoubling, AesKeyWordStep, AesStep, AesStepKind, AesTerm } from './walk.ts'
+
+// Diffie-Hellman walks (port of DhWalks.cs): the small prime 467 and RFC 3526 group 14.
+export { DhError, GROUP14_GENERATOR, GROUP14_PRACTICE, GROUP14_PRIME, REAL_EXPONENT_BITS, SMALL, dhGroup14, dhSmall, powWalk, toBytes } from './dh.ts'
+export type { DhErrorCode, DhGroupName, DhPowRow, DhPowWalk, DhSideWalk, DhWalk } from './dh.ts'

@@ -99,6 +99,73 @@ describe('group 14 against OpenSSL 3.5.7 known answers', () => {
   })
 })
 
+/**
+ * b^x mod p, right to left (low bit first). A different method from powWalk,
+ * which goes left to right, so a shared mistake is unlikely.
+ */
+function rtlPow(b: bigint, x: bigint, p: bigint): bigint {
+  let acc = 1n
+  let sq = b % p
+  for (let e = x; e > 0n; e >>= 1n) {
+    if (e & 1n) acc = (acc * sq) % p
+    sq = (sq * sq) % p
+  }
+  return acc
+}
+
+describe('each row against its own rule', () => {
+  // After the square on bit k, the value is b^(2 * (e >> (k + 1))).
+  // After the multiply on bit k, it is b^(e >> k).
+  const cases: Array<[string, bigint, bigint, bigint]> = [
+    ['small, client public', SMALL.generator, SMALL.clientPrivate, SMALL.prime],
+    ['small, server shared', dhSmall().client.public.result, SMALL.serverPrivate, SMALL.prime],
+    ['group 14, client public', GROUP14_GENERATOR, GROUP14_PRACTICE.client, GROUP14_PRIME],
+    ['group 14, server shared', dhGroup14().client.public.result, GROUP14_PRACTICE.server, GROUP14_PRIME],
+  ]
+  for (const [name, b, e, p] of cases) {
+    test(name, () => {
+      const walk = powWalk(b, e, p)
+      walk.rows.forEach((r, n) => {
+        assert.equal(r.bit, walk.rows.length - 1 - n, `row ${n} bit`)
+        assert.equal(r.afterSquare, rtlPow(b, 2n * (e >> BigInt(r.bit + 1)), p), `row ${n} square`)
+        if (r.isOne) assert.equal(r.afterMultiply, rtlPow(b, e >> BigInt(r.bit), p), `row ${n} multiply`)
+      })
+    })
+  }
+})
+
+describe('edges and errors', () => {
+  test('exponent 1 gives one row with a multiply', () => {
+    const w = powWalk(5n, 1n, 467n)
+    assert.equal(w.rows.length, 1)
+    assert.equal(w.rows[0].isOne, true)
+    assert.equal(w.result, 5n)
+  })
+  test('a base of p or more, or below 0, is reduced first', () => {
+    assert.equal(powWalk(467n + 5n, 153n, 467n).result, dhSmall().client.public.result)
+    assert.equal(powWalk(5n - 467n, 153n, 467n).result, dhSmall().client.public.result)
+    assert.equal(powWalk(0n, 7n, 467n).result, 0n)
+  })
+  test('bad input throws a coded error', () => {
+    assert.throws(() => powWalk(5n, 0n, 467n), { code: 'DH_BAD_EXPONENT' })
+    assert.throws(() => powWalk(5n, 3n, 2n), { code: 'DH_BAD_PRIME' })
+    assert.throws(() => toBytes(-1n), { code: 'DH_BAD_VALUE' })
+  })
+  test('toBytes pads to a width and keeps a leading zero byte off', () => {
+    assert.deepEqual(Array.from(toBytes(0x1ffn)), [0x01, 0xff])
+    assert.deepEqual(Array.from(toBytes(0x1ffn, 4)), [0, 0, 0x01, 0xff])
+    assert.equal(toBytes(GROUP14_PRIME).length, 256)
+  })
+  test('the whole walk is frozen', () => {
+    const w = dhGroup14()
+    for (const o of [w, w.client, w.server, w.client.public, w.client.shared, w.server.public, w.server.shared]) {
+      assert.ok(Object.isFrozen(o))
+    }
+    assert.ok(w.client.public.rows.every((r) => Object.isFrozen(r)))
+    assert.equal(w.realExponentBits, 512)
+  })
+})
+
 describe('group 14 practice exchange against node:crypto', () => {
   test('both public values and the secret match OpenSSL through node:crypto', () => {
     const walk = dhGroup14()
