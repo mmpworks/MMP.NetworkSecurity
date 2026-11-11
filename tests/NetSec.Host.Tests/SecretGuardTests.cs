@@ -5,6 +5,7 @@ using System.IO;
 using System.Linq;
 using System.Threading.Tasks;
 using System.Text;
+using NetSec.TestSupport;
 using Xunit;
 
 namespace NetSec.Host.Tests;

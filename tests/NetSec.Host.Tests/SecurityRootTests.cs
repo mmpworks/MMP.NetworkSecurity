@@ -2,6 +2,7 @@
 using System;
 using System.IO;
 using NetSec.Host.Security;
+using NetSec.TestSupport;
 using Xunit;
 
 namespace NetSec.Host.Tests;

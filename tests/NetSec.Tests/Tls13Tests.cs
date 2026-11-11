@@ -17,6 +17,7 @@ using NetSec.Pki;
 using NetSec.Platform;
 using NetSec.Tls13;
 using NetSec.Trace;
+using NetSec.TestSupport;
 using Xunit;
 
 namespace NetSec.Tests
@@ -370,8 +371,8 @@ namespace NetSec.Tests
             }
             finally
             {
-                if (Directory.Exists(a)) Directory.Delete(a, true);
-                if (Directory.Exists(b)) Directory.Delete(b, true);
+                if (Directory.Exists(a)) TempTree.Delete(a);
+                if (Directory.Exists(b)) TempTree.Delete(b);
             }
         }
     }

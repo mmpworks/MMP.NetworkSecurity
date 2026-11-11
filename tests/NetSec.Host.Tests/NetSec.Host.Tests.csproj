@@ -15,6 +15,11 @@
     <PackageReference Include="xunit.runner.visualstudio" Version="3.1.1" PrivateAssets="all" />
   </ItemGroup>
 
+  <!-- One temp delete helper for both test projects (#400). -->
+  <ItemGroup>
+    <Compile Include="..\Shared\TempTree.cs" Link="Shared\TempTree.cs" />
+  </ItemGroup>
+
   <ItemGroup>
     <ProjectReference Include="..\..\src\NetSec.Host\NetSec.Host.csproj" />
     <ProjectReference Include="..\..\src\NetSec.Node\NetSec.Node.csproj" ReferenceOutputAssembly="false" />

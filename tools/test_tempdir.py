@@ -10,7 +10,7 @@ import threading
 import unittest
 
 sys.path.insert(0, str(pathlib.Path(__file__).resolve().parent))  # tools/, where tempdir.py is (python -I leaves it off sys.path)
-from tempdir import SHARING_VIOLATION, TempDir, retry_sharing  # noqa: E402
+from tempdir import DIR_NOT_EMPTY, SHARING_VIOLATION, TempDir, retry_while_held  # noqa: E402
 
 WINDOWS = os.name == "nt"
 
@@ -78,25 +78,28 @@ class Rules(unittest.TestCase):
             raise FileNotFoundError("no such folder")
 
         with self.assertRaises(FileNotFoundError):
-            retry_sharing(fails, attempts=5, pause=0.05, sleep=sleeps)
+            retry_while_held(fails, attempts=5, pause=0.05, sleep=sleeps)
         self.assertEqual(1, len(calls))
         self.assertEqual([], sleeps.pauses)
 
-    def test_a_sharing_violation_that_clears_returns_the_result(self):
-        sleeps = Sleeps()
-        calls = []
+    def test_each_retried_error_that_clears_returns_the_result(self):
+        # 32: a file is open in another process. 145: another process added a file while the delete ran (the .git/gk case in #400).
+        for code, kind in ((SHARING_VIOLATION, PermissionError), (DIR_NOT_EMPTY, OSError)):
+            with self.subTest(winerror=code):
+                sleeps = Sleeps()
+                calls = []
 
-        def clears_on_third():
-            calls.append(1)
-            if len(calls) < 3:
-                error = PermissionError("held")
-                error.winerror = SHARING_VIOLATION
-                raise error
-            return "done"
+                def clears_on_third():
+                    calls.append(1)
+                    if len(calls) < 3:
+                        error = kind("held")
+                        error.winerror = code
+                        raise error
+                    return "done"
 
-        self.assertEqual("done", retry_sharing(clears_on_third, attempts=5, pause=0.05, sleep=sleeps))
-        self.assertEqual(3, len(calls))
-        self.assertEqual([0.05, 0.05], sleeps.pauses)
+                self.assertEqual("done", retry_while_held(clears_on_third, attempts=5, pause=0.05, sleep=sleeps))
+                self.assertEqual(3, len(calls))
+                self.assertEqual([0.05, 0.05], sleeps.pauses)
 
 
 if __name__ == "__main__":

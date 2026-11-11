@@ -6,6 +6,7 @@ using System.Linq;
 using System.Text.Json;
 using NetSec.Host.Security;
 using NetSec.Keys;
+using NetSec.TestSupport;
 using Xunit;
 
 namespace NetSec.Host.Tests;
