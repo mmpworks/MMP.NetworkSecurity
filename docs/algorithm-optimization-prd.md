@@ -209,6 +209,18 @@ The rules, in order of preference:
 What stays allocated, by design: one key object for each key, the buffers a caller makes, and the lesson walk (it records steps, and it is no product path).
 
 The test rows for these rules are in section 4.3: each AO-5 block row, each AO-5 message row, and one AO-5 row for each caller-buffer form (0 bytes for each call, with the output array included, because the caller made it).
+### 7.5 When form and the goals disagree (Steve, 2026-11-11)
+
+Steve's words: "try to be CUPID and DRY, but we may need to bend the rules a bit to get the performance and memory goals met."
+
+1. The order of weight in a hot path is: correct output, then the memory and speed goals, then CUPID and DRY.
+2. A bend is allowed only where a number shows the gain. The number is the benchmark ratio outside the measured noise band, or the AO-5 byte count.
+3. Each bend has a comment at its place in the code. The comment names the rule that is bent, the reason, and the measured gain. Example: a round that is written out two times because a shared helper costs a call on the 3.5 runtime.
+4. A bend stays inside one type. The public shape of a type stays simple and the same for all callers.
+5. A copy made for speed is covered by the same tests as its source: AO-1 and AO-2 run each copy.
+6. Outside the hot paths (key setup that runs one time, error paths, the lesson walk) the form rules have no exception.
+7. The reviewer rules on each bend. A bend with no number is a blocker.
+
 ## 8. Boundary and failure routing
 
 1. Free without asking: edits in the `Algorithm-Optimization` worktrees, PRs into `Algorithm-Optimization`, heavy runs through `tools/heavy_lock.py`.
