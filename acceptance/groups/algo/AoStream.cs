@@ -1,5 +1,6 @@
 using System;
 using System.Collections.Generic;
+using FC = Acceptance.Frozen.Crypto;
 using FE = Acceptance.Frozen.Errors;
 
 namespace Acceptance
@@ -31,8 +32,8 @@ namespace Acceptance
     /// rules of PRD 7.3 item 15, written here:
     /// 1. States: empty (new, or after Clear), ready (after Init), ended (after a CTR call with a partial block). Init is legal in every
     ///    state and starts a new message. Init with a null array throws ArgumentNullException, and with fewer than 16 bytes from the
-    ///    offset ArgumentOutOfRangeException.
-    /// 2. A call checks its arguments first: a CBC count that is not a multiple of 16 (refused as the frozen one-call form refuses it),
+    ///    offset ArgumentOutOfRangeException. A refused Init leaves the object as it was.
+    /// 2. A call checks its arguments first: a null array or a range outside its array (the frozen Arg.Range), then a CBC count that is not a multiple of 16 (refused as the frozen one-call form refuses it),
     ///    then the overlap rule (ARG_RANGES_OVERLAP). Then the state: a call on an empty or ended object throws InvalidOperationException.
     /// 3. A refused call changes neither the state object nor the output.
     /// 4. CBC: the chain value after a call is the last ciphertext block of that call.
@@ -66,6 +67,9 @@ namespace Acceptance
 
         public virtual void Call(byte[] i, int io, int n, byte[] o, int oo)
         {
+            // The frozen argument check of the (byte[], offset, count) forms: ArgumentNullException, then ArgumentOutOfRangeException.
+            FC.Arg.Range(i, io, n);
+            FC.Arg.Range(o, oo, n);
             byte[] src = new byte[n];
             Buffer.BlockCopy(i, io, src, 0, n);
             bool ctr = Kind == "ctr", encrypt = Kind == "cbc-encrypt";
@@ -151,6 +155,20 @@ namespace Acceptance
             e.N = 16 * (1 + r.Int(maxBlocks));
             if (r.Int(6) == 0) e.N += 1 + r.Int(15);
             e.P = AoIntoDiff.Place.Draw(r, e.N, e.N, kind == EvCall);
+            // 1 call in 12 with separate arrays gets one null or range fault. One fault only: the PRD orders null and range against the
+            // other checks, and gives no order between the input and the output.
+            if (kind == EvCall && e.P.Mode == 0 && r.Int(12) == 0)
+            {
+                switch (r.Int(6))
+                {
+                    case 0: e.P.In = null; break;
+                    case 1: e.P.Out = null; break;
+                    case 2: e.P.Io = -1 - r.Int(3); break;
+                    case 3: e.P.Oo = -1 - r.Int(3); break;
+                    case 4: e.P.In = r.Bytes(e.P.Io + e.N - 1 - r.Int(4)); break;    // 1 to 4 bytes short
+                    default: e.P.Out = r.Bytes(e.P.Oo + e.N - 1 - r.Int(4)); break;
+                }
+            }
             return e;
         }
 
@@ -170,10 +188,13 @@ namespace Acceptance
             for (int m = 0; m < messages; m++)
             {
                 int off = r.Int(5);
-                if (r.Int(24) == 0) evs.Add(Init(null, off));
-                if (r.Int(12) == 0) evs.Add(Init(r.Bytes(off + r.Int(16)), off));   // 0 to 15 bytes from the offset
-                // The Init that starts the message. It follows a refused Init at once, because the PRD does not fix the state after one.
-                evs.Add(Init(ctr ? Hex.Concat(r.Bytes(off), AoDraw.NearWrapCounter(r), r.Bytes(r.Int(5))) : r.Bytes(off + 16 + r.Int(8)), off));
+                bool refused = false;
+                if (r.Int(24) == 0) { evs.Add(Init(null, off)); refused = true; }
+                if (r.Int(12) == 0) { evs.Add(Init(r.Bytes(off + r.Int(16)), off)); refused = true; }   // 0 to 15 bytes from the offset
+                // A refused Init leaves the object as it was (PRD 7.3 item 15). After one, half of the messages have no good Init, so
+                // their calls run on the object as the refused Init left it: empty, ready with the old chain or counter, or ended.
+                if (!refused || r.Int(2) == 0)
+                    evs.Add(Init(ctr ? Hex.Concat(r.Bytes(off), AoDraw.NearWrapCounter(r), r.Bytes(r.Int(5))) : r.Bytes(off + 16 + r.Int(8)), off));
                 int chunks = 1 + r.Int(4);
                 for (int c = 0; c < chunks; c++) evs.Add(Call(r, 8, EvCall));
                 if (r.Int(4) == 0)

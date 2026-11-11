@@ -649,6 +649,8 @@ namespace Acceptance
         {
             // The second message on one object keeps the chain value and the counter position of the first.
             if (_fault == "second-init-keeps-state" && _used) { State = 1; return; }
+            // PRD 7.3 item 15: a refused Init leaves the object as it was. This fault empties the object first.
+            if (_fault == "refused-init-empties-object" && (b == null || offset < 0 || b.Length - offset < 16)) { Array.Clear(V, 0, 16); Done = 0; State = 0; }
             if (_fault == "short-init-padded" && b != null && offset >= 0 && offset <= b.Length && b.Length - offset < 16)
             {
                 V = new byte[16];
@@ -673,6 +675,18 @@ namespace Acceptance
             bool inPlace = ReferenceEquals(i, o) && io == oo;
             // PRD 7.3 item 15: the arguments are checked before the state. This fault checks the state first.
             if (_fault == "state-checked-before-arguments" && State != 1) throw new InvalidOperationException("planted");
+            if (_fault == "state-refusal-is-a-subtype" || _fault == "range-fault-is-argument-exception")
+            {
+                // The PRD names each exception "as that type and no subtype". These faults throw a subtype, or the base type.
+                try { base.Call(i, io, n, o, oo); }
+                catch (ArgumentOutOfRangeException) { if (_fault == "range-fault-is-argument-exception") throw new ArgumentException("planted"); throw; }
+                catch (InvalidOperationException e)
+                {
+                    if (_fault == "state-refusal-is-a-subtype" && e.GetType() == typeof(InvalidOperationException)) throw new ObjectDisposedException("planted");
+                    throw;
+                }
+                return;
+            }
             if (_fault == "refused-call-ends-object")
             {
                 // A refused call must change nothing. This fault ends the object after any refusal.
@@ -739,6 +753,9 @@ namespace Acceptance
                 new[] { "aes-cbc-stream", "state-checked-before-arguments" }, new[] { "aes-ctr-stream", "state-checked-before-arguments" },
                 new[] { "aes-cbc-stream", "refused-call-ends-object" }, new[] { "aes-ctr-stream", "refused-call-ends-object" },
                 new[] { "aes-cbc-stream", "short-init-padded" }, new[] { "aes-ctr-stream", "null-state-not-named" },
+                new[] { "aes-cbc-stream", "refused-init-empties-object" }, new[] { "aes-ctr-stream", "refused-init-empties-object" },
+                new[] { "aes-cbc-stream", "state-refusal-is-a-subtype" }, new[] { "aes-ctr-stream", "state-refusal-is-a-subtype" },
+                new[] { "aes-cbc-stream", "range-fault-is-argument-exception" }, new[] { "aes-ctr-stream", "range-fault-is-argument-exception" },
                 new[] { "aes-cmac-verify-into", "verify-skips-last-tag-byte" }, new[] { "aes-cmackey-verify-into", "verify-reads-tag-at-0" },
             };
             List<string> seen = new List<string>();
