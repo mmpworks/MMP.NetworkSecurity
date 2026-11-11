@@ -19,13 +19,16 @@ static class Cases
 
     public static readonly string[] HashNames = { "md5", "sha1", "sha256", "sha512", "sha3-256" };
 
+    // One set of input and output buffers, shared by both copies' lists. With a set per list, the two copies' buffers sat at fixed
+    // different addresses, and the "new" position ran AES encrypt-block about 12% faster in every process, whichever copy held it
+    // (2026-11-11 swap check: 1.110 to 1.125 normal, 1.122 to 1.142 swapped). Shared buffers give both positions the same addresses.
+    static readonly byte[] key16 = Filled(16, 0x10), key24 = Filled(24, 0x20), key32 = Filled(32, 0x30);
+    static readonly byte[] message = Filled(MessageBytes, 0x40);
+    static readonly byte[] zero16 = new byte[16], nonce = new byte[12], noAad = new byte[0];
+    static readonly byte[] block = Filled(16, 0x80), output = new byte[16];
+
     public static List<BenchCase> All(IBlockCases code)
     {
-        byte[] key16 = Filled(16, 0x10), key24 = Filled(24, 0x20), key32 = Filled(32, 0x30);
-        byte[] message = Filled(MessageBytes, 0x40);
-        byte[] zero16 = new byte[16], nonce = new byte[12], noAad = new byte[0];
-        byte[] block = Filled(16, 0x80), output = new byte[16];
-
         List<BenchCase> all = new List<BenchCase>
         {
             new BenchCase("aes128.encrypt-block", "block", 1, AesBlock, code.AesEncryptBlock(key16, block, output)),
