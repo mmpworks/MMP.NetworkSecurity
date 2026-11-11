@@ -29,9 +29,10 @@ static class Program
 
         a.TryGetValue("mode", out string mode);
         if (mode == "ao-merge") return AoParts.Merge(a);
-        Run run = new Run { Build = BuildName(), Head = a["head"], Priority = Measure.RaisePriority(), CfLine = CfLine };
+        Run run = new Run { Build = BuildName(), Head = a["head"], Priority = Measure.RaisePriority(a.TryGetValue("core", out string core) ? int.Parse(core) : (int?)null), CfLine = CfLine };
         bool sameCode = a.TryGetValue("same-code", out string sc) && sc == "true";
         if (mode == "files") return Files.FilesMode.Run(a, run, sameCode);
+        if (mode == "ao5") { AoAlloc.JsonRows(new Files.ProductCode()); return 0; }
         string filter = a.TryGetValue("filter", out string f) ? f : "";
 
         List<BenchCase> original = Cases.All(new Files.FrozenCode()), current = Cases.All(new Files.ProductCode());
@@ -46,7 +47,11 @@ static class Program
         Directory.CreateDirectory(a["out"]);
         File.WriteAllText(Path.Combine(a["out"], "bench-" + run.Build + ".json"), Report.Json(run, results));
         File.WriteAllText(Path.Combine(a["out"], "bench-" + run.Build + ".md"), Report.Markdown(run, results));
-        if (run.Build == "net10") AoParts.Write(a["out"], "net10-blocks", Report.AoBlockRows(results));
+        if (run.Build == "net10" && filter.Length == 0)
+        {
+            AoParts.Write(a["out"], "net10-blocks", Report.AoBlockRows(results));
+            AoParts.Write(a["out"], "net10-alloc", AoAlloc.JsonRows(new Files.ProductCode()));
+        }
         double[] ratios = results.Select(r => r.Pair.MedianRatio).ToArray();
         Console.WriteLine("BENCH_NOISE " + NoiseBand.Describe(ratios));
         Console.WriteLine(CfLine);
