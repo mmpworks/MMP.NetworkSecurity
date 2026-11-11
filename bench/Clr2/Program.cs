@@ -31,9 +31,17 @@ static class Program
         public Action Original, New;
     }
 
+    /// <summary>The runtime line the linked report sections print. CLR 2.0 has no RuntimeInformation, so it is Environment.Version and the process width.</summary>
+    public static string Machine() => "CLR " + Environment.Version + ", " + (IntPtr.Size * 8) + "-bit process, " + Environment.ProcessorCount + " logical processors";
+
     static int Main(string[] args)
     {
-        bool sameCode = args.Length >= 2 && args[0] == "--same-code" && args[1] == "true";
+        Dictionary<string, string> a = new Dictionary<string, string>();
+        for (int i = 0; i + 1 < args.Length; i += 2) a[args[i].TrimStart('-')] = args[i + 1];
+        string build = "cf-binaries-on-net35-clr2-" + (IntPtr.Size == 4 ? "x86" : "x64");
+        if (a.ContainsKey("mode") && a["mode"] == "footprint")
+            return Footprint.Run(a, new Run { Build = build, Head = a.ContainsKey("head") ? a["head"] : "", Priority = "normal (footprint does no timing)", CfLine = "CF ARM speed: UNMEASURED" });
+        bool sameCode = a.ContainsKey("same-code") && a["same-code"] == "true";
         Console.WriteLine("RUNTIME CLR " + Environment.Version + ", " + (IntPtr.Size * 8) + "-bit process");
         Console.WriteLine("NETSEC_CORE " + typeof(NetSec.Crypto.AesKey).Assembly.FullName);
         Console.WriteLine("FROZEN " + typeof(Acceptance.Frozen.Crypto.AesKey).Assembly.FullName);
