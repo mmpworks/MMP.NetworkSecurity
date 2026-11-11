@@ -151,7 +151,7 @@ S0 is done when the row-list check reads M of M for slice S0.
 7. `#if NETCF` only at a named seam, never inside a round function.
 8. Unproven for the CF JIT, so no rule depends on them: removal of bounds checks, the inline size limit, and a rotate instruction for `(x >> 8) | (x << 24)`.
 9. A block function reads all its input into locals before its first output write. This is what makes overlapped input and output correct.
-   A caller-buffer form of a mode accepts the same array at the same offset, or ranges that do not overlap. Any other overlap throws `ArgumentException` with a machine code at the public boundary. AO-2 tests the same-offset case against the separate-buffer result, and it tests the refusal. (The 5c5d4a4 code returns a new array from each mode, so it has no overlapped mode call to compare with.)
+   A caller-buffer form of a mode accepts the same array at the same offset, or ranges that do not overlap. Any other overlap throws `NetSecException` with the machine code `ARG_RANGES_OVERLAP` at the public boundary. AO-2 tests the same-offset case against the separate-buffer result, and it tests the refusal. (The 5c5d4a4 code returns a new array from each mode, so it has no overlapped mode call to compare with.)
 10. Argument checks stay at the public boundary, with the exception types and machine codes of today. No check is inside a round loop.
 11. The walk reads the key schedule through an internal read path. No public member returns an instance array.
 12. All `NETCF` seams are listed in one table in `docs/`, so a reviewer can count them. A gate check counts the `#if NETCF` and `#if !NETCF` lines in `src/NetSec.Core` and fails when the count differs from the table rows.
@@ -188,6 +188,18 @@ The S0 benchmark list includes AES key setup (both schedules). The row for the C
 12. The call sites that seal many records with one key (the TLS record paths) hold a `GcmKey`. S1 lists them. A static `Gcm` wrapper builds a `GcmKey` on each call, so it is for single calls only.
 13. S0 measures AES key setup. If the decrypt schedule in every constructor costs too much for per-transaction keys (DUKPT), an encrypt-only constructor is the fallback, and that needs a decision.
 14. HMAC with no allocation uses a working hash that the caller owns: `HmacKey.Compute(IHash work, byte[] data, int off, int len, byte[] mac, int macOff)`. One thread uses a work object at a time. The key copies its saved state into the work object through a copy-into method on the hash (hypothesis: `void CopyStateTo(IHash target)`), which throws a machine code when the target type differs. `Hmac.Compute` stays as a wrapper that allocates.
+15. S1 signatures, fixed before the slice so the acceptance rows can bind to them (from the S1 design note, reviewed by Jared on 2026-11-11). Each form that returns a new array stays as a thin wrapper over its caller-buffer form.
+    - `Modes.EcbEncrypt(AesKey k, byte[] input, int inOffset, int count, byte[] output, int outOffset)`, and `EcbDecrypt` with the same parameters.
+    - `Modes.CbcEncrypt(AesKey k, byte[] iv, int ivOffset, byte[] input, int inOffset, int count, byte[] output, int outOffset)`, and `CbcDecrypt` with the same parameters.
+    - `Modes.Ctr(AesKey k, byte[] counter, int counterOffset, byte[] input, int inOffset, int count, byte[] output, int outOffset)`.
+    - `public sealed class CbcChain` and `public sealed class CtrCounter`: the running state of a streamed CBC or CTR message. Each has `Init(byte[] b, int offset)` for each message and `Clear()` at its end. A call on an object that is empty or ended throws. CBC and CTR have overloads that take one of them in place of the iv or the counter. A streamed call takes whole blocks; a partial block ends the object.
+    - `Cmac.Compute(AesKey k, byte[] message, int offset, int count, byte[] tag, int tagOffset)` and `bool Cmac.Verify(AesKey k, byte[] message, int offset, int count, byte[] tag, int tagOffset)`.
+    - `public sealed class CmacKey`, constructor `CmacKey(AesKey key)`: immutable, with the two subkeys made one time, and with `Compute` and `Verify` of the same parameters without the key.
+    - `GcmKey`, caller-buffer forms: `void Seal(byte[] nonce, int nonceOffset, byte[] aad, int aadOffset, int aadCount, byte[] input, int inOffset, int count, byte[] output, int outOffset)` writes the ciphertext and then the 16-byte tag, so the output range is `count + 16`. `bool TryOpen(...)` has the same parameters; its `count` includes the tag, and its output range is `count - 16`.
+    - GCM nonce: 12 bytes in every form. The caller-buffer forms read 12 bytes at `nonceOffset` and refuse a shorter range with the machine code `GCM_NONCE_LENGTH`. The forms that return a new array refuse a length other than 12 as the 5c5d4a4 code does.
+    - A refused overlap (rule 7.1.9) throws `NetSecException` with the machine code `ARG_RANGES_OVERLAP`.
+    - `Tls13Records` holds a `GcmKey` and one 12-byte nonce buffer that it uses again. Its contract is one direction and one thread, stated in a comment and held by a test.
+16. S1 tradeoffs on record: the static `Gcm.Seal` and `Gcm.TryOpen` build a `GcmKey` on each call and get a byte budget; `Cmac.Compute` with no `CmacKey` does one extra AES block for each message and allocates 0 bytes; `GcmKey.TryOpen` makes a second pass over the ciphertext, because it checks the tag before it decrypts.
 
 ### 7.4 Zero-garbage rules (ordered by Steve on 2026-11-11)
 
