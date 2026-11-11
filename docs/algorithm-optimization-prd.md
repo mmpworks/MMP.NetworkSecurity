@@ -35,6 +35,7 @@ Echo writes these. Builders never write `acceptance/`.
 | AO-6 | Speed. Baseline at 5c5d4a4 and the new code, same machine, same run. | the report shows both numbers; AES target is 5 times baseline or better. The report line "CF ARM speed: UNMEASURED" stays until a run on a CE device exists |
 | AO-7 | The lesson walks still agree with the product path. | no `AES_WALK_DIVERGED`; golden files unchanged. The byte-level helpers the walk uses today move into `AesKey.Walk.cs` unchanged. The walk calls word-path code only through `EncryptBlock` and `DecryptBlock` for the last compare |
 | AO-8 | The CF build compiles, and the CF golden labs pass. | gate green |
+| AO-9 | File benchmark (ordered by Steve on 2026-11-11). Real files go through the frozen 5c5d4a4 code and the new code in one run: seal and open with GCM, encrypt and decrypt with CBC and CTR, SHA-256 and HMAC. Each row records time, bytes allocated, peak memory and garbage collection counts. | the output bytes of the two codes are equal for each file; the report shows both number sets side by side; section 3.3 gives the rules |
 
 Limit of the anchor: AO-2 uses our own old code as the reference. AO-1 (public vectors) is the independent check.
 
@@ -52,10 +53,22 @@ Limit of the anchor: AO-2 uses our own old code as the reference. AO-1 (public v
 10. A share of cases starts near the counter limits: CTR at all-FF, the GCM 32-bit counter wrap, and GCM nonces with a length other than 12.
 11. Each hash case runs once whole and once in random chunk splits, with 0-byte updates and splits at 63, 64, 65, 127, 128 and 129. A mid-stream `Clone()` continues as two separate states. HMAC keys longer than the block and HKDF output up to the limit are included.
 12. AO-4 runs in its own process, because the pool cap is for the whole process. AO-4 uses a fresh key object for each run, and the first call to each method occurs from many workers at the same time. One callback calls back into the same key. All modes, GCM and HMAC on shared keys are mixed in one run. The check asserts the result of `ThreadPool.SetMaxThreads(25, 25)` and prints the cap it got.
-13. AO-3 reads NOT RUN, PRODUCT_MISSING for each table until S1. After S1, a second row fails if table-building code runs at start-up.
+13. AO-3 has two kinds of row. A table row compares a table with the math. A start-up row fails when table-building code runs at start-up. Section 4.3 gives the state of each row before S1.
 14. Each run records its seed and prints it in the report. A failed case prints the seed and the case number.
 15. AO-2 runs on .NET 10 with the net10 binaries, and on .NET Framework 4.8 with the CF binaries. The second referee (rule 2) runs on .NET 10 only. After S6, the .NET 10 run covers the portable path and the hardware path (rule 7.1.13).
 16. AO-4 matches each result to its payload by a payload ID, because the pool does not keep order.
+
+### 3.3 File benchmark rules (AO-9)
+
+1. The test files are in the repository, in one folder, with a list that gives each file's name, size and SHA-256. The run fails when a file differs from the list.
+2. The set has one file of each kind: a PDF, a PNG image, a plain text file, a CSV file, a JSON file, a small binary file of 1 KB, and one large file of 4 MB or more. Small and large sizes are both present, because a pump message is small and a document is large.
+3. Each file is made by us or is already in this repository under its licence (for example a PNG from `docs/screens`). A script makes the PDF, the CSV and the large file from a fixed seed. No file comes from a third party.
+4. For each file and each operation, the run measures the frozen 5c5d4a4 code and the new code in the same process, on the same machine, after a warm-up. It gives the median of 15 runs or more, and the spread.
+5. Each row records: megabytes for each second, bytes allocated for each call, peak working set, and the count of generation 0, 1 and 2 collections.
+6. The run also records the cost for a small message: time and bytes for one key setup plus one 64-byte seal.
+7. The same measurement runs with the CF binaries on .NET Framework 4.8, as a second desktop number. CF ARM speed stays UNMEASURED.
+8. A second measurement repeats the run with 25 pool threads that share one key, and records total megabytes for each second and peak memory.
+9. The report is one file in `docs/_runs/`, with one table: file, operation, original, new, ratio. A styled page for Steve shows the same numbers.
 
 ### 3.2 Limits of the anchor
 
@@ -65,7 +78,38 @@ Limit of the anchor: AO-2 uses our own old code as the reference. AO-1 (public v
 
 ## 4. Kill condition
 
-The work ends when slices S0 to S4 each show AO-1 to AO-8 green on one head of `Algorithm-Optimization`, with the numbers in `docs/_runs/`. Target date: 2026-11-17. Slice S5 has its own go or stop decision.
+The work ends when one head of `Algorithm-Optimization` shows the result below after slices S1 to S4, with the numbers in `docs/_runs/`. Target date: 2026-11-17. Slices S5, S6 and S7 are outside the kill condition, and each has its own go or stop decision.
+
+### 4.1 The row list
+
+1. Echo owns one row list in `acceptance/`. It has one line for each AO row ID, with no wildcards.
+2. Each line has 4 fields: the row ID, the state before its slice, the reason code of that state, and the slice from which the row is PASS.
+3. The state text is the text the harness prints, for example `PASS`, `FAIL` or `NOT RUN, PRODUCT_MISSING`.
+4. A check in the suite compares each run with the row list. It needs the current slice as an input. The report gives N of M rows, and M is the number of lines in the row list.
+
+### 4.2 The rule
+
+1. Before its slice, a row shows the state and the reason code in the row list.
+2. From its slice on, a row shows PASS.
+3. Any other state, at any time, is a red. A FAIL with a different reason code is a red. A row in the run that is not in the list is a red. A row in the list that is not in the run is a red.
+
+### 4.3 What the list must contain
+
+| Rows | Before the slice | PASS from |
+|------|------------------|-----------|
+| AO-3 row for AES tables built at start-up | FAIL, reason: static constructor present (fact 1) | S1 |
+| AO-3 rows for the GHASH table | NOT RUN, no table exists | S1 |
+| AO-5 rows for AES and modes | FAIL, reason: bytes allocated for each block (fact 2) | S1 |
+| AO-5 rows for hash blocks and HMAC | the state the first S0 run shows, with its reason code | S3 |
+| AO-4 rows for the payload worker | NOT RUN, PRODUCT_MISSING | S2 |
+| AO-7 row for the walk helpers | FAIL, reason: `AesKey.Walk.cs` calls a helper in `AesKey.cs` | S1 |
+| AO-3 rows for hash and DES tables | NOT RUN, PRODUCT_MISSING | S3 and S4 |
+| AO-2 row for the hardware path on .NET 10 | NOT RUN, PRODUCT_MISSING | S6, outside the kill condition; it reads NOT RUN at the kill head |
+| Rows for the big-number paths | NOT RUN, PRODUCT_MISSING | S5, outside the kill condition; they read NOT RUN at the kill head |
+
+AO-6 and AO-9 are records at S0: the run stores the baseline numbers and judges nothing. From S1, the AO-9 report compares the frozen code with the new code. The AES target of 5 times baseline is judged from S1.
+
+S0 is done when the row-list check reads M of M for slice S0.
 
 ## 5. Non-goals
 
@@ -120,7 +164,7 @@ The S0 benchmark list includes AES key setup (both schedules). The row for the C
 ### 7.3 Types and signatures to confirm in S0 (hypothesis)
 
 1. `AesKey.EncryptBlock(byte[] i, int io, byte[] o, int oo)` and `DecryptBlock` keep their signatures. The constructor builds the plain key schedule (the walk reads it) and the decrypt schedule.
-2. `GcmKey` (immutable): holds an `AesKey` and the GHASH table. The static `Gcm` methods stay as wrappers.
+2. `GcmKey` (immutable): holds an `AesKey` and the GHASH table. Its methods have the names and parameters of the static `Gcm` methods, without the key: `byte[] Seal(byte[] nonce, byte[] aad, byte[] plain)` and `bool TryOpen(byte[] nonce, byte[] aad, byte[] sealedBytes, out byte[] plain)`. The static `Gcm` methods stay as wrappers.
 3. `HmacKey` (immutable): holds the inner and outer padded hash states. `IHash` keeps `Clone()` as its state copy. `Hmac.Compute` stays as a wrapper.
 4. `AesPayloadWorker(GcmKey key, int maxQueued)`. `bool TryEncode(int id, byte[] nonce, byte[] plain, Action<PayloadResult> done)` and `bool TryDecode(int id, byte[] wire, Action<PayloadResult> done)`. `PayloadResult` carries the ID, the bytes, or a machine error code.
 5. The worker catches each exception on the pool thread and reports it through `PayloadResult`. An exception that leaves a pool thread ends the process.
