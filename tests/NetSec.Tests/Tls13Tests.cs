@@ -572,14 +572,17 @@ namespace NetSec.Tests
 
         /// <summary>
         /// A gate that holds no event, yet lets each one pass late, as a step does when its continuation runs late on a busy thread pool (issue #394).
-        /// IsHolding stays false, so only the pumps' own state can say the session is not quiet.
+        /// IsHolding stays false, so only the pumps' own state can say the session is not quiet. Like StepGate, it shares that state through GateMembers.
         /// </summary>
-        sealed class LateGate : IStepGate, IGateState
+        sealed class LateGate : IStepGate, IGateState, IGateActivity
         {
             readonly int _lateMs;
+            readonly GateMembers _members = new GateMembers();
             public LateGate(int lateMs) { _lateMs = lateMs; }
             public IFuture Pass(TraceEvent e) { return Futures.Delay(_lateMs); }
             public bool IsHolding { get { return false; } }
+            public void Join(GateWork busy) { _members.Join(busy); }
+            public bool AnyBusy { get { return _members.AnyBusy; } }
         }
 
         /// <summary>
