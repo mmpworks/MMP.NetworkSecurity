@@ -66,7 +66,7 @@ static class FileBench
         Measure.PreWarm(Ops(o).Select(op =>
         {
             byte[] x = op.Input(smallest);
-            return ((Action)(() => Sink = op.Call(o, x)), (Action)(() => Sink = op.Call(n, x)));
+            return new Action[] { () => Sink = op.Call(o, x), () => Sink = op.Call(n, x) };
         }).ToList(), Program.PreWarmEach);
         List<FileRow> rows = new List<FileRow>();
         foreach (TestFile f in files)

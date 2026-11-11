@@ -1,0 +1,11 @@
+<Project Sdk="Microsoft.NET.Sdk">
+
+  <!-- The CLR 2.0 block bench as a 32-bit process (closer to the ARM32 word size of a CE device). bench/Clr2.X64 is the 64-bit twin. -->
+
+  <PropertyGroup>
+    <PlatformTarget>x86</PlatformTarget>
+  </PropertyGroup>
+
+  <Import Project="Clr2.props" />
+
+</Project>
