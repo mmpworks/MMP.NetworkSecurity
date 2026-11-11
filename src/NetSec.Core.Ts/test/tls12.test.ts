@@ -10,7 +10,7 @@
 import { describe, test } from 'node:test'
 import assert from 'node:assert/strict'
 import { readFileSync } from 'node:fs'
-import { constants, createHash, createHmac, createPrivateKey, privateDecrypt, randomBytes } from 'node:crypto'
+import { constants, createCipheriv, createHash, createHmac, createPrivateKey, privateDecrypt, randomBytes } from 'node:crypto'
 import { bytesToHex, hexToBytes } from '../src/hash.ts'
 import { GcmError } from '../src/gcm.ts'
 import { TlsParseError } from '../src/tls13.ts'
@@ -156,6 +156,20 @@ describe('the key block opens the encrypted Finished records of the capture', ()
   test('the server record: server_write_key and server_write_IV give the server Finished', () => {
     const rec = openRecord12(kb.serverWriteKey, kb.serverWriteIv, 0, B('server_finished_record'))
     assert.equal(bytesToHex(rec.plaintext), V.server_finished)
+  })
+  test('a record that node:crypto seals at record number 258 opens, and a bad record number is refused', () => {
+    // 258 = 0x0102, so 2 bytes of the sequence number are in use.
+    const plaintext = Buffer.from('record number two hundred fifty-eight')
+    const explicit = Buffer.from('0000000000000102', 'hex')
+    const aad = Buffer.concat([explicit, Buffer.from('170303', 'hex'), Buffer.from([0, plaintext.length])])
+    const c = createCipheriv('aes-128-gcm', kb.clientWriteKey, Buffer.concat([Buffer.from(kb.clientWriteIv), explicit]))
+    c.setAAD(aad)
+    const body = Buffer.concat([explicit, c.update(plaintext), c.final(), c.getAuthTag()])
+    const record = Buffer.concat([Buffer.from('170303', 'hex'), Buffer.from([0, body.length]), body])
+    assert.equal(Buffer.from(openRecord12(kb.clientWriteKey, kb.clientWriteIv, 258, record).plaintext).toString(), plaintext.toString())
+    for (const bad of [-1, 1.5, Number.NaN]) {
+      assert.throws(() => openRecord12(kb.clientWriteKey, kb.clientWriteIv, bad, record), TlsParseError)
+    }
   })
   test('the trace has the same 4 values as the key block', () => {
     assert.equal(id('key_block'), bytesToHex(kb.block))

@@ -266,6 +266,7 @@ export function parseHandshake12(message: ArrayLike<number>): ParsedHandshake {
       const suites = new Reader(r.vec(2))
       const names: string[] = []
       while (suites.left >= 2) names.push(suiteName(suites.uint(2)))
+      if (suites.left !== 0) throw new TlsParseError('The cipher suite list has an odd number of bytes.')
       field('cipher_suites', s, names.join(', '))
       s = r.pos
       r.vec(1)
@@ -344,6 +345,7 @@ export function openRecord12(key: ArrayLike<number>, writeIv: ArrayLike<number>,
   const all = Uint8Array.from(record)
   if (all.length < 5 + 8 + 16) throw new TlsParseError('The record is too short.')
   if (writeIv.length !== FIXED_IV_LEN) throw new TlsParseError('The write IV of an AES-GCM suite has 4 bytes.')
+  if (!Number.isSafeInteger(sequence) || sequence < 0) throw new TlsParseError('The record sequence number must be a whole number, 0 or more.')
   const header = all.slice(0, 5)
   if (header[3] * 256 + header[4] !== all.length - 5) throw new TlsParseError('The length in the record header does not match the size of the record.')
   const explicitNonce = all.slice(5, 13)

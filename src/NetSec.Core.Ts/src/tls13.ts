@@ -579,6 +579,7 @@ export function openRecord13(key: ArrayLike<number>, iv: ArrayLike<number>, sequ
   const header = all.slice(0, 5)
   const size = header[3] * 256 + header[4]
   if (size !== all.length - 5) throw new TlsParseError('The length in the record header does not match the size of the record.')
+  if (!Number.isSafeInteger(sequence) || sequence < 0) throw new TlsParseError('The record sequence number must be a whole number, 0 or more.')
   const nonce = Uint8Array.from(iv)
   let seq = sequence
   for (let i = nonce.length - 1; i >= 0 && seq > 0; i -= 1) {
