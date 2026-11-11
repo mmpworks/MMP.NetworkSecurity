@@ -27,7 +27,7 @@ static class Program
     sealed class Case
     {
         public string Id;
-        public int Units;
+        public int Units, Payload;   // payload bytes per call, for GC collections per MB (0 for key setup)
         public Action Original, New;
     }
 
@@ -58,6 +58,13 @@ static class Program
             Console.WriteLine(string.Format(Inv, "{0,-22} original {1,10:F1} new {2,10:F1} ns per unit  ratio {3:F3} ({4:F3} to {5:F3})  original {6,8:F1} new {7,8:F1} B per unit",
                 c.Id, p.Original.MedianNs / c.Units, p.New.MedianNs / c.Units, p.MedianRatio, p.Ratios.Min(), p.Ratios.Max(),
                 BytesPerCall(c.Original) / c.Units, BytesPerCall(c.New) / c.Units));
+            if (c.Payload > 0)
+            {
+                // Steve's measure: garbage collections per megabyte processed, over the timed rounds of each copy.
+                double mb = (double)p.CallsPerRound * Measure.Rounds * c.Payload / 1048576.0;
+                Console.WriteLine(string.Format(Inv, "  GC per MB  {0,-22} original gen0 {1:F3} gen1 {2:F4} gen2 {3:F4}   new gen0 {4:F3} gen1 {5:F4} gen2 {6:F4}   ({7:F1} MB per copy)",
+                    c.Id, p.Original.Gen0 / mb, p.Original.Gen1 / mb, p.Original.Gen2 / mb, p.New.Gen0 / mb, p.New.Gen1 / mb, p.New.Gen2 / mb, mb));
+            }
         }
         Console.WriteLine("BENCH_NOISE " + NoiseBand.Describe(ratios.ToArray()));
         Console.WriteLine("CF ARM speed: UNMEASURED");
@@ -68,20 +75,20 @@ static class Program
 
     static List<Case> All(IBlockCases o, IBlockCases n) => new List<Case>
     {
-        New("aes128.encrypt-block", 1, x => x.AesEncryptBlock(Key(16), Block(), new byte[16]), o, n),
-        New("aes128.decrypt-block", 1, x => x.AesDecryptBlock(Key(16), Block(), new byte[16]), o, n),
-        New("aes128.key-setup", 1, x => x.AesKeySetup(Key(16)), o, n),
-        New("aes128.cbc-encrypt", 64, x => x.CbcEncrypt(Key(16), new byte[16], Msg()), o, n),
-        New("aes128.ctr", 64, x => x.Ctr(Key(16), new byte[16], Msg()), o, n),
-        New("aes128.gcm-seal", 64, x => x.GcmSeal(Key(16), new byte[12], new byte[0], Msg()), o, n),
-        New("aes128.cmac", 64, x => x.Cmac(Key(16), Msg()), o, n),
-        New("sha256.update", 64, x => x.HashUpdate("sha256", 64), o, n),
-        New("hmac-sha256", 1, x => x.HmacSha256(Key(32), Msg()), o, n),
-        New("tdes.encrypt-block", 1, x => x.TdesEncryptBlock(Key(24), Block(), new byte[16]), o, n),
+        New("aes128.encrypt-block", 1, 16, x => x.AesEncryptBlock(Key(16), Block(), new byte[16]), o, n),
+        New("aes128.decrypt-block", 1, 16, x => x.AesDecryptBlock(Key(16), Block(), new byte[16]), o, n),
+        New("aes128.key-setup", 1, 0, x => x.AesKeySetup(Key(16)), o, n),
+        New("aes128.cbc-encrypt", 64, 1024, x => x.CbcEncrypt(Key(16), new byte[16], Msg()), o, n),
+        New("aes128.ctr", 64, 1024, x => x.Ctr(Key(16), new byte[16], Msg()), o, n),
+        New("aes128.gcm-seal", 64, 1024, x => x.GcmSeal(Key(16), new byte[12], new byte[0], Msg()), o, n),
+        New("aes128.cmac", 64, 1024, x => x.Cmac(Key(16), Msg()), o, n),
+        New("sha256.update", 64, 4096, x => x.HashUpdate("sha256", 64), o, n),
+        New("hmac-sha256", 1, 1024, x => x.HmacSha256(Key(32), Msg()), o, n),
+        New("tdes.encrypt-block", 1, 8, x => x.TdesEncryptBlock(Key(24), Block(), new byte[16]), o, n),
     };
 
-    static Case New(string id, int units, Func<IBlockCases, Action> make, IBlockCases o, IBlockCases n) =>
-        new Case { Id = id, Units = units, Original = make(o), New = make(n) };
+    static Case New(string id, int units, int payload, Func<IBlockCases, Action> make, IBlockCases o, IBlockCases n) =>
+        new Case { Id = id, Units = units, Payload = payload, Original = make(o), New = make(n) };
 
     /// <summary>
     /// Bytes per call from GC.GetTotalMemory after a forced collection, around a call count small enough that no gen-0 collection runs
