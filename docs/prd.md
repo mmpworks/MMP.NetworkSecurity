@@ -149,6 +149,8 @@ Cut order if time runs out: passkey and capabilities; glass TLS 1.3 server role;
 ## Licence checklist
 
 1. Keep X9 vectors behind a fetch script with SHA-256 and provenance.
+   2026-11-11: Steve decided to commit the X9.24-3 vector values (`acceptance/vectors/x9-24-3-aes-dukpt.nsv`). The file holds only the inputs and expected outputs the clauses read, with a source line per group, the ASC X9 attribution and a non-endorsement line. The PDF, its text and its internal-state traces stay out of git. `fetch-x9.ps1` stays as the second check (`SELF.x9-vectors-true-copy`).
+   Dave recommended this middle route, and an IP attorney review before it is adopted. Steve accepted the risk of committing before that review. Dave's memo is guidance from an in-house advisor, not legal advice.
 2. Keep CF references out of the repo. A9 checks this.
 3. Add third-party notices for Electron and Chromium.
 4. Draw our own picture for the ECB lab.

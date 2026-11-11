@@ -6,7 +6,8 @@ namespace Acceptance
     /// <summary>
     /// A3: AES DUKPT matches the ANSI X9.24-3-2017 published vectors for AES-128 and AES-256 base keys,
     /// the PIN pad and the bank agree for 1,000 sales, and used keys are absent from PIN-pad state.
-    /// Vectors: acceptance/vectors/x9-24-3-aes-dukpt.nsv (fetch-x9.ps1 + extract_x9.py, source hash in sources.lock.json).
+    /// Vectors: acceptance/vectors/x9-24-3-aes-dukpt.nsv, committed (made by extract_x9.py from the PDF that fetch-x9.ps1 downloads; source hash in
+    /// sources.lock.json). SELF.x9-vectors-true-copy compares the committed file with a fresh extraction when the PDF is in vectors/_cache.
     /// The tour statement about the managed heap is checked by checks/a3_tour_statement.py.
     /// </summary>
     public static class DukptClauses
