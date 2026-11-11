@@ -21,7 +21,7 @@ const ascii = (s: string): Uint8Array => Uint8Array.from(s, (c) => c.charCodeAt(
 export function pSha256(secret: ArrayLike<number>, seed: ArrayLike<number>, length: number): Uint8Array {
   const s = Uint8Array.from(seed)
   const out = new Uint8Array(length)
-  let a = s
+  let a: Uint8Array = s
   for (let at = 0; at < length; at += 32) {
     a = hmacSha256(secret, a)
     out.set(hmacSha256(secret, concatBytes(a, s)).subarray(0, Math.min(32, length - at)), at)
