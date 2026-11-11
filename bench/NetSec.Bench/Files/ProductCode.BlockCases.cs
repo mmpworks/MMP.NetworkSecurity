@@ -46,6 +46,13 @@ sealed partial class ProductCode : IBlockCases
         };
     }
 
+    public Action HashUpdate(string name, int blocks)
+    {
+        IHash h = MakeHash(name)();
+        byte[] data = new byte[blocks * h.BlockSize];
+        return () => h.Update(data, 0, data.Length);
+    }
+
     public int HashBlockSize(string name) => MakeHash(name)().BlockSize;
 
     public Action Shake128(byte[] message, int outputBytes) => () =>

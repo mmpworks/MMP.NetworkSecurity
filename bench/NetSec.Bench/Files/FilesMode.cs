@@ -35,6 +35,7 @@ static class FilesMode
         FileRow small = FileBench.SmallMessage(original, current, print);
         List<FileRow> rows = fileRows.Concat(new[] { small }).ToList();
         TestFile threadFile = files.First(f => f.Name == ThreadFile);
+        Measure.Unpin();
         List<ThreadRow> threads = new[] { original, current, current, original }.Select(c => FileBench.Threads(threadFile, c, PoolThreads, 8)).ToList();
         foreach (ThreadRow t in threads) Console.WriteLine("BENCH_THREADS " + t.Code + " " + t.TotalMegabytesPerSecond.ToString("F1", CultureInfo.InvariantCulture) + " MB/s, mismatches " + t.Mismatches + "; " + t.PoolCap);
 
