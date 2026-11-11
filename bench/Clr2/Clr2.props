@@ -1,0 +1,39 @@
+<Project>
+
+  <!-- Shared by the two CLR 2.0 hosts (bench/Clr2 for x86, bench/Clr2.X64 for x64). Each host lives in its own folder, so each has its
+       own obj/ and its own generated AssemblyInfo. The hosts are net35 and load the CF-built NetSec.Core, MMP.AsyncProxy and frozen copy
+       by HintPath, so both columns are CF binaries on the .NET Framework 3.5 desktop runtime (CLR 2.0). -->
+
+  <PropertyGroup>
+    <OutputType>Exe</OutputType>
+    <TargetFramework>net35</TargetFramework>
+    <LangVersion>latest</LangVersion>
+    <IsPackable>false</IsPackable>
+    <RootNamespace>NetSec.Bench</RootNamespace>
+    <AssemblyName>NetSec.Bench.Clr2</AssemblyName>
+    <NoWarn>$(NoWarn);CS1685</NoWarn>
+    <Optimize>true</Optimize>
+    <EnableDefaultCompileItems>false</EnableDefaultCompileItems>
+  </PropertyGroup>
+
+  <ItemGroup>
+    <PackageReference Include="Microsoft.NETFramework.ReferenceAssemblies" Version="1.0.3" PrivateAssets="all" />
+    <ProjectReference Include="$(MSBuildThisFileDirectory)..\..\src\NetSec.Core.NetCF\NetSec.Core.NetCF.csproj" ReferenceOutputAssembly="false" SetTargetFramework="TargetFramework=net35" />
+    <ProjectReference Include="$(MSBuildThisFileDirectory)..\Frozen.NetCF\NetSec.Bench.Frozen.NetCF.csproj" ReferenceOutputAssembly="false" SetTargetFramework="TargetFramework=net35" />
+    <Reference Include="NetSec.Core"><HintPath>$(MSBuildThisFileDirectory)..\..\src\NetSec.Core.NetCF\bin\$(Configuration)\net35\NetSec.Core.dll</HintPath><Private>true</Private></Reference>
+    <Reference Include="MMP.AsyncProxy"><HintPath>$(MSBuildThisFileDirectory)..\..\src\NetSec.Core.NetCF\bin\$(Configuration)\net35\MMP.AsyncProxy.dll</HintPath><Private>true</Private></Reference>
+    <Reference Include="Acceptance.Frozen"><HintPath>$(MSBuildThisFileDirectory)..\Frozen.NetCF\bin\$(Configuration)\net35\Acceptance.Frozen.dll</HintPath><Private>true</Private></Reference>
+  </ItemGroup>
+
+  <ItemGroup>
+    <Compile Include="$(MSBuildThisFileDirectory)Program.cs" Link="Program.cs" />
+    <Compile Include="$(MSBuildThisFileDirectory)..\NetSec.Bench\Measure.cs" Link="Shared\Measure.cs" />
+    <Compile Include="$(MSBuildThisFileDirectory)..\NetSec.Bench\CoreMap.cs" Link="Shared\CoreMap.cs" />
+    <Compile Include="$(MSBuildThisFileDirectory)..\NetSec.Bench\IBlockCases.cs" Link="Shared\IBlockCases.cs" />
+    <Compile Include="$(MSBuildThisFileDirectory)..\NetSec.Bench\Files\CodeUnderTest.cs" Link="Shared\CodeUnderTest.cs" />
+    <Compile Include="$(MSBuildThisFileDirectory)..\NetSec.Bench\Files\FrozenCode.cs" Link="Shared\FrozenCode.cs" />
+    <Compile Include="$(MSBuildThisFileDirectory)..\NetSec.Bench\Files\ProductCode.BlockCases.cs" Link="Shared\ProductCode.BlockCases.cs" />
+    <Compile Include="$(MSBuildThisFileDirectory)..\NetSec.Bench\Files\FrozenCode.BlockCases.cs" Link="Shared\FrozenCode.BlockCases.cs" />
+  </ItemGroup>
+
+</Project>

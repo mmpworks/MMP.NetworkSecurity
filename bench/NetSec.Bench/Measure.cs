@@ -65,12 +65,12 @@ static class Measure
     /// after enough calls, and dynamic PGO rewrites it once more, so a case measured before both copies settle reads a ratio far from 1
     /// (0.22 in the first pair of the first case of a smoke run). Each call runs for <paramref name="each"/> on both copies.
     /// </summary>
-    public static void PreWarm(System.Collections.Generic.IEnumerable<(Action Original, Action New)> calls, TimeSpan each)
+    public static void PreWarm(System.Collections.Generic.IEnumerable<Action[]> calls, TimeSpan each)
     {
         foreach (var pair in calls)
         {
-            RunFor(pair.Original, each);
-            RunFor(pair.New, each);
+            RunFor(pair[0], each);
+            RunFor(pair[1], each);
         }
     }
 
@@ -165,7 +165,12 @@ static class Measure
 /// <summary>The runtime's own allocated-bytes counter. The two runtimes have different counters, so the report names the one it read.</summary>
 static class Allocated
 {
-#if NETFRAMEWORK
+#if NET35
+    // CLR 2.0 has no allocation counter. The CLR 2.0 host measures bytes in its own pass (GC.GetTotalMemory around a call count with no gen-0 collection).
+    public const string Method = "none in the timed rounds on CLR 2.0; bytes come from a separate GC.GetTotalMemory pass";
+
+    public static long Now() => 0;
+#elif NETFRAMEWORK
     static Allocated() { AppDomain.MonitoringIsEnabled = true; }
 
     // The AppDomain counter moves in allocation-context steps of several KB, so a per-call value is an average over many calls.
