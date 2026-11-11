@@ -9,7 +9,9 @@ import assert from 'node:assert/strict'
 import { readFileSync } from 'node:fs'
 import { bytesToHex, hexToBytes } from '../src/hash.ts'
 import { x25519, x25519Public } from '../src/x25519.ts'
-import { keySchedule, keyShareOf, parseHandshake, type Tls13Messages } from '../src/tls13.ts'
+import { keySchedule, keyShareOf, openRecord13, parseHandshake, type Tls13Messages } from '../src/tls13.ts'
+import { GcmError } from '../src/gcm.ts'
+import { RFC8448 } from '../src/rfc8448.ts'
 
 const text = readFileSync(new URL('../../../acceptance/vectors/tls13-rfc8448.nsv', import.meta.url), 'utf8')
 const V: Record<string, string> = {}
@@ -171,4 +173,53 @@ describe('what each value comes from (RFC 8446 section 7.1)', () => {
   for (const [id, from] of Object.entries(FROM)) {
     test(id, () => assert.deepEqual([...schedule.byId[id].from], from))
   }
+})
+
+// 5. The protected records of the RFC: the keys of the schedule open them with AES-GCM (gcm.ts).
+// The record bytes are in test/vectors/tls13-rfc8448-records.nsv (read from the RFC text by tools/extract-rfc8448-records.py).
+describe('the protected records of RFC 8448 section 3', () => {
+  const R: Record<string, string> = {}
+  for (const line of readFileSync(new URL('./vectors/tls13-rfc8448-records.nsv', import.meta.url), 'utf8').split(/\r?\n/)) {
+    const m = /^([a-z_0-9]+) = ([0-9a-f]*)$/.exec(line.trim())
+    if (m) R[m[1]] = m[2]
+  }
+  const RB = (k: string): Uint8Array => hexToBytes(R[k])
+  test('the records file holds 2 records and their payloads, and the generated rfc8448.ts holds the same records', () => {
+    assert.equal(Object.keys(R).length, 4)
+    assert.equal(R.client_finished_payload, V.client_finished)
+    assert.equal(RFC8448.serverFlightRecord, R.server_flight_record)
+    assert.equal(RFC8448.clientFinishedRecord, R.client_finished_record)
+  })
+  const key =(id: string): Uint8Array => schedule.byId[id].value
+  const codeOf = (fn: () => unknown): string => {
+    try {
+      fn()
+    } catch (e) {
+      return e instanceof GcmError ? e.code : `other: ${String(e)}`
+    }
+    return 'no error'
+  }
+
+  test('the server flight: s_hs_key and s_hs_iv, record 0, give EncryptedExtensions to Finished', () => {
+    const rec = openRecord13(key('s_hs_key'), key('s_hs_iv'), 0, RB('server_flight_record'))
+    assert.equal(bytesToHex(rec.content), R.server_flight_payload)
+    assert.equal(bytesToHex(rec.content), V.encrypted_extensions + V.certificate + V.certificate_verify + V.server_finished)
+    assert.equal(rec.contentType, 22)
+    assert.equal(bytesToHex(rec.header), '17030302a2')
+    assert.equal(bytesToHex(rec.nonce), V.s_hs_iv, 'record 0: the nonce is the IV')
+    assert.equal(rec.content.length, 657)
+  })
+  test('the client Finished record: c_hs_key and c_hs_iv, record 0, give the client Finished', () => {
+    const rec = openRecord13(key('c_hs_key'), key('c_hs_iv'), 0, RB('client_finished_record'))
+    assert.equal(bytesToHex(rec.content), V.client_finished)
+    assert.equal(rec.contentType, 22)
+  })
+  test('the application key, the wrong record number, and a changed header all fail the tag', () => {
+    assert.equal(codeOf(() => openRecord13(key('s_ap_key'), key('s_ap_iv'), 0, RB('server_flight_record'))), 'GCM_TAG_MISMATCH')
+    assert.equal(codeOf(() => openRecord13(key('s_hs_key'), key('s_hs_iv'), 1, RB('server_flight_record'))), 'GCM_TAG_MISMATCH')
+    assert.equal(codeOf(() => openRecord13(key('c_hs_key'), key('c_hs_iv'), 0, RB('server_flight_record'))), 'GCM_TAG_MISMATCH')
+    const changed = RB('client_finished_record')
+    changed[1] ^= 1
+    assert.equal(codeOf(() => openRecord13(key('c_hs_key'), key('c_hs_iv'), 0, changed)), 'GCM_TAG_MISMATCH')
+  })
 })

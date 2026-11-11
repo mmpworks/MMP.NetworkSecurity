@@ -1,7 +1,7 @@
 /**
  * The simple 1-RTT handshake of RFC 8448 section 3 (TLS_AES_128_GCM_SHA256, x25519), as hex.
  *
- * Made by tools/make-rfc8448.py from acceptance/vectors/tls13-rfc8448.nsv. Do not edit by hand.
+ * Made by tools/make-rfc8448.py from acceptance/vectors/tls13-rfc8448.nsv and test/vectors/tls13-rfc8448-records.nsv. Do not edit by hand.
  * RFC 8448 is by M. Thomson, 2019. The trace bytes are quoted from it under the IETF Trust terms.
  */
 export const RFC8448 = Object.freeze({
@@ -47,4 +47,23 @@ export const RFC8448 = Object.freeze({
     '14000020a8ec436d677634ae525ac1fcebe11a039ec17694fac6e98527b642f2edd5ce61',
   ticketNonce:
     '0000',
+  serverFlightRecord:
+    '17030302a2d1ff334a56f5bff6594a07cc87b580233f500f45e489e7f33af35edf7869fcf40aa40aa2b8ea73f848a7ca' +
+    '07612ef9f945cb960b4068905123ea78b111b429ba9191cd05d2a389280f526134aadc7fc78c4b729df828b5ecf7b13b' +
+    'd9aefb0e57f271585b8ea9bb355c7c79020716cfb9b1183ef3ab20e37d57a6b9d7477609aee6e122a4cf51427325250c' +
+    '7d0e509289444c9b3a648f1d71035d2ed65b0e3cdd0cbae8bf2d0b227812cbb360987255cc744110c453baa4fcd61092' +
+    '8d809810e4b7ed1a8fd991f06aa6248204797e36a6a73b70a2559c09ead686945ba246ab66e5edd8044b4c6de3fcf2a8' +
+    '9441ac66272fd8fb330ef8190579b3684596c960bd596eea520a56a8d650f563aad27409960dca63d3e688611ea5e22f' +
+    '4415cf9538d51a200c27034272968a264ed6540c84838d89f72c24461aad6d26f59ecaba9acbbb317b66d902f4f292a3' +
+    '6ac1b639c637ce343117b659622245317b49eeda0c6258f100d7d961ffb138647e92ea330faeea6dfa31c7a84dc3bd7e' +
+    '1b7a6c7178af36879018e3f252107f243d243dc7339d5684c8b0378bf30244da8c87c843f5e56eb4c5e8280a2b48052c' +
+    'f93b16499a66db7cca71e4599426f7d461e66f99882bd89fc50800becca62d6c74116dbd2972fda1fa80f85df881edbe' +
+    '5a37668936b335583b599186dc5c6918a396fa48a181d6b6fa4f9d62d513afbb992f2b992f67f8afe67f76913fa388cb' +
+    '5630c8ca01e0c65d11c66a1e2ac4c85977b7c7a6999bbf10dc35ae69f5515614636c0b9b68c19ed2e31c0b3b66763038' +
+    'ebba42f3b38edc0399f3a9f23faa63978c317fc9fa66a73f60f0504de93b5b845e275592c12335ee340bbc4fddd50278' +
+    '4016e4b3be7ef04dda49f4b440a30cb5d2af939828fd4ae3794e44f94df5a631ede42c1719bfdabf0253fe5175be898e' +
+    '750edc53370d2b',
+  clientFinishedRecord:
+    '170303003575ec4dc238cce60b298044a71e219c56cc77b0517fe9b93c7a4bfc44d87f38f80338ac98fc46deb384bd1c' +
+    'aeacab6867d726c40546',
 } as const)

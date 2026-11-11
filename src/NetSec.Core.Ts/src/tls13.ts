@@ -7,6 +7,7 @@
  * 3. Pure and frozen. No Node API. Practice use only.
  */
 import { HASH_LEN, concatBytes, deriveSecret, hkdfExpandLabel, hkdfExtract, hmacSha256, sha256 } from './hash.ts'
+import { gcmDecrypt } from './gcm.ts'
 
 /** The handshake messages of one connection, each with its 4-byte handshake header. */
 export interface Tls13Messages {
@@ -295,6 +296,8 @@ export const EXTENSION_TYPES: Readonly<Record<number, string>> = Object.freeze({
   19: 'client_certificate_type',
   20: 'server_certificate_type',
   21: 'padding',
+  22: 'encrypt_then_mac',
+  23: 'extended_master_secret',
   28: 'record_size_limit',
   35: 'session_ticket',
   41: 'pre_shared_key',
@@ -327,7 +330,7 @@ export class TlsParseError extends Error {
 }
 
 /** Reads numbers and byte runs from a message, in order. */
-class Reader {
+export class Reader {
   private at = 0
   private readonly b: Uint8Array
   constructor(b: Uint8Array) {
@@ -433,7 +436,8 @@ function describeExtension(type: number, data: Uint8Array, inServerHello: boolea
   return data.length === 0 ? 'no data' : data.length === 1 ? '1 byte' : `${data.length} bytes`
 }
 
-function readExtensions(r: Reader, base: number, inServerHello: boolean): Extension[] {
+/** Reads an extensions block: a 2-byte length, then each extension. `base` is the offset of the reader's first byte in the message. */
+export function readExtensions(r: Reader, base: number, inServerHello: boolean): Extension[] {
   const out: Extension[] = []
   const total = r.uint(2)
   const end = r.pos + total
@@ -545,6 +549,49 @@ export function parseHandshake(message: ArrayLike<number>): ParsedHandshake {
     fields: Object.freeze(fields.map((f) => Object.freeze(f))),
     extensions: Object.freeze(extensions),
   })
+}
+
+// ── A protected record ─────────────────────────────────────────────────────────
+
+/** One TLS 1.3 record, opened: each input of AES-GCM and what came out. */
+export interface OpenedRecord13 {
+  /** The 5-byte record header. It is the associated data. */
+  readonly header: Uint8Array
+  /** The write IV XOR the record number (RFC 8446 section 5.3). */
+  readonly nonce: Uint8Array
+  readonly ciphertext: Uint8Array
+  readonly tag: Uint8Array
+  /** The inner plaintext: the content, 1 byte of content type, then zero padding. */
+  readonly inner: Uint8Array
+  /** The content, with the type byte and the padding taken off. */
+  readonly content: Uint8Array
+  /** The real content type: 22 is handshake, 23 is application data, 21 is alert. */
+  readonly contentType: number
+}
+
+/**
+ * Opens one protected TLS 1.3 record with AES-GCM (RFC 8446 sections 5.2 and 5.3).
+ * `sequence` is the record number in its direction, from 0. A wrong key or a changed byte throws GcmError.
+ */
+export function openRecord13(key: ArrayLike<number>, iv: ArrayLike<number>, sequence: number, record: ArrayLike<number>): OpenedRecord13 {
+  const all = Uint8Array.from(record)
+  if (all.length < 5 + 16 + 1) throw new TlsParseError('The record is too short.')
+  const header = all.slice(0, 5)
+  const size = header[3] * 256 + header[4]
+  if (size !== all.length - 5) throw new TlsParseError('The length in the record header does not match the size of the record.')
+  const nonce = Uint8Array.from(iv)
+  let seq = sequence
+  for (let i = nonce.length - 1; i >= 0 && seq > 0; i -= 1) {
+    nonce[i] ^= seq % 256
+    seq = Math.floor(seq / 256)
+  }
+  const ciphertext = all.slice(5, all.length - 16)
+  const tag = all.slice(all.length - 16)
+  const inner = gcmDecrypt(key, nonce, ciphertext, tag, header)
+  let end = inner.length
+  while (end > 0 && inner[end - 1] === 0) end -= 1
+  if (end === 0) throw new TlsParseError('The record has no content type.')
+  return Object.freeze({ header, nonce, ciphertext, tag, inner, content: inner.slice(0, end - 1), contentType: inner[end - 1] })
 }
 
 /** The key_share public value of a ClientHello or ServerHello for a group, or null. */

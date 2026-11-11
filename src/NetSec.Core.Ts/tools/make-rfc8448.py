@@ -1,4 +1,4 @@
-"""Write src/rfc8448.ts from acceptance/vectors/tls13-rfc8448.nsv.
+"""Write src/rfc8448.ts from acceptance/vectors/tls13-rfc8448.nsv and test/vectors/tls13-rfc8448-records.nsv.
 
 The bytes go file to file: no value is typed by hand. Run from src/NetSec.Core.Ts:
     python -I tools/make-rfc8448.py
@@ -8,11 +8,13 @@ from pathlib import Path
 
 here = Path(__file__).resolve().parent.parent
 nsv = here.parent.parent / "acceptance" / "vectors" / "tls13-rfc8448.nsv"
+records = here / "test" / "vectors" / "tls13-rfc8448-records.nsv"
 values: dict[str, str] = {}
-for line in nsv.read_text(encoding="utf-8").splitlines():
-    m = re.match(r"^([a-z_0-9]+) = ([0-9a-f]*)$", line.strip())
-    if m:
-        values[m.group(1)] = m.group(2)
+for source in (nsv, records):
+    for line in source.read_text(encoding="utf-8").splitlines():
+        m = re.match(r"^([a-z_0-9]+) = ([0-9a-f]*)$", line.strip())
+        if m:
+            values[m.group(1)] = m.group(2)
 
 KEYS = [
     ("clientPrivate", "client_private"),
@@ -28,6 +30,9 @@ KEYS = [
     ("serverFinished", "server_finished"),
     ("clientFinished", "client_finished"),
     ("ticketNonce", "ticket_nonce"),
+    # From test/vectors/tls13-rfc8448-records.nsv: 2 protected records of the same trace.
+    ("serverFlightRecord", "server_flight_record"),
+    ("clientFinishedRecord", "client_finished_record"),
 ]
 
 
@@ -40,7 +45,7 @@ out = [
     "/**",
     " * The simple 1-RTT handshake of RFC 8448 section 3 (TLS_AES_128_GCM_SHA256, x25519), as hex.",
     " *",
-    " * Made by tools/make-rfc8448.py from acceptance/vectors/tls13-rfc8448.nsv. Do not edit by hand.",
+    " * Made by tools/make-rfc8448.py from acceptance/vectors/tls13-rfc8448.nsv and test/vectors/tls13-rfc8448-records.nsv. Do not edit by hand.",
     " * RFC 8448 is by M. Thomson, 2019. The trace bytes are quoted from it under the IETF Trust terms.",
     " */",
     "export const RFC8448 = Object.freeze({",

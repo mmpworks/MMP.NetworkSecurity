@@ -22,6 +22,13 @@ export { HASH_LEN, bytesToHex, concatBytes, deriveSecret, hexToBytes, hkdfExpand
 export { A24, BASE_U, P25519, X25519Error, clamp, decodeLittleEndian, decodeU, encodeU, ladderWalk, x25519, x25519Exchange, x25519Public } from './x25519.ts'
 export type { Clamp, LadderRow, LadderWalk, X25519Exchange, X25519SideWalk } from './x25519.ts'
 // TLS 1.3 key schedule and message reader, and the RFC 8448 trace.
-export { CIPHER_SUITES, EXTENSION_TYPES, HANDSHAKE_TYPES, NAMED_GROUPS, SIGNATURE_SCHEMES, TlsParseError, keySchedule, keyShareOf, parseHandshake, versionName } from './tls13.ts'
-export type { Extension, Field, KeySchedule, ParsedHandshake, SchedulePhase, ScheduleStep, Tls13Messages } from './tls13.ts'
+export { CIPHER_SUITES, EXTENSION_TYPES, HANDSHAKE_TYPES, NAMED_GROUPS, Reader, SIGNATURE_SCHEMES, TlsParseError, keySchedule, keyShareOf, openRecord13, parseHandshake, readExtensions, versionName } from './tls13.ts'
+export type { Extension, Field, KeySchedule, OpenedRecord13, ParsedHandshake, SchedulePhase, ScheduleStep, Tls13Messages } from './tls13.ts'
 export { RFC8448 } from './rfc8448.ts'
+// AES-GCM (SP 800-38D), with each value on the way.
+export { GcmError, gcmDecrypt, gcmEncrypt, gcmOpenParts, gcmParts, ghash } from './gcm.ts'
+export type { GcmErrorCode, GcmParts, GcmSealed } from './gcm.ts'
+// TLS 1.2 (RFC 5246): the PRF, the keys of an RSA key transport handshake, the message reader, and one OpenSSL capture.
+export { CIPHER_SUITES_12, HANDSHAKE_TYPES_12, MASTER_SECRET_LEN, VERIFY_DATA_LEN, encryptedPreMasterOf, helloRandom, keyBlock12, masterSecret12, openRecord12, pSha256, parseHandshake12, prf12, tls12Trace, verifyData12 } from './tls12.ts'
+export type { FinishedLabel12, KeyBlock12, OpenedRecord12, Tls12Messages, Tls12Phase, Tls12Step, Tls12Trace } from './tls12.ts'
+export { TLS12_CAPTURE } from './tls12capture.ts'
