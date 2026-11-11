@@ -197,8 +197,10 @@ The S0 benchmark list includes AES key setup (both schedules). The row for the C
     - `CbcChain` and `CtrCounter` have a public constructor with no parameters. A new object is empty until `Init`.
     - States: empty (new, or after `Clear`), ready (after `Init`), and ended (after a CTR partial block). `Init` is legal in every state and starts a new message.
     - A streamed call on an empty or ended object throws `InvalidOperationException`, as that type and no subtype. It has no machine code.
+    - A null `CbcChain` or `CtrCounter` throws `ArgumentNullException`.
+    - Order of the checks in a streamed call: the arguments first (null, range, CBC count, overlap), then the state of the object. A call with an argument fault on an empty or ended object throws the argument exception.
     - `Init(byte[] b, int offset)` checks its range as the other offset forms do: a null `b` throws `ArgumentNullException`, and fewer than 16 bytes from `offset` throws `ArgumentOutOfRangeException`, as that type and no subtype.
-    - A refused call (an overlap, or a CBC count that is not a multiple of 16) changes neither the state object nor the output. The object stays usable: the next correct call gives the same result as the same call on a new object after the same `Init`.
+    - A refused call (any argument fault, or a call on an empty or ended object) changes neither the state object nor the output. The object stays usable: the next correct call gives the same result as the same call on a new object after the same `Init`.
     - `Cmac.Compute(AesKey k, byte[] message, int offset, int count, byte[] tag, int tagOffset)` and `bool Cmac.Verify(AesKey k, byte[] message, int offset, int count, byte[] tag, int tagOffset)`.
     - `public sealed class CmacKey`, constructor `CmacKey(AesKey key)`: immutable, with the two subkeys made one time, and with `Compute` and `Verify` of the same parameters without the key.
     - `GcmKey`, caller-buffer forms: `void Seal(byte[] nonce, int nonceOffset, byte[] aad, int aadOffset, int aadCount, byte[] input, int inOffset, int count, byte[] output, int outOffset)` writes the ciphertext and then the 16-byte tag, so the output range is `count + 16`. `bool TryOpen(...)` has the same parameters; its `count` includes the tag, and its output range is `count - 16`.
