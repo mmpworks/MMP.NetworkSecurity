@@ -20,6 +20,9 @@ static class Program
 {
     const string CfLine = "CF ARM speed: UNMEASURED";
 
+    /// <summary>Warm-up time for each call on each copy before the first measurement (<see cref="Measure.PreWarm"/>).</summary>
+    public static readonly TimeSpan PreWarmEach = TimeSpan.FromMilliseconds(500);
+
     static int Main(string[] args)
     {
         Dictionary<string, string> a = ParseArgs(args);
@@ -36,6 +39,8 @@ static class Program
         string filter = a.TryGetValue("filter", out string f) ? f : "";
 
         List<BenchCase> original = Cases.All(new Files.FrozenCode()), current = Cases.All(new Files.ProductCode());
+        List<int> picked = Enumerable.Range(0, current.Count).Where(i => current[i].Id.Contains(filter)).ToList();
+        Measure.PreWarm(picked.Select(i => (original[i].Op, current[i].Op)), PreWarmEach);
         List<CaseResult> results = new List<CaseResult>();
         for (int i = 0; i < current.Count; i++)
         {
