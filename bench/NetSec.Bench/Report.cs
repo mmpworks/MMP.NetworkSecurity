@@ -7,37 +7,39 @@ using System.Text;
 namespace NetSec.Bench;
 
 /// <summary>
-/// Writes the results as JSON (for a check to read) and as Markdown (for a person). Both carry the provenance: the build, the head,
-/// the machine, the timing settings, the allocation counter, and the CF line. The JSON is written by hand because the net48 build has no
-/// JSON serializer in its base library, and this project adds no package.
+/// Writes the block results as JSON (for a check to read) and as Markdown (for a person). Both carry the provenance: the build, the head,
+/// the machine, the timing settings, the priority, the allocation counter, the same-code band, and the CF line. The JSON is written by hand
+/// because the net48 build has no JSON serializer in its base library, and this project adds no package.
 /// </summary>
 static class Report
 {
     static readonly CultureInfo Inv = CultureInfo.InvariantCulture;
+    public static readonly TimeSpan BlockRound = TimeSpan.FromMilliseconds(150);
 
-    public static string Json(string build, string head, IList<CaseResult> results, string cfLine)
+    public static string Json(Run run, IList<CaseResult> results)
     {
         StringBuilder s = new StringBuilder();
         s.Append("{\n");
-        Field(s, "schema", "netsec-bench/1");
-        Field(s, "build", build);
-        Field(s, "head", head);
+        Field(s, "schema", "netsec-bench/2");
+        Field(s, "build", run.Build);
+        Field(s, "head", run.Head);
         Field(s, "utc", DateTime.UtcNow.ToString("yyyy-MM-ddTHH:mm:ssZ", Inv));
         Field(s, "machine", Program.Machine());
         Field(s, "allocationCounter", Allocated.Method);
-        Field(s, "timing", Settings());
-        Field(s, "cfArm", cfLine);
+        Field(s, "timing", Settings(BlockRound));
+        Field(s, "priority", run.Priority);
+        Field(s, "noiseBand", NoiseBand.Describe(results.Select(r => r.Pair.MedianRatio).ToArray()));
+        Field(s, "cfArm", run.CfLine);
         s.Append("  \"cases\": [\n");
         for (int i = 0; i < results.Count; i++)
         {
             CaseResult r = results[i];
             s.Append("    {");
-            s.AppendFormat(Inv, "\"id\": {0}, \"unit\": {1}, \"unitsPerOp\": {2}, \"bytesPerOp\": {3}, ",
-                Quote(r.Case.Id), Quote(r.Case.Unit), r.Case.UnitsPerOp, r.Case.BytesPerOp);
-            s.AppendFormat(Inv, "\"nsPerUnit\": {0:F2}, \"bytesAllocatedPerUnit\": {1:F2}, \"bytesAllocatedPerOp\": {2:F2}, \"mbPerSecond\": {3:F2}, ",
-                r.MedianNsPerUnit, r.BytesAllocatedPerUnit, r.BytesAllocatedPerOp, r.MegabytesPerSecond);
-            s.AppendFormat(Inv, "\"opsPerRound\": {0}, \"nsPerOpRounds\": [{1}]", r.OpsPerRound,
-                string.Join(", ", r.NsPerOpRounds.Select(v => v.ToString("F2", Inv))));
+            s.AppendFormat(Inv, "\"id\": {0}, \"unit\": {1}, \"unitsPerOp\": {2}, \"bytesPerOp\": {3}, \"callsPerRound\": {4}, ",
+                Quote(r.Case.Id), Quote(r.Case.Unit), r.Case.UnitsPerOp, r.Case.BytesPerOp, r.Pair.CallsPerRound);
+            s.AppendFormat(Inv, "\"originalNsPerUnit\": {0:F2}, \"newNsPerUnit\": {1:F2}, \"ratio\": {2:F4}, \"originalBytesPerUnit\": {3:F2}, \"newBytesPerUnit\": {4:F2}, ",
+                r.OriginalNsPerUnit, r.NewNsPerUnit, r.Pair.MedianRatio, r.OriginalBytesPerUnit, r.NewBytesPerUnit);
+            s.AppendFormat(Inv, "\"ratioRounds\": [{0}]", string.Join(", ", r.Pair.Ratios.Select(v => v.ToString("F4", Inv))));
             s.Append(i + 1 < results.Count ? "},\n" : "}\n");
         }
         s.Append("  ]\n}\n");
@@ -48,16 +50,16 @@ static class Report
     /// The AO-5 and AO-6 rows of acceptance/ao-bench-schema.md: one AO-5 row (bytes per operation, product) and one AO-6 row (frozen and
     /// product ns per operation) for each case in <see cref="Cases.AoId"/>. Numbers only; the suite judges them. <see cref="AoParts"/> writes them.
     /// </summary>
-    public static List<string> AoBlockRows(IList<CaseResult> baseline, IList<CaseResult> results)
+    public static List<string> AoBlockRows(IList<CaseResult> results)
     {
         List<string> rows = new List<string>();
-        for (int i = 0; i < results.Count; i++)
+        foreach (CaseResult r in results)
         {
-            if (!Cases.AoId.TryGetValue(results[i].Case.Id, out var ao)) continue;
+            if (!Cases.AoId.TryGetValue(r.Case.Id, out var ao)) continue;
             if (ao.Row != "aes-key-setup")
-                rows.Add(string.Format(Inv, "{{ \"id\": \"AO-5.{0}.net10\", \"bytesPerOp\": {1:F2}, \"op\": {2} }}", ao.Row, results[i].BytesAllocatedPerUnit, Quote(ao.Op)));
+                rows.Add(string.Format(Inv, "{{ \"id\": \"AO-5.{0}.net10\", \"bytesPerOp\": {1:F2}, \"op\": {2} }}", ao.Row, r.NewBytesPerUnit, Quote(ao.Op)));
             rows.Add(string.Format(Inv, "{{ \"id\": \"AO-6.{0}.net10\", \"baselineNsPerOp\": {1:F2}, \"newNsPerOp\": {2:F2}, \"op\": {3} }}",
-                ao.Row, baseline[i].MedianNsPerUnit, results[i].MedianNsPerUnit, Quote(ao.Op)));
+                ao.Row, r.OriginalNsPerUnit, r.NewNsPerUnit, Quote(ao.Op)));
         }
         return rows;
     }
@@ -65,34 +67,41 @@ static class Report
     /// <summary>CPU name and logical processor count, as the schema asks. The machine name is left out, because the report is public.</summary>
     public static string Cpu() => (Environment.GetEnvironmentVariable("PROCESSOR_IDENTIFIER") ?? "unknown CPU") + "; " + Environment.ProcessorCount + " logical processors";
 
-    public static string Markdown(string build, string head, IList<CaseResult> baseline, IList<CaseResult> results, string cfLine)
+    /// <summary>The provenance lines both Markdown reports start with.</summary>
+    public static void Header(StringBuilder s, Run run, TimeSpan round, string noise)
+    {
+        s.AppendLine("- Head: `" + run.Head + "`");
+        s.AppendLine("- Machine: " + Program.Machine());
+        s.AppendLine("- Timing: " + Settings(round));
+        s.AppendLine("- Priority: " + run.Priority);
+        s.AppendLine("- Allocation counter: " + Allocated.Method + ". Allocated bytes and GC counts cover the timed rounds only.");
+        s.AppendLine("- Noise: " + noise);
+        s.AppendLine("- " + run.CfLine);
+        s.AppendLine();
+        s.AppendLine("Original is Echo's frozen 5c5d4a4 copy; new is the product at the head. Ratio is the median of the per-round-pair ratios "
+            + "(original ns over new ns), so above 1 means the new code is faster.");
+        s.AppendLine();
+    }
+
+    public static string Markdown(Run run, IList<CaseResult> results)
     {
         StringBuilder s = new StringBuilder();
-        s.AppendLine("# Benchmark: " + build);
+        s.AppendLine("# Benchmark: " + run.Build);
         s.AppendLine();
-        s.AppendLine("- Head: `" + head + "`");
-        s.AppendLine("- Machine: " + Program.Machine());
-        s.AppendLine("- Timing: " + Settings());
-        s.AppendLine("- Allocation counter: " + Allocated.Method);
-        s.AppendLine("- " + cfLine);
-        s.AppendLine();
-        s.AppendLine("Original is Echo's frozen 5c5d4a4 copy; new is the product at the head. Ratio is original ns over new ns, so above 1 means the new code is faster.");
-        s.AppendLine();
-        s.AppendLine("| Case | Unit | Original ns per unit | New ns per unit | Ratio | New spread of rounds | Original B per unit | New B per unit | New MB/s |");
-        s.AppendLine("|---|---|---:|---:|---:|---:|---:|---:|---:|");
-        for (int i = 0; i < results.Count; i++)
-        {
-            CaseResult o = baseline[i], r = results[i];
-            double lo = r.NsPerOpRounds.Min() / r.Case.UnitsPerOp, hi = r.NsPerOpRounds.Max() / r.Case.UnitsPerOp;
-            s.AppendLine(string.Format(Inv, "| `{0}` | {1} | {2:F1} | {3:F1} | {4:F2} | {5:F1} to {6:F1} | {7:F1} | {8:F1} | {9} |",
-                r.Case.Id, r.Case.Unit, o.MedianNsPerUnit, r.MedianNsPerUnit, o.MedianNsPerUnit / r.MedianNsPerUnit, lo, hi,
-                o.BytesAllocatedPerUnit, r.BytesAllocatedPerUnit, r.Case.BytesPerOp == 0 ? "n/a" : r.MegabytesPerSecond.ToString("F1", Inv)));
-        }
+        Header(s, run, BlockRound, NoiseBand.Describe(results.Select(r => r.Pair.MedianRatio).ToArray()));
+        s.AppendLine("| Case | Unit | Original ns per unit | New ns per unit | Ratio | Ratio spread of round pairs | New spread ns | Original B per unit | New B per unit | New MB/s |");
+        s.AppendLine("|---|---|---:|---:|---:|---:|---:|---:|---:|---:|");
+        foreach (CaseResult r in results)
+            s.AppendLine(string.Format(Inv, "| `{0}` | {1} | {2:F1} | {3:F1} | {4:F3} | {5:F3} to {6:F3} | {7:F1} to {8:F1} | {9:F1} | {10:F1} | {11} |",
+                r.Case.Id, r.Case.Unit, r.OriginalNsPerUnit, r.NewNsPerUnit, r.Pair.MedianRatio, r.Pair.Ratios.Min(), r.Pair.Ratios.Max(),
+                r.NewLowNsPerUnit, r.NewHighNsPerUnit, r.OriginalBytesPerUnit, r.NewBytesPerUnit,
+                r.Case.BytesPerOp == 0 ? "n/a" : r.NewMegabytesPerSecond.ToString("F1", Inv)));
         return s.ToString();
     }
 
-    static string Settings() => string.Format(Inv, "warm-up {0} ms, {1} rounds of about {2} ms, median round reported, Stopwatch {3} ticks/s",
-        Measure.WarmupTarget.TotalMilliseconds, Measure.Rounds, Measure.RoundTarget.TotalMilliseconds, System.Diagnostics.Stopwatch.Frequency);
+    public static string Settings(TimeSpan round) => string.Format(Inv,
+        "warm-up {0} ms per copy, then {1} round pairs of at least {2} ms per copy; original and new alternate (O,N then N,O); a full GC before each timed round; Stopwatch {3} ticks/s",
+        Measure.WarmTarget.TotalMilliseconds, Measure.Rounds, round.TotalMilliseconds, System.Diagnostics.Stopwatch.Frequency);
 
     static void Field(StringBuilder s, string name, string value) => s.Append("  ").Append(Quote(name)).Append(": ").Append(Quote(value)).Append(",\n");
 
@@ -107,4 +116,10 @@ static class Report
         }
         return q.Append('"').ToString();
     }
+}
+
+/// <summary>The facts of one bench process that every report names.</summary>
+sealed class Run
+{
+    public string Build, Head, Priority, CfLine;
 }
