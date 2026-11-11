@@ -38,6 +38,28 @@ Echo writes these. Builders never write `acceptance/`.
 
 Limit of the anchor: AO-2 uses our own old code as the reference. AO-1 (public vectors) is the independent check.
 
+### 3.1 Case rules for AO-2 and AO-4 (added 2026-11-10 after the test review)
+
+1. Scope of "each algorithm" in AO-2: AES block, ECB, CBC, CTR, GCM, CMAC, DES, TDES, MD5, SHA-1, SHA-256, SHA-512, SHA-3, SHAKE, HMAC, HKDF, the TLS PRFs, DUKPT derivation, PIN block. The count for RSA, P-256, 25519 and ML-KEM is set at S5.
+2. Second referee on .NET 10: `System.Security.Cryptography` runs the same cases where it has the algorithm. CMAC, DUKPT, PIN block and SHAKE have the frozen reference and the vectors only. The report says so.
+3. The frozen reference comes from a script that reads the files at 5c5d4a4 and changes only the namespace line. The check rebuilds the copy and fails on any byte difference.
+4. Aliasing is a case axis: separate arrays, the same array at the same offset, and the same array shifted by 1 to 15 bytes in each direction.
+5. Each output buffer has random guard bytes on both sides. A changed guard byte is a difference.
+6. Input, IV, nonce, AAD and key bytes are compared before and after each call.
+7. Invalid cases are part of the run (bad offset, bad length, key length 0, 15, 17, null). The exception type and machine code must match. A GCM open with a changed tag, AAD or ciphertext must return false with the same output state.
+8. Lengths are weighted to 0, 1, 15, 16, 17, 31, 32, 33 and block multiples plus or minus 1, then uniform to 4096 or more.
+9. AES key sizes 16, 24 and 32 are drawn equally. Decrypt of random ciphertext is compared with the reference.
+10. A share of cases starts near the counter limits: CTR at all-FF, the GCM 32-bit counter wrap, and GCM nonces with a length other than 12.
+11. Each hash case runs once whole and once in random chunk splits, with 0-byte updates and splits at 63, 64, 65, 127, 128 and 129. A mid-stream `Clone()` continues as two separate states. HMAC keys longer than the block and HKDF output up to the limit are included.
+12. AO-4 uses a fresh key object for each run, and the first call to each method occurs from many workers at the same time. One callback calls back into the same key. All modes, GCM and HMAC on shared keys are mixed in one run. The check asserts the result of `ThreadPool.SetMaxThreads(25, 25)` and prints the cap it got.
+13. AO-3 reads NOT RUN, PRODUCT_MISSING for each table until S1. After S1, a second row fails if table-building code runs at start-up.
+
+### 3.2 Limits of the anchor
+
+1. The "cf" build runs on the .NET Framework 4.8 desktop runtime in the gate. No check runs on the CF runtime or on a CE device. The CF JIT and the CF memory model are not covered.
+2. Big-endian targets are not covered.
+3. Timing leaks are not covered (non-goal 3).
+
 ## 4. Kill condition
 
 The work ends when slices S0 to S4 each show AO-1 to AO-8 green on one head of `Algorithm-Optimization`, with the numbers in `docs/_runs/`. Target date: 2026-11-17. Slice S5 has its own go or stop decision.
