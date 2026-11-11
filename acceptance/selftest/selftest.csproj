@@ -40,5 +40,8 @@
     <Compile Include="..\groups\a17\LessonKeysReferee.cs" Link="a17\LessonKeysReferee.cs" />
     <Compile Include="..\groups\a17\RepoClauses.cs" Link="a17\RepoClauses.cs" />
     <Compile Include="..\lib\Host\*.cs" Link="HostKit\%(Filename)%(Extension)" />
+    <!-- The AO checks (algorithm-optimization PRD section 3) with the frozen 5c5d4a4 reference; SelfAo.cs plants the faults. -->
+    <Compile Include="..\groups\algo\AoSide.cs;..\groups\algo\AoCases.cs;..\groups\algo\AoGrammar.cs;..\groups\algo\AoDiff.cs;..\groups\algo\AoThreads.cs;..\groups\algo\AoTables.cs;..\groups\algo\AoFiles.cs" Link="algo\%(Filename)%(Extension)" />
+    <Compile Include="..\groups\algo\Frozen\*.cs" Link="algo\Frozen\%(Filename)%(Extension)" />
   </ItemGroup>
 </Project>

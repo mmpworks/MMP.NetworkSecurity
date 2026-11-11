@@ -224,8 +224,26 @@ function Select-Clauses {
         }
     }
     if ($SelfTest) { $sel += $all | Where-Object { -not $_.counts } }
+    # AO-1 and AO-8 (docs/algorithm-optimization-prd.md section 3) read the results of other clauses in the same run, so they bring them in.
+    if ($sel | Where-Object { $_.id -like 'AO-1.*' }) { $sel += $all | Where-Object { $_.assertion -eq 'A1' -or $_.id -like 'A3.vec.*' -or $_.id -like 'A3.pinblock.*' } }
+    if ($sel | Where-Object { $_.id -like 'AO-8.*' }) { $sel += $all | Where-Object { $_.assertion -eq 'A9' -or $_.id -eq 'A17.mock.golden-trace-equal.cf' } }
     $sel = @($sel | Sort-Object -Property id -Unique)
     return $sel
+}
+
+# AO-1 and AO-8 verdicts: PASS when every named row in this run passed, NOT RUN when none ran, else FAIL with the rows that did not pass.
+function Get-RowsVerdict([object[]]$ids, [string]$what, [hashtable]$table) {
+    $have = @($ids | Where-Object { $table.ContainsKey($_) })
+    if ($have.Count -eq 0) { return @('NOT RUN', 'AO_ROWS_ABSENT', "no $what row ran in this run") }
+    $notPass = @($have | Where-Object { $table[$_].status -ne 'PASS' })
+    if ($notPass.Count -gt 0) {
+        return @('FAIL', 'AO_ROW_NOT_PASS', ("{0} of {1} {2} rows pass. Not PASS: {3}" -f ($have.Count - $notPass.Count), $have.Count, $what, (($notPass | ForEach-Object { "$_ ($($table[$_].status) $($table[$_].reason))" }) -join '; ')))
+    }
+    return @('PASS', '', ("{0} of {0} {1} rows pass: {2}" -f $have.Count, $what, ($have -join ', ')))
+}
+function Set-FromRows([string]$id, [object[]]$ids, [string]$what) {
+    $v = Get-RowsVerdict $ids $what $results
+    Set-Result $id $v[0] $v[1] $v[2]
 }
 $sel = Select-Clauses
 if ($sel.Count -eq 0) { throw "no clause matches: $($Clauses -join ', ')" }
@@ -269,7 +287,7 @@ if ($needX9 -and -not (Test-Path $x9Out)) {
 $productExists = Test-Path (Join-Path $ProductRoot 'src\NetSec.Core\NetSec.Core.csproj')
 $prep = [ordered]@{ core10 = $null; coreCf = $null; ce = $null; node = $null; host = $null; ap = $null; errors = [ordered]@{} }
 $groupsNeeded = @($pending | ForEach-Object { $_.group } | Sort-Object -Unique)
-$needsProductGroups = @('prim', 'walk', 'dukpt', 'kschedule', 'tls13live', 'tls11', 'ssh', 'auth', 'nativeprod', 'bridge', 'host', 'a17', 'a17probe', 'golden', 'keys', 'binproof', 'e2e')
+$needsProductGroups = @('prim', 'walk', 'dukpt', 'kschedule', 'tls13live', 'tls11', 'ssh', 'auth', 'nativeprod', 'bridge', 'host', 'a17', 'a17probe', 'golden', 'keys', 'binproof', 'e2e', 'algo')
 $wantProduct = @($groupsNeeded | Where-Object { $needsProductGroups -contains $_ }).Count -gt 0
 
 function Build-Piece([string]$key, [string]$projRel, [string[]]$extra, [string[]]$outRels) {
@@ -573,6 +591,29 @@ foreach ($c in @($pending | Where-Object { $_.group -eq 'driver' -and -not $resu
         'SELF.vectors-python' {
             $r = Invoke-Tool 'python' @('-I', (Join-Path $acc 'vectors\tools\selfcheck_vectors.py'), (Join-Path $acc 'vectors')) -TimeoutSec 300
             Set-Result $c.id $(if ($r.ExitCode -eq 0) { 'PASS' } else { 'FAIL' }) $(if ($r.ExitCode -eq 0) { '' } else { 'ASSERTION' }) (Tail $r.Output 400)
+        }
+        { $_ -in @('AO-1.vectors-pass.net10', 'AO-1.vectors-pass.cf') } {
+            $b = $c.id.Substring($c.id.LastIndexOf('.') + 1)
+            $vec = @($all | Where-Object { ($_.assertion -eq 'A1' -or $_.id -like 'A3.vec.*' -or $_.id -like 'A3.pinblock.*') -and $_.build -eq $b } | ForEach-Object { $_.id })
+            Set-FromRows $c.id $vec "known-answer ($b)"
+        }
+        'AO-8.cf-compiles-and-golden-pass' {
+            $cf = @($all | Where-Object { $_.assertion -eq 'A9' -or $_.id -eq 'A17.mock.golden-trace-equal.cf' } | ForEach-Object { $_.id })
+            Set-FromRows $c.id $cf 'CF build and CF golden'
+        }
+        'SELF.ao-row-verdicts-bite' {
+            # AO-1 and AO-8 read other rows. All PASS must PASS; one FAIL or one NOT RUN must FAIL; no row at all must be NOT RUN.
+            $ok = @{ 'x.a' = [pscustomobject]@{ status = 'PASS'; reason = '' }; 'x.b' = [pscustomobject]@{ status = 'PASS'; reason = '' } }
+            $oneFail = @{ 'x.a' = [pscustomobject]@{ status = 'PASS'; reason = '' }; 'x.b' = [pscustomobject]@{ status = 'FAIL'; reason = 'ASSERTION' } }
+            $oneNotRun = @{ 'x.a' = [pscustomobject]@{ status = 'NOT RUN'; reason = 'PRODUCT_MISSING' }; 'x.b' = [pscustomobject]@{ status = 'PASS'; reason = '' } }
+            $got = @((Get-RowsVerdict @('x.a', 'x.b') 'self' $ok)[0], (Get-RowsVerdict @('x.a', 'x.b') 'self' $oneFail)[0], (Get-RowsVerdict @('x.a', 'x.b') 'self' $oneNotRun)[0], (Get-RowsVerdict @('x.a', 'x.b') 'self' @{})[0])
+            $want = @('PASS', 'FAIL', 'FAIL', 'NOT RUN')
+            if ((Compare-Object $got $want -SyncWindow 0)) { Set-Result $c.id 'FAIL' 'ASSERTION' ("verdicts were " + ($got -join ', ') + "; wanted " + ($want -join ', ')) }
+            else { Set-Result $c.id 'PASS' '' 'all PASS -> PASS; one FAIL -> FAIL; one NOT RUN -> FAIL; no rows -> NOT RUN' }
+        }
+        'AO-2.reference-frozen-from-git' {
+            $r = Invoke-Tool 'python' @('-I', (Join-Path $acc 'tools\freeze_ref.py'), '--check', '--repo', $ProductRoot) -TimeoutSec 120
+            Set-Result $c.id $(if ($r.ExitCode -eq 0) { 'PASS' } else { 'FAIL' }) $(if ($r.ExitCode -eq 0) { '' } else { 'FROZEN_DIFFERS' }) (Tail $r.Output 400)
         }
         default { Set-Result $c.id 'FAIL' 'NO_RESULT' 'driver has no code for this clause' }
     }
