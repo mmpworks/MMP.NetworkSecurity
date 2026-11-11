@@ -19,7 +19,12 @@ export interface Curve {
 /** A point: the point at infinity (the "zero" of the group), or (x, y). */
 export type Point = { readonly kind: 'inf' } | { readonly kind: 'pt'; readonly x: bigint; readonly y: bigint }
 
-export type CurveErrorCode = 'CURVE_SINGULAR' | 'CURVE_NOT_ON_CURVE' | 'CURVE_BAD_SCALAR' | 'CURVE_WALK_DIVERGED'
+export type CurveErrorCode =
+  | 'CURVE_SINGULAR'
+  | 'CURVE_NOT_ON_CURVE'
+  | 'CURVE_BAD_SCALAR'
+  | 'CURVE_NO_INVERSE'
+  | 'CURVE_WALK_DIVERGED'
 
 export class CurveError extends Error {
   readonly code: CurveErrorCode
@@ -44,6 +49,8 @@ export function invMod(v: bigint, p: bigint): bigint {
     ;[r0, r1] = [r1, r0 - q * r1]
     ;[s0, s1] = [s1, s0 - q * s1]
   }
+  // r0 is the common factor of v and p. For a prime p it is 1, unless v is 0 mod p: then no inverse exists.
+  if (r0 !== 1n) throw new CurveError('CURVE_NO_INVERSE', 'The number is 0 mod p, so it has no inverse.')
   return mod(s0, p)
 }
 

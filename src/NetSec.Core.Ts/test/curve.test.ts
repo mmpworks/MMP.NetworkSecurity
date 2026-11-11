@@ -115,6 +115,12 @@ describe('the add rule', () => {
   test('invMod: v · v^-1 = 1 mod 17 for every v', () => {
     for (let v = 1n; v < 17n; v += 1n) assert.equal((v * invMod(v, 17n)) % 17n, 1n)
   })
+  test('invMod of 0, and an add of points that are not on the curve, throw a coded error', () => {
+    assert.throws(() => invMod(0n, 17n), { code: 'CURVE_NO_INVERSE' })
+    assert.throws(() => invMod(34n, 17n), { code: 'CURVE_NO_INVERSE' })
+    // Two points off the curve with the same x: the slope needs 1 / 0.
+    assert.throws(() => addStep(TOY_CURVE, pt(1n, 5n), pt(1n, 5n + 17n)), { code: 'CURVE_NO_INVERSE' })
+  })
 })
 
 describe('double-and-add walk', () => {
