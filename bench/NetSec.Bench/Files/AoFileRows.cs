@@ -28,12 +28,12 @@ static class AoFileRows
     {
         string suffix = build == "net10" ? "net10" : "cf";
         int files = fileRows.Select(r => r.File).Distinct().Count();
-        List<string> rows = Groups.Select(g => Row("AO-9." + g.Row + "." + suffix, true,
+        List<string> rows = Groups.Select(g => Row("AO-9." + g.Row + "." + suffix + ".time", true,
             Sum(fileRows, g.Ops, r => r.Pair.Original), Sum(fileRows, g.Ops, r => r.Pair.New), files, g.Op)).ToList();
-        rows.Add(Row("AO-9.small-message." + suffix, true, small.Pair.Original.MedianNs, small.Pair.New.MedianNs, 0,
+        rows.Add(Row("AO-9.small-message." + suffix + ".time", true, small.Pair.Original.MedianNs, small.Pair.New.MedianNs, 0,
             "one AES-128 key setup plus one GCM seal of 64 bytes"));
         ThreadRow last = threads.Last();
-        rows.Add(Row("AO-9.pool-25." + suffix, threads.All(t => t.Mismatches == 0), MeanWall(threads, "original"), MeanWall(threads, "new"), 1,
+        rows.Add(Row("AO-9.pool-25." + suffix + ".time", threads.All(t => t.Mismatches == 0), MeanWall(threads, "original"), MeanWall(threads, "new"), 1,
             "mean wall time of 2 runs: " + last.Workers + " pool workers x " + last.CallsPerWorker + " GCM seals of " + last.File + " on one shared key"));
         return rows;
     }
