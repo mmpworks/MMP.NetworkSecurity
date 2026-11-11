@@ -193,6 +193,13 @@ The S0 benchmark list includes AES key setup (both schedules). The row for the C
 
 Steve's order: reduce or remove memory allocation in these paths, most of all on the 3.5 build, so that the garbage collector has less to do. A design that removes the need for an allocation is better than one that makes the allocation cheaper.
 
+This is a goal, and Steve said so: "This is a desire - it may not be feasible and tradeoffs are acceptable." So:
+
+1. Each slice tries for 0 bytes first.
+2. Where 0 bytes costs too much (speed, a public shape that is hard to use, risk to correct output), the slice keeps a small allocation and records the tradeoff in its PR: the bytes that stay, for each call or each message, the reason, and what the 0-byte design would have cost.
+3. The row for that path then gets a byte budget in the row list, in an acceptance PR, in place of 0. A measured value above the budget is a red. Steve sees each budget in the slice report.
+4. A path with no recorded tradeoff is held to 0 bytes.
+
 Why it matters on the 3.5 build: every allocated byte brings the next collection closer, and a collection stops the program. Today a GCM seal of a 4 MiB file allocates about 25 MB (262,144 blocks at about 96 bytes each). How often the Compact Framework collector runs for a given amount of allocation is not measured in this project; the benchmark records collection counts on the .NET 3.5 desktop runtime as the nearest evidence.
 
 The rules, in order of preference:
