@@ -31,7 +31,7 @@ Echo writes these. Builders never write `acceptance/`.
 | AO-2 | Differential test. A frozen copy of the main 5c5d4a4 code is the reference. Random keys, lengths and offsets go through the reference and the new code. | 1,000,000 cases for each algorithm, 0 differences |
 | AO-3 | Table proof. A test builds each constant table from the math and compares it with the constant in the product. | every table equal |
 | AO-4 | Thread test. One shared key object. A payload worker encodes and decodes on `ThreadPool.QueueUserWorkItem` with the pool capped at 25. Results equal the single-thread results. | 100,000 payloads, 0 mismatches, 10 runs |
-| AO-5 | Allocation. Bytes allocated after warm-up, net10: for each block for AES, modes and hash blocks, and for each message for HMAC with an `HmacKey`. | 0 B for AES, modes and hashes |
+| AO-5 | Allocation. Bytes allocated after warm-up, net10: for each block for AES, modes and hash blocks, and for each message for HMAC with an `HmacKey`. | 0 B for each block for AES, modes and hash blocks; 0 B for each message for HMAC through `HmacKey.Compute` with a caller-owned work object and output buffer |
 | AO-6 | Speed. Baseline at 5c5d4a4 and the new code, same machine, same run. | the report shows both numbers; AES target is 5 times baseline or better. The report line "CF ARM speed: UNMEASURED" stays until a run on a CE device exists |
 | AO-7 | The lesson walks still agree with the product path. | no `AES_WALK_DIVERGED`; golden files unchanged. The byte-level helpers the walk uses today move into `AesKey.Walk.cs` unchanged. The walk calls word-path code only through `EncryptBlock` and `DecryptBlock` for the last compare |
 | AO-8 | The CF build compiles, and the CF golden labs pass. | gate green |
@@ -96,17 +96,17 @@ The work ends when slices S0 to S4 each show AO-1 to AO-8 green on one head of `
 7. `#if NETCF` only at a named seam, never inside a round function.
 8. Unproven for the CF JIT, so no rule depends on them: removal of bounds checks, the inline size limit, and a rotate instruction for `(x >> 8) | (x << 24)`.
 9. A block function reads all its input into locals before its first output write. This is what makes overlapped input and output correct.
+   A mode over many blocks keeps the block order of the 5c5d4a4 code. When the output starts 1 to 15 bytes after the input in the same array, the result must equal the reference result. The mode does not reject the overlap and does not reverse the loop.
 10. Argument checks stay at the public boundary, with the exception types and machine codes of today. No check is inside a round loop.
 11. The walk reads the key schedule through an internal read path. No public member returns an instance array.
-12. All `NETCF` seams are listed in one table in `docs/`, so a reviewer can count them.
-13. The net10 build has a named seam that forces the portable word path. AO-2 on .NET 10 runs the portable path and the hardware path.
+12. All `NETCF` seams are listed in one table in `docs/`, so a reviewer can count them. A gate check counts the `#if NETCF` and `#if !NETCF` lines in `src/NetSec.Core` and fails when the count differs from the table rows.
+13. The net10 build has a named seam that forces the portable word path. The seam is an internal constructor argument on the key. No static switch changes the path during a run. AO-2 on .NET 10 runs the portable path and the hardware path.
 
 ### 7.2 Slices
 
 | Slice | Content | Owner | Review |
 |-------|---------|-------|--------|
 | S0 | Anchor AO-1 to AO-8, frozen reference, benchmark project, baseline numbers for net10 and CF. | Echo (anchor), Richard (benchmark) | Jared |
-| S0 note | The S0 benchmark list includes AES key setup (both schedules). The row for the CF build reads "CF binaries on net48 desktop JIT". It is not a CF number. |  |  |
 | S1 | AES: constant tables, word state, no allocation, word key schedule, equivalent inverse cipher. Modes, CMAC, GCM with `GcmKey` (decision 4). | Richard | Jared |
 | S2 | `AesPayloadWorker`: encode and decode payloads on the thread pool, modelled on the GasPumpSimulator dispatch pattern. Bounded queue, pool cap 25, no shared scratch. | Richard | Jared, Echo runs AO-4 |
 | S3 | Hashes: MD5, SHA-1, SHA-256, SHA-512, Keccak. `HmacKey` keeps the two padded key states. HKDF and the TLS PRFs reuse them. | Richard | Jared |
@@ -114,6 +114,8 @@ The work ends when slices S0 to S4 each show AO-1 to AO-8 green on one head of `
 | S5 | Big-number paths: `BigUInt`, Montgomery, RSA, P-256, 25519, ML-KEM. Highest risk. Starts only after S0 numbers show it is worth it. | to assign | Jared |
 | S6 | .NET 10 fast paths behind `#if !NETCF` (hardware AES and carry-less multiply), with pointers at C# 3 (decision 1). | Richard | Jared |
 | S7 | Release selector in the app. The code view gets a control to pick the release (CE with CF 3.5, or .NET 10). The view then shows the code that release runs, so a learner can read the fast path for each release. Ordered by Steve on 2026-11-10. The design comes after S1, when the first fast-path file exists. | to assign | Jared, Echo |
+
+The S0 benchmark list includes AES key setup (both schedules). The row for the CF build reads "CF binaries on net48 desktop JIT". It is not a CF number.
 
 ### 7.3 Types and signatures to confirm in S0 (hypothesis)
 
@@ -124,13 +126,13 @@ The work ends when slices S0 to S4 each show AO-1 to AO-8 green on one head of `
 5. The worker catches each exception on the pool thread and reports it through `PayloadResult`. An exception that leaves a pool thread ends the process.
 6. The caller supplies the nonce for each payload. The worker holds no nonce counter. The caller must never use a nonce two times with one key. The worker does not check this.
 7. Dispatch is a seam. The worker gets an `Action<WaitCallback>` that queues work. The default is `ThreadPool.QueueUserWorkItem`. The host program sets the pool cap; the worker never calls `SetMaxThreads`.
-8. `TryEncode` and `TryDecode` never block. An `Interlocked` counter holds the number of pending payloads, and a call returns false when the counter is at `maxQueued`. CF 3.5 has no `Monitor.Wait`, no `Monitor.Pulse` and no `Semaphore`, so a blocking queue is out of scope.
+8. `TryEncode` and `TryDecode` never block. An `Interlocked` counter holds the number of pending payloads, and a call returns false when the counter is at `maxQueued`. The order is: increment, then read a `volatile` disposed flag; if the flag is set, decrement and return false. The worker decrements in a `finally` after `done` returns or throws. If the dispatch delegate throws, the worker decrements and the call returns false. CF 3.5 has no `Monitor.Wait`, no `Monitor.Pulse` and no `Semaphore`, so a blocking queue is out of scope.
 9. The worker also catches an exception that the `done` callback throws, and counts it. It does not call `done` again for that payload.
-10. Stop rule: after `Dispose`, `TryEncode` and `TryDecode` return false. Each payload already queued still gets its `done` call.
-11. Wire layout for a payload: 12-byte nonce, ciphertext, 16-byte tag. This is a new layout that only the worker uses. Non-goal 2 covers the layouts that exist today.
+10. Stop rule: after `Dispose`, `TryEncode` and `TryDecode` return false. Each payload already queued still gets its `done` call. `Dispose` does not wait. The worker has an `Idle` event that is set when the counter is 0, and a caller that must wait uses it.
+11. Wire layout for a payload: 12-byte nonce, ciphertext, 16-byte tag. This is a new layout that only the worker uses. Non-goal 2 covers the layouts that exist today. `TryEncode` rejects a nonce that is not 12 bytes, with a machine code. `TryDecode` rejects a wire shorter than 28 bytes, with a machine code. On a tag failure, `PayloadResult` carries the error code and no plaintext bytes. The 4 bytes of the payload ID are the AAD, so a payload moved to a different ID fails its tag. The layout has no replay check: the same wire with the same ID decodes again. The caller owns replay defence.
 12. The call sites that seal many records with one key (the TLS record paths) hold a `GcmKey`. S1 lists them. A static `Gcm` wrapper builds a `GcmKey` on each call, so it is for single calls only.
 13. S0 measures AES key setup. If the decrypt schedule in every constructor costs too much for per-transaction keys (DUKPT), an encrypt-only constructor is the fallback, and that needs a decision.
-14. `HmacKey` restores its states with no allocation. S3 adds a copy-into method on the hash (hypothesis: `void CopyStateTo(IHash target)`), because `Clone()` allocates.
+14. HMAC with no allocation uses a working hash that the caller owns: `HmacKey.Compute(IHash work, byte[] data, int off, int len, byte[] mac, int macOff)`. One thread uses a work object at a time. The key copies its saved state into the work object through a copy-into method on the hash (hypothesis: `void CopyStateTo(IHash target)`), which throws a machine code when the target type differs. `Hmac.Compute` stays as a wrapper that allocates.
 
 ## 8. Boundary and failure routing
 
