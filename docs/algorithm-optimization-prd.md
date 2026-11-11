@@ -108,7 +108,7 @@ The work ends when one head of `Algorithm-Optimization` shows the result below a
 | AO-5 rows for the caller-buffer forms of the AES modes, CMAC and GCM (section 7.4 rule 2) | `NOT RUN PRODUCT_MISSING` | S1 |
 | AO-5 rows for the caller-buffer forms of the hashes, HMAC, HKDF and the TLS PRFs | `NOT RUN PRODUCT_MISSING` | S3 |
 | AO-5 rows for the caller-buffer forms of TDES, DUKPT derivation and the PIN block | `NOT RUN PRODUCT_MISSING` | S4 |
-| AO-9 suite rows (file output equality) | `NOT RUN AO9_FILES_ABSENT` until the test files are in the tree, then `PASS` | S0 |
+| AO-9 suite rows (file output equality) | `NOT RUN AO9_FILES_ABSENT` is a red here: S0 does not close before the test files are in the tree and the rows read `PASS` | S0 |
 | AO-5 row for TDES | `PASS` (the block path allocates 0 bytes today) | S0 |
 | AO-5 row for DUKPT derivation | `FAIL AO5_ALLOCATES` | S4 |
 | AO-2 rows for `HmacKey.Compute` | `NOT RUN PRODUCT_MISSING` | S3 |
@@ -196,8 +196,8 @@ Steve's order: reduce or remove memory allocation in these paths, most of all on
 This is a goal, and Steve said so: "This is a desire - it may not be feasible and tradeoffs are acceptable." So:
 
 1. Each slice tries for 0 bytes first.
-2. Where 0 bytes costs too much (speed, a public shape that is hard to use, risk to correct output), the slice keeps a small allocation and records the tradeoff in its PR: the bytes that stay, for each call or each message, the reason, and what the 0-byte design would have cost.
-3. The row for that path then gets a byte budget in the row list, in an acceptance PR, in place of 0. A measured value above the budget is a red. Steve sees each budget in the slice report.
+2. Where 0 bytes costs too much, the slice keeps a small allocation and records the tradeoff in its PR: the bytes that stay, for each call or each message, the reason, and what the 0-byte design would have cost. The cost is a number: a speed ratio outside the noise band, a count of extra bytes held, or a named risk to correct output with its test.
+3. The row for that path then gets a byte budget in place of 0. The budget is in the acceptance tree and only Echo writes it. Four conditions hold: the reviewer rules on the tradeoff before the acceptance PR; the PR records the measured value and what the 0-byte design would cost; a budget never goes up without a new recorded tradeoff; a row with no budget entry is held to 0. A measured value above the budget is a red. Steve sees each budget in the slice report.
 4. A path with no recorded tradeoff is held to 0 bytes.
 
 Why it matters on the 3.5 build: every allocated byte brings the next collection closer, and a collection stops the program. Today a GCM seal of a 4 MiB file allocates about 25 MB (262,144 blocks at about 96 bytes each). How often the Compact Framework collector runs for a given amount of allocation is not measured in this project; the benchmark records collection counts on the .NET 3.5 desktop runtime as the nearest evidence.
@@ -206,27 +206,37 @@ The rules, in order of preference:
 
 1. No state on the heap. A block function keeps its state in local words. It makes no array.
 2. The caller owns the buffers. Each operation that produces bytes has a form that writes into a buffer the caller gives: `(byte[] input, int inOffset, int count, byte[] output, int outOffset)`. The form that returns a new array stays as a thin wrapper over it. This holds for ECB, CBC, CTR, GCM seal and open, CMAC, each hash `Finish`, HMAC, the TLS PRFs, HKDF, the DUKPT derivation and the PIN block.
-3. In-place work is legal. Input and output may be the same array at the same offset, so a caller can encrypt a buffer with no second buffer. The modes keep the block order of the 5c5d4a4 code (rule 7.1.9).
+3. In-place work is legal. Input and output may be the same array at the same offset, so a caller can encrypt a buffer with no second buffer. The modes keep the block order of the 5c5d4a4 code (rule 7.1.9). GCM open is the one special case: it computes and checks the tag over the ciphertext first, and only then decrypts. On a tag failure it sets the output range to 0 and returns false. For in-place use the caller then has neither text. No plaintext leaves a call whose tag did not check. AO-2 has a case for it: an in-place open with a changed tag leaves the output range all 0.
 4. A key object holds all it needs for its life: round keys, the GHASH table, the padded HMAC states. It builds them one time, in its constructor. No call builds them again.
-5. A running operation that needs state between calls keeps it in an object the caller owns and can use again: a hash object has `Reset()`, and a mode with a running state (CTR counter, CBC chain, GCM tag state) takes a small state object from the caller. One thread uses a state object at a time.
-6. The payload worker takes buffers from a bounded set that it owns, built one time, and gives each buffer back when its `done` call returns. Taking and giving back use `Interlocked` only. When the set is empty, `TryEncode` returns false; the worker does not allocate a new buffer in its place.
+5. A running operation that needs state between calls keeps it in an object the caller owns and can use again: a hash object has `Reset()`, and a mode with a running state (CTR counter, CBC chain, GCM tag state) takes a small state object from the caller. One thread uses a state object at a time. A state object needs `Init` with the nonce or IV for each message, refuses work before `Init`, and clears itself when the message ends, so no counter and no tag state passes into the next message. The caller still must never use a nonce two times with one key.
+6. The payload worker takes buffers from a bounded set that it owns, built one time, and gives each buffer back when its `done` call returns.
+   - The set is a fixed array of slots. A slot is claimed with `Interlocked.CompareExchange` on an integer (0 free, 1 taken) and freed with `Interlocked.Exchange`. There is no linked free list, because a list of reused nodes can hand out one node two times.
+   - When the set is empty, `TryEncode` returns false. The worker does not allocate a new buffer in its place.
+   - The bytes in `PayloadResult` are valid only until `done` returns. A caller that needs them later copies them inside `done`. `PayloadResult` carries a length, because a buffer from the set is longer than the result.
+   - The worker sets the used range of a buffer to 0 before the buffer goes back to the set, so no plaintext and no key stream stays in it.
+   - AO-4 has a planted callback that keeps the array, and it checks that the next payload does not change a copy taken inside `done`.
 7. No hidden allocation in a hot path: no closure or delegate made for each call, no `params` array, no boxing of a value type, no string building, no `foreach` over an interface, no exception used for flow.
-8. A check that compares a tag or a digest uses the bytes where they are. It makes no copy to compare.
+8. A check that compares a tag or a digest uses the bytes where they are, with the constant-time compare (`ConstantTime`). It makes no copy to compare, and it has no early exit.
 
 What stays allocated, by design: one key object for each key, the buffers a caller makes, and the lesson walk (it records steps, and it is no product path).
 
 The test rows for these rules are in section 4.3: each AO-5 block row, each AO-5 message row, and one AO-5 row for each caller-buffer form (0 bytes for each call, with the output array included, because the caller made it).
+
+The acceptance suite gets its rows for the caller-buffer forms in an acceptance PR before S1 starts. A builder does not start a slice whose rows do not exist.
 ### 7.5 When form and the goals disagree (Steve, 2026-11-11)
 
 Steve's words: "try to be CUPID and DRY, but we may need to bend the rules a bit to get the performance and memory goals met."
 
 1. The order of weight in a hot path is: correct output, then the memory and speed goals, then CUPID and DRY.
 2. A bend is allowed only where a number shows the gain. The number is the benchmark ratio outside the measured noise band, or the AO-5 byte count.
-3. Each bend has a comment at its place in the code. The comment names the rule that is bent, the reason, and the measured gain. Example: a round that is written out two times because a shared helper costs a call on the 3.5 runtime.
+3. Each bend has a comment at its place in the code. The comment names the rule that is bent, the reason, the measured gain, and the runtime that was measured. Example: a round that is written out two times because a shared helper costs a call, measured on the .NET 3.5 desktop runtime, 32-bit.
 4. A bend stays inside one type. The public shape of a type stays simple and the same for all callers.
 5. A copy made for speed is covered by the same tests as its source: AO-1 and AO-2 run each copy.
 6. Outside the hot paths (key setup that runs one time, error paths, the lesson walk) the form rules have no exception.
 7. The reviewer rules on each bend. A bend with no number is a blocker.
+8. Every bend is listed in one table in `docs/`, as the `NETCF` seams are (rule 7.1.12). A gate check counts the bend comments in the source against the rows of that table.
+9. Each later slice measures every bend again. A bend whose gain is now inside the noise band is removed.
+10. The number names the runtime and the JIT that gave it. A number from the .NET 3.5 desktop runtime does not show a gain on a CE device with an ARM processor (section 3.2, limit 1).
 
 ## 8. Boundary and failure routing
 
