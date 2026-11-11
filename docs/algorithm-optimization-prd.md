@@ -31,7 +31,7 @@ Echo writes these. Builders never write `acceptance/`.
 | AO-2 | Differential test. A frozen copy of the main 5c5d4a4 code is the reference. Random keys, lengths and offsets go through the reference and the new code. | 1,000,000 cases for each algorithm, 0 differences |
 | AO-3 | Table proof. A test builds each constant table from the math and compares it with the constant in the product. | every table equal |
 | AO-4 | Thread test. One shared key object. A payload worker encodes and decodes on `ThreadPool.QueueUserWorkItem` with the pool capped at 25. Results equal the single-thread results. | 100,000 payloads, 0 mismatches, 10 runs |
-| AO-5 | Allocation. Bytes allocated after warm-up, net10: for each block for AES, modes and hash blocks, and for each message for HMAC with an `HmacKey`. | 0 B for each block for AES, modes and hash blocks; 0 B for each message for HMAC through `HmacKey.Compute` with a caller-owned work object and output buffer |
+| AO-5 | Allocation. Bytes allocated after warm-up, net10: for each block for AES, modes, TDES and hash blocks, for each message for HMAC with an `HmacKey`, and for each DUKPT key derivation. | 0 B for each block for AES, modes and hash blocks; 0 B for each message for HMAC through `HmacKey.Compute` with a caller-owned work object and output buffer |
 | AO-6 | Speed. Baseline at 5c5d4a4 and the new code, same machine, same run. | the report shows both numbers; AES target is 5 times baseline or better. The report line "CF ARM speed: UNMEASURED" stays until a run on a CE device exists |
 | AO-7 | The lesson walks still agree with the product path. | no `AES_WALK_DIVERGED`; golden files unchanged. The byte-level helpers the walk uses today move into `AesKey.Walk.cs` unchanged. The walk calls word-path code only through `EncryptBlock` and `DecryptBlock` for the last compare |
 | AO-8 | The CF build compiles, and the CF golden labs pass. | gate green |
@@ -58,6 +58,12 @@ Limit of the anchor: AO-2 uses our own old code as the reference. AO-1 (public v
 15. AO-2 runs on .NET 10 with the net10 binaries, and on .NET Framework 4.8 with the CF binaries. The second referee (rule 2) runs on .NET 10 only. After S6, the .NET 10 run covers the portable path and the hardware path (rule 7.1.13).
 16. AO-4 matches each result to its payload by a payload ID, because the pool does not keep order.
 
+### 3.2 Limits of the anchor
+
+1. The "cf" build runs on the .NET Framework 4.8 desktop runtime in the gate. No check runs on the CF runtime or on a CE device. The CF JIT and the CF memory model are not covered.
+2. Big-endian targets are not covered.
+3. Timing leaks are not covered (non-goal 3).
+
 ### 3.3 File benchmark rules (AO-9)
 
 1. The test files are in the repository, in one folder, with a list that gives each file's name, size and SHA-256. The run fails when a file differs from the list.
@@ -69,12 +75,7 @@ Limit of the anchor: AO-2 uses our own old code as the reference. AO-1 (public v
 7. The same measurement runs with the CF binaries on .NET Framework 4.8, as a second desktop number. CF ARM speed stays UNMEASURED.
 8. A second measurement repeats the run with 25 pool threads that share one key, and records total megabytes for each second and peak memory.
 9. The report is one file in `docs/_runs/`, with one table: file, operation, original, new, ratio. A styled page for Steve shows the same numbers.
-
-### 3.2 Limits of the anchor
-
-1. The "cf" build runs on the .NET Framework 4.8 desktop runtime in the gate. No check runs on the CF runtime or on a CE device. The CF JIT and the CF memory model are not covered.
-2. Big-endian targets are not covered.
-3. Timing leaks are not covered (non-goal 3).
+10. The suite, and not the benchmark, checks the file list, compares the output of the two codes for each file, and measures the AO-5 bytes. The file list with each name, size and SHA-256 is in `acceptance/`. The benchmark numbers for these are a second record. A difference between the suite and the benchmark is a red. The benchmark alone gives the AO-6 and AO-9 times.
 
 ## 4. Kill condition
 
@@ -97,13 +98,17 @@ The work ends when one head of `Algorithm-Optimization` shows the result below a
 
 | Rows | Before the slice | PASS from |
 |------|------------------|-----------|
-| AO-3 row for AES tables built at start-up | FAIL, reason: static constructor present (fact 1) | S1 |
-| AO-3 rows for the GHASH table | NOT RUN, no table exists | S1 |
-| AO-5 rows for AES and modes | FAIL, reason: bytes allocated for each block (fact 2) | S1 |
-| AO-5 rows for hash blocks and HMAC | the state the first S0 run shows, with its reason code | S3 |
-| AO-4 rows for the payload worker | NOT RUN, PRODUCT_MISSING | S2 |
-| AO-7 row for the walk helpers | FAIL, reason: `AesKey.Walk.cs` calls a helper in `AesKey.cs` | S1 |
-| AO-3 rows for hash and DES tables | NOT RUN, PRODUCT_MISSING | S3 and S4 |
+| AO-3 rows for AES tables built at start-up | `FAIL AO_TABLE_BUILT_AT_STARTUP` (fact 1) | S1 |
+| AO-3 rows for the GHASH table | `NOT RUN NO_TABLES` | S1 |
+| AO-4 rows for a shared `GcmKey` | `NOT RUN PRODUCT_MISSING` | S1 |
+| AO-5 rows for AES and modes | `FAIL AO5_ALLOCATES` (fact 2) | S1 |
+| AO-5 rows for hash blocks and HMAC | `FAIL AO5_ALLOCATES` | S3 |
+| AO-5 row for TDES | `PASS` (the block path allocates 0 bytes today) | S0 |
+| AO-5 row for DUKPT derivation | `FAIL AO5_ALLOCATES` | S4 |
+| AO-2 rows for `HmacKey.Compute` | `NOT RUN PRODUCT_MISSING` | S3 |
+| AO-4 rows for the payload worker | `NOT RUN PRODUCT_MISSING` | S2 |
+| AO-7 row for the walk helpers | `FAIL AO_WALK_CALLS_AESKEY_HELPER` | S1 |
+| AO-3 rows for hash and DES tables | `NOT RUN PRODUCT_MISSING` | S3 and S4 |
 | AO-2 row for the hardware path on .NET 10 | NOT RUN, PRODUCT_MISSING | S6, outside the kill condition; it reads NOT RUN at the kill head |
 | Rows for the big-number paths | NOT RUN, PRODUCT_MISSING | S5, outside the kill condition; they read NOT RUN at the kill head |
 
