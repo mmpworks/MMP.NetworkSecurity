@@ -423,7 +423,7 @@ function describeExtension(type: number, data: Uint8Array, inServerHello: boolea
   } catch {
     // A field that does not parse shows its size only.
   }
-  return data.length === 0 ? 'no data' : `${data.length} bytes`
+  return data.length === 0 ? 'no data' : data.length === 1 ? '1 byte' : `${data.length} bytes`
 }
 
 function readExtensions(r: Reader, base: number, inServerHello: boolean): Extension[] {
