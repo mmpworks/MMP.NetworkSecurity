@@ -338,3 +338,18 @@ Limits:
 5. The binder has run on stand-in types on .NET 10 only. Its first run on the product's types, and on the .NET Framework 4.8 runtime, is the first S1 run.
 
 Disposition: merge into `Algorithm-Optimization` before the S1 code that adds these forms.
+
+## 21. A break in the suite's own code is a FAIL (added 2026-11-11)
+
+Conclusion: a clause group that does not compile because of acceptance code reads FAIL `ACCEPTANCE_COMPILE_ERROR` in every slice. It no longer reads NOT RUN `PRODUCT_MISSING`.
+
+What happened: the thread group links `groups/algo/AoSide.Product.cs`. That file started to use `AoStreamSeam`, and the thread group did not link the new file. The compiler gave CS0246, the code for a missing name. The runner read every such code as a missing product type, so 2 rows that must PASS at S0 read NOT RUN `PRODUCT_MISSING`. `AO-0.row-list-matches` showed it. In a group where every row is NOT RUN `PRODUCT_MISSING` before its slice, the same break gives no red.
+
+| Part | Where |
+|---|---|
+| The verdict of a failed group build. A missing name that `acceptance/groups` or `acceptance/lib` declares is the suite's own, and the group is FAIL `ACCEPTANCE_COMPILE_ERROR`. A name that `contract/` or a `Frozen/` folder also declares counts as a product name | `Get-GroupBuildVerdict` and `Get-SuiteTypeNames` in `run.ps1` (CONTRACT.md rule 4) |
+| Self-check: a real project that names `AoStreamSeam` without its file must read FAIL; 6 recorded compiler lines, each with its verdict | `SELF.suite-compile-break-is-a-fail` in `run.ps1` |
+
+Limit: the check reads the first quoted name of the errors CS0246, CS0234, CS0103, CS1061 and CS0117. A break of the suite that gives only another missing-symbol code (for example CS1503, a wrong argument type) still reads NOT RUN `PRODUCT_MISSING`.
+
+Disposition: keep. A group build that fails for a missing product name stays NOT RUN `PRODUCT_MISSING`, as before.
