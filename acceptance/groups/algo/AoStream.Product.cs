@@ -38,6 +38,7 @@ namespace Acceptance
 
         public object NewKey(byte[] key) { return new AesKey(key); }
         public IAoChain NewChain(object k, string kind) { return new ProductChain(AoSeams.Stream((AesKey)k, StateType(kind), Method(kind))); }
+        public void NullStateCall(object k, string kind, byte[] i, int io, int n, byte[] o, int oo) { AoSeams.StreamNullState((AesKey)k, StateType(kind), Method(kind))(i, io, n, o, oo); }
         public bool CmacVerify(object k, byte[] m, int mo, int n, byte[] t, int to) { return _verify((AesKey)k, m, mo, n, t, to); }
         public bool CmacKeyVerify(object k, byte[] m, int mo, int n, byte[] t, int to) { return AoSeams.CmacKeyVerify((AesKey)k)(m, mo, n, t, to); }
     }

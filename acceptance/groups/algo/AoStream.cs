@@ -20,21 +20,24 @@ namespace Acceptance
         object NewKey(byte[] key);
         /// <summary>kind: "cbc-encrypt", "cbc-decrypt" or "ctr". One new state object for each call of this method.</summary>
         IAoChain NewChain(object k, string kind);
+        /// <summary>The streamed overload of that kind, called with a null state object.</summary>
+        void NullStateCall(object k, string kind, byte[] i, int io, int n, byte[] o, int oo);
         bool CmacVerify(object k, byte[] m, int mo, int n, byte[] t, int to);
         bool CmacKeyVerify(object k, byte[] m, int mo, int n, byte[] t, int to);
     }
 
     /// <summary>
     /// The reference for one streamed message. The 5c5d4a4 code has no streamed form, so the reference is the frozen one-call op plus the
-    /// rules of PRD 7.3 item 15 and 7.1.9, written here:
-    /// 1. State 0 is empty, 1 is ready, 2 is ended. Init copies 16 bytes and makes the object ready. Clear ends it.
-    /// 2. A call on an object that is not ready throws and writes nothing. The exception type is not fixed by the PRD, so the rows compare
-    ///    "refused" against "ok" for these calls, and no type.
-    /// 3. CBC: the chain value after a call is the last ciphertext block of that call. A count that is not a multiple of 16 is refused as
-    ///    the frozen one-call form refuses it.
-    /// 4. CTR: the calls of one message give the bytes of one frozen call over the joined input. A call with a partial last block is
+    /// rules of PRD 7.3 item 15, written here:
+    /// 1. States: empty (new, or after Clear), ready (after Init), ended (after a CTR call with a partial block). Init is legal in every
+    ///    state and starts a new message. Init with a null array throws ArgumentNullException, and with fewer than 16 bytes from the
+    ///    offset ArgumentOutOfRangeException.
+    /// 2. A call checks its arguments first: a CBC count that is not a multiple of 16 (refused as the frozen one-call form refuses it),
+    ///    then the overlap rule (ARG_RANGES_OVERLAP). Then the state: a call on an empty or ended object throws InvalidOperationException.
+    /// 3. A refused call changes neither the state object nor the output.
+    /// 4. CBC: the chain value after a call is the last ciphertext block of that call.
+    /// 5. CTR: the calls of one message give the bytes of one frozen call over the joined input. A call with a partial last block is
     ///    processed, and it ends the object.
-    /// 5. The overlap rule of the caller-buffer forms holds (ARG_RANGES_OVERLAP before any write).
     /// </summary>
     public class FrozenChain : IAoChain
     {
@@ -44,28 +47,37 @@ namespace Acceptance
         protected byte[] V = new byte[16];
         /// <summary>CTR only: the input bytes of this message so far. It is a multiple of 16 while the object is ready.</summary>
         protected int Done;
+        /// <summary>0 empty, 1 ready, 2 ended.</summary>
         protected int State;
 
         public FrozenChain(object key, string kind) { Key = key; Kind = kind; }
 
         public virtual void Init(byte[] b, int offset)
         {
+            if (b == null) throw new ArgumentNullException("b");
+            if (offset < 0 || b.Length - offset < 16) throw new ArgumentOutOfRangeException("offset");
             V = new byte[16];
             Buffer.BlockCopy(b, offset, V, 0, 16);
             Done = 0;
             State = 1;
         }
 
-        public virtual void Clear() { Array.Clear(V, 0, 16); Done = 0; State = 2; }
+        public virtual void Clear() { Array.Clear(V, 0, 16); Done = 0; State = 0; }
 
         public virtual void Call(byte[] i, int io, int n, byte[] o, int oo)
         {
-            if (State != 1) throw new InvalidOperationException("the object is empty or ended");
-            if (i != null && ReferenceEquals(i, o) && io != oo && io < oo + n && oo < io + n)
-                throw new FE.NetSecException(FE.NetSecError.Of("ARG_RANGES_OVERLAP", "input and output overlap and do not start at the same index"));
             byte[] src = new byte[n];
             Buffer.BlockCopy(i, io, src, 0, n);
-            if (Kind == "ctr")
+            bool ctr = Kind == "ctr", encrypt = Kind == "cbc-encrypt";
+            if (!ctr && n % 16 != 0)
+            {
+                Side.Cbc(Key, new byte[16], src, encrypt);   // throws what the frozen form throws for this count
+                throw new AoHarnessException("the frozen CBC accepted a count of " + n);
+            }
+            if (ReferenceEquals(i, o) && io != oo && io < oo + n && oo < io + n)
+                throw new FE.NetSecException(FE.NetSecError.Of("ARG_RANGES_OVERLAP", "input and output overlap and do not start at the same index"));
+            if (State != 1) throw new InvalidOperationException("the object is empty or ended");
+            if (ctr)
             {
                 byte[] joined = new byte[Done + n];
                 Buffer.BlockCopy(src, 0, joined, Done, n);
@@ -75,7 +87,6 @@ namespace Acceptance
                 if (n % 16 != 0) State = 2;
                 return;
             }
-            bool encrypt = Kind == "cbc-encrypt";
             byte[] c = Side.Cbc(Key, (byte[])V.Clone(), src, encrypt);
             Buffer.BlockCopy(c, 0, o, oo, n);
             if (n >= 16) { V = new byte[16]; Buffer.BlockCopy(encrypt ? c : src, n - 16, V, 0, 16); }
@@ -89,6 +100,7 @@ namespace Acceptance
         public bool Has(string op) { return true; }
         public object NewKey(byte[] key) { return _f.NewAes(key); }
         public virtual IAoChain NewChain(object k, string kind) { return new FrozenChain(k, kind); }
+        public virtual void NullStateCall(object k, string kind, byte[] i, int io, int n, byte[] o, int oo) { throw new ArgumentNullException("state"); }
 
         public virtual bool CmacVerify(object k, byte[] m, int mo, int n, byte[] t, int to)
         {
@@ -100,8 +112,10 @@ namespace Acceptance
 
     /// <summary>
     /// AO-2 for the streamed CBC and CTR forms and for the caller-buffer Verify forms. A streamed case is one object and 1 or 2 messages.
-    /// Each message is Init and 1 to 4 calls, each call with its own drawn aliasing of input and output. A share of cases adds a call before
-    /// Init, a call after Clear, a CTR call with a partial block and a call after it, or a CBC count that is not a multiple of 16.
+    /// Each message is Init and 1 to 4 calls, each call with its own drawn aliasing of input and output. A share of the calls has a
+    /// partial block (CTR: it ends the object; CBC: the count is refused) or a partial overlap (refused), and the case goes on after it,
+    /// so a refused call that changed the object shows in the next call. A share of cases adds a call with a null state object, a call
+    /// before the first Init, an Init with a null or short array, and a call after Clear. Every outcome is compared by exception type.
     /// </summary>
     public static class AoStreamDiff
     {
@@ -118,17 +132,9 @@ namespace Acceptance
             catch (Exception e) { r.Add(AoRec.SigOf(e)); }
         }
 
-        /// <summary>For a call on an object that is not ready: any exception reads "refused" (model rule 2).</summary>
-        static void TryRefused(AoRec r, Body b)
-        {
-            try { b(); r.Add("ok"); }
-            catch (AoHarnessException) { throw; }
-            catch (Exception) { r.Add("refused"); }
-        }
-
         static byte[] C(byte[] b) { return b == null ? null : (byte[])b.Clone(); }
 
-        const int EvInit = 0, EvCall = 1, EvRefusedCall = 2, EvClear = 3;
+        const int EvInit = 0, EvCall = 1, EvClear = 2, EvNullStateCall = 3;
 
         sealed class Ev
         {
@@ -137,45 +143,43 @@ namespace Acceptance
             public AoIntoDiff.Place P;
         }
 
-        static Ev Call(Rng r, int n, bool allowOverlap, int kind)
+        /// <summary>A call of 1 to maxBlocks blocks; 1 call in 6 gets 1 to 15 bytes more. The aliasing is drawn, a partial overlap included.</summary>
+        static Ev Call(Rng r, int maxBlocks, int kind)
         {
             Ev e = new Ev();
-            e.Kind = kind; e.N = n; e.P = AoIntoDiff.Place.Draw(r, n, n, allowOverlap);
+            e.Kind = kind;
+            e.N = 16 * (1 + r.Int(maxBlocks));
+            if (r.Int(6) == 0) e.N += 1 + r.Int(15);
+            e.P = AoIntoDiff.Place.Draw(r, e.N, e.N, kind == EvCall);
+            return e;
+        }
+
+        static Ev Init(byte[] buf, int off)
+        {
+            Ev e = new Ev();
+            e.Kind = EvInit; e.Buf = buf; e.Off = off;
             return e;
         }
 
         static List<Ev> DrawEvents(Rng r, bool ctr)
         {
             List<Ev> evs = new List<Ev>();
-            if (r.Int(8) == 0) evs.Add(Call(r, 16, false, EvRefusedCall));   // before the first Init
+            if (r.Int(16) == 0) evs.Add(Call(r, 2, EvNullStateCall));
+            if (r.Int(8) == 0) evs.Add(Call(r, 4, EvCall));   // before the first Init: the object is empty
             int messages = 1 + r.Int(2);
             for (int m = 0; m < messages; m++)
             {
-                Ev init = new Ev();
-                init.Kind = EvInit; init.Off = r.Int(5);
-                init.Buf = ctr ? Hex.Concat(r.Bytes(init.Off), AoDraw.NearWrapCounter(r), r.Bytes(r.Int(5))) : r.Bytes(init.Off + 16 + r.Int(8));
-                evs.Add(init);
+                int off = r.Int(5);
+                if (r.Int(24) == 0) evs.Add(Init(null, off));
+                if (r.Int(12) == 0) evs.Add(Init(r.Bytes(off + r.Int(16)), off));   // 0 to 15 bytes from the offset
+                // The Init that starts the message. It follows a refused Init at once, because the PRD does not fix the state after one.
+                evs.Add(Init(ctr ? Hex.Concat(r.Bytes(off), AoDraw.NearWrapCounter(r), r.Bytes(r.Int(5))) : r.Bytes(off + 16 + r.Int(8)), off));
                 int chunks = 1 + r.Int(4);
-                for (int c = 0; c < chunks; c++)
-                {
-                    int n = 16 * (1 + r.Int(8));
-                    bool partial = c == chunks - 1 && r.Int(4) == 0;
-                    if (partial) n += 1 + r.Int(15);
-                    if (partial && !ctr)
-                    {
-                        // CBC refuses this count as the frozen form does. The state after a refused call is not fixed, so the case ends.
-                        evs.Add(Call(r, n, false, EvCall));
-                        return evs;
-                    }
-                    Ev call = Call(r, n, true, EvCall);
-                    evs.Add(call);
-                    if (call.P.Mode == 3) return evs;   // a refused overlap ends the case, for the same reason
-                    if (partial) evs.Add(Call(r, 16, false, EvRefusedCall));   // the partial block ended the CtrCounter
-                }
+                for (int c = 0; c < chunks; c++) evs.Add(Call(r, 8, EvCall));
                 if (r.Int(4) == 0)
                 {
                     Ev clear = new Ev(); clear.Kind = EvClear; evs.Add(clear);
-                    evs.Add(Call(r, 16, false, EvRefusedCall));
+                    evs.Add(Call(r, 2, EvCall));   // after Clear: the object is empty
                 }
             }
             return evs;
@@ -200,14 +204,14 @@ namespace Acceptance
                         {
                             byte[] b = C(e.Buf);
                             Try(rec, delegate { ch.Init(b, e.Off); });
-                            rec.Add(b);
+                            if (b != null) rec.Add(b);
                         }
                         else if (e.Kind == EvClear) Try(rec, delegate { ch.Clear(); });
                         else
                         {
                             byte[] inb = C(e.P.In), outb = e.P.Mode == 0 ? C(e.P.Out) : inb;
-                            Body call = delegate { ch.Call(inb, e.P.Io, e.N, outb, e.P.Oo); };
-                            if (e.Kind == EvRefusedCall) TryRefused(rec, call); else Try(rec, call);
+                            if (e.Kind == EvNullStateCall) Try(rec, delegate { s.NullStateCall(k, kind, inb, e.P.Io, e.N, outb, e.P.Oo); });
+                            else Try(rec, delegate { ch.Call(inb, e.P.Io, e.N, outb, e.P.Oo); });
                             rec.Add(inb); if (e.P.Mode == 0) rec.Add(outb);
                         }
                     }
@@ -247,14 +251,15 @@ namespace Acceptance
             if (!subject.Has(op)) throw new NotRunException("PRODUCT_MISSING", op + ": the form does not exist yet (PRD 7.3 item 15, slice S1)");
             bool stream = op == "aes-cbc-stream" || op == "aes-ctr-stream";
             ulong seed = AoDiff.SeedOf(op);
-            int bad = 0, refused = 0, yes = 0, no = 0;
+            int bad = 0, state = 0, overlap = 0, yes = 0, no = 0;
             List<string> first = new List<string>();
             for (int i = 0; i < cases; i++)
             {
                 Rng r = new Rng(seed + (ulong)i * 0x9E3779B97F4A7C15UL);
                 StreamCase k = Draw(op, r);
                 AoRec a = Exec(k, reference), b = Exec(k, subject);
-                foreach (string t in a.Texts) if (t == "refused" || t.Contains("ARG_RANGES_OVERLAP")) { refused++; break; }
+                if (a.Texts.Contains("InvalidOperationException")) state++;
+                foreach (string t in a.Texts) if (t.Contains("ARG_RANGES_OVERLAP")) { overlap++; break; }
                 if (a.Texts.Contains("true")) yes++;
                 if (a.Texts.Contains("false")) no++;
                 string d = AoRec.Diff(a, b);
@@ -263,10 +268,11 @@ namespace Acceptance
                 if (first.Count < 3) first.Add("case " + i + " (seed 0x" + seed.ToString("x16") + "): " + d);
             }
             string tail = op + ": seed 0x" + seed.ToString("x16") + ", cases " + cases +
-                          (stream ? ", cases with a refusal on the reference " + refused : ", reference true " + yes + ", reference false " + no) +
+                          (stream ? ", cases with a state refusal on the reference " + state + ", with an overlap refusal " + overlap
+                                  : ", reference true " + yes + ", reference false " + no) +
                           ", reference " + reference.Name + ", subject " + subject.Name;
             if (bad > 0) throw new FailException("AO_DIFFERS", bad + " of " + cases + " cases differ (" + tail + "). First: " + string.Join(" | ", first.ToArray()));
-            if (stream && refused == 0) throw new FailException("AO_GRAMMAR_ONE_SIDED", "no case drew a refusal, so the state rule went untested (" + tail + ")");
+            if (stream && (state == 0 || overlap == 0)) throw new FailException("AO_GRAMMAR_ONE_SIDED", "no case drew a state refusal or no case drew an overlap refusal (" + tail + ")");
             if (!stream && (yes == 0 || no == 0)) throw new FailException("AO_GRAMMAR_ONE_SIDED", "the cases gave one answer only (" + tail + ")");
             return cases + " of " + cases + " cases equal (" + tail + ")";
         }

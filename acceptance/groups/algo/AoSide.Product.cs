@@ -252,6 +252,22 @@ namespace Acceptance
             return delegate (byte[] i, int io, int n, byte[] o, int oo) { d(k, state, i, io, n, o, oo); };
         }
 
+        /// <summary>The same overload, closed over the key and a null state object, or null when the state type or the overload does not exist.</summary>
+        public static Action<byte[], int, int, byte[], int> TryStreamNullState(AesKey k, string stateType, string method)
+        {
+            Type t = PublicType(stateType);
+            if (t == null) return null;
+            System.Reflection.MethodInfo m = typeof(Modes).GetMethod(method, new[] { K, t, B, I, I, B, I });
+            if (m == null) return null;
+            if (m.ReturnType != typeof(void))
+                throw new Acceptance.NotRunException("SIGNATURE_NOT_CONFIRMED", "Modes." + method + " with a " + stateType + " returns a value (PRD 7.3 item 15)");
+            System.Reflection.MethodInfo close = typeof(AoSeams).GetMethod("CloseStream", System.Reflection.BindingFlags.NonPublic | System.Reflection.BindingFlags.Static);
+            return (Action<byte[], int, int, byte[], int>)close.MakeGenericMethod(t).Invoke(null, new object[] { m, k, null });
+        }
+
+        public static Action<byte[], int, int, byte[], int> StreamNullState(AesKey k, string stateType, string method)
+        { return Need(TryStreamNullState(k, stateType, method), "Modes." + method + " with a " + stateType); }
+
         public static Func<AesKey, byte[], int, int, byte[], int, bool> TryCmacVerifyInto()
         { return Bind<Func<AesKey, byte[], int, int, byte[], int, bool>>(typeof(Cmac), null, "Verify", new[] { K, B, I, I, B, I }); }
 

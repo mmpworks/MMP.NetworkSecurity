@@ -314,28 +314,26 @@ Conclusion: each remaining form of PRD 7.3 item 15 has an AO-2 row and an AO-5 r
 | AO-2 `aes-cmac-verify-into`, `aes-cmackey-verify-into`: the right tag at an offset, then no change, one changed tag bit, or one changed message bit | the same files |
 | AO-5 for the 4 forms: 0 B for Init, one call and Clear on one object used again; 0 B for a Verify call | `groups/algo/AoAlloc.Product.cs` |
 | The seams: the state type and the overload are found by name, and bound as typed delegates | `AoSeams.TryStream`, `TryCmacVerifyInto`, `TryCmacKeyVerify` in `groups/algo/AoSide.Product.cs` |
-| Self-check, 12 planted faults (PRD 7.4 rule 5: a call before Init, after Clear, after a partial CTR block; a second Init that keeps the state of the first message; a Verify that skips a tag byte) | `SELF.ao2-stream-control-and-planted-faults` in `selftest/SelfAo.cs` |
+| Self-check, 18 planted faults (PRD 7.4 rule 5 and 7.3 item 15: a call before Init, after Clear, after a partial CTR block; a second Init that keeps the state of the first message; the state checked before the arguments; a refused call that ends the object; a short Init accepted; a null state object not named; a Verify that skips a tag byte) | `SELF.ao2-stream-control-and-planted-faults` in `selftest/SelfAo.cs` |
 | The GCM check order of PRD 7.3 item 15 (the nonce length before the overlap): a planted fault that checks the overlap first goes red | `gcm-overlap-checked-before-nonce` in `SELF.ao2-into-control-and-planted-faults` |
 
-The signatures that the rows bind to (the PRD names the types, and these parameter lists are the reading of it):
+The rows bind to the signatures of PRD 7.3 item 15 (the streamed forms, the state objects, and Verify with offsets).
 
-1. `Modes.CbcEncrypt(AesKey k, CbcChain chain, byte[] input, int inOffset, int count, byte[] output, int outOffset)`, and `CbcDecrypt` with the same parameters.
-2. `Modes.Ctr(AesKey k, CtrCounter counter, byte[] input, int inOffset, int count, byte[] output, int outOffset)`.
-3. `CbcChain` and `CtrCounter`: a public constructor with no parameters, `void Init(byte[] b, int offset)`, `void Clear()`.
-4. `bool Cmac.Verify(AesKey k, byte[] message, int offset, int count, byte[] tag, int tagOffset)`, and `bool CmacKey.Verify` with the same parameters without the key.
-
-The rules of the reference model (the 5c5d4a4 code has no streamed form):
+The rules of the reference model, each from PRD 7.3 item 15 (the 5c5d4a4 code has no streamed form):
 
 1. The calls of one message give the bytes of one frozen call over the joined input.
-2. A call before Init, after Clear, or after a CTR call with a partial block throws. The PRD does not fix the exception type, so the row accepts any exception there.
-3. A CBC count that is not a multiple of 16 is refused with the exception of the frozen form.
-4. A partial overlap is refused with `ARG_RANGES_OVERLAP`.
+2. A call checks its arguments first, then the state. A null state object throws `ArgumentNullException`. A CBC count that is not a multiple of 16 is refused with the exception of the frozen form. A partial overlap is refused with `ARG_RANGES_OVERLAP`.
+3. A call on an empty or ended object throws `InvalidOperationException`. The object is empty when new and after Clear. It is ended after a CTR call with a partial block.
+4. A refused call changes neither the state object nor the output. The case goes on after a refused call, so a change shows in the next call.
+5. Init is legal in every state. A null array throws `ArgumentNullException`. Fewer than 16 bytes from the offset throws `ArgumentOutOfRangeException`.
+6. Each exception is compared by its type name, so a subtype is a difference.
 
 Limits:
 
-1. No case calls a state object again after a refused overlap or a refused CBC count. The PRD does not say what state the object has then.
-2. No case gives Init fewer than 16 bytes. The PRD does not name that refusal.
+1. A refused Init is followed at once by a good Init. The PRD does not say what state the object has after a refused Init.
+2. No case gives a streamed call a null array or a range outside its array. The allocating forms have those cases in their own rows.
 3. `Tls13Records` (one direction, one thread) is a product test. It has no acceptance row.
 4. The Verify rows check the answer. They do not check that the compare takes constant time (PRD 7.4 rule 8, and non-goal 3).
+5. The code that binds the product's state types (`AoSeams.TryStream`) has run only with the types missing. Its first run on real types is the first S1 run.
 
 Disposition: merge into `Algorithm-Optimization` before the S1 code that adds these forms.

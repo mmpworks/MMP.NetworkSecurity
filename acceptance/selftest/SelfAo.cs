@@ -649,6 +649,13 @@ namespace Acceptance
         {
             // The second message on one object keeps the chain value and the counter position of the first.
             if (_fault == "second-init-keeps-state" && _used) { State = 1; return; }
+            if (_fault == "short-init-padded" && b != null && offset >= 0 && offset <= b.Length && b.Length - offset < 16)
+            {
+                V = new byte[16];
+                Buffer.BlockCopy(b, offset, V, 0, b.Length - offset);
+                Done = 0; State = 1;
+                return;
+            }
             base.Init(b, offset);
             _used = true;
             _first = (byte[])V.Clone();
@@ -664,6 +671,16 @@ namespace Acceptance
         {
             if (_fault == "call-before-init-accepted" && State == 0) { V = new byte[16]; State = 1; }
             bool inPlace = ReferenceEquals(i, o) && io == oo;
+            // PRD 7.3 item 15: the arguments are checked before the state. This fault checks the state first.
+            if (_fault == "state-checked-before-arguments" && State != 1) throw new InvalidOperationException("planted");
+            if (_fault == "refused-call-ends-object")
+            {
+                // A refused call must change nothing. This fault ends the object after any refusal.
+                try { base.Call(i, io, n, o, oo); }
+                catch (AoHarnessException) { throw; }
+                catch (Exception) { State = 2; throw; }
+                return;
+            }
             base.Call(i, io, n, o, oo);
             if (_fault == "chain-not-carried") V = (byte[])_first.Clone();
             // Decrypt in place, taking the next chain value from the array after the plaintext went over the ciphertext.
@@ -679,6 +696,12 @@ namespace Acceptance
         public PlantedStream(string fault) { _fault = fault; }
         public override string Name { get { return "planted:" + _fault; } }
         public override IAoChain NewChain(object k, string kind) { return new PlantedChain(k, kind, _fault); }
+
+        public override void NullStateCall(object k, string kind, byte[] i, int io, int n, byte[] o, int oo)
+        {
+            if (_fault == "null-state-not-named") throw new NullReferenceException();
+            base.NullStateCall(k, kind, i, io, n, o, oo);
+        }
 
         public override bool CmacVerify(object k, byte[] m, int mo, int n, byte[] t, int to)
         {
@@ -713,6 +736,9 @@ namespace Acceptance
                 new[] { "aes-ctr-stream", "counter-not-carried" }, new[] { "aes-ctr-stream", "partial-does-not-end" },
                 new[] { "aes-ctr-stream", "call-before-init-accepted" }, new[] { "aes-ctr-stream", "clear-keeps-ready" },
                 new[] { "aes-cbc-stream", "second-init-keeps-state" }, new[] { "aes-ctr-stream", "second-init-keeps-state" },
+                new[] { "aes-cbc-stream", "state-checked-before-arguments" }, new[] { "aes-ctr-stream", "state-checked-before-arguments" },
+                new[] { "aes-cbc-stream", "refused-call-ends-object" }, new[] { "aes-ctr-stream", "refused-call-ends-object" },
+                new[] { "aes-cbc-stream", "short-init-padded" }, new[] { "aes-ctr-stream", "null-state-not-named" },
                 new[] { "aes-cmac-verify-into", "verify-skips-last-tag-byte" }, new[] { "aes-cmackey-verify-into", "verify-reads-tag-at-0" },
             };
             List<string> seen = new List<string>();
