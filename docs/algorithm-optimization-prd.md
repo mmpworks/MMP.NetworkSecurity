@@ -65,7 +65,19 @@ Limit of the anchor: AO-2 uses our own old code as the reference. AO-1 (public v
 
 ## 4. Kill condition
 
-The work ends when slices S0 to S4 each show AO-1 to AO-8 green on one head of `Algorithm-Optimization`, with the numbers in `docs/_runs/`. Target date: 2026-11-17. Slice S5 has its own go or stop decision.
+The work ends when one head of `Algorithm-Optimization` shows AO-1 to AO-8 green after slices S1 to S4, with the numbers in `docs/_runs/`. Target date: 2026-11-17. Slice S5 has its own go or stop decision.
+
+Rows that are not green before their slice, by design:
+
+| Row | State at S0 | Green from |
+|-----|-------------|------------|
+| `AO-3.aes.no-startup-build` | FAIL (the static constructor builds the tables, fact 1) | S1 |
+| `AO-3.ghash.*` | NOT RUN, NO_TABLES | S1 |
+| `AO-4.payload-worker-pool-25` and the payload rows | NOT RUN, PRODUCT_MISSING | S2 |
+| AO-3 rows for hash and DES tables | not built yet | S3 and S4 |
+| AO-2 hardware path on .NET 10 | not built yet | S6 |
+
+S0 is done when every other AO row is green, and each row in this table shows the state the table names. A row in this table that shows a different state is a red.
 
 ## 5. Non-goals
 
