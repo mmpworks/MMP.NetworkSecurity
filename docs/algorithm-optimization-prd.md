@@ -31,7 +31,7 @@ Echo writes these. Builders never write `acceptance/`.
 | AO-2 | Differential test. A frozen copy of the main 5c5d4a4 code is the reference. Random keys, lengths and offsets go through the reference and the new code. | 1,000,000 cases for each algorithm, 0 differences |
 | AO-3 | Table proof. A test builds each constant table from the math and compares it with the constant in the product. | every table equal |
 | AO-4 | Thread test. One shared key object. A payload worker encodes and decodes on `ThreadPool.QueueUserWorkItem` with the pool capped at 25. Results equal the single-thread results. | 100,000 payloads, 0 mismatches, 10 runs |
-| AO-5 | Allocation. Bytes allocated after warm-up, net10: for each block for AES, modes, TDES and hash blocks, for each message for HMAC with an `HmacKey`, and for each DUKPT key derivation. | 0 B for each block for AES, modes and hash blocks; 0 B for each message for HMAC through `HmacKey.Compute` with a caller-owned work object and output buffer |
+| AO-5 | Allocation. Bytes allocated after warm-up, net10: for each block for AES, modes, TDES and hash blocks, for each message for HMAC with an `HmacKey`, and for each DUKPT key derivation. | 0 B for each block for AES, modes, TDES and hash blocks; 0 B for each message for HMAC through `HmacKey.Compute` with a caller-owned work object and output buffer; 0 B for each DUKPT derivation and for each call of a caller-buffer form (section 7.4) |
 | AO-6 | Speed. Baseline at 5c5d4a4 and the new code, same machine, same run. | the report shows both numbers; AES target is 5 times baseline or better. The report line "CF ARM speed: UNMEASURED" stays until a run on a CE device exists |
 | AO-7 | The lesson walks still agree with the product path. | no `AES_WALK_DIVERGED`; golden files unchanged. The byte-level helpers the walk uses today move into `AesKey.Walk.cs` unchanged. The walk calls word-path code only through `EncryptBlock` and `DecryptBlock` for the last compare |
 | AO-8 | The CF build compiles, and the CF golden labs pass. | gate green |
@@ -102,15 +102,21 @@ The work ends when one head of `Algorithm-Optimization` shows the result below a
 | AO-3 rows for the GHASH table | `NOT RUN NO_TABLES` | S1 |
 | AO-4 rows for a shared `GcmKey` | `NOT RUN PRODUCT_MISSING` | S1 |
 | AO-5 rows for AES and modes | `FAIL AO5_ALLOCATES` (fact 2) | S1 |
-| AO-5 rows for hash blocks and HMAC | `FAIL AO5_ALLOCATES` | S3 |
+| AO-5 rows for the hash block loop of MD5, SHA-1, SHA-256 and SHA-512 | `PASS` (the loop allocates 0 bytes today) | S0 |
+| AO-5 rows for the Keccak block loop and for HMAC | `FAIL AO5_ALLOCATES` | S3 |
+| AO-5 rows for one whole hash message (MD5, SHA-1, SHA-256, SHA-512, Keccak) | `FAIL AO5_ALLOCATES` | S3 |
+| AO-5 rows for the caller-buffer forms of the AES modes, CMAC and GCM (section 7.4 rule 2) | `NOT RUN PRODUCT_MISSING` | S1 |
+| AO-5 rows for the caller-buffer forms of the hashes, HMAC, HKDF and the TLS PRFs | `NOT RUN PRODUCT_MISSING` | S3 |
+| AO-5 rows for the caller-buffer forms of TDES, DUKPT derivation and the PIN block | `NOT RUN PRODUCT_MISSING` | S4 |
+| AO-9 suite rows (file output equality) | `NOT RUN AO9_FILES_ABSENT` until the test files are in the tree, then `PASS` | S0 |
 | AO-5 row for TDES | `PASS` (the block path allocates 0 bytes today) | S0 |
 | AO-5 row for DUKPT derivation | `FAIL AO5_ALLOCATES` | S4 |
 | AO-2 rows for `HmacKey.Compute` | `NOT RUN PRODUCT_MISSING` | S3 |
 | AO-4 rows for the payload worker | `NOT RUN PRODUCT_MISSING` | S2 |
 | AO-7 row for the walk helpers | `FAIL AO_WALK_CALLS_AESKEY_HELPER` | S1 |
 | AO-3 rows for hash and DES tables | `NOT RUN PRODUCT_MISSING` | S3 and S4 |
-| AO-2 row for the hardware path on .NET 10 | NOT RUN, PRODUCT_MISSING | S6, outside the kill condition; it reads NOT RUN at the kill head |
-| Rows for the big-number paths | NOT RUN, PRODUCT_MISSING | S5, outside the kill condition; they read NOT RUN at the kill head |
+| AO-2 row for the hardware path on .NET 10 | `NOT RUN PRODUCT_MISSING` | S6, outside the kill condition; it reads NOT RUN at the kill head |
+| Rows for the big-number paths | `NOT RUN PRODUCT_MISSING` | S5, outside the kill condition; they read NOT RUN at the kill head |
 
 AO-6 and AO-9 are records at S0: the run stores the baseline numbers and judges nothing. From S1, the AO-9 report compares the frozen code with the new code. The AES target of 5 times baseline is judged from S1.
 
@@ -183,6 +189,26 @@ The S0 benchmark list includes AES key setup (both schedules). The row for the C
 13. S0 measures AES key setup. If the decrypt schedule in every constructor costs too much for per-transaction keys (DUKPT), an encrypt-only constructor is the fallback, and that needs a decision.
 14. HMAC with no allocation uses a working hash that the caller owns: `HmacKey.Compute(IHash work, byte[] data, int off, int len, byte[] mac, int macOff)`. One thread uses a work object at a time. The key copies its saved state into the work object through a copy-into method on the hash (hypothesis: `void CopyStateTo(IHash target)`), which throws a machine code when the target type differs. `Hmac.Compute` stays as a wrapper that allocates.
 
+### 7.4 Zero-garbage rules (ordered by Steve on 2026-11-11)
+
+Steve's order: reduce or remove memory allocation in these paths, most of all on the 3.5 build, so that the garbage collector has less to do. A design that removes the need for an allocation is better than one that makes the allocation cheaper.
+
+Why it matters on the 3.5 build: every allocated byte brings the next collection closer, and a collection stops the program. Today a GCM seal of a 4 MiB file allocates about 25 MB (262,144 blocks at about 96 bytes each). How often the Compact Framework collector runs for a given amount of allocation is not measured in this project; the benchmark records collection counts on the .NET 3.5 desktop runtime as the nearest evidence.
+
+The rules, in order of preference:
+
+1. No state on the heap. A block function keeps its state in local words. It makes no array.
+2. The caller owns the buffers. Each operation that produces bytes has a form that writes into a buffer the caller gives: `(byte[] input, int inOffset, int count, byte[] output, int outOffset)`. The form that returns a new array stays as a thin wrapper over it. This holds for ECB, CBC, CTR, GCM seal and open, CMAC, each hash `Finish`, HMAC, the TLS PRFs, HKDF, the DUKPT derivation and the PIN block.
+3. In-place work is legal. Input and output may be the same array at the same offset, so a caller can encrypt a buffer with no second buffer. The modes keep the block order of the 5c5d4a4 code (rule 7.1.9).
+4. A key object holds all it needs for its life: round keys, the GHASH table, the padded HMAC states. It builds them one time, in its constructor. No call builds them again.
+5. A running operation that needs state between calls keeps it in an object the caller owns and can use again: a hash object has `Reset()`, and a mode with a running state (CTR counter, CBC chain, GCM tag state) takes a small state object from the caller. One thread uses a state object at a time.
+6. The payload worker takes buffers from a bounded set that it owns, built one time, and gives each buffer back when its `done` call returns. Taking and giving back use `Interlocked` only. When the set is empty, `TryEncode` returns false; the worker does not allocate a new buffer in its place.
+7. No hidden allocation in a hot path: no closure or delegate made for each call, no `params` array, no boxing of a value type, no string building, no `foreach` over an interface, no exception used for flow.
+8. A check that compares a tag or a digest uses the bytes where they are. It makes no copy to compare.
+
+What stays allocated, by design: one key object for each key, the buffers a caller makes, and the lesson walk (it records steps, and it is no product path).
+
+The test rows for these rules are in section 4.3: each AO-5 block row, each AO-5 message row, and one AO-5 row for each caller-buffer form (0 bytes for each call, with the output array included, because the caller made it).
 ## 8. Boundary and failure routing
 
 1. Free without asking: edits in the `Algorithm-Optimization` worktrees, PRs into `Algorithm-Optimization`, heavy runs through `tools/heavy_lock.py`.
