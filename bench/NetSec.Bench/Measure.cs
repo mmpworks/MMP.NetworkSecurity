@@ -133,9 +133,12 @@ static class Measure
     }
 
     /// <summary>
-    /// Raises this process and thread to High / Highest and pins the process to one logical processor, so the paired rounds always run on
-    /// the same core and never migrate. The core is the last logical processor, or --core N. Returns what it set, for the report.
-    /// <see cref="Unpin"/> gives the process every core back for the 25-thread run.
+    /// Raises this process and thread to High / Highest and pins THIS THREAD (the one that times the rounds) to one logical processor, so
+    /// the paired rounds always run on the same core and never migrate. The core is the fastest one, or --core N. Returns what it set, for
+    /// the report. <see cref="Unpin"/> gives the thread every core back for the 25-thread run.
+    /// The pin is per thread, not per process: with the whole process on one core, the runtime's background tiering thread shared that
+    /// core with a Highest-priority timing loop, so each copy reached optimized code at a random time (2026-11-11: tdes.encrypt-block
+    /// alone ran 11908 ns, against 2326 ns with tiering off, and a same-code ratio of 0.748 in a full run).
     /// </summary>
     public static string RaisePriority(int? core)
     {
@@ -149,8 +152,8 @@ static class Measure
             Thread.CurrentThread.Priority = ThreadPriority.Highest;
             string why = core.HasValue ? "chosen by --core" : fastest == null ? "no CPU set information, so processor 0"
                 : "core " + fastest.Core + ", efficiency class " + fastest.EfficiencyClass + " (the highest on this CPU; lowest is " + fastest.LowestClass + ")";
-            return "process priority High, thread priority Highest, pinned to logical processor " + pick + " of " + Environment.ProcessorCount
-                + ", " + why + ", for the paired rounds (all processors for the 25-thread run)";
+            return "process priority High, thread priority Highest, timing thread pinned to logical processor " + pick + " of " + Environment.ProcessorCount
+                + ", " + why + ", for the paired rounds; runtime threads (tiered JIT, GC) on any processor (all processors for the 25-thread run)";
         }
         catch (Exception e)
         {
@@ -160,13 +163,22 @@ static class Measure
 
     public static void Unpin() => SetAffinity(Environment.ProcessorCount >= 64 ? -1L : (1L << Environment.ProcessorCount) - 1);
 
-    /// <summary>Process affinity exists on Windows and Linux only; the bench runs on Windows, and the guard keeps the platform analyzer exact.</summary>
+    [System.Runtime.InteropServices.DllImport("kernel32.dll")]
+    static extern IntPtr GetCurrentThread();
+
+    [System.Runtime.InteropServices.DllImport("kernel32.dll", SetLastError = true)]
+    static extern UIntPtr SetThreadAffinityMask(IntPtr thread, UIntPtr mask);
+
+    /// <summary>Sets the calling thread's affinity (Windows only; the bench runs on Windows). BeginThreadAffinity keeps the managed thread
+    /// on this OS thread.</summary>
     static void SetAffinity(long mask)
     {
 #if NET
         if (!OperatingSystem.IsWindows()) throw new PlatformNotSupportedException("the bench pins a core on Windows only");
 #endif
-        using (Process p = Process.GetCurrentProcess()) p.ProcessorAffinity = (IntPtr)mask;
+        Thread.BeginThreadAffinity();
+        if (SetThreadAffinityMask(GetCurrentThread(), (UIntPtr)(ulong)mask) == UIntPtr.Zero)
+            throw new System.ComponentModel.Win32Exception(System.Runtime.InteropServices.Marshal.GetLastWin32Error());
     }
 }
 
