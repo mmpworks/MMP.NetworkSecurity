@@ -308,7 +308,9 @@ namespace Acceptance
             foreach (KeyValuePair<string, Action> p in new[] {
                 new KeyValuePair<string, Action>("one byte[1] per call", delegate { sink = new byte[1]; }),
                 new KeyValuePair<string, Action>("a byte[32] plus one object per call", delegate { sink = new byte[32]; sink = new object(); }),
-                new KeyValuePair<string, Action>("one byte[16] per 64 calls", MakeRare()) })
+                new KeyValuePair<string, Action>("one byte[16] per 64 calls", MakeRare(64)),
+                // Rarer than once in 400 calls: the lowest round can read 0 B, so only the highest round sees it (Jared on #405, N2).
+                new KeyValuePair<string, Action>("one byte[16] per 1000 calls", MakeRare(1000)) })
             {
                 int outLen = p.Key.StartsWith("a byte[32]") ? 32 : -1;
                 string got;
@@ -321,11 +323,11 @@ namespace Acceptance
             return "control: " + none + "; " + arrayOnly + "; planted: " + string.Join("; ", planted.ToArray());
         }
 
-        static Action MakeRare()
+        static Action MakeRare(int every)
         {
             int n = 0;
             object keep = null;
-            return delegate { if (++n % 64 == 0) keep = new byte[16]; GC.KeepAlive(keep); };
+            return delegate { if (++n % every == 0) keep = new byte[16]; GC.KeepAlive(keep); };
         }
 
         [Clause("SELF.ao9-files-bite", TimeoutSec = 900)]

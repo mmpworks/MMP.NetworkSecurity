@@ -115,6 +115,23 @@ namespace Acceptance
             return null;
         }
 
+        /// <summary>
+        /// GcmKey.Seal(nonce, aad, plain) on one GcmKey built from k (ctor(AesKey) or ctor(byte[] key)), as a closed delegate, or null when
+        /// no public GcmKey exists. A GcmKey without that shape is NOT RUN SIGNATURE_NOT_CONFIRMED.
+        /// </summary>
+        public static Func<byte[], byte[], byte[], byte[]> GcmKeySeal(AesKey k)
+        {
+            Type t = null;
+            foreach (Type x in typeof(AesKey).Assembly.GetTypes()) if (x.Name == "GcmKey" && x.IsPublic) t = x;
+            if (t == null) return null;
+            System.Reflection.MethodInfo m = t.GetMethod("Seal", new[] { typeof(byte[]), typeof(byte[]), typeof(byte[]) });
+            System.Reflection.ConstructorInfo byAes = t.GetConstructor(new[] { typeof(AesKey) });
+            if (m == null || m.ReturnType != typeof(byte[]) || byAes == null)
+                throw new Acceptance.NotRunException("SIGNATURE_NOT_CONFIRMED", "GcmKey exists but lacks ctor(AesKey) and byte[] Seal(byte[] nonce, byte[] aad, byte[] plain) (PRD 7.3 item 2)");
+            object key = byAes.Invoke(new object[] { k });
+            return (Func<byte[], byte[], byte[], byte[]>)Delegate.CreateDelegate(typeof(Func<byte[], byte[], byte[], byte[]>), key, m);
+        }
+
         public static bool HasType(string name)
         {
             foreach (Type t in typeof(AesKey).Assembly.GetTypes()) if (t.Name == name && t.IsPublic) return true;

@@ -12,8 +12,9 @@ namespace Acceptance
     public static class AoAlloc
     {
         const int Blocks = 64;
-        static double PerUnit(Action op, int outLen, int units) { return AoAllocMeter.PerUnit(op, outLen, units); }
-        static string Judge(string what, double perUnit, string unit) { return AoAllocMeter.Judge(what, perUnit, unit); }
+        static AoAllocMeter.PerUnitResult PerUnit(Action op, int outLen, int units) { return AoAllocMeter.PerUnit(op, outLen, units); }
+        static string Judge(string what, AoAllocMeter.PerUnitResult p, string unit) { return AoAllocMeter.Judge(what, p, unit); }
+        static AoAllocMeter.PerUnitResult Larger(AoAllocMeter.PerUnitResult a, AoAllocMeter.PerUnitResult b) { return AoAllocMeter.Max(a, b); }
 
         static AesKey Aes(Ctx c) { AoSubject.Make(c); return new AesKey(new Rng(0xA05).Bytes(16)); }
         static readonly byte[] Data = new Rng(0xA05D).Bytes(16 * Blocks);
@@ -24,8 +25,9 @@ namespace Acceptance
         {
             AesKey k = Aes(c);
             byte[] i = new byte[16], o = new byte[16];
-            double enc = PerUnit(delegate { k.EncryptBlock(i, 0, o, 0); }, -1, 1), dec = PerUnit(delegate { k.DecryptBlock(i, 0, o, 0); }, -1, 1);
-            return Judge("AesKey.EncryptBlock/DecryptBlock", Math.Max(enc, dec), "block");
+            var enc = PerUnit(delegate { k.EncryptBlock(i, 0, o, 0); }, -1, 1);
+            var dec = PerUnit(delegate { k.DecryptBlock(i, 0, o, 0); }, -1, 1);
+            return Judge("AesKey.EncryptBlock/DecryptBlock", Larger(enc, dec), "block");
         }
 
         [Clause("AO-5.aes-ecb.net10")]
@@ -35,15 +37,25 @@ namespace Acceptance
         public static string AesCbc(Ctx c)
         {
             AesKey k = Aes(c);
-            double e = PerUnit(delegate { Modes.CbcEncrypt(k, Iv, Data); }, Data.Length, Blocks), d = PerUnit(delegate { Modes.CbcDecrypt(k, Iv, Data); }, Data.Length, Blocks);
-            return Judge("Modes.CbcEncrypt/CbcDecrypt", Math.Max(e, d), "block");
+            var e = PerUnit(delegate { Modes.CbcEncrypt(k, Iv, Data); }, Data.Length, Blocks);
+            var d = PerUnit(delegate { Modes.CbcDecrypt(k, Iv, Data); }, Data.Length, Blocks);
+            return Judge("Modes.CbcEncrypt/CbcDecrypt", Larger(e, d), "block");
         }
 
         [Clause("AO-5.aes-ctr.net10")]
         public static string AesCtr(Ctx c) { AesKey k = Aes(c); return Judge("Modes.Ctr", PerUnit(delegate { Modes.Ctr(k, Iv, Data); }, Data.Length, Blocks), "block"); }
 
         [Clause("AO-5.aes-gcm.net10")]
-        public static string AesGcm(Ctx c) { AesKey k = Aes(c); return Judge("Gcm.Seal", PerUnit(delegate { Gcm.Seal(k, Nonce, Aad, Data); }, Data.Length + 16, Blocks), "block"); }
+        public static string AesGcm(Ctx c)
+        {
+            AesKey k = Aes(c);
+            // Jared on #405, B1: PRD 7.3 item 12 says the static Gcm.Seal builds a GcmKey on each call, so the S1 claim is about GcmKey.Seal.
+            // When the type exists, the row measures GcmKey.Seal(nonce, aad, plain) on one key built outside the loop, through a closed
+            // delegate (a reflection call would allocate its own argument array). Until then it measures the wrapper.
+            Func<byte[], byte[], byte[], byte[]> seal = AoSeams.GcmKeySeal(k);
+            if (seal == null) return Judge("Gcm.Seal (the wrapper; no GcmKey yet)", PerUnit(delegate { Gcm.Seal(k, Nonce, Aad, Data); }, Data.Length + 16, Blocks), "block");
+            return Judge("GcmKey.Seal", PerUnit(delegate { seal(Nonce, Aad, Data); }, Data.Length + 16, Blocks), "block");
+        }
 
         [Clause("AO-5.aes-cmac.net10")]
         public static string AesCmac(Ctx c) { AesKey k = Aes(c); return Judge("Cmac.Compute", PerUnit(delegate { Cmac.Compute(k, Data); }, 16, Blocks), "block"); }
@@ -99,8 +111,9 @@ namespace Acceptance
             AoSubject.Make(c);
             TdesKey k = new TdesKey(new Rng(0xA05E).Bytes(24));
             byte[] i = new byte[8], o = new byte[8];
-            double e = PerUnit(delegate { k.EncryptBlock(i, 0, o, 0); }, -1, 1), d = PerUnit(delegate { k.DecryptBlock(i, 0, o, 0); }, -1, 1);
-            return Judge("TdesKey.EncryptBlock/DecryptBlock", Math.Max(e, d), "block");
+            var e = PerUnit(delegate { k.EncryptBlock(i, 0, o, 0); }, -1, 1);
+            var d = PerUnit(delegate { k.DecryptBlock(i, 0, o, 0); }, -1, 1);
+            return Judge("TdesKey.EncryptBlock/DecryptBlock", Larger(e, d), "block");
         }
 
         [Clause("AO-5.dukpt-derive.net10")]
