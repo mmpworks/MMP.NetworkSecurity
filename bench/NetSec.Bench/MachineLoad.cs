@@ -13,17 +13,22 @@ namespace NetSec.Bench;
 /// 2026-11-11 a dotnet test from another worktree started one minute into an S0 run and pushed one same-code ratio to 1.187.
 /// A developer desktop is never idle (a browser and editors held 30 to 45% of all processors in the same hour, per the Windows
 /// processor counter), so the rule is about NEW load: each timing host first waits for a steady baseline, and a pair fails the run when
-/// its outside load rose more than <see cref="Rise"/> above that baseline.
+/// its outside load rose more than <see cref="Rise"/> above that baseline (the baseline is never taken below <see cref="Floor"/>).
 /// </summary>
 static class MachineLoad
 {
     // 10 points of 24 logical processors is about 2.4 busy cores: a browser drifts less, a dotnet build or test adds more.
     public const double Rise = 0.10, Steady = 0.05;
+
+    // shortcut: a fixed floor under the baseline, from this desktop's measured normal (2026-11-11 Job T: clean rows 12 to 32%,
+    // a Chrome-only row 30.3%, rustc rows 41 to 57%), so a quiet dip at settle cannot set a limit that ordinary desktop use breaks.
+    // Upgrade when the bench runs on another machine: measure its normal and set the floor from it.
+    public const double Floor = 0.25;
     public const int BusyExit = 8;
     static readonly TimeSpan SettleLimit = TimeSpan.FromMinutes(2), Window = TimeSpan.FromSeconds(1);
     const int BaselineWindows = 3;
 
-    /// <summary>The outside load a pair may reach: the settle baseline plus <see cref="Rise"/>. NaN until <see cref="Settle"/> succeeds.</summary>
+    /// <summary>The outside load a pair may reach: max(settle baseline, <see cref="Floor"/>) plus <see cref="Rise"/>. NaN until <see cref="Settle"/> succeeds.</summary>
     public static double Limit = double.NaN;
 
     // GetSystemTimes gives FILETIME values (100 ns ticks summed over all logical processors); kernel time includes idle time.
@@ -112,7 +117,7 @@ static class MachineLoad
             filled++;
             if (filled >= BaselineWindows && last.Max() - last.Min() <= Steady)
             {
-                Limit = last.Average() + Rise;
+                Limit = Math.Max(last.Average(), Floor) + Rise;
                 Console.WriteLine(string.Format(CultureInfo.InvariantCulture,
                     "BENCH_SETTLE outside load {0:P1} (steady {1:P1} to {2:P1}) after {3:F0} s; a pair fails above {4:P1}",
                     last.Average(), last.Min(), last.Max(), waited.Elapsed.TotalSeconds, Limit));
