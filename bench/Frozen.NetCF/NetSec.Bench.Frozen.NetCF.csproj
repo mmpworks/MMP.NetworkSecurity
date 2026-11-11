@@ -1,0 +1,38 @@
+<Project Sdk="Microsoft.NET.Sdk">
+
+  <!-- Echo's frozen 5c5d4a4 copy compiled for CF 3.5, with the settings of src/NetSec.Core.NetCF, so the net48 run of the bench
+       times "original" as CF binaries too. The files are linked from acceptance/groups/algo/Frozen, never copied. -->
+
+  <PropertyGroup>
+    <TargetFramework>net35</TargetFramework>
+    <LangVersion>3</LangVersion>
+    <AssemblyName>Acceptance.Frozen</AssemblyName>
+    <RootNamespace>Acceptance.Frozen</RootNamespace>
+    <DefineConstants>$(DefineConstants);NETCF</DefineConstants>
+    <AutomaticallyUseReferenceAssemblyPackages>false</AutomaticallyUseReferenceAssemblyPackages>
+    <FrameworkPathOverride>$(NetCFRefDir)</FrameworkPathOverride>
+    <GenerateAssemblyFileVersionAttribute>false</GenerateAssemblyFileVersionAttribute>
+    <NoStdLib>true</NoStdLib>
+    <NoCompilerStandardLib>true</NoCompilerStandardLib>
+    <DisableImplicitFrameworkReferences>true</DisableImplicitFrameworkReferences>
+    <GenerateTargetFrameworkAttribute>false</GenerateTargetFrameworkAttribute>
+    <EnableDefaultCompileItems>false</EnableDefaultCompileItems>
+    <IsPackable>false</IsPackable>
+    <NoWarn>$(NoWarn);CS1591;CS1685</NoWarn>
+  </PropertyGroup>
+
+  <ItemGroup>
+    <Compile Include="..\..\acceptance\groups\algo\Frozen\*.cs" Link="Frozen\%(Filename)%(Extension)" />
+  </ItemGroup>
+
+  <ItemGroup>
+    <Reference Include="mscorlib"><HintPath>$(NetCFRefDir)\mscorlib.dll</HintPath><Private>false</Private></Reference>
+    <Reference Include="System"><HintPath>$(NetCFRefDir)\System.dll</HintPath><Private>false</Private></Reference>
+    <Reference Include="System.Core"><HintPath>$(NetCFRefDir)\System.Core.dll</HintPath><Private>false</Private></Reference>
+  </ItemGroup>
+
+  <Target Name="CheckNetCFRefDir" BeforeTargets="CoreCompile">
+    <Error Condition="!Exists('$(NetCFRefDir)\mscorlib.dll')" Text="CF 3.5 reference assemblies missing at $(NetCFRefDir)." />
+  </Target>
+
+</Project>

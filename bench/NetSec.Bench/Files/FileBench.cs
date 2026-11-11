@@ -26,7 +26,7 @@ sealed class ThreadRow
 {
     public string Code, File;
     public int Workers, CallsPerWorker, Mismatches;
-    public double TotalMegabytesPerSecond;
+    public double TotalMegabytesPerSecond, WallNs;
     public long PeakWorkingSet;
     public string PoolCap;
 }
@@ -130,6 +130,7 @@ static class FileBench
             {
                 Code = code.Name, File = f.Name, Workers = workers, CallsPerWorker = callsPerWorker, Mismatches = mismatches, PoolCap = cap,
                 TotalMegabytesPerSecond = (double)f.Bytes.Length * workers * callsPerWorker / sw.Elapsed.TotalSeconds / (1024 * 1024),
+                WallNs = sw.Elapsed.TotalMilliseconds * 1e6,
                 PeakWorkingSet = PeakWorkingSet(),
             };
         }

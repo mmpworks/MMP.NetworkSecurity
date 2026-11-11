@@ -1,0 +1,20 @@
+<Project Sdk="Microsoft.NET.Sdk">
+
+  <!-- Echo's frozen 5c5d4a4 copy (acceptance/groups/algo/Frozen, made by acceptance/tools/freeze_ref.py), compiled for .NET 10
+       with the settings of src/NetSec.Core: LangVersion 3, so "original" binds the way the product build bound at 5c5d4a4.
+       The files are linked, never copied; freeze_ref.py in check mode fails on any byte change. -->
+
+  <PropertyGroup>
+    <TargetFramework>net10.0</TargetFramework>
+    <LangVersion>3</LangVersion>
+    <AssemblyName>Acceptance.Frozen</AssemblyName>
+    <RootNamespace>Acceptance.Frozen</RootNamespace>
+    <IsPackable>false</IsPackable>
+    <EnableDefaultCompileItems>false</EnableDefaultCompileItems>
+  </PropertyGroup>
+
+  <ItemGroup>
+    <Compile Include="..\..\acceptance\groups\algo\Frozen\*.cs" Link="Frozen\%(Filename)%(Extension)" />
+  </ItemGroup>
+
+</Project>

@@ -28,19 +28,26 @@ static class Program
         if (refusal != null) { Console.Error.WriteLine(refusal); return 3; }
 
         string build = BuildName();
-        if (a.TryGetValue("mode", out string mode) && mode == "files") return Files.FilesMode.Run(a, build, CfLine);
+        a.TryGetValue("mode", out string mode);
+        if (mode == "files") return Files.FilesMode.Run(a, build, CfLine);
+        if (mode == "ao-merge") return AoParts.Merge(a);
         string filter = a.TryGetValue("filter", out string f) ? f : "";
-        List<CaseResult> results = new List<CaseResult>();
-        foreach (BenchCase c in Cases.All().Where(c => c.Id.Contains(filter)))
+
+        // Each case runs on the frozen copy, then at once on the product, so a slow spell on the machine hits both columns alike.
+        List<BenchCase> original = Cases.All(new Files.FrozenCode()), current = Cases.All(new Files.ProductCode());
+        List<CaseResult> baseline = new List<CaseResult>(), results = new List<CaseResult>();
+        for (int i = 0; i < current.Count; i++)
         {
-            CaseResult r = Measure.Run(c);
-            results.Add(r);
-            Console.WriteLine(Row(r));
+            if (!current[i].Id.Contains(filter)) continue;
+            baseline.Add(Measure.Run(original[i]));
+            results.Add(Measure.Run(current[i]));
+            Console.WriteLine(Row(results[results.Count - 1]) + string.Format(CultureInfo.InvariantCulture, "   original {0,10:F1} ns", baseline[baseline.Count - 1].MedianNsPerUnit));
         }
 
         Directory.CreateDirectory(a["out"]);
         File.WriteAllText(Path.Combine(a["out"], "bench-" + build + ".json"), Report.Json(build, a["head"], results, CfLine));
-        File.WriteAllText(Path.Combine(a["out"], "bench-" + build + ".md"), Report.Markdown(build, a["head"], results, CfLine));
+        File.WriteAllText(Path.Combine(a["out"], "bench-" + build + ".md"), Report.Markdown(build, a["head"], baseline, results, CfLine));
+        if (build == "net10") AoParts.Write(a["out"], "net10-blocks", Report.AoBlockRows(baseline, results));
         Console.WriteLine(CfLine);
         Console.WriteLine("BENCH_DONE " + build + " " + results.Count + " cases");
         return 0;

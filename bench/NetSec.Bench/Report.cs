@@ -44,7 +44,28 @@ static class Report
         return s.ToString();
     }
 
-    public static string Markdown(string build, string head, IList<CaseResult> results, string cfLine)
+    /// <summary>
+    /// The AO-5 and AO-6 rows of acceptance/ao-bench-schema.md: one AO-5 row (bytes per operation, product) and one AO-6 row (frozen and
+    /// product ns per operation) for each case in <see cref="Cases.AoId"/>. Numbers only; the suite judges them. <see cref="AoParts"/> writes them.
+    /// </summary>
+    public static List<string> AoBlockRows(IList<CaseResult> baseline, IList<CaseResult> results)
+    {
+        List<string> rows = new List<string>();
+        for (int i = 0; i < results.Count; i++)
+        {
+            if (!Cases.AoId.TryGetValue(results[i].Case.Id, out var ao)) continue;
+            if (ao.Row != "aes-key-setup")
+                rows.Add(string.Format(Inv, "{{ \"id\": \"AO-5.{0}.net10\", \"bytesPerOp\": {1:F2}, \"op\": {2} }}", ao.Row, results[i].BytesAllocatedPerUnit, Quote(ao.Op)));
+            rows.Add(string.Format(Inv, "{{ \"id\": \"AO-6.{0}.net10\", \"baselineNsPerOp\": {1:F2}, \"newNsPerOp\": {2:F2}, \"op\": {3} }}",
+                ao.Row, baseline[i].MedianNsPerUnit, results[i].MedianNsPerUnit, Quote(ao.Op)));
+        }
+        return rows;
+    }
+
+    /// <summary>CPU name and logical processor count, as the schema asks. The machine name is left out, because the report is public.</summary>
+    public static string Cpu() => (Environment.GetEnvironmentVariable("PROCESSOR_IDENTIFIER") ?? "unknown CPU") + "; " + Environment.ProcessorCount + " logical processors";
+
+    public static string Markdown(string build, string head, IList<CaseResult> baseline, IList<CaseResult> results, string cfLine)
     {
         StringBuilder s = new StringBuilder();
         s.AppendLine("# Benchmark: " + build);
@@ -55,14 +76,17 @@ static class Report
         s.AppendLine("- Allocation counter: " + Allocated.Method);
         s.AppendLine("- " + cfLine);
         s.AppendLine();
-        s.AppendLine("| Case | Unit | ns per unit (median) | Spread of rounds | B allocated per unit | B allocated per op | MB/s |");
-        s.AppendLine("|---|---|---:|---:|---:|---:|---:|");
-        foreach (CaseResult r in results)
+        s.AppendLine("Original is Echo's frozen 5c5d4a4 copy; new is the product at the head. Ratio is original ns over new ns, so above 1 means the new code is faster.");
+        s.AppendLine();
+        s.AppendLine("| Case | Unit | Original ns per unit | New ns per unit | Ratio | New spread of rounds | Original B per unit | New B per unit | New MB/s |");
+        s.AppendLine("|---|---|---:|---:|---:|---:|---:|---:|---:|");
+        for (int i = 0; i < results.Count; i++)
         {
+            CaseResult o = baseline[i], r = results[i];
             double lo = r.NsPerOpRounds.Min() / r.Case.UnitsPerOp, hi = r.NsPerOpRounds.Max() / r.Case.UnitsPerOp;
-            s.AppendLine(string.Format(Inv, "| `{0}` | {1} | {2:F1} | {3:F1} to {4:F1} | {5:F1} | {6:F0} | {7} |",
-                r.Case.Id, r.Case.Unit, r.MedianNsPerUnit, lo, hi, r.BytesAllocatedPerUnit, r.BytesAllocatedPerOp,
-                r.Case.BytesPerOp == 0 ? "n/a" : r.MegabytesPerSecond.ToString("F1", Inv)));
+            s.AppendLine(string.Format(Inv, "| `{0}` | {1} | {2:F1} | {3:F1} | {4:F2} | {5:F1} to {6:F1} | {7:F1} | {8:F1} | {9} |",
+                r.Case.Id, r.Case.Unit, o.MedianNsPerUnit, r.MedianNsPerUnit, o.MedianNsPerUnit / r.MedianNsPerUnit, lo, hi,
+                o.BytesAllocatedPerUnit, r.BytesAllocatedPerUnit, r.Case.BytesPerOp == 0 ? "n/a" : r.MegabytesPerSecond.ToString("F1", Inv)));
         }
         return s.ToString();
     }
@@ -72,7 +96,7 @@ static class Report
 
     static void Field(StringBuilder s, string name, string value) => s.Append("  ").Append(Quote(name)).Append(": ").Append(Quote(value)).Append(",\n");
 
-    static string Quote(string v)
+    public static string Quote(string v)
     {
         StringBuilder q = new StringBuilder("\"");
         foreach (char c in v)
