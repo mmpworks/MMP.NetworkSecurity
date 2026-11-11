@@ -39,9 +39,17 @@ static class MachineLoad
     /// <summary>The pinned logical processor and its hyper-thread sibling (set by <see cref="Measure.RaisePriority"/>); empty when not pinned.</summary>
     public static int[] CorePair = new int[0];
 
+    [DllImport("kernel32.dll")]
+    static extern IntPtr GetCurrentThread();
+
+    [DllImport("kernel32.dll", SetLastError = true)]
+    static extern bool GetThreadTimes(IntPtr thread, out long creation, out long exit, out long kernel, out long user);
+
     public struct Sample
     {
-        public long Idle, Total, Own, CoreIdle, CoreTotal;
+        // Own: this process (all threads), for the machine figure. OwnThread: the calling (timing) thread, the only thread pinned to the
+        // core pair, for the core figure. Runtime threads on the pair count as outside work there, which they are for the timed rounds.
+        public long Idle, Total, Own, OwnThread, CoreIdle, CoreTotal;
     }
 
     public static Sample Now()
@@ -50,6 +58,7 @@ static class MachineLoad
         Sample s;
         using (Process self = Process.GetCurrentProcess())
             s = new Sample { Idle = idle, Total = kernel + user, Own = self.TotalProcessorTime.Ticks };
+        if (GetThreadTimes(GetCurrentThread(), out long _, out long _, out long threadKernel, out long threadUser)) s.OwnThread = threadKernel + threadUser;
         long[] info = new long[LongsPerProcessor * Environment.ProcessorCount];
         if (CorePair.Length == 0 || NtQuerySystemInformation(ProcessorPerformanceClass, info, info.Length * 8, out int _) != 0) return s;
         foreach (int lp in CorePair)
@@ -60,13 +69,13 @@ static class MachineLoad
         return s;
     }
 
-    /// <summary>The busy share of the pinned core pair between two samples, less this process (which runs only on the pinned processor
-    /// while timing). NaN when the pair was not read.</summary>
+    /// <summary>The busy share of the pinned core pair between two samples, less the timing thread (pinned there). NaN when the pair was
+    /// not read.</summary>
     public static double CoreBusy(Sample from, Sample to)
     {
         long total = to.CoreTotal - from.CoreTotal;
         if (total <= 0) return double.NaN;
-        long busy = total - (to.CoreIdle - from.CoreIdle) - (to.Own - from.Own);
+        long busy = total - (to.CoreIdle - from.CoreIdle) - (to.OwnThread - from.OwnThread);
         return Math.Max(0, (double)busy / total);
     }
 
