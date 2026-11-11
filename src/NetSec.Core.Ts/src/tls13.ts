@@ -118,13 +118,20 @@ export function keySchedule(m: Tls13Messages, ecdheShared: ArrayLike<number>, ti
     ['s_hs_traffic'],
     hkdfExpandLabel(sHs, 'finished', EMPTY, HASH_LEN),
   )
-  const hToCv = hashOf(m.clientHello, m.serverHello, m.encryptedExtensions, m.certificate, m.certificateVerify)
+  const hToCv = add(
+    'hash_to_certificate_verify',
+    'Transcript-Hash(ClientHello...CertificateVerify)',
+    'handshake',
+    'SHA-256 of every message up to CertificateVerify',
+    [],
+    hashOf(m.clientHello, m.serverHello, m.encryptedExtensions, m.certificate, m.certificateVerify),
+  )
   add(
     's_finished_verify_data',
     'server Finished verify_data',
     'handshake',
     'HMAC(finished_key, Transcript-Hash(ClientHello...CertificateVerify))',
-    ['s_finished_key'],
+    ['s_finished_key', 'hash_to_certificate_verify'],
     hmacSha256(sFinKey, hToCv),
   )
 
@@ -357,7 +364,7 @@ export interface Field {
   /** Offset of the first byte in the message, header included. */
   readonly at: number
   readonly length: number
-  /** The value in plain words: "TLS 1.2", "x25519", "32 bytes". */
+  /** The value in simple words: "TLS 1.2", "x25519", "32 bytes". */
   readonly text: string
 }
 
@@ -366,7 +373,7 @@ export interface Extension {
   readonly name: string
   readonly at: number
   readonly length: number
-  /** What the extension says, in plain words. */
+  /** What the extension says, in simple words. */
   readonly text: string
   readonly data: Uint8Array
 }
@@ -445,6 +452,7 @@ function readExtensions(r: Reader, base: number, inServerHello: boolean): Extens
       }),
     )
   }
+  if (r.pos !== end) throw new TlsParseError('An extension runs past the end of the extensions block.')
   return out
 }
 

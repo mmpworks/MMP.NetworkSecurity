@@ -135,4 +135,40 @@ describe('the message reader', () => {
   test('a wrong length throws a coded error', () => {
     assert.throws(() => parseHandshake(messages.serverHello.subarray(0, 40)), { code: 'TLS_PARSE' })
   })
+  test('an extension that runs past its block, and a field cut short, throw a coded error', () => {
+    // EncryptedExtensions: a block length of 2, then one extension of 8 bytes.
+    const overrun = hexToBytes('08' + '00000a' + '0002' + '000a0004' + '00000000')
+    assert.throws(() => parseHandshake(overrun), { code: 'TLS_PARSE' })
+    // ServerHello with a correct outer length, cut inside the random value.
+    const cut = hexToBytes('02' + '000006' + '0303' + 'aabbccdd')
+    assert.throws(() => parseHandshake(cut), { code: 'TLS_PARSE' })
+  })
+})
+
+describe('what each value comes from (RFC 8446 section 7.1)', () => {
+  // The lesson says which values a value comes from. These lists are written from the RFC figure, not from the code.
+  const FROM: Record<string, string[]> = {
+    early_secret: [],
+    derived_for_handshake: ['early_secret', 'empty_hash'],
+    handshake_secret: ['derived_for_handshake'],
+    c_hs_traffic: ['handshake_secret', 'hash_client_hello_to_server_hello'],
+    s_hs_traffic: ['handshake_secret', 'hash_client_hello_to_server_hello'],
+    s_hs_key: ['s_hs_traffic'],
+    c_hs_iv: ['c_hs_traffic'],
+    s_finished_key: ['s_hs_traffic'],
+    s_finished_verify_data: ['s_finished_key', 'hash_to_certificate_verify'],
+    derived_for_master: ['handshake_secret', 'empty_hash'],
+    master_secret: ['derived_for_master'],
+    c_ap_traffic: ['master_secret', 'hash_to_server_finished'],
+    s_ap_traffic: ['master_secret', 'hash_to_server_finished'],
+    exp_master: ['master_secret', 'hash_to_server_finished'],
+    c_ap_key: ['c_ap_traffic'],
+    c_finished_key: ['c_hs_traffic'],
+    c_finished_verify_data: ['c_finished_key', 'hash_to_server_finished'],
+    res_master: ['master_secret', 'hash_to_client_finished'],
+    resumption_secret: ['res_master'],
+  }
+  for (const [id, from] of Object.entries(FROM)) {
+    test(id, () => assert.deepEqual([...schedule.byId[id].from], from))
+  }
 })
