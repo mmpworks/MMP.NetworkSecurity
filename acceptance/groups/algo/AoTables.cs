@@ -258,6 +258,9 @@ namespace Acceptance
 
         public static string NoStartupBuild(List<Type> types)
         {
+            int tables = 0;
+            foreach (Type t in types) tables += TableFields(t).Count;
+            if (tables == 0) throw new NotRunException("NO_TABLES", "no static table in the scope (" + types.Count + " types), so there is no start-up build to judge");
             List<string> bad = new List<string>();
             foreach (Type t in types) { string why = StartupBuild(t); if (why != null) bad.Add(why); }
             if (bad.Count > 0) throw new FailException("AO_TABLE_BUILT_AT_STARTUP", string.Join("; ", bad.ToArray()));

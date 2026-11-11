@@ -10,6 +10,12 @@ namespace Acceptance
         public static AoSide Make(Ctx c) { return new FrozenSide(); }
     }
 
+    public static class AoSeams
+    {
+        public static System.Reflection.ConstructorInfo PortableSeam() { return null; }
+        public static bool HasType(string name) { return false; }
+    }
+
     /// <summary>
     /// The frozen reference with one planted fault: the kind of mistake an optimization makes. Each fault must turn its AO check red.
     /// </summary>
@@ -250,6 +256,46 @@ namespace Acceptance
             new[] { "tls11-prf", "prf-count-zero-null" }, new[] { "pinblock-format4", "pin-ignores-pan" },
             new[] { "aes-walk", "walk-wrong-for-192" },
         };
+
+        [Clause("SELF.ao2-second-referee-agrees-and-bites", TimeoutSec = 1800)]
+        public static string Ao2SecondReferee(Ctx c)
+        {
+            List<string> ran = new List<string>();
+            foreach (string alg in AoGrammar.Algorithms)
+            {
+                if (!BclSide.Supports(alg)) continue;
+                string r = AoDiff.Run(alg, new FrozenSide(), new FrozenSide(), new BclSide(), SelfCases);
+                if (!r.StartsWith(SelfCases + " of ") || r.Contains(" ran 0 cases")) throw new FailException(alg + ": the BCL referee did not agree or did not run: " + r);
+                ran.Add(alg);
+            }
+            string planted;
+            try { planted = "PASS " + AoDiff.Run("sha256", new FrozenSide(), new FrozenSide(), new PlantedSide("hash-drops-byte-at-block-split"), SelfCases); }
+            catch (FailException e) { planted = "FAIL " + e.Reason + " " + e.Message; }
+            if (!planted.StartsWith("FAIL AO_DIFFERS") || !planted.Contains("the second referee")) throw new FailException("a wrong second referee went unseen: " + planted);
+            return "BCL agrees with the frozen reference on the clean cases of " + ran.Count + " algorithms (" + string.Join(", ", ran.ToArray()) + "); a wrong second referee FAILs AO_DIFFERS";
+        }
+
+        [Clause("SELF.ao7-walk-helper-rule-bites")]
+        public static string Ao7WalkRuleBites(Ctx c)
+        {
+            string dir = System.IO.Path.Combine(c.WorkDir, "ao7-walk-" + Guid.NewGuid().ToString("N").Substring(0, 8));
+            System.IO.Directory.CreateDirectory(dir);
+            string other = System.IO.Path.Combine(dir, "AesKey.cs"), good = System.IO.Path.Combine(dir, "GoodWalk.cs"), bad = System.IO.Path.Combine(dir, "BadWalk.cs");
+            System.IO.File.WriteAllText(other, "class AesKey {\n  static byte Xtime(byte a) { return a; }\n  public void EncryptBlock(byte[] i, int io, byte[] o, int oo)\n  {\n  }\n}\n");
+            System.IO.File.WriteAllText(good, "class AesKey {\n  static byte WalkXtime(byte a) { return a; }\n  void W() { WalkXtime(1); EncryptBlock(null, 0, null, 0); // Xtime(2) in a comment\n  }\n}\n");
+            System.IO.File.WriteAllText(bad, "class AesKey {\n  void W() { byte b = Xtime(1); EncryptBlock(null, 0, null, 0); }\n}\n");
+            string control = AoFiles.WalkCallsOnlyBlockEntries(good, new[] { other });
+            string planted;
+            try { planted = "PASS " + AoFiles.WalkCallsOnlyBlockEntries(bad, new[] { other }); }
+            catch (FailException e) { planted = "FAIL " + e.Reason + " " + e.Message; }
+            if (!planted.StartsWith("FAIL AO_WALK_CALLS_AESKEY_HELPER")) throw new FailException("a walk that calls Xtime passed: " + planted);
+            string frozenDir = System.IO.Path.Combine(c.AcceptanceDir, "groups", "algo", "Frozen");
+            string frozen;
+            try { frozen = "PASS " + AoFiles.WalkCallsOnlyBlockEntries(System.IO.Path.Combine(frozenDir, "AesKey.Walk.cs"), new[] { System.IO.Path.Combine(frozenDir, "AesKey.cs") }); }
+            catch (FailException e) { frozen = "FAIL " + e.Reason + " " + e.Message; }
+            if (!frozen.StartsWith("FAIL AO_WALK_CALLS_AESKEY_HELPER")) throw new FailException("the 5c5d4a4 walk, which calls helpers in AesKey.cs, passed: " + frozen);
+            return "control: " + control + "; planted Xtime call: FAIL; the 5c5d4a4 walk: " + frozen;
+        }
 
         [Clause("SELF.ao7-files-check-bites")]
         public static string Ao7FilesBite(Ctx c)

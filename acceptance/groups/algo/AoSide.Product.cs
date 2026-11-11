@@ -81,10 +81,45 @@ namespace Acceptance
         }
         public override object WalkMixTerms(byte[] before, bool inverse) { return AesKey.MixTerms(before, inverse); }
 
+        public override byte[] DukptInitialKey(byte[] bdk, byte[] initialKeyId) { return DukptBank.DeriveInitialKey(bdk, initialKeyId); }
+        public override byte[] DukptWorkingKey(byte[] bdk, byte[] ksn, int usage, int type) { return DukptBank.DeriveWorkingKey(bdk, ksn, (DukptKeyUsage)usage, (DukptKeyType)type); }
+        public override object NewPinPad(byte[] initialKey, byte[] initialKeyId) { return new DukptPinPad(initialKey, initialKeyId); }
+        public override byte[][] PinPadNext(object pad, int[] usages, int type)
+        {
+            DukptKeyUsage[] u = new DukptKeyUsage[usages.Length];
+            for (int i = 0; i < u.Length; i++) u[i] = (DukptKeyUsage)usages[i];
+            DukptUse[] uses = ((DukptPinPad)pad).NextTogether(u, (DukptKeyType)type);
+            System.Collections.Generic.List<byte[]> r = new System.Collections.Generic.List<byte[]>();
+            foreach (DukptUse x in uses) { r.Add(x.Ksn); r.Add(x.Key); }
+            return r.ToArray();
+        }
+        public override byte[][] PinPadHeld(object pad) { return ((DukptPinPad)pad).HeldKeys(); }
+
         public override byte[] PinEncrypt4(byte[] pinKey, string pin, string pan, byte[] random8) { return PinBlock.EncryptFormat4(pinKey, pin, pan, random8); }
         public override bool PinTryDecrypt4(byte[] pinKey, byte[] block, string pan, out string pin) { return PinBlock.TryDecryptFormat4(pinKey, block, pan, out pin); }
         public override byte[] PinClearField4(string pin, byte[] random8) { return PinBlock.ClearFieldFormat4(pin, random8); }
         public override bool PinTryOpenField4(byte[] pinKey, byte[] block, string pan, out byte[] field) { return PinBlock.TryOpenFieldFormat4(pinKey, block, pan, out field); }
+    }
+
+    /// <summary>Reads the product for the seams of later slices. The selftest group has its own copy that finds none.</summary>
+    public static class AoSeams
+    {
+        /// <summary>An internal AesKey constructor that takes the key and more (PRD 7.1 rule 13), or null.</summary>
+        public static System.Reflection.ConstructorInfo PortableSeam()
+        {
+            foreach (System.Reflection.ConstructorInfo k in typeof(AesKey).GetConstructors(System.Reflection.BindingFlags.NonPublic | System.Reflection.BindingFlags.Instance))
+            {
+                System.Reflection.ParameterInfo[] p = k.GetParameters();
+                if (p.Length >= 2 && p[0].ParameterType == typeof(byte[])) return k;
+            }
+            return null;
+        }
+
+        public static bool HasType(string name)
+        {
+            foreach (Type t in typeof(AesKey).Assembly.GetTypes()) if (t.Name == name && t.IsPublic) return true;
+            return false;
+        }
     }
 
     /// <summary>The side under test. The selftest group has its own copy of this class that returns a planted fault.</summary>

@@ -27,6 +27,7 @@ FILES = [
     "src/NetSec.Core/Crypto/TdesKey.cs",
     "src/NetSec.Core/Tls11/Tls11Prf.cs",
     "src/NetSec.Core/Dukpt/PinBlock.cs", "src/NetSec.Core/Dukpt/DukptDerivation.cs",
+    "src/NetSec.Core/Dukpt/DukptBank.cs", "src/NetSec.Core/Dukpt/DukptPinPad.cs",
     "src/NetSec.Core/Errors/Errors.cs", "src/NetSec.Core/Bytes/Bytes.cs",
 ]
 

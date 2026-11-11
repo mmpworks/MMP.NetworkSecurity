@@ -1,4 +1,5 @@
 using System;
+using System.Collections.Generic;
 using F = Acceptance.Frozen.Crypto;
 using FT = Acceptance.Frozen.Tls11;
 using FD = Acceptance.Frozen.Dukpt;
@@ -55,6 +56,14 @@ namespace Acceptance
         public abstract object WalkKeyExpansion(object k);
         public abstract object WalkTables(int rconCount);
         public abstract object WalkMixTerms(byte[] before, bool inverse);
+
+        // ---- DUKPT through the public route (DukptBank, DukptPinPad); enums pass as their numeric values ----
+        public abstract byte[] DukptInitialKey(byte[] bdk, byte[] initialKeyId);
+        public abstract byte[] DukptWorkingKey(byte[] bdk, byte[] ksn, int usage, int type);
+        public abstract object NewPinPad(byte[] initialKey, byte[] initialKeyId);
+        /// <summary>One sale: the KSN and the key of each usage, in order.</summary>
+        public abstract byte[][] PinPadNext(object pad, int[] usages, int type);
+        public abstract byte[][] PinPadHeld(object pad);
 
         public abstract byte[] PinEncrypt4(byte[] pinKey, string pin, string pan, byte[] random8);
         public abstract bool PinTryDecrypt4(byte[] pinKey, byte[] block, string pan, out string pin);
@@ -137,6 +146,20 @@ namespace Acceptance
                                   F.AesKey.RoundConstants(rconCount), F.AesKey.RoundConstantSteps(rconCount) };
         }
         public override object WalkMixTerms(byte[] before, bool inverse) { return F.AesKey.MixTerms(before, inverse); }
+
+        public override byte[] DukptInitialKey(byte[] bdk, byte[] initialKeyId) { return FD.DukptBank.DeriveInitialKey(bdk, initialKeyId); }
+        public override byte[] DukptWorkingKey(byte[] bdk, byte[] ksn, int usage, int type) { return FD.DukptBank.DeriveWorkingKey(bdk, ksn, (FD.DukptKeyUsage)usage, (FD.DukptKeyType)type); }
+        public override object NewPinPad(byte[] initialKey, byte[] initialKeyId) { return new FD.DukptPinPad(initialKey, initialKeyId); }
+        public override byte[][] PinPadNext(object pad, int[] usages, int type)
+        {
+            FD.DukptKeyUsage[] u = new FD.DukptKeyUsage[usages.Length];
+            for (int i = 0; i < u.Length; i++) u[i] = (FD.DukptKeyUsage)usages[i];
+            FD.DukptUse[] uses = ((FD.DukptPinPad)pad).NextTogether(u, (FD.DukptKeyType)type);
+            List<byte[]> r = new List<byte[]>();
+            foreach (FD.DukptUse x in uses) { r.Add(x.Ksn); r.Add(x.Key); }
+            return r.ToArray();
+        }
+        public override byte[][] PinPadHeld(object pad) { return ((FD.DukptPinPad)pad).HeldKeys(); }
 
         public override byte[] PinEncrypt4(byte[] pinKey, string pin, string pan, byte[] random8) { return FD.PinBlock.EncryptFormat4(pinKey, pin, pan, random8); }
         public override bool PinTryDecrypt4(byte[] pinKey, byte[] block, string pan, out string pin) { return FD.PinBlock.TryDecryptFormat4(pinKey, block, pan, out pin); }

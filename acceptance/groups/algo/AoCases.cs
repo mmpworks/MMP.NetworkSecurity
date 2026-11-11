@@ -47,6 +47,9 @@ namespace Acceptance
 
     public delegate void AoCase(AoSide s, AoRec r);
 
+    /// <summary>A referee that cannot run this case. The case is counted as skipped for that referee, never as an outcome.</summary>
+    public class AoSkipException : Exception { }
+
     /// <summary>A fault in the suite's own code. It ends the clause; it never counts as an outcome that both sides share.</summary>
     public sealed class AoHarnessException : Exception
     {

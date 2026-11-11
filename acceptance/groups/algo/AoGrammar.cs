@@ -12,7 +12,7 @@ namespace Acceptance
         public static readonly string[] Algorithms = {
             "aes-block", "aes-ecb", "aes-cbc", "aes-ctr", "aes-gcm", "aes-cmac", "tdes-block",
             "md5", "sha1", "sha256", "sha384", "sha512", "sha3-256", "sha3-512", "shake128", "shake256",
-            "hmac", "hkdf", "tls11-prf", "pinblock-format4" };
+            "hmac", "hkdf", "tls11-prf", "pinblock-format4", "dukpt-derive" };
 
         static readonly string[] HashAlgs = { "md5", "sha1", "sha256", "sha384", "sha512", "sha3-256", "sha3-512" };
 
@@ -45,6 +45,8 @@ namespace Acceptance
         static void Try(AoRec r, Body b)
         {
             try { b(); r.Add("ok"); }
+            catch (AoSkipException) { throw; }
+            catch (AoHarnessException) { throw; }
             catch (Exception e) { r.Add(AoRec.SigOf(e)); }
         }
 
@@ -68,6 +70,7 @@ namespace Acceptance
                 case "tls11-prf": return PrfCase(r);
                 case "pinblock-format4": return PinCase(r);
                 case "aes-walk": return WalkCase(r);
+                case "dukpt-derive": return DukptCase(r);
                 default:
                     if (Array.IndexOf(HashAlgs, alg) >= 0) return HashCase(r, alg);
                     throw new ArgumentException("no grammar for " + alg);
@@ -245,6 +248,11 @@ namespace Acceptance
             return delegate (AoSide s, AoRec rec)
             {
                 byte[] b = C(buf);
+                // Once whole (3.1 rule 11), then the same bytes in the drawn pieces.
+                IAoHash whole = s.NewHash(alg);
+                byte[] dw = null;
+                Try(rec, delegate { whole.Update(b, pre, n); dw = whole.Finish(); });
+                rec.Add(dw);
                 IAoHash h = s.NewHash(alg);
                 IAoHash clone = null;
                 int off = pre, cloneOff = -1;
@@ -389,6 +397,65 @@ namespace Acceptance
                     default: Try(rec, delegate { walk = s.WalkMixTerms(bf, inverse); }); break;
                 }
                 rec.Add(AoDump.Of(walk)); rec.Add(k); rec.Add(b); rec.Add(bf);
+            };
+        }
+
+        // ---- DUKPT (ANSI X9.24-3) through DukptBank and DukptPinPad ----
+
+        static readonly int[] Usages = { 0x0002, 0x1000, 0x2000, 0x2001, 0x2002, 0x3000, 0x3001, 0x3002 };
+
+        static int Usage(Rng r) { return r.Int(50) == 0 ? 0x1234 : Usages[r.Int(Usages.Length)]; }
+        static int KeyType(Rng r) { return r.Int(50) == 0 ? (r.Int(2) == 0 ? 1 : 5) : 2 + r.Int(3); }
+
+        /// <summary>A counter weighted to few 1 bits (the pad's own range) and to the edges 0, 1 and all ones.</summary>
+        static uint Counter(Rng r)
+        {
+            int p = r.Int(10);
+            if (p == 0) { uint[] e = { 0, 1, 2, 0x80000000, 0xFFFFFFFF, 0x0000FFFF }; return e[r.Int(e.Length)]; }
+            if (p < 6) { uint c = 0; int bits = 1 + r.Int(8); for (int i = 0; i < bits; i++) c |= 1u << r.Int(32); return c; }
+            return (uint)r.Next();
+        }
+
+        static AoCase DukptCase(Rng r)
+        {
+            int op = r.Int(3);
+            byte[] bdk = AesKeyBytes(r);
+            byte[] ikid = r.Int(50) == 0 ? r.Bytes(r.Int(2) == 0 ? 7 : 9) : r.Bytes(8);
+            uint counter = Counter(r);
+            byte[] ksn = r.Int(50) == 0 ? r.Bytes(11) : Hex.Concat(r.Bytes(8), new byte[] { (byte)(counter >> 24), (byte)(counter >> 16), (byte)(counter >> 8), (byte)counter });
+            int usage = Usage(r), type = KeyType(r);
+            int sales = 1 + r.Int(12);
+            int[][] saleUsages = new int[sales][];
+            int[] saleTypes = new int[sales];
+            for (int i = 0; i < sales; i++)
+            {
+                saleUsages[i] = r.Int(2) == 0 ? new[] { Usage(r) } : new[] { 0x1000, 0x2000 };
+                saleTypes[i] = KeyType(r);
+            }
+            return delegate (AoSide s, AoRec rec)
+            {
+                byte[] b = C(bdk), id = C(ikid), k = C(ksn), o = null;
+                switch (op)
+                {
+                    case 0: Try(rec, delegate { o = s.DukptInitialKey(b, id); }); rec.Add(o); break;
+                    case 1: Try(rec, delegate { o = s.DukptWorkingKey(b, k, usage, type); }); rec.Add(o); break;
+                    default:
+                        {
+                            object pad = s.NewPinPad(b, id);
+                            for (int i = 0; i < sales; i++)
+                            {
+                                byte[][] got = null;
+                                int at = i;
+                                Try(rec, delegate { got = s.PinPadNext(pad, saleUsages[at], saleTypes[at]); });
+                                if (got != null) foreach (byte[] g in got) rec.Add(g);
+                            }
+                            byte[][] held = null;
+                            Try(rec, delegate { held = s.PinPadHeld(pad); });
+                            if (held != null) foreach (byte[] h in held) rec.Add(h);
+                            break;
+                        }
+                }
+                rec.Add(b); rec.Add(id); rec.Add(k);
             };
         }
 

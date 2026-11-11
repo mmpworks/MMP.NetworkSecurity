@@ -40,7 +40,11 @@ param(
     [switch]$SelfTest,
     [switch]$RecordGolden,
     [switch]$Contract,
-    [switch]$FreshChild
+    [switch]$FreshChild,
+    # The Algorithm-Optimization slice this run judges against acceptance/ao-rows.tsv (S0 to S7). No default: a default goes stale.
+    [string]$AoSlice,
+    # The S0 benchmark report (acceptance/ao-bench-schema.md). With none, the bench rows of the row list read as absent.
+    [string]$AoBenchReport
 )
 
 # An explicit -NetCFRefDir that holds no mscorlib.dll stops the run here with one named error, before it queues for the lock.
@@ -225,6 +229,7 @@ function Select-Clauses {
     }
     if ($SelfTest) { $sel += $all | Where-Object { -not $_.counts } }
     # AO-1 and AO-8 (docs/algorithm-optimization-prd.md section 3) read the results of other clauses in the same run, so they bring them in.
+    if ($sel | Where-Object { $_.id -like 'AO-0.*' }) { $sel += $all | Where-Object { $_.assertion -like 'AO-*' } }
     if ($sel | Where-Object { $_.id -like 'AO-1.*' }) { $sel += $all | Where-Object { $_.assertion -eq 'A1' -or $_.id -like 'A3.vec.*' -or $_.id -like 'A3.pinblock.*' } }
     if ($sel | Where-Object { $_.id -like 'AO-8.*' }) { $sel += $all | Where-Object { $_.assertion -eq 'A9' -or $_.id -eq 'A17.mock.golden-trace-equal.cf' } }
     $sel = @($sel | Sort-Object -Property id -Unique)
@@ -241,6 +246,72 @@ function Get-RowsVerdict([object[]]$ids, [string]$what, [hashtable]$table) {
     }
     return @('PASS', '', ("{0} of {0} {1} rows pass: {2}" -f $have.Count, $what, ($have -join ', ')))
 }
+# ---- the AO row list (docs/algorithm-optimization-prd.md section 4) ----
+$AoSlices = @('S0', 'S1', 'S2', 'S3', 'S4', 'S5', 'S6', 'S7')
+function Read-AoRowList([string]$path) {
+    $list = [ordered]@{}
+    foreach ($line in (Get-Content -LiteralPath $path -Encoding utf8)) {
+        if ($line -match '^\s*#' -or $line -match '^id\t' -or -not $line.Trim()) { continue }
+        $f = $line -split "`t"
+        if ($f.Count -ne 5) { throw "ao-rows.tsv: a line needs 5 tab-separated fields: $line" }
+        if ($AoSlices -notcontains $f[3]) { throw "ao-rows.tsv: unknown slice '$($f[3])' in: $line" }
+        if ($list.Contains($f[0])) { throw "ao-rows.tsv: the id $($f[0]) is listed twice" }
+        $list[$f[0]] = [pscustomobject]@{ id = $f[0]; state = $f[1]; reason = $f[2]; from = $f[3]; source = $f[4] }
+    }
+    return $list
+}
+# The bench rows, judged by the suite from the numbers (acceptance/ao-bench-schema.md). Returns id -> result.
+function Read-AoBench([string]$path, $list, [string]$slice, [string]$head) {
+    $out = @{}
+    if (-not $path) { return $out }
+    $doc = Get-Content -LiteralPath $path -Raw -Encoding utf8 | ConvertFrom-Json
+    $byId = @{}
+    foreach ($r in @($doc.rows)) { $byId[[string]$r.id] = $r }
+    $other = ([string]$doc.commit) -ne $head
+    foreach ($e in @($list.Values | Where-Object { $_.source -eq 'bench' })) {
+        $r = $byId[$e.id]
+        if ($other) { $out[$e.id] = [pscustomobject]@{ status = 'FAIL'; reason = 'AO_BENCH_OTHER_COMMIT'; detail = "the bench report is for $($doc.commit), the run is on $head" }; continue }
+        if (-not $r) { $out[$e.id] = [pscustomobject]@{ status = 'FAIL'; reason = 'AO_BENCH_ROW_BAD'; detail = 'no row in the bench report' }; continue }
+        if ($e.id -like 'AO-5.*') {
+            $b = $r.PSObject.Properties['bytesPerOp']
+            if (-not $b -or $b.Value -isnot [ValueType]) { $out[$e.id] = [pscustomobject]@{ status = 'FAIL'; reason = 'AO_BENCH_ROW_BAD'; detail = 'bytesPerOp is missing or not a number' }; continue }
+            $v = [double]$b.Value
+            $out[$e.id] = if ($v -eq 0) { [pscustomobject]@{ status = 'PASS'; reason = ''; detail = "0 B per op ($($r.op))" } } else { [pscustomobject]@{ status = 'FAIL'; reason = 'AO5_ALLOCATES'; detail = "$v B per op ($($r.op))" } }
+        } else {
+            $p0 = $r.PSObject.Properties['baselineNsPerOp']; $p1 = $r.PSObject.Properties['newNsPerOp']
+            if (-not $p0 -or -not $p1 -or $p0.Value -isnot [ValueType] -or $p1.Value -isnot [ValueType] -or [double]$p0.Value -le 0 -or [double]$p1.Value -le 0) { $out[$e.id] = [pscustomobject]@{ status = 'FAIL'; reason = 'AO_BENCH_ROW_BAD'; detail = 'baselineNsPerOp or newNsPerOp is missing, not a number, or not above 0' }; continue }
+            $ratio = [double]$p0.Value / [double]$p1.Value
+            $judge = $e.id -eq 'AO-6.aes-block.net10' -and [array]::IndexOf($AoSlices, $slice) -ge 1
+            if ($judge -and $ratio -lt 5) { $out[$e.id] = [pscustomobject]@{ status = 'FAIL'; reason = 'AO6_BELOW_TARGET'; detail = ("{0:N2} x baseline, target 5 x" -f $ratio) }; continue }
+            $out[$e.id] = [pscustomobject]@{ status = 'PASS'; reason = ''; detail = ("recorded: baseline {0} ns, new {1} ns, {2:N2} x" -f $p0.Value, $p1.Value, $ratio) }
+        }
+    }
+    return $out
+}
+# PRD 4.2: before its slice a row shows its listed state and reason; from its slice on, PASS. Anything else, a missing row and an
+# unlisted row are each a red. Returns status, reason, detail; the detail starts with N of M (M = lines in the list).
+function Get-AoRowListVerdict($list, [hashtable]$run, [string]$slice) {
+    if (-not $slice) { return @('FAIL', 'AO_SLICE_MISSING', 'run with -AoSlice S0 (or the current slice); the check has no default') }
+    if ($AoSlices -notcontains $slice) { return @('FAIL', 'AO_SLICE_UNKNOWN', "-AoSlice '$slice' is not one of $($AoSlices -join ', ')") }
+    $at = [array]::IndexOf($AoSlices, $slice)
+    $reds = @(); $ok = 0
+    foreach ($e in $list.Values) {
+        $r = $run[$e.id]
+        $wantPass = $at -ge [array]::IndexOf($AoSlices, $e.from)
+        if (-not $r) { $reds += "$($e.id): absent from the run"; continue }
+        if ($wantPass) {
+            if ($r.status -eq 'PASS') { $ok++ } else { $reds += "$($e.id): $($r.status) $($r.reason), wanted PASS from $($e.from)" }
+            continue
+        }
+        if ($r.status -eq $e.state -and $r.reason -eq $e.reason) { $ok++ } else { $reds += "$($e.id): $($r.status) $($r.reason), wanted $($e.state) $($e.reason) before $($e.from)" }
+    }
+    foreach ($id in @($run.Keys | Sort-Object)) { if (-not $list.Contains($id)) { $reds += "${id}: in the run, not in the row list" } }
+    $m = $list.Count
+    $detail = "$ok of $m rows match the row list for slice $slice" + $(if ($reds) { '. Red: ' + ($reds -join '; ') } else { '' })
+    if ($reds) { return @('FAIL', 'AO_ROW_LIST_RED', $detail) }
+    return @('PASS', '', $detail)
+}
+
 function Set-FromRows([string]$id, [object[]]$ids, [string]$what) {
     $v = Get-RowsVerdict $ids $what $results
     Set-Result $id $v[0] $v[1] $v[2]
@@ -601,6 +672,43 @@ foreach ($c in @($pending | Where-Object { $_.group -eq 'driver' -and -not $resu
             $cf = @($all | Where-Object { $_.assertion -eq 'A9' -or $_.id -eq 'A17.mock.golden-trace-equal.cf' } | ForEach-Object { $_.id })
             Set-FromRows $c.id $cf 'CF build and CF golden'
         }
+        'AO-0.row-list-matches' { }   # judged after this loop, when every other row has its result
+        'SELF.ao-row-list-bites' {
+            # The row-list check against a 3-line list: a matching run PASSes; a wrong reason, a deleted row, an extra row and a FAIL after
+            # its slice each go red; a bench row that claims PASS with bytes allocated is judged FAIL from its number.
+            New-Item -ItemType Directory -Force -Path $work | Out-Null
+            $tsv = Join-Path $work ("ao-rows-self-{0}.tsv" -f [guid]::NewGuid().ToString('N').Substring(0, 8))
+            Set-Content -LiteralPath $tsv -Encoding utf8 -Value @("id`tstate_before`treason_before`tpass_from`tsource", "X.a`t-`t-`tS0`tsuite", "X.b`tFAIL`tCODE_B`tS1`tsuite", "X.c`tNOT RUN`tPRODUCT_MISSING`tS2`tsuite")
+            $l = Read-AoRowList $tsv
+            # Not "R": that name is the built-in alias of Invoke-History, and an alias wins over a function.
+            function New-AoRow($s, $why) { [pscustomobject]@{ status = $s; reason = $why } }
+            $good = @{ 'X.a' = (New-AoRow 'PASS' ''); 'X.b' = (New-AoRow 'FAIL' 'CODE_B'); 'X.c' = (New-AoRow 'NOT RUN' 'PRODUCT_MISSING') }
+            $cases = [ordered]@{
+                'matching run at S0'        = @($good, 'S0', 'PASS')
+                'wrong reason code'         = @(@{ 'X.a' = (New-AoRow 'PASS' ''); 'X.b' = (New-AoRow 'FAIL' 'OTHER'); 'X.c' = (New-AoRow 'NOT RUN' 'PRODUCT_MISSING') }, 'S0', 'FAIL')
+                'deleted row'               = @(@{ 'X.a' = (New-AoRow 'PASS' ''); 'X.c' = (New-AoRow 'NOT RUN' 'PRODUCT_MISSING') }, 'S0', 'FAIL')
+                'extra row'                 = @(($good + @{ 'X.d' = (New-AoRow 'PASS' '') }), 'S0', 'FAIL')
+                'FAIL after its slice'      = @($good, 'S1', 'FAIL')
+                'no slice given'            = @($good, '', 'FAIL')
+                'all PASS at S2'            = @(@{ 'X.a' = (New-AoRow 'PASS' ''); 'X.b' = (New-AoRow 'PASS' ''); 'X.c' = (New-AoRow 'PASS' '') }, 'S2', 'PASS')
+            }
+            $bad = @(); $seen = @()
+            foreach ($k in $cases.Keys) {
+                $v = Get-AoRowListVerdict $l $cases[$k][0] $cases[$k][1]
+                $seen += "${k}: $($v[0])"
+                if ($v[0] -ne $cases[$k][2]) { $bad += "${k}: got $($v[0]) ($($v[2])), wanted $($cases[$k][2])" }
+            }
+            $bl = Read-AoRowList $tsv
+            $bl['AO-5.x.net10'] = [pscustomobject]@{ id = 'AO-5.x.net10'; state = 'FAIL'; reason = 'AO5_ALLOCATES'; from = 'S1'; source = 'bench' }
+            $bj = Join-Path $work ("ao-bench-self-{0}.json" -f [guid]::NewGuid().ToString('N').Substring(0, 8))
+            Set-Content -LiteralPath $bj -Encoding utf8 -Value '{"schema":1,"commit":"HEADX","rows":[{"id":"AO-5.x.net10","status":"PASS","bytesPerOp":16,"op":"block"}]}'
+            $bv = Read-AoBench $bj $bl 'S0' 'HEADX'
+            if ($bv['AO-5.x.net10'].status -ne 'FAIL' -or $bv['AO-5.x.net10'].reason -ne 'AO5_ALLOCATES') { $bad += "a bench row with 16 B that says PASS read $($bv['AO-5.x.net10'].status) $($bv['AO-5.x.net10'].reason)" }
+            $bo = Read-AoBench $bj $bl 'S0' 'OTHERHEAD'
+            if ($bo['AO-5.x.net10'].reason -ne 'AO_BENCH_OTHER_COMMIT') { $bad += "a bench report for another commit read $($bo['AO-5.x.net10'].reason)" }
+            if ($bad) { Set-Result $c.id 'FAIL' 'ASSERTION' ($bad -join '; ') }
+            else { Set-Result $c.id 'PASS' '' (($seen -join '; ') + '; bench 16 B claiming PASS -> FAIL AO5_ALLOCATES; bench for another commit -> AO_BENCH_OTHER_COMMIT') }
+        }
         'SELF.ao-row-verdicts-bite' {
             # AO-1 and AO-8 read other rows. All PASS must PASS; one FAIL or one NOT RUN must FAIL; no row at all must be NOT RUN.
             $ok = @{ 'x.a' = [pscustomobject]@{ status = 'PASS'; reason = '' }; 'x.b' = [pscustomobject]@{ status = 'PASS'; reason = '' } }
@@ -617,6 +725,21 @@ foreach ($c in @($pending | Where-Object { $_.group -eq 'driver' -and -not $resu
         }
         default { Set-Result $c.id 'FAIL' 'NO_RESULT' 'driver has no code for this clause' }
     }
+}
+
+# ------------------------------------------------------------------ AO-0: the run against the row list
+if ($sel | Where-Object { $_.id -eq 'AO-0.row-list-matches' }) {
+    try {
+        $aoList = Read-AoRowList (Join-Path $acc 'ao-rows.tsv')
+        $aoRun = @{}
+        foreach ($k in @($results.Keys | Where-Object { $_ -like 'AO-*' -and $_ -ne 'AO-0.row-list-matches' })) { $aoRun[$k] = $results[$k] }
+        $headSha = (git -C $ProductRoot rev-parse HEAD 2>$null)
+        $bench = Read-AoBench $AoBenchReport $aoList $AoSlice $headSha
+        foreach ($k in $bench.Keys) { $aoRun[$k] = $bench[$k] }
+        $v = Get-AoRowListVerdict $aoList $aoRun $AoSlice
+        $benchNote = if ($AoBenchReport) { " Bench report: $AoBenchReport." } else { ' No bench report (-AoBenchReport), so the bench rows are absent.' }
+        Set-Result 'AO-0.row-list-matches' $v[0] $v[1] ($v[2] + $benchNote)
+    } catch { Set-Result 'AO-0.row-list-matches' 'FAIL' 'AO_ROW_LIST_UNREADABLE' $_.Exception.Message }
 }
 
 # ------------------------------------------------------------------ the suite must not pass while the product is missing
