@@ -6,7 +6,8 @@ namespace Acceptance
     /// <summary>
     /// A wait that looks first and checks the limit second. A wait that checks the limit first misses a line that came in during its
     /// last sleep, when the thread wakes after the limit: it gives up with the answer already there (Richard on #367, the acceptance
-    /// sweep after it). Every poll loop in the harness goes through here.
+    /// sweep after it). Every harness loop that waits for an answer goes through here. BridgeRun.SettleLogs waits for quiet logs and
+    /// goes on after its limit, so it keeps its own loop (Jared on #396).
     /// </summary>
     public static class Poll
     {
