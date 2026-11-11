@@ -10,6 +10,7 @@ using NetSec.Bytes;
 using NetSec.Crypto;
 using NetSec.Errors;
 using NetSec.Labs;
+using NetSec.TestSupport;
 using Xunit;
 
 namespace NetSec.Tests
@@ -208,7 +209,7 @@ namespace NetSec.Tests
             finally
             {
                 // The test removes only the fresh folder it made.
-                Directory.Delete(dir, true);
+                TempTree.Delete(dir);
             }
         }
 

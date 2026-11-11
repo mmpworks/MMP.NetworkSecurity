@@ -2,15 +2,17 @@
 import pathlib
 import subprocess
 import sys
-import tempfile
 import unittest
+
+sys.path.insert(0, str(pathlib.Path(__file__).resolve().parent))  # tools/, for the shared temp folder (#400)
+from tempdir import TempDir  # noqa: E402
 
 SCRIPT = pathlib.Path(__file__).resolve().parent / "transport_name_lint.py"
 
 
 class TransportNameLint(unittest.TestCase):
     def setUp(self):
-        self.tmp = tempfile.TemporaryDirectory()
+        self.tmp = TempDir()
         self.root = pathlib.Path(self.tmp.name)
         (self.root / "app" / "src" / "views").mkdir(parents=True)
         self.put("app/src/types.ts", "export type Transport = 'glass' | 'os'\n")
@@ -55,7 +57,7 @@ class TransportNameLint(unittest.TestCase):
 
     def test_a_tree_with_no_app_fails_by_name(self):
         self.tmp.cleanup()
-        self.tmp = tempfile.TemporaryDirectory()
+        self.tmp = TempDir()
         self.root = pathlib.Path(self.tmp.name)
         code, out = self.run_check()
         self.assertEqual(code, 1, out)

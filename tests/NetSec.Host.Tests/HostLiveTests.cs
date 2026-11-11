@@ -11,6 +11,7 @@ using System.Text;
 using System.Text.Json;
 using System.Threading;
 using System.Threading.Tasks;
+using NetSec.TestSupport;
 using Xunit;
 
 namespace NetSec.Host.Tests
@@ -109,7 +110,7 @@ namespace NetSec.Host.Tests
                 await ProcessWaits.ExitedWithin(_process, TimeSpan.FromSeconds(5));
                 _process.Dispose();
             }
-            Directory.Delete(AppData, recursive: true);
+            TempTree.Delete(AppData);
         }
     }
 

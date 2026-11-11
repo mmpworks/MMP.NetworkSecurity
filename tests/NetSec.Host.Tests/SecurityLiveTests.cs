@@ -13,6 +13,7 @@ using System.Text;
 using System.Text.Json;
 using System.Threading;
 using System.Threading.Tasks;
+using NetSec.TestSupport;
 using Xunit;
 
 namespace NetSec.Host.Tests;
@@ -145,7 +146,7 @@ public class SecurityLiveTests
             _process.WaitForExit(5000);
             _process.Dispose();
             _http.Dispose();
-            Directory.Delete(Root, true);
+            TempTree.Delete(Root);
         }
     }
 
