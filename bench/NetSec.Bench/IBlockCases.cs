@@ -26,6 +26,9 @@ interface IBlockCases
 
     /// <summary>One whole hash of the message: new state, one Update, Finish. Names: md5, sha1, sha256, sha512, sha3-256.</summary>
     Action Hash(string name, byte[] message);
+
+    /// <summary>Update only, on one hash state made at once: each call adds <paramref name="blocks"/> blocks of the hash's block size.</summary>
+    Action HashUpdate(string name, int blocks);
     int HashBlockSize(string name);
     Action Shake128(byte[] message, int outputBytes);
     Action HmacSha256(byte[] key, byte[] message);

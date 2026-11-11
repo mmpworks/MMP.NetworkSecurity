@@ -47,8 +47,8 @@ static class Report
     }
 
     /// <summary>
-    /// The AO-5 and AO-6 rows of acceptance/ao-bench-schema.md: one AO-5 row (bytes per operation, product) and one AO-6 row (frozen and
-    /// product ns per operation) for each case in <see cref="Cases.AoId"/>. Numbers only; the suite judges them. <see cref="AoParts"/> writes them.
+    /// The AO-6 rows of acceptance/ao-bench-schema.md: frozen and product ns per operation, for each case in <see cref="Cases.AoId"/>.
+    /// Numbers only; the suite judges them. <see cref="AoParts"/> writes them. The AO-5 rows come from <see cref="AoAlloc"/>.
     /// </summary>
     public static List<string> AoBlockRows(IList<CaseResult> results)
     {
@@ -56,8 +56,6 @@ static class Report
         foreach (CaseResult r in results)
         {
             if (!Cases.AoId.TryGetValue(r.Case.Id, out var ao)) continue;
-            if (ao.Row != "aes-key-setup")
-                rows.Add(string.Format(Inv, "{{ \"id\": \"AO-5.{0}.net10\", \"bytesPerOp\": {1:F2}, \"op\": {2} }}", ao.Row, r.NewBytesPerUnit, Quote(ao.Op)));
             rows.Add(string.Format(Inv, "{{ \"id\": \"AO-6.{0}.net10\", \"baselineNsPerOp\": {1:F2}, \"newNsPerOp\": {2:F2}, \"op\": {3} }}",
                 ao.Row, r.OriginalNsPerUnit, r.NewNsPerUnit, Quote(ao.Op)));
         }

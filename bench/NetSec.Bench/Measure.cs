@@ -38,7 +38,7 @@ sealed class Pair
 /// </summary>
 static class Measure
 {
-    public const int Rounds = 15;
+    public const int Rounds = 31;
     public static readonly TimeSpan WarmTarget = TimeSpan.FromMilliseconds(300);
 
     public static Pair Run(Action original, Action current, TimeSpan roundTarget)
@@ -105,19 +105,37 @@ static class Measure
         using (Process p = Process.GetCurrentProcess()) return p.PeakWorkingSet64;
     }
 
-    /// <summary>Raises this process and thread to High / Highest, so the scheduler favours the measurement. Returns what it set, for the report.</summary>
-    public static string RaisePriority()
+    /// <summary>
+    /// Raises this process and thread to High / Highest and pins the process to one logical processor, so the paired rounds always run on
+    /// the same core and never migrate. The core is the last logical processor, or --core N. Returns what it set, for the report.
+    /// <see cref="Unpin"/> gives the process every core back for the 25-thread run.
+    /// </summary>
+    public static string RaisePriority(int? core)
     {
         try
         {
+            int pick = core ?? Environment.ProcessorCount - 1;
             using (Process p = Process.GetCurrentProcess()) p.PriorityClass = ProcessPriorityClass.High;
+            SetAffinity(1L << pick);
             Thread.CurrentThread.Priority = ThreadPriority.Highest;
-            return "process priority High, thread priority Highest";
+            return "process priority High, thread priority Highest, pinned to logical processor " + pick + " of " + Environment.ProcessorCount
+                + " for the paired rounds (all processors for the 25-thread run)";
         }
         catch (Exception e)
         {
-            return "priority not raised (" + e.GetType().Name + "): normal priority";
+            return "priority or affinity not set (" + e.GetType().Name + "): normal priority, no pin";
         }
+    }
+
+    public static void Unpin() => SetAffinity(Environment.ProcessorCount >= 64 ? -1L : (1L << Environment.ProcessorCount) - 1);
+
+    /// <summary>Process affinity exists on Windows and Linux only; the bench runs on Windows, and the guard keeps the platform analyzer exact.</summary>
+    static void SetAffinity(long mask)
+    {
+#if NET
+        if (!OperatingSystem.IsWindows()) throw new PlatformNotSupportedException("the bench pins a core on Windows only");
+#endif
+        using (Process p = Process.GetCurrentProcess()) p.ProcessorAffinity = (IntPtr)mask;
     }
 }
 
