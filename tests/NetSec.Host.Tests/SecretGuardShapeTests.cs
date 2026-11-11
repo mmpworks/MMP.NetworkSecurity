@@ -5,6 +5,7 @@ using System.IO;
 using System.Linq;
 using System.Text;
 using System.Threading.Tasks;
+using NetSec.TestSupport;
 using Xunit;
 
 namespace NetSec.Host.Tests;
@@ -102,7 +103,7 @@ public class SecretGuardShapeTests
         finally
         {
             foreach (string f in Directory.GetFiles(dir, "*", SearchOption.AllDirectories)) File.SetAttributes(f, FileAttributes.Normal);   // Git makes its objects read-only
-            Directory.Delete(dir, true);
+            TempTree.Delete(dir);
         }
     }
 

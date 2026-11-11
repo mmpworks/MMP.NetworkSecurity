@@ -5,9 +5,11 @@ import os
 import pathlib
 import subprocess
 import sys
-import tempfile
 import time
 import unittest
+
+sys.path.insert(0, str(pathlib.Path(__file__).resolve().parent))  # tools/, for the shared temp folder (#400)
+from tempdir import TempDir  # noqa: E402
 
 TOOLS = pathlib.Path(__file__).resolve().parent
 GATE = TOOLS / "gate.ps1"
@@ -16,7 +18,7 @@ LOCK = TOOLS / "heavy_lock.py"
 
 class GateLock(unittest.TestCase):
     def setUp(self):
-        self.tmp = tempfile.TemporaryDirectory()
+        self.tmp = TempDir()
         self.dir = pathlib.Path(self.tmp.name)
         self.holder = None
 

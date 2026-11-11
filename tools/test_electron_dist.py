@@ -4,8 +4,10 @@ import json
 import pathlib
 import subprocess
 import sys
-import tempfile
 import unittest
+
+sys.path.insert(0, str(pathlib.Path(__file__).resolve().parent))  # tools/, for the shared temp folder (#400)
+from tempdir import TempDir  # noqa: E402
 import zipfile
 
 SCRIPT = pathlib.Path(__file__).resolve().parent / "electron_dist.py"
@@ -15,7 +17,7 @@ ZIP_NAME = f"electron-v{VERSION}-win32-x64.zip"
 
 class ElectronDist(unittest.TestCase):
     def setUp(self):
-        self.tmp = tempfile.TemporaryDirectory()
+        self.tmp = TempDir()
         root = pathlib.Path(self.tmp.name)
         self.app = root / "app"
         self.pkg = self.app / "node_modules" / "electron"

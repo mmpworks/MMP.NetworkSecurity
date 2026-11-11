@@ -25,11 +25,37 @@ namespace NetSec.Io
         public IFuture Pass(TraceEvent e) { return Futures.Completed; }
     }
 
+    /// <summary>The pumps that joined one gate (IGateActivity, issue #394). A gate that shares its session's quiet state holds one of these.</summary>
+    public sealed class GateMembers : IGateActivity
+    {
+        readonly object _lock = new object();
+        readonly List<GateWork> _members = new List<GateWork>();
+
+        public void Join(GateWork busy)
+        {
+            if (busy == null) throw new ArgumentNullException("busy");
+            lock (_lock) _members.Add(busy);
+        }
+
+        /// <summary>Each member reads its own state under its own lock, so this copies the list and asks outside this lock.</summary>
+        public bool AnyBusy
+        {
+            get
+            {
+                GateWork[] members;
+                lock (_lock) members = _members.ToArray();
+                for (int i = 0; i < members.Length; i++) if (members[i]()) return true;
+                return false;
+            }
+        }
+    }
+
     /// <summary>Holds each event until Step releases one. Run opens the gate for good, and Pause closes it again.</summary>
-    public sealed class StepGate : IStepGate, IGateState
+    public sealed class StepGate : IStepGate, IGateState, IGateActivity
     {
         readonly object _lock = new object();
         readonly Queue<Promise> _waiting = new Queue<Promise>();
+        readonly GateMembers _members = new GateMembers();
         bool _open;
         bool _stepHeld;
 
@@ -50,6 +76,10 @@ namespace NetSec.Io
         }
 
         public bool IsHolding { get { lock (_lock) return _waiting.Count > 0; } }
+
+        public void Join(GateWork busy) { _members.Join(busy); }
+
+        public bool AnyBusy { get { return _members.AnyBusy; } }
 
         public void Step()
         {
@@ -114,6 +144,7 @@ namespace NetSec.Io
         readonly Queue<int> _outboxSizes = new Queue<int>();
         readonly Queue<PublishWaiter> _publishWaiters = new Queue<PublishWaiter>();
         readonly bool _readsWhileWriting;
+        readonly IGateActivity _activity;
         long _inboundBacklog, _queuedOutputs, _publishedOutputs;
 
         /// <summary>
@@ -155,6 +186,9 @@ namespace NetSec.Io
             _engine = engine; _link = link; _sink = sink ?? new NullSink(); _gate = gate ?? new FreeRunGate();
             _tamper = tamper; _deadlineMs = deadlineMs;
             _readsWhileWriting = _gate is FreeRunGate;
+            // An ended pump no longer counts as work, so an outbox left full at the end cannot hold every other clock at 0.
+            _activity = _gate as IGateActivity;
+            if (_activity != null) _activity.Join(delegate { return !IsEnded && OutboxBusy; });
             TraceStream s = engine.Stream;
             _wireStream = new TraceStream(s.StreamId + "/wire", s.SessionId, s.TraceId, s.Hop, s.Actor, clock);
         }
@@ -256,9 +290,15 @@ namespace NetSec.Io
             {
                 int slice = Math.Min(DeadlineSliceMs, ReadLimitMs() - waited);
                 yield return Futures.WhenAny(read, Futures.Delay(slice));
-                waited = LearnerHolds || OutboxBusy ? 0 : waited + slice;
+                waited = LearnerHolds || SessionBusy ? 0 : waited + slice;
             }
         }
+
+        /// <summary>
+        /// This pump's outbox, or with a shared gate any pump's outbox (issue #394). A released event can resume late on a busy pool, and then the
+        /// gate holds nothing while the peer is still at work. Counting then let the idle side's limit run out before the stuck side's deadline.
+        /// </summary>
+        bool SessionBusy { get { return _activity != null ? _activity.AnyBusy : OutboxBusy; } }
 
         /// <summary>True while the engine holds unconsumed input. An engine that cannot say keeps the read deadline on every read, as before #309.</summary>
         bool HoldsPartialInput

@@ -4,8 +4,11 @@ Run: python -I tools/test_dist_stamp.py
 import json
 import pathlib
 import subprocess
-import tempfile
+import sys
 import unittest
+
+sys.path.insert(0, str(pathlib.Path(__file__).resolve().parent))  # tools/, for the shared temp folder (#400)
+from tempdir import TempDir  # noqa: E402
 
 SCRIPT = pathlib.Path(__file__).resolve().parent.parent / "app" / "scripts" / "dist-stamp.cjs"
 
@@ -22,7 +25,7 @@ def git(*args, cwd):
 
 class DistStamp(unittest.TestCase):
     def setUp(self):
-        self.tmp = tempfile.TemporaryDirectory()
+        self.tmp = TempDir()
         self.repo = pathlib.Path(self.tmp.name)
         git("init", "-q", "-b", "main", cwd=self.repo)
         git("config", "user.email", "t@example.com", cwd=self.repo)
@@ -100,7 +103,7 @@ class DistStamp(unittest.TestCase):
         self.assertIn("npm run build", r.stdout + r.stderr)
 
     def test_outside_a_git_repo_the_check_cannot_judge_and_says_so(self):
-        with tempfile.TemporaryDirectory() as other:
+        with TempDir() as other:
             dist = pathlib.Path(other) / "app" / "dist"
             dist.mkdir(parents=True)
             (dist / "index.html").write_text("x", encoding="utf-8")

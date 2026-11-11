@@ -129,6 +129,7 @@ Step 'gate app decision tests' { python -I tools/test_gate_app.py }
 Step 'dist stamp tests' { python -I tools/test_dist_stamp.py }
 Step 'every tools test has a gate step' { python -I tools/check_tests_wired.py }
 Step 'tests-wired check tests' { python -I tools/test_check_tests_wired.py }
+Step 'tool temp folder tests' { python -I tools/test_tempdir.py }
 # A change to acceptance/ may touch only acceptance/ and docs/ (tools/check_acceptance_scope.py names each other path).
 Step 'acceptance scope (acceptance/ and docs/ only)' { python -I tools/check_acceptance_scope.py }
 Step 'acceptance scope check tests' { python -I tools/test_check_acceptance_scope.py }

@@ -5,6 +5,7 @@ using System.IO;
 using System.Linq;
 using System.Threading.Tasks;
 using System.Text;
+using NetSec.TestSupport;
 using Xunit;
 
 namespace NetSec.Host.Tests;
@@ -61,7 +62,7 @@ public class SecretGuardTests
         public void Dispose()
         {
             foreach (string f in Directory.GetFiles(Dir, "*", SearchOption.AllDirectories)) File.SetAttributes(f, FileAttributes.Normal);
-            Directory.Delete(Dir, true);
+            TempTree.Delete(Dir);
         }
     }
 
