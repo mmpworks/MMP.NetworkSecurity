@@ -11,3 +11,7 @@ export type { AesBlockWalk, AesColumnByte, AesDoubling, AesKeyWordStep, AesStep,
 // Diffie-Hellman walks (port of DhWalks.cs): the small prime 467 and RFC 3526 group 14.
 export { DhError, GROUP14_GENERATOR, GROUP14_PRACTICE, GROUP14_PRIME, REAL_EXPONENT_BITS, SMALL, dhGroup14, dhSmall, powWalk, toBytes } from './dh.ts'
 export type { DhErrorCode, DhGroupName, DhPowRow, DhPowWalk, DhSideWalk, DhWalk } from './dh.ts'
+
+// Elliptic curves in short Weierstrass form, with the toy curve of the lesson (y^2 = x^3 + 2x + 2 mod 17).
+export { CurveError, INF, TOY_CURVE, TOY_G, TOY_ORDER, TOY_SECRETS, add, addStep, affinePoints, checkCurve, ecdhWalk, invMod, isOnCurve, mul, mulWalk, negate, pt, samePoint, toyEcdh } from './curve.ts'
+export type { AddRule, AddStep, Curve, CurveErrorCode, EcdhSideWalk, EcdhWalk, MulRow, MulWalk, Point } from './curve.ts'
