@@ -85,7 +85,20 @@ static class Program
         New("sha256.update", 64, 4096, x => x.HashUpdate("sha256", 64), o, n),
         New("hmac-sha256", 1, 1024, x => x.HmacSha256(Key(32), Msg()), o, n),
         New("tdes.encrypt-block", 1, 8, x => x.TdesEncryptBlock(Key(24), Block(), new byte[16]), o, n),
+        SmallMessage((ICodeUnderTest)o, (ICodeUnderTest)n),
     };
+
+    /// <summary>The S1 baseline for the static GCM wrapper budget: one AES-128 key setup plus one GCM seal of 64 bytes, as one call (AO-9 rule 6).</summary>
+    static Case SmallMessage(ICodeUnderTest o, ICodeUnderTest n)
+    {
+        byte[] key = Key(16), nonce = new byte[12], aad = new byte[0], plain = new byte[64];
+        return new Case
+        {
+            Id = "gcm.key-setup+seal64", Units = 1, Payload = 64,
+            Original = () => Cases.Sink = o.KeySetupAndSeal(key, nonce, aad, plain),
+            New = () => Cases.Sink = n.KeySetupAndSeal(key, nonce, aad, plain),
+        };
+    }
 
     static Case New(string id, int units, int payload, Func<IBlockCases, Action> make, IBlockCases o, IBlockCases n) =>
         new Case { Id = id, Units = units, Payload = payload, Original = make(o), New = make(n) };
