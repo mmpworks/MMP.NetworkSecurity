@@ -52,11 +52,13 @@ static class Program
         Measure.PreWarm(cases.Select(c => new[] { c.Original, c.New }), PreWarmEach);
         if (!MachineLoad.Settle()) return MachineLoad.BusyExit;
         List<double> ratios = new List<double>(), busy = new List<double>();
+        List<string> detail = new List<string>();
         foreach (Case c in cases)
         {
             Pair p = Measure.Run(c.Original, c.New, Round);
             ratios.Add(p.MedianRatio);
             busy.Add(p.OtherBusy);
+            detail.Add(c.Id + ": " + p.TopOutside);
             Console.WriteLine(string.Format(Inv, "{0,-22} original {1,10:F1} new {2,10:F1} ns per unit  ratio {3:F3} ({4:F3} to {5:F3})  original {6,8:F1} new {7,8:F1} B per unit  load {8:P1} core {9:P1} cpu {10}>{11}",
                 c.Id, p.Original.MedianNs / c.Units, p.New.MedianNs / c.Units, p.MedianRatio, p.Ratios.Min(), p.Ratios.Max(),
                 BytesPerCall(c.Original) / c.Units, BytesPerCall(c.New) / c.Units, p.OtherBusy, p.CoreBusy, p.CpuStart, p.CpuEnd));
@@ -70,7 +72,7 @@ static class Program
         }
         Console.WriteLine("BENCH_NOISE " + NoiseBand.Describe(ratios.ToArray()));
         Console.WriteLine("CF ARM speed: UNMEASURED");
-        int load = MachineLoad.Exit(busy.ToArray());
+        int load = MachineLoad.Exit(busy.ToArray(), detail.ToArray());
         if (load != 0) return load;
         if (!sameCode || NoiseBand.Inside(ratios.ToArray())) return 0;
         Console.WriteLine("BENCH_NOISE_OUTSIDE_BAND: the two copies are the same code, so a ratio outside the target band is harness or machine noise");
