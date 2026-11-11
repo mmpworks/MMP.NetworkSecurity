@@ -3,6 +3,7 @@ namespace NetSec.Crypto
     /// <summary>
     /// Points on edwards25519 in extended coordinates: a point is long[4][] holding X, Y, Z, T, where x = X/Z, y = Y/Z and
     /// x*y = T/Z. These formulas cover doubling as well, so one Add serves both. Writes into caller-owned arrays.
+    /// Layout follows TweetNaCl (public domain); the formulas and constants are those of RFC 8032.
     /// Built to show the parts. Do not copy: managed code gives no constant-time guarantee.
     /// </summary>
     internal static class Ge25519
