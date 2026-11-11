@@ -73,6 +73,14 @@ AO-2.aes-cmackey-into.net10	NOT RUN	PRODUCT_MISSING	S1	suite
 AO-2.aes-cmackey-into.cf	NOT RUN	PRODUCT_MISSING	S1	suite
 AO-2.aes-gcm-into.net10	NOT RUN	PRODUCT_MISSING	S1	suite
 AO-2.aes-gcm-into.cf	NOT RUN	PRODUCT_MISSING	S1	suite
+AO-2.aes-cbc-stream.net10	NOT RUN	PRODUCT_MISSING	S1	suite
+AO-2.aes-cbc-stream.cf	NOT RUN	PRODUCT_MISSING	S1	suite
+AO-2.aes-ctr-stream.net10	NOT RUN	PRODUCT_MISSING	S1	suite
+AO-2.aes-ctr-stream.cf	NOT RUN	PRODUCT_MISSING	S1	suite
+AO-2.aes-cmac-verify-into.net10	NOT RUN	PRODUCT_MISSING	S1	suite
+AO-2.aes-cmac-verify-into.cf	NOT RUN	PRODUCT_MISSING	S1	suite
+AO-2.aes-cmackey-verify-into.net10	NOT RUN	PRODUCT_MISSING	S1	suite
+AO-2.aes-cmackey-verify-into.cf	NOT RUN	PRODUCT_MISSING	S1	suite
 AO-3.aes.tables-equal-math.net10	-	-	S0	suite
 AO-3.aes.no-startup-build.net10	FAIL	AO_TABLE_BUILT_AT_STARTUP	S1	suite
 AO-3.ghash.tables-equal-math.net10	NOT RUN	NO_TABLES	S1	suite
@@ -148,6 +156,14 @@ AO-5.aes-gcm-seal-into.net10	NOT RUN	PRODUCT_MISSING	S1	suite
 AO-5.aes-gcm-seal-into.cf	NOT RUN	PRODUCT_MISSING	S1	suite
 AO-5.aes-gcm-open-into.net10	NOT RUN	PRODUCT_MISSING	S1	suite
 AO-5.aes-gcm-open-into.cf	NOT RUN	PRODUCT_MISSING	S1	suite
+AO-5.aes-cbc-stream.net10	NOT RUN	PRODUCT_MISSING	S1	suite
+AO-5.aes-cbc-stream.cf	NOT RUN	PRODUCT_MISSING	S1	suite
+AO-5.aes-ctr-stream.net10	NOT RUN	PRODUCT_MISSING	S1	suite
+AO-5.aes-ctr-stream.cf	NOT RUN	PRODUCT_MISSING	S1	suite
+AO-5.aes-cmac-verify-into.net10	NOT RUN	PRODUCT_MISSING	S1	suite
+AO-5.aes-cmac-verify-into.cf	NOT RUN	PRODUCT_MISSING	S1	suite
+AO-5.aes-cmackey-verify-into.net10	NOT RUN	PRODUCT_MISSING	S1	suite
+AO-5.aes-cmackey-verify-into.cf	NOT RUN	PRODUCT_MISSING	S1	suite
 AO-6.aes-block.net10	-	-	S0	bench
 AO-6.aes-ecb.net10	-	-	S0	bench
 AO-6.aes-cbc.net10	-	-	S0	bench

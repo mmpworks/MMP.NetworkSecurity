@@ -131,7 +131,7 @@ namespace Acceptance
         static byte[] C(byte[] b) { return b == null ? null : (byte[])b.Clone(); }
 
         /// <summary>Places a range of n input bytes and an output range of m bytes by the drawn aliasing. Returns (in, io, out, oo).</summary>
-        sealed class Place
+        public sealed class Place
         {
             public byte[] In, Out; public int Io, Oo; public int Mode;   // 0 separate, 1 same index, 2 apart in one array, 3 partial overlap
             public static Place Draw(Rng r, int n, int m, bool allowOverlap)

@@ -207,6 +207,79 @@ namespace Acceptance
         public static Action<byte[], int, int, byte[], int> CmacKeyCompute(AesKey k) { return Need(TryCmacKeyCompute(k), "CmacKey"); }
         public static Action<byte[], int, byte[], int, int, byte[], int, int, byte[], int> GcmKeySealInto(AesKey k) { return Need(TryGcmKeySealInto(k), "GcmKey.Seal into"); }
         public static Func<byte[], int, byte[], int, int, byte[], int, int, byte[], int, bool> GcmKeyOpenInto(AesKey k) { return Need(TryGcmKeyOpenInto(k), "GcmKey.TryOpen into"); }
+
+        // ---- streamed forms and caller-buffer Verify forms of PRD 7.3 item 15 ----
+
+        /// <summary>One new state object (CbcChain or CtrCounter), with its Init and Clear and the Modes overload that takes it, closed over the key.</summary>
+        public sealed class StreamSeam
+        {
+            public Action<byte[], int> Init;
+            public Action Clear;
+            public Action<byte[], int, int, byte[], int> Call;
+        }
+
+        /// <summary>
+        /// Null when the state type or the overload Modes.method(AesKey, state, byte[], int, int, byte[], int) does not exist. A state type
+        /// with no public parameterless constructor, no void Init(byte[], int), no void Clear(), or an overload that returns a value, is
+        /// NOT RUN SIGNATURE_NOT_CONFIRMED.
+        /// </summary>
+        public static StreamSeam TryStream(AesKey k, string stateType, string method)
+        {
+            Type t = PublicType(stateType);
+            if (t == null) return null;
+            System.Reflection.MethodInfo m = typeof(Modes).GetMethod(method, new[] { K, t, B, I, I, B, I });
+            if (m == null) return null;
+            System.Reflection.ConstructorInfo ctor = t.GetConstructor(Type.EmptyTypes);
+            StreamSeam s = new StreamSeam();
+            object state = ctor == null ? null : ctor.Invoke(null);
+            if (state != null)
+            {
+                s.Init = Bind<Action<byte[], int>>(t, state, "Init", new[] { B, I });
+                s.Clear = Bind<Action>(t, state, "Clear", Type.EmptyTypes);
+            }
+            if (s.Init == null || s.Clear == null || m.ReturnType != typeof(void))
+                throw new Acceptance.NotRunException("SIGNATURE_NOT_CONFIRMED", stateType + " and Modes." + method + " exist but lack a public constructor (), void Init(byte[], int), void Clear(), or the void overload (PRD 7.3 item 15)");
+            System.Reflection.MethodInfo close = typeof(AoSeams).GetMethod("CloseStream", System.Reflection.BindingFlags.NonPublic | System.Reflection.BindingFlags.Static);
+            s.Call = (Action<byte[], int, int, byte[], int>)close.MakeGenericMethod(t).Invoke(null, new object[] { m, k, state });
+            return s;
+        }
+
+        /// <summary>A typed open delegate on the overload, wrapped so that a call allocates nothing (a reflection call allocates its argument array).</summary>
+        static Action<byte[], int, int, byte[], int> CloseStream<TState>(System.Reflection.MethodInfo m, AesKey k, TState state)
+        {
+            Action<AesKey, TState, byte[], int, int, byte[], int> d =
+                (Action<AesKey, TState, byte[], int, int, byte[], int>)Delegate.CreateDelegate(typeof(Action<AesKey, TState, byte[], int, int, byte[], int>), m);
+            return delegate (byte[] i, int io, int n, byte[] o, int oo) { d(k, state, i, io, n, o, oo); };
+        }
+
+        /// <summary>The same overload, closed over the key and a null state object, or null when the state type or the overload does not exist.</summary>
+        public static Action<byte[], int, int, byte[], int> TryStreamNullState(AesKey k, string stateType, string method)
+        {
+            Type t = PublicType(stateType);
+            if (t == null) return null;
+            System.Reflection.MethodInfo m = typeof(Modes).GetMethod(method, new[] { K, t, B, I, I, B, I });
+            if (m == null) return null;
+            if (m.ReturnType != typeof(void))
+                throw new Acceptance.NotRunException("SIGNATURE_NOT_CONFIRMED", "Modes." + method + " with a " + stateType + " returns a value (PRD 7.3 item 15)");
+            System.Reflection.MethodInfo close = typeof(AoSeams).GetMethod("CloseStream", System.Reflection.BindingFlags.NonPublic | System.Reflection.BindingFlags.Static);
+            return (Action<byte[], int, int, byte[], int>)close.MakeGenericMethod(t).Invoke(null, new object[] { m, k, null });
+        }
+
+        public static Action<byte[], int, int, byte[], int> StreamNullState(AesKey k, string stateType, string method)
+        { return Need(TryStreamNullState(k, stateType, method), "Modes." + method + " with a " + stateType); }
+
+        public static Func<AesKey, byte[], int, int, byte[], int, bool> TryCmacVerifyInto()
+        { return Bind<Func<AesKey, byte[], int, int, byte[], int, bool>>(typeof(Cmac), null, "Verify", new[] { K, B, I, I, B, I }); }
+
+        public static Func<byte[], int, int, byte[], int, bool> TryCmacKeyVerify(AesKey k)
+        {
+            object ck = NewKeyObject("CmacKey", k);
+            return ck == null ? null : Bind<Func<byte[], int, int, byte[], int, bool>>(ck.GetType(), ck, "Verify", new[] { B, I, I, B, I });
+        }
+
+        public static StreamSeam Stream(AesKey k, string stateType, string method) { return Need(TryStream(k, stateType, method), "Modes." + method + " with a " + stateType); }
+        public static Func<AesKey, byte[], int, int, byte[], int, bool> CmacVerifyInto() { return Need(TryCmacVerifyInto(), "Cmac.Verify with offsets"); }
+        public static Func<byte[], int, int, byte[], int, bool> CmacKeyVerify(AesKey k) { return Need(TryCmacKeyVerify(k), "CmacKey.Verify"); }
     }
 
     /// <summary>The side under test. The selftest group has its own copy of this class that returns a planted fault.</summary>
