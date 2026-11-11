@@ -89,6 +89,7 @@ The work ends when one head of `Algorithm-Optimization` shows the result below a
 | AO-5 rows for AES and modes | FAIL, reason: bytes allocated for each block (fact 2) | S1 |
 | AO-5 rows for hash blocks and HMAC | the state the first S0 run shows, with its reason code | S3 |
 | AO-4 rows for the payload worker | NOT RUN, PRODUCT_MISSING | S2 |
+| AO-7 row for the walk helpers | FAIL, reason: `AesKey.Walk.cs` calls a helper in `AesKey.cs` | S1 |
 | AO-3 rows for hash and DES tables | NOT RUN, PRODUCT_MISSING | S3 and S4 |
 | AO-2 row for the hardware path on .NET 10 | NOT RUN, PRODUCT_MISSING | S6, outside the kill condition; it reads NOT RUN at the kill head |
 | Rows for the big-number paths | NOT RUN, PRODUCT_MISSING | S5, outside the kill condition; they read NOT RUN at the kill head |
@@ -150,7 +151,7 @@ The S0 benchmark list includes AES key setup (both schedules). The row for the C
 ### 7.3 Types and signatures to confirm in S0 (hypothesis)
 
 1. `AesKey.EncryptBlock(byte[] i, int io, byte[] o, int oo)` and `DecryptBlock` keep their signatures. The constructor builds the plain key schedule (the walk reads it) and the decrypt schedule.
-2. `GcmKey` (immutable): holds an `AesKey` and the GHASH table. The static `Gcm` methods stay as wrappers.
+2. `GcmKey` (immutable): holds an `AesKey` and the GHASH table. Its methods have the names and parameters of the static `Gcm` methods, without the key: `byte[] Seal(byte[] nonce, byte[] aad, byte[] plain)` and `bool TryOpen(byte[] nonce, byte[] aad, byte[] sealedBytes, out byte[] plain)`. The static `Gcm` methods stay as wrappers.
 3. `HmacKey` (immutable): holds the inner and outer padded hash states. `IHash` keeps `Clone()` as its state copy. `Hmac.Compute` stays as a wrapper.
 4. `AesPayloadWorker(GcmKey key, int maxQueued)`. `bool TryEncode(int id, byte[] nonce, byte[] plain, Action<PayloadResult> done)` and `bool TryDecode(int id, byte[] wire, Action<PayloadResult> done)`. `PayloadResult` carries the ID, the bytes, or a machine error code.
 5. The worker catches each exception on the pool thread and reports it through `PayloadResult`. An exception that leaves a pool thread ends the process.
