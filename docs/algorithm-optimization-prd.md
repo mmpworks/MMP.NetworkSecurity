@@ -80,8 +80,8 @@ The work ends when slices S0 to S4 each show AO-1 to AO-8 green on one head of `
 |---|----------|------|--------|
 | 1 | Language level for the .NET 10 fast paths. | D1 stays: both builds use C# 3. The fast paths use `unsafe` pointers and the `System.Runtime.Intrinsics` types behind `#if !NETCF`. A spike on net10 with `LangVersion` 3 ran `Aes.Encrypt` and `Pclmulqdq.CarrylessMultiply` and printed `out[0]=99` (0x63, correct for a zero block and zero key). A higher level on one build can make one shared file bind in two ways, so the CF build would no longer prove what the net10 build runs. | confirmed by Steve on 2026-11-10: shared files stay C# 3, fast paths for newer runtimes go in separate `#if !NETCF` files |
 | 2 | Table size for AES. | Default: 1 table of 1 KB plus rotates for each direction, and a 256-byte inverse S-box. The forward S-box comes from the encrypt table. The 4-table shape (8 KB for both directions) competes with the stack and the data in a 16 KB data cache. The pick is reviewed when a CE device number exists. | set as default |
-| 4 | GHASH table. | A 4-bit table for each key: 16 entries of 4 `uint`, 256 bytes, plus one constant reduction table. | set |
 | 3 | How the long branch reaches main. | Each slice is a PR into `Algorithm-Optimization`. One PR to `main` at the end, on Steve's order. | set |
+| 4 | GHASH table. | A 4-bit table for each key: 16 entries of 4 `uint`, 256 bytes, plus one constant reduction table. | set |
 
 ## 7. Program design
 
@@ -113,15 +113,15 @@ The work ends when slices S0 to S4 each show AO-1 to AO-8 green on one head of `
 
 1. `AesKey.EncryptBlock(byte[] i, int io, byte[] o, int oo)` and `DecryptBlock` keep their signatures. The constructor builds the plain key schedule (the walk reads it) and the decrypt schedule.
 2. `GcmKey` (immutable): holds an `AesKey` and the GHASH table. The static `Gcm` methods stay as wrappers.
-3. `HmacKey` (immutable): holds the inner and outer padded hash states. `IHash` gets a state copy. `Hmac.Compute` stays as a wrapper.
+3. `HmacKey` (immutable): holds the inner and outer padded hash states. `IHash` keeps `Clone()` as its state copy. `Hmac.Compute` stays as a wrapper.
 4. `AesPayloadWorker(GcmKey key, int maxQueued)`. `bool TryEncode(int id, byte[] nonce, byte[] plain, Action<PayloadResult> done)` and `bool TryDecode(int id, byte[] wire, Action<PayloadResult> done)`. `PayloadResult` carries the ID, the bytes, or a machine error code.
 5. The worker catches each exception on the pool thread and reports it through `PayloadResult`. An exception that leaves a pool thread ends the process.
-6. The caller supplies the nonce for each payload. The worker holds no nonce counter. A nonce is never used two times with one key.
+6. The caller supplies the nonce for each payload. The worker holds no nonce counter. The caller must never use a nonce two times with one key. The worker does not check this.
 
 ## 8. Boundary and failure routing
 
 1. Free without asking: edits in the `Algorithm-Optimization` worktrees, PRs into `Algorithm-Optimization`, heavy runs through `tools/heavy_lock.py`.
-2. Needs Steve: the merge to `main`, any change to a lesson, golden file or wire format.
+2. Needs Steve: the merge to `main`, any change to D1, any change to a lesson, golden file or wire format.
 3. A red AO check stops the slice. The builder reports it. A rerun pass does not close it.
 4. A CF API gap (for example thread-local storage) is a stop and report to the lead with the missing member named.
 
