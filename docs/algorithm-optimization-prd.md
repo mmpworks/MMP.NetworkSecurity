@@ -52,7 +52,7 @@ Limit of the anchor: AO-2 uses our own old code as the reference. AO-1 (public v
 10. A share of cases starts near the counter limits: CTR at all-FF, the GCM 32-bit counter wrap, and GCM nonces with a length other than 12.
 11. Each hash case runs once whole and once in random chunk splits, with 0-byte updates and splits at 63, 64, 65, 127, 128 and 129. A mid-stream `Clone()` continues as two separate states. HMAC keys longer than the block and HKDF output up to the limit are included.
 12. AO-4 runs in its own process, because the pool cap is for the whole process. AO-4 uses a fresh key object for each run, and the first call to each method occurs from many workers at the same time. One callback calls back into the same key. All modes, GCM and HMAC on shared keys are mixed in one run. The check asserts the result of `ThreadPool.SetMaxThreads(25, 25)` and prints the cap it got.
-13. AO-3 reads NOT RUN, PRODUCT_MISSING for each table until S1. After S1, a second row fails if table-building code runs at start-up.
+13. AO-3 has two kinds of row. A table row compares a table with the math. A start-up row fails when table-building code runs at start-up. Section 4.3 gives the state of each row before S1.
 14. Each run records its seed and prints it in the report. A failed case prints the seed and the case number.
 15. AO-2 runs on .NET 10 with the net10 binaries, and on .NET Framework 4.8 with the CF binaries. The second referee (rule 2) runs on .NET 10 only. After S6, the .NET 10 run covers the portable path and the hardware path (rule 7.1.13).
 16. AO-4 matches each result to its payload by a payload ID, because the pool does not keep order.
@@ -65,19 +65,37 @@ Limit of the anchor: AO-2 uses our own old code as the reference. AO-1 (public v
 
 ## 4. Kill condition
 
-The work ends when one head of `Algorithm-Optimization` shows AO-1 to AO-8 green after slices S1 to S4, with the numbers in `docs/_runs/`. Target date: 2026-11-17. Slice S5 has its own go or stop decision.
+The work ends when one head of `Algorithm-Optimization` shows the result below after slices S1 to S4, with the numbers in `docs/_runs/`. Target date: 2026-11-17. Slices S5, S6 and S7 are outside the kill condition, and each has its own go or stop decision.
 
-Rows that are not green before their slice, by design:
+### 4.1 The row list
 
-| Row | State at S0 | Green from |
-|-----|-------------|------------|
-| `AO-3.aes.no-startup-build` | FAIL (the static constructor builds the tables, fact 1) | S1 |
-| `AO-3.ghash.*` | NOT RUN, NO_TABLES | S1 |
-| `AO-4.payload-worker-pool-25` and the payload rows | NOT RUN, PRODUCT_MISSING | S2 |
-| AO-3 rows for hash and DES tables | not built yet | S3 and S4 |
-| AO-2 hardware path on .NET 10 | not built yet | S6 |
+1. Echo owns one row list in `acceptance/`. It has one line for each AO row ID, with no wildcards.
+2. Each line has 4 fields: the row ID, the state before its slice, the reason code of that state, and the slice from which the row is PASS.
+3. The state text is the text the harness prints, for example `PASS`, `FAIL` or `NOT RUN, PRODUCT_MISSING`.
+4. A check in the suite compares each run with the row list. It needs the current slice as an input. The report gives N of M rows, and M is the number of lines in the row list.
 
-S0 is done when every other AO row is green, and each row in this table shows the state the table names. A row in this table that shows a different state is a red.
+### 4.2 The rule
+
+1. Before its slice, a row shows the state and the reason code in the row list.
+2. From its slice on, a row shows PASS.
+3. Any other state, at any time, is a red. A FAIL with a different reason code is a red. A row in the run that is not in the list is a red. A row in the list that is not in the run is a red.
+
+### 4.3 What the list must contain
+
+| Rows | Before the slice | PASS from |
+|------|------------------|-----------|
+| AO-3 row for AES tables built at start-up | FAIL, reason: static constructor present (fact 1) | S1 |
+| AO-3 rows for the GHASH table | NOT RUN, no table exists | S1 |
+| AO-5 rows for AES and modes | FAIL, reason: bytes allocated for each block (fact 2) | S1 |
+| AO-5 rows for hash blocks and HMAC | the state the first S0 run shows, with its reason code | S3 |
+| AO-4 rows for the payload worker | NOT RUN, PRODUCT_MISSING | S2 |
+| AO-3 rows for hash and DES tables | NOT RUN, PRODUCT_MISSING | S3 and S4 |
+| AO-2 row for the hardware path on .NET 10 | NOT RUN, PRODUCT_MISSING | S6, outside the kill condition; it reads NOT RUN at the kill head |
+| Rows for the big-number paths | NOT RUN, PRODUCT_MISSING | S5, outside the kill condition; they read NOT RUN at the kill head |
+
+AO-6 is a record at S0: the run stores the baseline numbers and judges nothing. The AES target of 5 times baseline is judged from S1.
+
+S0 is done when the row-list check reads M of M for slice S0.
 
 ## 5. Non-goals
 
