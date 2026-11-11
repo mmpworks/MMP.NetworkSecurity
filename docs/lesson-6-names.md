@@ -37,6 +37,8 @@ Order on the reader for one sale: `dukpt.key.derived`, `dukpt.message.sent`, `wi
 
 Order on the bank for one sale: `dukpt.message.received`, `check.result` (`KSN already seen`), `dukpt.key.derived`, `check.result` (`PIN block format check`), `dukpt.message.sent`, `wire.sent`.
 
+That is the order the trace shows, and the golden trace in `acceptance/golden` pins it. The code checks in another order: `DukptBank.CheckPinSale` opens the PIN block first and asks the ledger second, so a forged block gets `DUKPT_PINBLOCK_FORMAT` whether or not the bank has seen its KSN. The ledger refuses an exact repeat (`DUKPT_KSN_REPLAY`, check `KSN already seen`) and a counter at or below the highest one it accepted from the same reader (`DUKPT_KSN_STALE`, check `KSN at or below the device's highest counter`). The normal run and the attacks of this lesson never reach the second refusal.
+
 The reader's `held` values in a run: 32 after the load, then 31, 31, 30, 31. So the count does not fall on every sale. A sale erases one register, and it can fill lower ones with child keys. The UI reads `held` from the event and invents no number.
 
 ## Attacks
