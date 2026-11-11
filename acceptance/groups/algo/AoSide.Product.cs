@@ -116,13 +116,12 @@ namespace Acceptance
         }
 
         /// <summary>
-        /// GcmKey.Seal(nonce, aad, plain) on one GcmKey built from k (ctor(AesKey) or ctor(byte[] key)), as a closed delegate, or null when
-        /// no public GcmKey exists. A GcmKey without that shape is NOT RUN SIGNATURE_NOT_CONFIRMED.
+        /// GcmKey.Seal(nonce, aad, plain) on one GcmKey built from k with ctor(AesKey) (PRD 7.3 item 2), as a closed delegate, or null when
+        /// no public GcmKey exists. A GcmKey without that constructor or that Seal is NOT RUN SIGNATURE_NOT_CONFIRMED.
         /// </summary>
         public static Func<byte[], byte[], byte[], byte[]> GcmKeySeal(AesKey k)
         {
-            Type t = null;
-            foreach (Type x in typeof(AesKey).Assembly.GetTypes()) if (x.Name == "GcmKey" && x.IsPublic) t = x;
+            Type t = PublicType("GcmKey");
             if (t == null) return null;
             System.Reflection.MethodInfo m = t.GetMethod("Seal", new[] { typeof(byte[]), typeof(byte[]), typeof(byte[]) });
             System.Reflection.ConstructorInfo byAes = t.GetConstructor(new[] { typeof(AesKey) });
@@ -132,11 +131,82 @@ namespace Acceptance
             return (Func<byte[], byte[], byte[], byte[]>)Delegate.CreateDelegate(typeof(Func<byte[], byte[], byte[], byte[]>), key, m);
         }
 
-        public static bool HasType(string name)
+        public static bool HasType(string name) { return PublicType(name) != null; }
+
+        public static Type PublicType(string name)
         {
-            foreach (Type t in typeof(AesKey).Assembly.GetTypes()) if (t.Name == name && t.IsPublic) return true;
-            return false;
+            foreach (Type t in typeof(AesKey).Assembly.GetTypes()) if (t.Name == name && t.IsPublic) return t;
+            return null;
         }
+
+        // ---- caller-buffer forms of PRD 7.3 item 15, bound once as closed delegates (a reflection call allocates its own argument array) ----
+
+        /// <summary>
+        /// The method of that name and parameter list as a delegate of type T, or null when no such overload exists. An overload with those
+        /// parameters and another return type is NOT RUN SIGNATURE_NOT_CONFIRMED.
+        /// </summary>
+        static T Bind<T>(Type owner, object target, string name, Type[] ps) where T : class
+        {
+            if (owner == null) return null;
+            System.Reflection.MethodInfo m = owner.GetMethod(name, ps);
+            if (m == null) return null;
+            try { return (T)(object)(target == null ? Delegate.CreateDelegate(typeof(T), m) : Delegate.CreateDelegate(typeof(T), target, m)); }
+            catch (ArgumentException) { throw new Acceptance.NotRunException("SIGNATURE_NOT_CONFIRMED", owner.Name + "." + name + " exists with the parameters of PRD 7.3 item 15 and returns " + m.ReturnType.Name); }
+        }
+
+        static T Need<T>(T d, string what) where T : class
+        {
+            if (d == null) throw new Acceptance.NotRunException("PRODUCT_MISSING", what + " does not exist yet (PRD 7.3 item 15, slice S1)");
+            return d;
+        }
+
+        static readonly Type B = typeof(byte[]), I = typeof(int), K = typeof(AesKey);
+
+        public static Action<AesKey, byte[], int, int, byte[], int> TryEcbInto(bool encrypt)
+        { return Bind<Action<AesKey, byte[], int, int, byte[], int>>(typeof(Modes), null, encrypt ? "EcbEncrypt" : "EcbDecrypt", new[] { K, B, I, I, B, I }); }
+        public static Action<AesKey, byte[], int, byte[], int, int, byte[], int> TryCbcInto(bool encrypt)
+        { return Bind<Action<AesKey, byte[], int, byte[], int, int, byte[], int>>(typeof(Modes), null, encrypt ? "CbcEncrypt" : "CbcDecrypt", new[] { K, B, I, B, I, I, B, I }); }
+        public static Action<AesKey, byte[], int, byte[], int, int, byte[], int> TryCtrInto()
+        { return Bind<Action<AesKey, byte[], int, byte[], int, int, byte[], int>>(typeof(Modes), null, "Ctr", new[] { K, B, I, B, I, I, B, I }); }
+        public static Action<AesKey, byte[], int, int, byte[], int> TryCmacInto()
+        { return Bind<Action<AesKey, byte[], int, int, byte[], int>>(typeof(Cmac), null, "Compute", new[] { K, B, I, I, B, I }); }
+
+        static object NewKeyObject(string typeName, AesKey k)
+        {
+            Type t = PublicType(typeName);
+            if (t == null) return null;
+            System.Reflection.ConstructorInfo ctor = t.GetConstructor(new[] { K });
+            if (ctor == null) throw new Acceptance.NotRunException("SIGNATURE_NOT_CONFIRMED", typeName + " exists but has no constructor (AesKey) (PRD 7.3 item 15)");
+            return ctor.Invoke(new object[] { k });
+        }
+
+        public static Action<byte[], int, int, byte[], int> TryCmacKeyCompute(AesKey k)
+        {
+            object ck = NewKeyObject("CmacKey", k);
+            return ck == null ? null : Bind<Action<byte[], int, int, byte[], int>>(ck.GetType(), ck, "Compute", new[] { B, I, I, B, I });
+        }
+
+        static readonly Type[] GcmInto = { B, I, B, I, I, B, I, I, B, I };
+
+        public static Action<byte[], int, byte[], int, int, byte[], int, int, byte[], int> TryGcmKeySealInto(AesKey k)
+        {
+            object gk = NewKeyObject("GcmKey", k);
+            return gk == null ? null : Bind<Action<byte[], int, byte[], int, int, byte[], int, int, byte[], int>>(gk.GetType(), gk, "Seal", GcmInto);
+        }
+
+        public static Func<byte[], int, byte[], int, int, byte[], int, int, byte[], int, bool> TryGcmKeyOpenInto(AesKey k)
+        {
+            object gk = NewKeyObject("GcmKey", k);
+            return gk == null ? null : Bind<Func<byte[], int, byte[], int, int, byte[], int, int, byte[], int, bool>>(gk.GetType(), gk, "TryOpen", GcmInto);
+        }
+
+        public static Action<AesKey, byte[], int, int, byte[], int> EcbInto(bool encrypt) { return Need(TryEcbInto(encrypt), encrypt ? "Modes.EcbEncrypt into" : "Modes.EcbDecrypt into"); }
+        public static Action<AesKey, byte[], int, byte[], int, int, byte[], int> CbcInto(bool encrypt) { return Need(TryCbcInto(encrypt), encrypt ? "Modes.CbcEncrypt into" : "Modes.CbcDecrypt into"); }
+        public static Action<AesKey, byte[], int, byte[], int, int, byte[], int> CtrInto() { return Need(TryCtrInto(), "Modes.Ctr into"); }
+        public static Action<AesKey, byte[], int, int, byte[], int> CmacInto() { return Need(TryCmacInto(), "Cmac.Compute into"); }
+        public static Action<byte[], int, int, byte[], int> CmacKeyCompute(AesKey k) { return Need(TryCmacKeyCompute(k), "CmacKey"); }
+        public static Action<byte[], int, byte[], int, int, byte[], int, int, byte[], int> GcmKeySealInto(AesKey k) { return Need(TryGcmKeySealInto(k), "GcmKey.Seal into"); }
+        public static Func<byte[], int, byte[], int, int, byte[], int, int, byte[], int, bool> GcmKeyOpenInto(AesKey k) { return Need(TryGcmKeyOpenInto(k), "GcmKey.TryOpen into"); }
     }
 
     /// <summary>The side under test. The selftest group has its own copy of this class that returns a planted fault.</summary>

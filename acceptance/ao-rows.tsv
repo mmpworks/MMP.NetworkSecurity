@@ -61,6 +61,18 @@ AO-2.ed25519.net10	NOT RUN	PRODUCT_MISSING	S5	suite
 AO-2.ed25519.cf	NOT RUN	PRODUCT_MISSING	S5	suite
 AO-2.mlkem768.net10	NOT RUN	PRODUCT_MISSING	S5	suite
 AO-2.mlkem768.cf	NOT RUN	PRODUCT_MISSING	S5	suite
+AO-2.aes-ecb-into.net10	NOT RUN	PRODUCT_MISSING	S1	suite
+AO-2.aes-ecb-into.cf	NOT RUN	PRODUCT_MISSING	S1	suite
+AO-2.aes-cbc-into.net10	NOT RUN	PRODUCT_MISSING	S1	suite
+AO-2.aes-cbc-into.cf	NOT RUN	PRODUCT_MISSING	S1	suite
+AO-2.aes-ctr-into.net10	NOT RUN	PRODUCT_MISSING	S1	suite
+AO-2.aes-ctr-into.cf	NOT RUN	PRODUCT_MISSING	S1	suite
+AO-2.aes-cmac-into.net10	NOT RUN	PRODUCT_MISSING	S1	suite
+AO-2.aes-cmac-into.cf	NOT RUN	PRODUCT_MISSING	S1	suite
+AO-2.aes-cmackey-into.net10	NOT RUN	PRODUCT_MISSING	S1	suite
+AO-2.aes-cmackey-into.cf	NOT RUN	PRODUCT_MISSING	S1	suite
+AO-2.aes-gcm-into.net10	NOT RUN	PRODUCT_MISSING	S1	suite
+AO-2.aes-gcm-into.cf	NOT RUN	PRODUCT_MISSING	S1	suite
 AO-3.aes.tables-equal-math.net10	-	-	S0	suite
 AO-3.aes.no-startup-build.net10	FAIL	AO_TABLE_BUILT_AT_STARTUP	S1	suite
 AO-3.ghash.tables-equal-math.net10	NOT RUN	NO_TABLES	S1	suite
@@ -102,6 +114,40 @@ AO-5.keccak-message.net10	FAIL	AO5_ALLOCATES	S3	suite
 AO-5.hmac.net10	FAIL	AO5_ALLOCATES	S3	suite
 AO-5.tdes.net10	-	-	S0	suite
 AO-5.dukpt-derive.net10	FAIL	AO5_ALLOCATES	S4	suite
+AO-5.aes-block.cf	FAIL	AO5_ALLOCATES	S1	suite
+AO-5.aes-ecb.cf	FAIL	AO5_ALLOCATES	S1	suite
+AO-5.aes-cbc.cf	FAIL	AO5_ALLOCATES	S1	suite
+AO-5.aes-ctr.cf	FAIL	AO5_ALLOCATES	S1	suite
+AO-5.aes-gcm.cf	FAIL	AO5_ALLOCATES	S1	suite
+AO-5.aes-cmac.cf	FAIL	AO5_ALLOCATES	S1	suite
+AO-5.md5.cf	-	-	S0	suite
+AO-5.sha1.cf	-	-	S0	suite
+AO-5.sha256.cf	-	-	S0	suite
+AO-5.sha512.cf	-	-	S0	suite
+AO-5.keccak.cf	FAIL	AO5_ALLOCATES	S3	suite
+AO-5.md5-message.cf	FAIL	AO5_ALLOCATES	S3	suite
+AO-5.sha1-message.cf	FAIL	AO5_ALLOCATES	S3	suite
+AO-5.sha256-message.cf	FAIL	AO5_ALLOCATES	S3	suite
+AO-5.sha512-message.cf	FAIL	AO5_ALLOCATES	S3	suite
+AO-5.keccak-message.cf	FAIL	AO5_ALLOCATES	S3	suite
+AO-5.hmac.cf	FAIL	AO5_ALLOCATES	S3	suite
+AO-5.tdes.cf	-	-	S0	suite
+AO-5.dukpt-derive.cf	FAIL	AO5_ALLOCATES	S4	suite
+AO-5.aes-gcm-static.net10	FAIL	AO5_ALLOCATES	S1	suite
+AO-5.aes-ecb-into.net10	NOT RUN	PRODUCT_MISSING	S1	suite
+AO-5.aes-ecb-into.cf	NOT RUN	PRODUCT_MISSING	S1	suite
+AO-5.aes-cbc-into.net10	NOT RUN	PRODUCT_MISSING	S1	suite
+AO-5.aes-cbc-into.cf	NOT RUN	PRODUCT_MISSING	S1	suite
+AO-5.aes-ctr-into.net10	NOT RUN	PRODUCT_MISSING	S1	suite
+AO-5.aes-ctr-into.cf	NOT RUN	PRODUCT_MISSING	S1	suite
+AO-5.aes-cmac-into.net10	NOT RUN	PRODUCT_MISSING	S1	suite
+AO-5.aes-cmac-into.cf	NOT RUN	PRODUCT_MISSING	S1	suite
+AO-5.aes-cmackey-into.net10	NOT RUN	PRODUCT_MISSING	S1	suite
+AO-5.aes-cmackey-into.cf	NOT RUN	PRODUCT_MISSING	S1	suite
+AO-5.aes-gcm-seal-into.net10	NOT RUN	PRODUCT_MISSING	S1	suite
+AO-5.aes-gcm-seal-into.cf	NOT RUN	PRODUCT_MISSING	S1	suite
+AO-5.aes-gcm-open-into.net10	NOT RUN	PRODUCT_MISSING	S1	suite
+AO-5.aes-gcm-open-into.cf	NOT RUN	PRODUCT_MISSING	S1	suite
 AO-6.aes-block.net10	-	-	S0	bench
 AO-6.aes-ecb.net10	-	-	S0	bench
 AO-6.aes-cbc.net10	-	-	S0	bench

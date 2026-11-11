@@ -320,7 +320,13 @@ namespace Acceptance
                 planted.Add(p.Key + ": FAIL");
             }
             GC.KeepAlive(sink);
-            return "control: " + none + "; " + arrayOnly + "; planted: " + string.Join("; ", planted.ToArray());
+            // The budget (Jared's condition 2): 10 B against a budget of 16 is PASS; against a budget of 8 it is FAIL AO5_ALLOCATES.
+            AoAllocMeter.PerUnitResult ten = new AoAllocMeter.PerUnitResult { Low = 10, High = 10 };
+            string within = AoAllocMeter.Judge("ten bytes", ten, "call", 16);
+            string over;
+            try { over = "PASS " + AoAllocMeter.Judge("ten bytes", ten, "call", 8); } catch (FailException e) { over = "FAIL " + e.Reason; }
+            if (!within.Contains("within the budget") || over != "FAIL AO5_ALLOCATES") throw new FailException("the budget judge gave '" + within + "' and '" + over + "'");
+            return "control: " + none + "; " + arrayOnly + "; planted: " + string.Join("; ", planted.ToArray()) + "; budget: 10 B within 16 -> PASS, 10 B over 8 -> FAIL";
         }
 
         static Action MakeRare(int every)
@@ -527,5 +533,98 @@ namespace Acceptance.AoPlanted
     static class GhashKnownTable
     {
         static readonly ushort[] Last4 = { 0x0000, 0x1c20, 0x3840, 0x2460, 0x7080, 0x6ca0, 0x48c0, 0x54e0, 0xe100, 0xfd20, 0xd940, 0xc560, 0x9180, 0x8da0, 0xa9c0, 0xb5e0 };
+    }
+}
+
+namespace Acceptance
+{
+    /// <summary>The caller-buffer reference model with one planted fault: each must turn its AO-2 "-into" row red.</summary>
+    public sealed class PlantedInto : FrozenInto
+    {
+        readonly string _fault;
+        public PlantedInto(string fault) { _fault = fault; }
+        public override string Name { get { return "planted:" + _fault; } }
+
+        protected override void Overlap(byte[] a, int ao, int an, byte[] b, int bo, int bn)
+        {
+            if (_fault == "accepts-partial-overlap") return;
+            base.Overlap(a, ao, an, b, bo, bn);
+        }
+
+        protected override byte[] Nonce(byte[] nonce, int no)
+        {
+            if (_fault == "gcm-short-nonce-padded" && nonce != null && no >= 0 && nonce.Length - no < 12)
+            {
+                byte[] n = new byte[12];
+                Buffer.BlockCopy(nonce, no, n, 0, Math.Max(0, nonce.Length - no));
+                return n;
+            }
+            return base.Nonce(nonce, no);
+        }
+
+        public override void Cbc(object k, bool encrypt, byte[] iv, int ivo, byte[] i, int io, int n, byte[] o, int oo)
+        {
+            if (_fault != "cbc-decrypt-in-place-loses-chain" || encrypt || !ReferenceEquals(i, o) || io != oo) { base.Cbc(k, encrypt, iv, ivo, i, io, n, o, oo); return; }
+            // In place, block by block, taking the chain from the array after the block before it was overwritten.
+            FrozenSide f = new FrozenSide();
+            byte[] prev = Slice(iv, ivo, 16), plain = new byte[16];
+            for (int b = 0; b < n; b += 16)
+            {
+                f.AesDecrypt(k, i, io + b, plain, 0);
+                for (int j = 0; j < 16; j++) o[oo + b + j] = (byte)(plain[j] ^ prev[j]);
+                prev = Slice(o, oo + b, 16);
+            }
+        }
+
+        public override void Ctr(object k, byte[] ctr, int co, byte[] i, int io, int n, byte[] o, int oo)
+        {
+            base.Ctr(k, ctr, co, i, io, n, o, oo);
+            if (_fault == "ctr-moves-caller-counter") ctr[co + 15]++;
+        }
+
+        public override bool GcmOpen(object k, byte[] nonce, int no, byte[] aad, int ao, int an, byte[] i, int io, int n, byte[] o, int oo)
+        {
+            if (_fault != "gcm-open-bad-tag-keeps-output") return base.GcmOpen(k, nonce, no, aad, ao, an, i, io, n, o, oo);
+            byte[] keep = Slice(o, oo, n - 16);
+            bool ok = base.GcmOpen(k, nonce, no, aad, ao, an, i, io, n, o, oo);
+            if (!ok) Buffer.BlockCopy(keep, 0, o, oo, n - 16);
+            return ok;
+        }
+
+        public override void CmacKey(object k, byte[] m, int mo, int n, byte[] t, int to)
+        {
+            base.CmacKey(k, m, mo, n, t, to);
+            if (_fault == "cmackey-tag-short" ) t[to + 15] = 0;
+        }
+    }
+
+    public static class SelfAoInto
+    {
+        const int Cases = 20000;
+
+        [Clause("SELF.ao2-into-control-and-planted-faults", TimeoutSec = 1800)]
+        public static string IntoBites(Ctx c)
+        {
+            foreach (string op in AoIntoDiff.Ops)
+            {
+                string r = AoIntoDiff.Run(op, new FrozenInto(), new FrozenInto(), Cases);
+                if (!r.StartsWith(Cases + " of ")) throw new FailException(op + " control gave " + r);
+            }
+            string[][] planted = {
+                new[] { "aes-ecb-into", "accepts-partial-overlap" }, new[] { "aes-cbc-into", "cbc-decrypt-in-place-loses-chain" },
+                new[] { "aes-ctr-into", "ctr-moves-caller-counter" }, new[] { "aes-gcm-into", "gcm-open-bad-tag-keeps-output" },
+                new[] { "aes-gcm-into", "gcm-short-nonce-padded" }, new[] { "aes-cmackey-into", "cmackey-tag-short" },
+            };
+            List<string> seen = new List<string>();
+            foreach (string[] p in planted)
+            {
+                string got;
+                try { got = "PASS " + AoIntoDiff.Run(p[0], new FrozenInto(), new PlantedInto(p[1]), Cases); }
+                catch (FailException e) { got = "FAIL " + e.Reason; }
+                if (got != "FAIL AO_DIFFERS") throw new FailException(p[0] + " did not catch " + p[1] + ": " + got);
+                seen.Add(p[0] + "/" + p[1] + ": FAIL");
+            }
+            return AoIntoDiff.Ops.Length + " caller-buffer ops: the model against itself, " + Cases + " cases each, 0 differences; planted: " + string.Join("; ", seen.ToArray());
+        }
     }
 }

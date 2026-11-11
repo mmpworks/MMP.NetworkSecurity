@@ -57,6 +57,7 @@ namespace Acceptance
                 new[] { "dispose", "idle-never-set", "FAIL AO_IDLE_TIMEOUT" }, new[] { "dispose", "blocks-when-full", "FAIL AO_WORKER_BLOCKED" },
                 new[] { "dispose", "accepts-after-dispose", "FAIL AO_WORKER_AFTER_DISPOSE" }, new[] { "dispose", "drops-queued-on-dispose", "FAIL AO_WORKER_LOST_PAYLOAD" },
                 new[] { "shared-gcmkey", "gcm-shared-scratch", "FAIL AO_THREAD_MISMATCH" },
+                new[] { "round-trip", "result-not-cleared", "FAIL AO_WORKER_MISMATCH" },
             };
             Dictionary<string, Body> rows = new Dictionary<string, Body>();
             foreach (KeyValuePair<string, Body> kv in Rows()) rows[kv.Key] = kv.Value;
@@ -112,8 +113,14 @@ namespace Acceptance.WorkerStandIn
 
     public sealed class PayloadResult
     {
-        public int Id; public byte[] Bytes; public string Code;
-        public static PayloadResult Of(int id, byte[] b, string code) { PayloadResult r = new PayloadResult(); r.Id = id; r.Bytes = b; r.Code = code; return r; }
+        public int Id; public byte[] Bytes; public string Code; public int Length;
+        public static PayloadResult Of(int id, byte[] b, string code)
+        {
+            // PRD 7.4 rule 6: a buffer longer than the result, with the length beside it.
+            PayloadResult r = new PayloadResult(); r.Id = id; r.Code = code;
+            if (b != null) { r.Bytes = new byte[b.Length + 7]; Buffer.BlockCopy(b, 0, r.Bytes, 0, b.Length); r.Length = b.Length; }
+            return r;
+        }
     }
 
     /// <summary>PRD 7.3 items 4 to 11: counter, volatile disposed flag, decrement in finally, catch on the pool thread, Idle as a drain signal.</summary>
@@ -129,7 +136,7 @@ namespace Acceptance.WorkerStandIn
         public AesPayloadWorker(GcmKey key, int maxQueued, Action<WaitCallback> dispatch)
         {
             _key = key; _max = maxQueued; _dispatch = dispatch;
-            foreach (string f in new[] { "wrong-id", "decode-skips-tag", "nonce-length-unchecked", "aad-little-endian", "idle-never-set", "blocks-when-full", "accepts-after-dispose", "drops-queued-on-dispose" })
+            foreach (string f in new[] { "wrong-id", "decode-skips-tag", "nonce-length-unchecked", "aad-little-endian", "idle-never-set", "blocks-when-full", "accepts-after-dispose", "drops-queued-on-dispose", "result-not-cleared" })
                 if (Faults.Is(f)) _fault = f;
         }
 
@@ -163,6 +170,8 @@ namespace Acceptance.WorkerStandIn
                         PayloadResult r;
                         try { r = work(); } catch (Exception e) { r = PayloadResult.Of(-1, null, AoRec.SigOf(e)); }
                         try { done(r); } catch (Exception) { }
+                        // The used range goes to 0 when done returns (PRD 7.4 rule 6); the planted fault leaves the plaintext.
+                        if (r.Bytes != null && _fault != "result-not-cleared") Array.Clear(r.Bytes, 0, r.Length);
                     }
                     finally { Leave(); }
                 });
