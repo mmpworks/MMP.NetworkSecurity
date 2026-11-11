@@ -60,6 +60,26 @@ static class Measure
         };
     }
 
+    /// <summary>
+    /// The process warm-up, run once over every case before the first measurement. The tiered JIT moves a method to optimized code
+    /// after enough calls, and dynamic PGO rewrites it once more, so a case measured before both copies settle reads a ratio far from 1
+    /// (0.22 in the first pair of the first case of a smoke run). Each call runs for <paramref name="each"/> on both copies.
+    /// </summary>
+    public static void PreWarm(System.Collections.Generic.IEnumerable<(Action Original, Action New)> calls, TimeSpan each)
+    {
+        foreach (var pair in calls)
+        {
+            RunFor(pair.Original, each);
+            RunFor(pair.New, each);
+        }
+    }
+
+    static void RunFor(Action call, TimeSpan time)
+    {
+        Stopwatch sw = Stopwatch.StartNew();
+        while (sw.Elapsed < time) call();
+    }
+
     /// <summary>Runs the call for the warm-up time, doubling the batch until one batch lasts the round target. Returns that batch size.</summary>
     static long CallsFor(Action call, TimeSpan roundTarget)
     {
@@ -114,12 +134,15 @@ static class Measure
     {
         try
         {
-            int pick = core ?? Environment.ProcessorCount - 1;
+            CoreMap.Pick fastest = core.HasValue ? null : CoreMap.Fastest();
+            int pick = core ?? (fastest != null ? fastest.LogicalProcessor : 0);
             using (Process p = Process.GetCurrentProcess()) p.PriorityClass = ProcessPriorityClass.High;
             SetAffinity(1L << pick);
             Thread.CurrentThread.Priority = ThreadPriority.Highest;
+            string why = core.HasValue ? "chosen by --core" : fastest == null ? "no CPU set information, so processor 0"
+                : "core " + fastest.Core + ", efficiency class " + fastest.EfficiencyClass + " (the highest on this CPU; lowest is " + fastest.LowestClass + ")";
             return "process priority High, thread priority Highest, pinned to logical processor " + pick + " of " + Environment.ProcessorCount
-                + " for the paired rounds (all processors for the 25-thread run)";
+                + ", " + why + ", for the paired rounds (all processors for the 25-thread run)";
         }
         catch (Exception e)
         {
@@ -162,7 +185,7 @@ static class Allocated
 /// </summary>
 static class NoiseBand
 {
-    public const double Low = 0.95, High = 1.05;
+    public const double Low = 0.90, High = 1.10;   // the S0 same-code rule the lead set; the measured band is printed beside it
 
     public static string Describe(double[] ratios) => string.Format(System.Globalization.CultureInfo.InvariantCulture,
         "same-code band measured: {0:F3} to {1:F3} over {2} rows; target {3:F2} to {4:F2}; rows outside the target: {5}",

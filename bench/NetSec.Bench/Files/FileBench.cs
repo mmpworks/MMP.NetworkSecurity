@@ -62,6 +62,12 @@ static class FileBench
     public static List<FileRow> Run(IList<TestFile> files, ICodeUnderTest original, ICodeUnderTest current, Action<FileRow> progress)
     {
         IBoundCode o = original.Bind(AesKey, HmacKey), n = current.Bind(AesKey, HmacKey);
+        TestFile smallest = files.OrderBy(f => f.Bytes.Length).First();
+        Measure.PreWarm(Ops(o).Select(op =>
+        {
+            byte[] x = op.Input(smallest);
+            return ((Action)(() => Sink = op.Call(o, x)), (Action)(() => Sink = op.Call(n, x)));
+        }).ToList(), Program.PreWarmEach);
         List<FileRow> rows = new List<FileRow>();
         foreach (TestFile f in files)
             foreach (Op op in Ops(o))
