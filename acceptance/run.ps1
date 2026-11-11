@@ -504,8 +504,11 @@ function Get-SuiteTypeNames {
             if (-not (Test-Path -LiteralPath $rootDir)) { continue }
             foreach ($f in (Get-ChildItem -LiteralPath $rootDir -Recurse -Filter *.cs -File)) {
                 if ($f.FullName -match '[\\/](?:bin|obj)[\\/]') { continue }
-                $into = if ($rootName -eq 'contract' -or $f.FullName -match '[\\/]Frozen[\\/]') { $product } else { $set }
-                foreach ($m in $decl.Matches([System.IO.File]::ReadAllText($f.FullName))) { [void]$into.Add($m.Groups['name'].Value) }
+                # No "$x = if (...) { $set }": PowerShell unrolls an empty set to $null there.
+                $isProduct = $rootName -eq 'contract' -or $f.FullName -match '[\\/]Frozen[\\/]'
+                foreach ($m in $decl.Matches([System.IO.File]::ReadAllText($f.FullName))) {
+                    if ($isProduct) { [void]$product.Add($m.Groups['name'].Value) } else { [void]$set.Add($m.Groups['name'].Value) }
+                }
             }
         }
         $set.ExceptWith($product)
