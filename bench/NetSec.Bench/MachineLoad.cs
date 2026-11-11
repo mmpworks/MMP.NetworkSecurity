@@ -30,16 +30,44 @@ static class MachineLoad
     [DllImport("kernel32.dll", SetLastError = true)]
     static extern bool GetSystemTimes(out long idle, out long kernel, out long user);
 
+    // SYSTEM_PROCESSOR_PERFORMANCE_INFORMATION (class 8), one per logical processor: IdleTime, KernelTime, UserTime, DpcTime,
+    // InterruptTime as 64-bit values, then a 32-bit InterruptCount padded to 8: 6 longs. KernelTime includes IdleTime.
+    [DllImport("ntdll.dll")]
+    static extern int NtQuerySystemInformation(int infoClass, [Out] long[] info, int length, out int returned);
+    const int ProcessorPerformanceClass = 8, LongsPerProcessor = 6;
+
+    /// <summary>The pinned logical processor and its hyper-thread sibling (set by <see cref="Measure.RaisePriority"/>); empty when not pinned.</summary>
+    public static int[] CorePair = new int[0];
+
     public struct Sample
     {
-        public long Idle, Total, Own;
+        public long Idle, Total, Own, CoreIdle, CoreTotal;
     }
 
     public static Sample Now()
     {
         GetSystemTimes(out long idle, out long kernel, out long user);
+        Sample s;
         using (Process self = Process.GetCurrentProcess())
-            return new Sample { Idle = idle, Total = kernel + user, Own = self.TotalProcessorTime.Ticks };
+            s = new Sample { Idle = idle, Total = kernel + user, Own = self.TotalProcessorTime.Ticks };
+        long[] info = new long[LongsPerProcessor * Environment.ProcessorCount];
+        if (CorePair.Length == 0 || NtQuerySystemInformation(ProcessorPerformanceClass, info, info.Length * 8, out int _) != 0) return s;
+        foreach (int lp in CorePair)
+        {
+            s.CoreIdle += info[LongsPerProcessor * lp];
+            s.CoreTotal += info[LongsPerProcessor * lp + 1] + info[LongsPerProcessor * lp + 2];
+        }
+        return s;
+    }
+
+    /// <summary>The busy share of the pinned core pair between two samples, less this process (which runs only on the pinned processor
+    /// while timing). NaN when the pair was not read.</summary>
+    public static double CoreBusy(Sample from, Sample to)
+    {
+        long total = to.CoreTotal - from.CoreTotal;
+        if (total <= 0) return double.NaN;
+        long busy = total - (to.CoreIdle - from.CoreIdle) - (to.Own - from.Own);
+        return Math.Max(0, (double)busy / total);
     }
 
     /// <summary>The busy share of all processors between two samples, less the time this process used.</summary>

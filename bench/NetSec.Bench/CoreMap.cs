@@ -22,27 +22,46 @@ static class CoreMap
     /// <summary>The fastest logical processor, or null when Windows gives no CPU set information.</summary>
     public static Pick Fastest()
     {
+        Pick best = null;
+        int lowest = int.MaxValue;
+        foreach (Pick set in Read())
+        {
+            lowest = Math.Min(lowest, set.EfficiencyClass);
+            bool faster = best == null || set.EfficiencyClass > best.EfficiencyClass;
+            bool laterCore = best != null && set.EfficiencyClass == best.EfficiencyClass && set.Core > best.Core;
+            if (faster || laterCore) best = set;
+        }
+        if (best != null) { best.HighestClass = best.EfficiencyClass; best.LowestClass = lowest; }
+        return best;
+    }
+
+    /// <summary>Every logical processor on the same physical core as <paramref name="logicalProcessor"/> (itself and its hyper-thread
+    /// sibling), or just itself when Windows gives no CPU set information.</summary>
+    public static int[] CorePair(int logicalProcessor)
+    {
+        System.Collections.Generic.List<Pick> sets = Read();
+        Pick own = sets.Find(s => s.LogicalProcessor == logicalProcessor);
+        if (own == null) return new[] { logicalProcessor };
+        return sets.FindAll(s => s.Core == own.Core).ConvertAll(s => s.LogicalProcessor).ToArray();
+    }
+
+    static System.Collections.Generic.List<Pick> Read()
+    {
+        System.Collections.Generic.List<Pick> sets = new System.Collections.Generic.List<Pick>();
         GetSystemCpuSetInformation(IntPtr.Zero, 0, out uint length, IntPtr.Zero, 0);
-        if (length == 0) return null;
+        if (length == 0) return sets;
         IntPtr buffer = Marshal.AllocHGlobal((int)length);
         try
         {
-            if (!GetSystemCpuSetInformation(buffer, length, out length, IntPtr.Zero, 0)) return null;
-            Pick best = null;
-            int lowest = int.MaxValue;
+            if (!GetSystemCpuSetInformation(buffer, length, out length, IntPtr.Zero, 0)) return sets;
             for (int offset = 0; offset < length;)
             {
                 // SYSTEM_CPU_SET_INFORMATION: Size (DWORD) at 0, LogicalProcessorIndex at 14, CoreIndex at 15, EfficiencyClass at 18.
                 int size = Marshal.ReadInt32(buffer, offset);
-                int lp = Marshal.ReadByte(buffer, offset + 14), core = Marshal.ReadByte(buffer, offset + 15), efficiency = Marshal.ReadByte(buffer, offset + 18);
-                lowest = Math.Min(lowest, efficiency);
-                bool faster = best == null || efficiency > best.EfficiencyClass;
-                bool laterCore = best != null && efficiency == best.EfficiencyClass && core > best.Core;
-                if (faster || laterCore) best = new Pick { LogicalProcessor = lp, Core = core, EfficiencyClass = efficiency };
+                sets.Add(new Pick { LogicalProcessor = Marshal.ReadByte(buffer, offset + 14), Core = Marshal.ReadByte(buffer, offset + 15), EfficiencyClass = Marshal.ReadByte(buffer, offset + 18) });
                 offset += size;
             }
-            if (best != null) { best.HighestClass = best.EfficiencyClass; best.LowestClass = lowest; }
-            return best;
+            return sets;
         }
         finally
         {

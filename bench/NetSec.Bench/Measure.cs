@@ -25,7 +25,8 @@ sealed class Pair
     public double[] Ratios;
     public long CallsPerRound;
     public long PeakWorkingSet;
-    public double OtherBusy;   // CPU share outside this process over the timed rounds (MachineLoad)
+    public double OtherBusy;   // CPU share outside this process over the timed rounds, whole machine (MachineLoad)
+    public double CoreBusy;    // the same, on the pinned core pair only; NaN when not pinned
 
     public double MedianRatio => Measure.Median(Ratios);
 }
@@ -57,9 +58,11 @@ static class Measure
         }
         o.BytesPerCall /= calls * rounds;
         n.BytesPerCall /= calls * rounds;
+        MachineLoad.Sample loadTo = MachineLoad.Now();
         return new Pair
         {
-            Original = o, New = n, CallsPerRound = calls, PeakWorkingSet = PeakWorkingSet(), OtherBusy = MachineLoad.OtherBusy(loadFrom, MachineLoad.Now()),
+            Original = o, New = n, CallsPerRound = calls, PeakWorkingSet = PeakWorkingSet(),
+            OtherBusy = MachineLoad.OtherBusy(loadFrom, loadTo), CoreBusy = MachineLoad.CoreBusy(loadFrom, loadTo),
             Ratios = Enumerable.Range(0, rounds).Select(r => o.NsPerCall[r] / n.NsPerCall[r]).ToArray(),
         };
     }
@@ -142,6 +145,7 @@ static class Measure
             int pick = core ?? (fastest != null ? fastest.LogicalProcessor : 0);
             using (Process p = Process.GetCurrentProcess()) p.PriorityClass = ProcessPriorityClass.High;
             SetAffinity(1L << pick);
+            MachineLoad.CorePair = CoreMap.CorePair(pick);
             Thread.CurrentThread.Priority = ThreadPriority.Highest;
             string why = core.HasValue ? "chosen by --core" : fastest == null ? "no CPU set information, so processor 0"
                 : "core " + fastest.Core + ", efficiency class " + fastest.EfficiencyClass + " (the highest on this CPU; lowest is " + fastest.LowestClass + ")";

@@ -108,15 +108,22 @@ static class Program
     }
 
     static string Row(CaseResult r) => string.Format(CultureInfo.InvariantCulture,
-        "{0,-34} original {1,10:F1} new {2,10:F1} ns/{3,-10} ratio {4,6:F3} ({5:F3} to {6:F3})  new {7,9:F1} B/{3}  load {8:P1}",
-        r.Case.Id, r.OriginalNsPerUnit, r.NewNsPerUnit, r.Case.Unit, r.Pair.MedianRatio, r.Pair.Ratios.Min(), r.Pair.Ratios.Max(), r.NewBytesPerUnit, r.Pair.OtherBusy);
+        "{0,-34} original {1,10:F1} new {2,10:F1} ns/{3,-10} ratio {4,6:F3} ({5:F3} to {6:F3})  new {7,9:F1} B/{3}  load {8:P1} core {9:P1}",
+        r.Case.Id, r.OriginalNsPerUnit, r.NewNsPerUnit, r.Case.Unit, r.Pair.MedianRatio, r.Pair.Ratios.Min(), r.Pair.Ratios.Max(), r.NewBytesPerUnit, r.Pair.OtherBusy, r.Pair.CoreBusy);
 
     /// <summary>The load check alone, for a run script and its self-check: settle, then with --hold N read N seconds and apply the pair rule.</summary>
     static int SettleCheck(Dictionary<string, string> a)
     {
         if (!MachineLoad.Settle()) return MachineLoad.BusyExit;
         int hold = a.TryGetValue("hold", out string h) ? int.Parse(h, CultureInfo.InvariantCulture) : 0;
-        return hold == 0 ? 0 : MachineLoad.Exit(new[] { MachineLoad.Read(TimeSpan.FromSeconds(hold)) });
+        if (hold == 0) return 0;
+        Console.WriteLine("PRIORITY " + Measure.RaisePriority(null));
+        MachineLoad.Sample from = MachineLoad.Now();
+        System.Threading.Thread.Sleep(TimeSpan.FromSeconds(hold));
+        MachineLoad.Sample to = MachineLoad.Now();
+        Console.WriteLine(string.Format(CultureInfo.InvariantCulture, "BENCH_HOLD {0} s: load {1:P1}, core pair [{2}] {3:P1}",
+            hold, MachineLoad.OtherBusy(from, to), string.Join(",", MachineLoad.CorePair.Select(p => p.ToString(CultureInfo.InvariantCulture)).ToArray()), MachineLoad.CoreBusy(from, to)));
+        return MachineLoad.Exit(new[] { MachineLoad.OtherBusy(from, to) });
     }
 
     static Dictionary<string, string> ParseArgs(string[] args)

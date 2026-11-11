@@ -29,7 +29,7 @@ static class FilesMode
         Action<FileRow> print = r => Console.WriteLine(string.Format(CultureInfo.InvariantCulture,
             "{0,-16} {1,-20} original {2,8:F1} new {3,8:F1} MB/s ratio {4,6:F3} ({5:F3} to {6:F3}) new {7,12:F0} B/call",
             r.File, r.Operation, r.MegabytesPerSecond(r.Pair.Original), r.MegabytesPerSecond(r.Pair.New), r.Pair.MedianRatio,
-            r.Pair.Ratios.Min(), r.Pair.Ratios.Max(), r.Pair.New.BytesPerCall) + string.Format(CultureInfo.InvariantCulture, " load {0:P1}", r.Pair.OtherBusy));
+            r.Pair.Ratios.Min(), r.Pair.Ratios.Max(), r.Pair.New.BytesPerCall) + string.Format(CultureInfo.InvariantCulture, " load {0:P1} core {1:P1}", r.Pair.OtherBusy, r.Pair.CoreBusy));
 
         if (!MachineLoad.Settle()) return MachineLoad.BusyExit;
         List<FileRow> fileRows = FileBench.Run(files, original, current, print);
