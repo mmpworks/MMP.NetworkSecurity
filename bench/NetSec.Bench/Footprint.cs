@@ -21,6 +21,7 @@ static class Footprint
 {
     static readonly CultureInfo Inv = CultureInfo.InvariantCulture;
     const int Keys = 1000;
+    const int WorkloadPasses = 4;   // about 37 MB through the cipher, enough collections to read a per-MB rate
 
     public static int Run(Dictionary<string, string> a, Run run)
     {
@@ -116,11 +117,18 @@ static class Footprint
         using (Process p = Process.GetCurrentProcess()) peakBefore = p.PeakWorkingSet64;
         Files.IBoundCode b = copy.Bind(new byte[16], new byte[32]);
         byte[] nonce = new byte[12], aad = new byte[0];
-        foreach (Files.TestFile f in files) Cases.Sink = b.GcmOpen(nonce, aad, b.GcmSeal(nonce, aad, f.Bytes));
+        int g0 = GC.CollectionCount(0), g1 = GC.CollectionCount(1), g2 = GC.CollectionCount(2);
+        for (int pass = 0; pass < WorkloadPasses; pass++)
+            foreach (Files.TestFile f in files) Cases.Sink = b.GcmOpen(nonce, aad, b.GcmSeal(nonce, aad, f.Bytes));
+        g0 = GC.CollectionCount(0) - g0; g1 = GC.CollectionCount(1) - g1; g2 = GC.CollectionCount(2) - g2;
         long peak;
         using (Process p = Process.GetCurrentProcess()) { p.Refresh(); peak = p.PeakWorkingSet64; }
-        string line = string.Format(Inv, "BENCH_WORKLOAD {0} {1}: peak working set {2:F1} MB (before the workload {3:F1} MB); GCM seal and open of {4} files, {5} bytes in all",
-            run.Build, code, peak / 1048576.0, peakBefore / 1048576.0, files.Count, files.Sum(f => (long)f.Bytes.Length));
+        // Megabytes processed: each pass seals and opens every file, so each file byte goes through the cipher twice.
+        double mb = 2.0 * WorkloadPasses * files.Sum(f => (long)f.Bytes.Length) / 1048576.0;
+        string line = string.Format(Inv,
+            "BENCH_WORKLOAD {0} {1}: peak working set {2:F1} MB (before the workload {3:F1} MB); {4} passes of GCM seal and open of {5} files, {6:F1} MB processed; "
+            + "GC collections gen0 {7} gen1 {8} gen2 {9}, so {10:F3} gen0, {11:F3} gen1, {12:F3} gen2 per MB",
+            run.Build, code, peak / 1048576.0, peakBefore / 1048576.0, WorkloadPasses, files.Count, mb, g0, g1, g2, g0 / mb, g1 / mb, g2 / mb);
         Console.WriteLine(line);
         Directory.CreateDirectory(a["out"]);
         File.AppendAllText(Path.Combine(a["out"], "workload-" + run.Build + ".txt"), line + Environment.NewLine);
