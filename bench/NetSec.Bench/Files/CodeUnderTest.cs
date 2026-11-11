@@ -30,7 +30,7 @@ interface IBoundCode
 }
 
 /// <summary>The product code, NetSec.Core as built today. At S0 it is the 5c5d4a4 code, so original and new must agree to within the noise.</summary>
-sealed class ProductCode : ICodeUnderTest
+sealed partial class ProductCode : ICodeUnderTest
 {
     public string Name => "new";
 
