@@ -314,7 +314,8 @@ Conclusion: each remaining form of PRD 7.3 item 15 has an AO-2 row and an AO-5 r
 | AO-2 `aes-cmac-verify-into`, `aes-cmackey-verify-into`: the right tag at an offset, then no change, one changed tag bit, or one changed message bit | the same files |
 | AO-5 for the 4 forms: 0 B for Init, one call and Clear on one object used again; 0 B for a Verify call | `groups/algo/AoAlloc.Product.cs` |
 | The seams: the state type and the overload are found by name, and bound as typed delegates | `AoSeams.TryStream`, `TryCmacVerifyInto`, `TryCmacKeyVerify` in `groups/algo/AoSide.Product.cs` |
-| Self-check, 10 planted faults | `SELF.ao2-stream-control-and-planted-faults` in `selftest/SelfAo.cs` |
+| Self-check, 12 planted faults (PRD 7.4 rule 5: a call before Init, after Clear, after a partial CTR block; a second Init that keeps the state of the first message; a Verify that skips a tag byte) | `SELF.ao2-stream-control-and-planted-faults` in `selftest/SelfAo.cs` |
+| The GCM check order of PRD 7.3 item 15 (the nonce length before the overlap): a planted fault that checks the overlap first goes red | `gcm-overlap-checked-before-nonce` in `SELF.ao2-into-control-and-planted-faults` |
 
 The signatures that the rows bind to (the PRD names the types, and these parameter lists are the reading of it):
 
@@ -335,5 +336,6 @@ Limits:
 1. No case calls a state object again after a refused overlap or a refused CBC count. The PRD does not say what state the object has then.
 2. No case gives Init fewer than 16 bytes. The PRD does not name that refusal.
 3. `Tls13Records` (one direction, one thread) is a product test. It has no acceptance row.
+4. The Verify rows check the answer. They do not check that the compare takes constant time (PRD 7.4 rule 8, and non-goal 3).
 
 Disposition: merge into `Algorithm-Optimization` before the S1 code that adds these forms.

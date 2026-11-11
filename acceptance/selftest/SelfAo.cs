@@ -562,6 +562,13 @@ namespace Acceptance
             return base.Nonce(nonce, no);
         }
 
+        public override void GcmSeal(object k, byte[] nonce, int no, byte[] aad, int ao, int an, byte[] i, int io, int n, byte[] o, int oo)
+        {
+            // PRD 7.3 item 15: the nonce length is checked before the overlap. This fault checks the overlap first.
+            if (_fault == "gcm-overlap-checked-before-nonce") base.Overlap(i, io, n, o, oo, n + 16);
+            base.GcmSeal(k, nonce, no, aad, ao, an, i, io, n, o, oo);
+        }
+
         public override void Cbc(object k, bool encrypt, byte[] iv, int ivo, byte[] i, int io, int n, byte[] o, int oo)
         {
             if (_fault != "cbc-decrypt-in-place-loses-chain" || encrypt || !ReferenceEquals(i, o) || io != oo) { base.Cbc(k, encrypt, iv, ivo, i, io, n, o, oo); return; }
@@ -614,6 +621,7 @@ namespace Acceptance
                 new[] { "aes-ecb-into", "accepts-partial-overlap" }, new[] { "aes-cbc-into", "cbc-decrypt-in-place-loses-chain" },
                 new[] { "aes-ctr-into", "ctr-moves-caller-counter" }, new[] { "aes-gcm-into", "gcm-open-bad-tag-keeps-output" },
                 new[] { "aes-gcm-into", "gcm-short-nonce-padded" }, new[] { "aes-cmackey-into", "cmackey-tag-short" },
+                new[] { "aes-gcm-into", "gcm-overlap-checked-before-nonce" },
             };
             List<string> seen = new List<string>();
             foreach (string[] p in planted)
@@ -635,9 +643,14 @@ namespace Acceptance
         byte[] _first = new byte[16];
         public PlantedChain(object key, string kind, string fault) : base(key, kind) { _fault = fault; }
 
+        bool _used;
+
         public override void Init(byte[] b, int offset)
         {
+            // The second message on one object keeps the chain value and the counter position of the first.
+            if (_fault == "second-init-keeps-state" && _used) { State = 1; return; }
             base.Init(b, offset);
+            _used = true;
             _first = (byte[])V.Clone();
         }
 
@@ -699,6 +712,7 @@ namespace Acceptance
                 new[] { "aes-cbc-stream", "call-before-init-accepted" }, new[] { "aes-cbc-stream", "clear-keeps-ready" },
                 new[] { "aes-ctr-stream", "counter-not-carried" }, new[] { "aes-ctr-stream", "partial-does-not-end" },
                 new[] { "aes-ctr-stream", "call-before-init-accepted" }, new[] { "aes-ctr-stream", "clear-keeps-ready" },
+                new[] { "aes-cbc-stream", "second-init-keeps-state" }, new[] { "aes-ctr-stream", "second-init-keeps-state" },
                 new[] { "aes-cmac-verify-into", "verify-skips-last-tag-byte" }, new[] { "aes-cmackey-verify-into", "verify-reads-tag-at-0" },
             };
             List<string> seen = new List<string>();
