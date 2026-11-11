@@ -1,0 +1,15 @@
+# AO-5 byte budgets (docs/algorithm-optimization-prd.md section 7.4 rule 3). Owner: Echo. Only an acceptance PR changes this file.
+# Columns, tab-separated: id, budget_bytes, unit, from_slice, tradeoff_pr.
+#   id            an AO-5 row ID of acceptance/ao-rows.tsv, net10 rows only (the cf rows judge zero against not zero).
+#   budget_bytes  the bytes per unit that the row may keep. The AO-5 clause reads it: at or under is PASS; over is FAIL AO5_ALLOCATES,
+#                 and the detail gives the measured value and the budget.
+#   from_slice    the slice whose PR recorded the tradeoff.
+#   tradeoff_pr   the PR number (for example #420) where the reviewer ruled on the recorded tradeoff, with the measured value and the cost
+#                 of the 0-byte design.
+# Conditions (Jared on #405, 2026-11-11), checked by AO-0.row-list-matches:
+#   1. A line whose id is not in acceptance/ao-rows.tsv is a red, and so is a second line for one id.
+#   2. The AO-5 clause judges against the budget, so the row's state stays inside the closed rule of PRD 4.2.
+#   3. This file sits inside acceptance/ (PIN and the scope check cover it). A line with budget_bytes above 0 and an empty tradeoff_pr
+#      is a red.
+# A row with no line here is held to 0 bytes.
+id	budget_bytes	unit	from_slice	tradeoff_pr

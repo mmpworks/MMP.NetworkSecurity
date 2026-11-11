@@ -287,3 +287,19 @@ Conclusion: the AO rows are the anchor of `docs/algorithm-optimization-prd.md` s
 Run: `pwsh acceptance/run.ps1 -AoSlice S0 -Clauses AO [-AoBenchReport PATH]`. `-AoSlice` has no default. With no bench report, the bench rows read as absent, so AO-0 is FAIL.
 
 Disposition: merge into `Algorithm-Optimization`. The S0 close needs the bench report of the merged head.
+
+## 19. AO: caller-buffer forms, budgets and the cf meter (added 2026-11-11)
+
+Conclusion: the rows that S1 to S4 need for the zero-garbage rules of PRD 7.4 exist before S1 starts. They read NOT RUN PRODUCT_MISSING until their form exists.
+
+| Part | Where |
+|---|---|
+| AO-5 caller-buffer rows, 0 B for the whole call (PRD 7.3 item 15) | `groups/algo/AoAlloc.Product.cs`, bound through closed delegates in `AoSide.Product.cs` |
+| AO-2 caller-buffer rows: separate, same index, apart in one array, partial overlap refused (`ARG_RANGES_OVERLAP`), short nonce refused (`GCM_NONCE_LENGTH`), bad tag leaves the output all 0 | `groups/algo/AoInto.cs`, `AoInto.Product.cs` |
+| Byte budgets, a row with no line held to 0 | `ao-budgets.tsv` (header: Jared's 3 conditions), read by the AO-5 clause and by AO-0 |
+| The cf AO-5 rows: `AppDomain.MonitoringTotalAllocatedMemorySize`, 1,000,000 blocks per op, zero against not zero | `groups/algo/AoAllocMeter.cs` |
+| AO-4: a kept result array is cleared after `done`, and the copy taken inside `done` stays right | `groups/algothreads/AoWorker.cs` |
+
+Limit of the cf meter: the counter moves in 8,192-byte steps, so an allocation total under 8,192 B over the run is unseen. Each cf row prints its call count and this limit.
+
+Disposition: merge into `Algorithm-Optimization` before S1.

@@ -140,20 +140,41 @@ namespace Acceptance
         }
 
         /// <summary>A PayloadResult read by member type: the int is the ID, the byte[] the bytes, the string the error code.</summary>
+        /// <summary>
+        /// A PayloadResult read inside its done call (PRD 7.4 rule 6: the bytes are valid only until done returns, and PayloadResult
+        /// carries a length because a buffer from the worker's set is longer than the result). Bytes is a copy of the first Length bytes,
+        /// taken here; Raw is the worker's own array, kept to check that the worker clears it when done returns. Members are read by type:
+        /// an int named Id is the ID, an int named Length or Count is the length, the byte[] is the bytes, the string is the error code.
+        /// </summary>
         public sealed class Res
         {
-            public int Id; public byte[] Bytes; public string Code;
+            public int Id; public byte[] Bytes, Raw; public string Code; public int Length = -1;
             public static Res Of(object o)
             {
                 Res r = new Res();
                 Type t = o.GetType();
+                int otherInt = 0; bool sawId = false;
                 foreach (MemberInfo m in t.GetMembers(BindingFlags.Public | BindingFlags.Instance))
                 {
                     object v; Type vt;
                     if (m is FieldInfo) { v = ((FieldInfo)m).GetValue(o); vt = ((FieldInfo)m).FieldType; }
                     else if (m is PropertyInfo && ((PropertyInfo)m).GetIndexParameters().Length == 0) { v = ((PropertyInfo)m).GetValue(o, null); vt = ((PropertyInfo)m).PropertyType; }
                     else continue;
-                    if (vt == typeof(int)) r.Id = (int)v; else if (vt == typeof(byte[])) r.Bytes = (byte[])v; else if (vt == typeof(string)) r.Code = (string)v;
+                    if (vt == typeof(int))
+                    {
+                        if (m.Name == "Length" || m.Name == "Count") r.Length = (int)v;
+                        else if (m.Name == "Id" || m.Name == "ID") { r.Id = (int)v; sawId = true; }
+                        else otherInt = (int)v;
+                    }
+                    else if (vt == typeof(byte[])) r.Raw = (byte[])v;
+                    else if (vt == typeof(string)) r.Code = (string)v;
+                }
+                if (!sawId) r.Id = otherInt;
+                if (r.Raw != null)
+                {
+                    int n = r.Length < 0 ? r.Raw.Length : Math.Min(r.Length, r.Raw.Length);
+                    r.Bytes = new byte[n];
+                    Buffer.BlockCopy(r.Raw, 0, r.Bytes, 0, n);
                 }
                 return r;
             }
@@ -254,13 +275,15 @@ namespace Acceptance
                 Rng r = new Rng(AoThreads.Seed ^ 0x77 ^ (ulong)run);
                 byte[] key = r.Bytes(AoDraw.KeyLen(r));
                 byte[][] plain = new byte[payloads][], nonce = new byte[payloads][];
-                int[] kind = new int[payloads];   // 0 normal, 1 flipped wire byte, 2 moved ID, 3 bad nonce, 4 short wire, 5 callback throws, 6 re-enters
+                // 0 normal, 1 flipped wire byte, 2 moved ID, 3 bad nonce, 4 short wire, 5 callback throws, 6 re-enters, 7 keeps the array
+                // (PRD 7.4 rule 6: the copy taken inside done stays right while later payloads run, and the kept array is cleared).
+                int[] kind = new int[payloads];
                 for (int i = 0; i < payloads; i++)
                 {
                     plain[i] = r.Bytes(AoDraw.Len(r, 1024));
                     nonce[i] = Hex.Concat(Be(run), Be(i), r.Bytes(4));
                     int p = r.Int(100);
-                    kind[i] = p < 80 ? 0 : p < 84 ? 1 : p < 88 ? 2 : p < 90 ? 3 : p < 92 ? 4 : p < 96 ? 5 : 6;
+                    kind[i] = p < 78 ? 0 : p < 82 ? 1 : p < 86 ? 2 : p < 88 ? 3 : p < 90 ? 4 : p < 94 ? 5 : p < 97 ? 6 : 7;
                 }
                 using (Worker a = NewWorker(asm, key, 64, null))
                 using (Worker b = NewWorker(asm, key, 64, null))
@@ -310,6 +333,12 @@ namespace Acceptance
                     for (int i = 0; i < payloads; i++)
                     {
                         string why = Judge(kind[i], i, key, nonce[i], plain[i], wire[i], back[i]);
+                        if (why == null && kind[i] == 7 && back[i] != null && back[i].Raw != null)
+                        {
+                            // The worker sets the used range to 0 before the buffer goes back to its set (PRD 7.4 rule 6, bullet 4).
+                            int used = Math.Min(back[i].Bytes.Length, back[i].Raw.Length);
+                            for (int j = 0; j < used && why == null; j++) if (back[i].Raw[j] != 0) why = "the kept result array still holds plaintext after done returned";
+                        }
                         if (kind[i] >= 1 && kind[i] <= 4) faulted++;
                         if (why != null) { bad++; if (first == null) first = "run " + run + " id " + i + " kind " + kind[i] + ": " + why; }
                     }

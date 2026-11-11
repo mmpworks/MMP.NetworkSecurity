@@ -296,6 +296,26 @@ function Read-AoBench([string]$path, $list, [string]$slice, [string]$head) {
     }
     return $out
 }
+# acceptance/ao-budgets.tsv (PRD 7.4 rule 3; Jared's 3 conditions in its header). Returns one red text for each bad line: an id that
+# is not in the row list, a second line for one id, a budget above 0 with no tradeoff PR, a malformed line.
+function Get-AoBudgetReds([string]$path, $list) {
+    $reds = @(); $seen = @{}
+    if (-not (Test-Path -LiteralPath $path)) { return @('acceptance/ao-budgets.tsv is missing') }
+    foreach ($line in (Get-Content -LiteralPath $path -Encoding utf8)) {
+        if ($line -match '^\s*#' -or $line -match '^id\t' -or -not $line.Trim()) { continue }
+        $f = $line -split "`t"
+        if ($f.Count -ne 5) { $reds += "ao-budgets.tsv: a line needs 5 tab-separated fields: $line"; continue }
+        $id = $f[0]
+        if (-not $list.Contains($id)) { $reds += "ao-budgets.tsv: ${id} is not a row of ao-rows.tsv" }
+        if ($seen.ContainsKey($id)) { $reds += "ao-budgets.tsv: ${id} has a second line" }
+        $seen[$id] = $true
+        $b = 0.0
+        if (-not [double]::TryParse($f[1], [System.Globalization.NumberStyles]::Float, [System.Globalization.CultureInfo]::InvariantCulture, [ref]$b) -or $b -lt 0) { $reds += "ao-budgets.tsv: ${id} budget_bytes '$($f[1])' is not a number of 0 or more" }
+        elseif ($b -gt 0 -and -not $f[4].Trim()) { $reds += "ao-budgets.tsv: ${id} has a budget above 0 and no tradeoff PR" }
+    }
+    return $reds
+}
+
 # Jared on #405 (B1): the suite measures AO-5 and computes AO-9 equality itself. The bench numbers are a second record, and a
 # disagreement is a red: an AO-5 bench row whose bytesPerOp is 0 while the suite row FAILs (or above 0 while it PASSes), and an AO-9 .time
 # row whose outputsEqual differs from the suite's AO-9 row. A suite row that did not run (NOT RUN) is not compared.
@@ -746,10 +766,18 @@ foreach ($c in @($pending | Where-Object { $_.group -eq 'driver' -and -not $resu
             if ($dis.Count -ne 2 -or -not ($dis -match 'AO5_BENCH_DISAGREES') -or -not ($dis -match 'AO9_BENCH_DISAGREES')) { $bad += "the second-record check gave " + ($dis -join ' | ') + ", wanted one AO5_BENCH_DISAGREES and one AO9_BENCH_DISAGREES" }
             $agree = @(Get-AoBenchDisagreements $bj @{ 'AO-5.x.net10' = (New-AoRow 'PASS' ''); 'AO-9.gcm.net10' = (New-AoRow 'FAIL' 'AO9_OUTPUT_DIFFERS'); 'AO-9.pool-25.net10' = (New-AoRow 'PASS' '') })
             if ($agree.Count -ne 0) { $bad += "the second-record check flagged agreeing rows: " + ($agree -join ' | ') }
+            # The budget file: a good line passes; an unknown id, a second line and a budget with no tradeoff PR each go red.
+            $bt = Join-Path $work ("ao-budgets-self-{0}.tsv" -f [guid]::NewGuid().ToString('N').Substring(0, 8))
+            Set-Content -LiteralPath $bt -Encoding utf8 -Value @("id`tbudget_bytes`tunit`tfrom_slice`ttradeoff_pr", "X.a`t64`tmessage`tS1`t#420")
+            $budOk = @(Get-AoBudgetReds $bt $l)
+            if ($budOk.Count -ne 0) { $bad += "a good budget line went red: " + ($budOk -join ' | ') }
+            Set-Content -LiteralPath $bt -Encoding utf8 -Value @("id`tbudget_bytes`tunit`tfrom_slice`ttradeoff_pr", "X.a`t64`tmessage`tS1`t#420", "X.a`t32`tmessage`tS1`t#421", "X.z`t0`tmessage`tS1`t", "X.b`t16`tblock`tS1`t ")
+            $budBad = @(Get-AoBudgetReds $bt $l)
+            if (-not ($budBad -match 'second line') -or -not ($budBad -match 'not a row') -or -not ($budBad -match 'no tradeoff PR')) { $bad += "the budget check missed a bad line: " + ($budBad -join ' | ') }
             $bo = Read-AoBench $bj $bl 'S0' 'OTHERHEAD'
             if ($bo['AO-5.x.net10'].reason -ne 'AO_BENCH_OTHER_COMMIT') { $bad += "a bench report for another commit read $($bo['AO-5.x.net10'].reason)" }
             if ($bad) { Set-Result $c.id 'FAIL' 'ASSERTION' ($bad -join '; ') }
-            else { Set-Result $c.id 'PASS' '' (($seen -join '; ') + '; bench 16 B claiming PASS -> FAIL AO5_ALLOCATES; AO-9 timing row -> PASS; bench 0 B against a suite FAIL -> AO5_BENCH_DISAGREES; bench outputsEqual false against a suite PASS -> AO9_BENCH_DISAGREES; agreeing records -> no red; bench for another commit -> AO_BENCH_OTHER_COMMIT') }
+            else { Set-Result $c.id 'PASS' '' (($seen -join '; ') + '; bench 16 B claiming PASS -> FAIL AO5_ALLOCATES; AO-9 timing row -> PASS; bench 0 B against a suite FAIL -> AO5_BENCH_DISAGREES; bench outputsEqual false against a suite PASS -> AO9_BENCH_DISAGREES; agreeing records -> no red; bench for another commit -> AO_BENCH_OTHER_COMMIT; budget file: a good line passes, an unknown id, a second line and a budget with no tradeoff PR each go red') }
         }
         'SELF.ao-row-verdicts-bite' {
             # AO-1 and AO-8 read other rows. All PASS must PASS; one FAIL or one NOT RUN must FAIL; no row at all must be NOT RUN.
@@ -780,8 +808,12 @@ if ($sel | Where-Object { $_.id -eq 'AO-0.row-list-matches' }) {
         foreach ($k in $bench.Keys) { $aoRun[$k] = $bench[$k] }
         $v = Get-AoRowListVerdict $aoList $aoRun $AoSlice
         $dis = @(Get-AoBenchDisagreements $AoBenchReport $aoRun)
+        $bud = @(Get-AoBudgetReds (Join-Path $acc 'ao-budgets.tsv') $aoList)
         $benchNote = if ($AoBenchReport) { " Bench report: $AoBenchReport." } else { ' No bench report (-AoBenchReport), so the bench rows are absent.' }
-        if ($dis.Count -gt 0) { Set-Result 'AO-0.row-list-matches' 'FAIL' 'AO_ROW_LIST_RED' ($v[2] + '. Bench disagrees with the suite: ' + ($dis -join '; ') + '.' + $benchNote) }
+        $extra = ''
+        if ($dis.Count -gt 0) { $extra += '. Bench disagrees with the suite: ' + ($dis -join '; ') }
+        if ($bud.Count -gt 0) { $extra += '. Budget file: ' + ($bud -join '; ') }
+        if ($extra) { Set-Result 'AO-0.row-list-matches' 'FAIL' 'AO_ROW_LIST_RED' ($v[2] + $extra + '.' + $benchNote) }
         else { Set-Result 'AO-0.row-list-matches' $v[0] $v[1] ($v[2] + $benchNote) }
     } catch { Set-Result 'AO-0.row-list-matches' 'FAIL' 'AO_ROW_LIST_UNREADABLE' $_.Exception.Message }
 }
