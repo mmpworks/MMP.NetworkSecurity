@@ -33,6 +33,7 @@ static class Program
         a.TryGetValue("mode", out string mode);
         if (mode == "ao-merge") return AoParts.Merge(a);
         if (mode == "settle") return SettleCheck(a);
+        if (mode == "crossover") return Crossover.Combine(a);
         Run run = new Run { Build = BuildName(), Head = a["head"], Priority = Measure.RaisePriority(a.TryGetValue("core", out string core) ? int.Parse(core) : (int?)null), CfLine = CfLine };
         bool sameCode = a.TryGetValue("same-code", out string sc) && sc == "true";
         if (mode == "files") return Files.FilesMode.Run(a, run, sameCode);
@@ -41,11 +42,13 @@ static class Program
         if (mode == "footprint") return Footprint.Run(a, run);
         string filter = a.TryGetValue("filter", out string f) ? f : "";
 
-        // --swap true times the product as "original" and the frozen copy as "new": a harness symmetry check. A bias that follows the
-        // position is the harness; a bias that follows the copy is the code or its placement.
+        // --swap true times the product as "original" and the frozen copy as "new". A bias that follows the position is the harness; the
+        // crossover (Crossover.Combine) cancels it from a normal and a swapped part. --part TAG writes this process's rows as one part.
         bool swap = a.TryGetValue("swap", out string sw) && sw == "true";
+        a.TryGetValue("part", out string part);
+        int pairs = a.TryGetValue("pairs", out string pr) ? int.Parse(pr, CultureInfo.InvariantCulture) : Measure.Rounds;
         List<BenchCase> original = Cases.All(swap ? (IBlockCases)new Files.ProductCode() : new Files.FrozenCode()), current = Cases.All(swap ? (IBlockCases)new Files.FrozenCode() : new Files.ProductCode());
-        if (swap) Console.WriteLine("BENCH_SWAP original = product, new = frozen copy (symmetry check; not a publishable run)");
+        if (swap) Console.WriteLine("BENCH_SWAP original = product, new = frozen copy");
         List<int> picked = Enumerable.Range(0, current.Count).Where(i => current[i].Id.Contains(filter)).ToList();
         Measure.PreWarm(picked.Select(i => new[] { original[i].Op, current[i].Op }), PreWarmEach);
         if (!MachineLoad.Settle()) return MachineLoad.BusyExit;
@@ -53,11 +56,19 @@ static class Program
         for (int i = 0; i < current.Count; i++)
         {
             if (!current[i].Id.Contains(filter)) continue;
-            results.Add(new CaseResult(current[i], Measure.Run(original[i].Op, current[i].Op, Report.BlockRound)));
+            results.Add(new CaseResult(current[i], Measure.Run(original[i].Op, current[i].Op, Report.BlockRound, pairs)));
             Console.WriteLine(Row(results[results.Count - 1]));
         }
 
         Directory.CreateDirectory(a["out"]);
+        int load = MachineLoad.Exit(results.Select(r => r.Pair.OtherBusy).ToArray(), results.Select(r => r.Case.Id + ": " + r.Pair.TopOutside).ToArray());
+        if (part != null)
+        {
+            // One crossover part: the band does not apply to one order; Crossover.Combine judges the code ratio.
+            Crossover.WritePart(a["out"], run, part, swap, pairs, results);
+            Console.WriteLine("BENCH_PART_DONE " + run.Build + " " + part + " " + results.Count + " cases");
+            return load;
+        }
         File.WriteAllText(Path.Combine(a["out"], "bench-" + run.Build + ".json"), Report.Json(run, results));
         File.WriteAllText(Path.Combine(a["out"], "bench-" + run.Build + ".md"), Report.Markdown(run, results));
         if (run.Build == "net10" && filter.Length == 0)
@@ -69,9 +80,8 @@ static class Program
         Console.WriteLine("BENCH_NOISE " + NoiseBand.Describe(ratios));
         Console.WriteLine(CfLine);
         Console.WriteLine("BENCH_DONE " + run.Build + " " + results.Count + " cases");
-        int busy = MachineLoad.Exit(results.Select(r => r.Pair.OtherBusy).ToArray());
         int band = SameCodeExit(sameCode, ratios);
-        return busy != 0 ? busy : band;
+        return load != 0 ? load : band;
     }
 
     /// <summary>With --same-code true (an S0 run, where both copies are the 5c5d4a4 code), a ratio outside the target band fails the run.</summary>

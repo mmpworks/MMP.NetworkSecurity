@@ -128,13 +128,56 @@ static class MachineLoad
         "outside load per row: max {0:P1} over {1} rows; limit {2:P1}; rows over the limit: {3}",
         busy.Max(), busy.Length, Limit, busy.Count(b => !(b <= Limit)));
 
-    /// <summary>Prints the load line; returns 0 when every row stayed at or under the limit, else prints BENCH_MACHINE_BUSY and returns 8.
-    /// A NaN limit (no settle ran) fails every row, so a host that skips the settle cannot pass.</summary>
-    public static int Exit(double[] busy)
+    /// <summary>
+    /// Prints the load line; returns 0 when every row stayed at or under the limit, else prints BENCH_MACHINE_BUSY, then one line per row
+    /// over the limit with <paramref name="detail"/> for that row (its id and the top outside processes), and returns 8.
+    /// A NaN limit (no settle ran) fails every row, so a host that skips the settle cannot pass.
+    /// </summary>
+    public static int Exit(double[] busy, string[] detail = null)
     {
         Console.WriteLine("BENCH_LOAD " + Describe(busy));
         if (busy.All(b => b <= Limit)) return 0;
         Console.WriteLine("BENCH_MACHINE_BUSY: other work started during timed rounds, so their ratios are not evidence");
+        for (int i = 0; detail != null && i < busy.Length; i++)
+            if (!(busy[i] <= Limit)) Console.WriteLine(string.Format(CultureInfo.InvariantCulture, "  over the limit: {0} ({1:P1})", detail[i], busy[i]));
         return BusyExit;
+    }
+
+    /// <summary>CPU time per process at one moment, for naming the processes behind a busy pair.</summary>
+    public sealed class ProcessTimes
+    {
+        public readonly System.Collections.Generic.Dictionary<int, long> Ticks = new System.Collections.Generic.Dictionary<int, long>();
+        public readonly System.Collections.Generic.Dictionary<int, string> Names = new System.Collections.Generic.Dictionary<int, string>();
+        public long Taken;
+    }
+
+    /// <summary>Reads every process this user can read (protected processes are skipped), outside the timed rounds.</summary>
+    public static ProcessTimes Snapshot()
+    {
+        ProcessTimes t = new ProcessTimes { Taken = Stopwatch.GetTimestamp() };
+        int self;
+        using (Process me = Process.GetCurrentProcess()) self = me.Id;
+        foreach (Process p in Process.GetProcesses())
+        {
+            using (p)
+            {
+                if (p.Id == self || p.Id == 0) continue;
+                try { t.Ticks[p.Id] = p.TotalProcessorTime.Ticks; t.Names[p.Id] = p.ProcessName; }
+                catch (Exception) { }   // a protected or exited process: nothing to read
+            }
+        }
+        return t;
+    }
+
+    /// <summary>The top <paramref name="count"/> processes by CPU between two snapshots, as "name (pid) N.NN cores".</summary>
+    public static string Top(ProcessTimes from, ProcessTimes to, int count)
+    {
+        double seconds = (double)(to.Taken - from.Taken) / Stopwatch.Frequency;
+        if (seconds <= 0) return "no process sample";
+        // A process that started during the pair (the intruder case) counts from zero.
+        var used = to.Ticks
+            .Select(kv => new { Id = kv.Key, Cores = (kv.Value - (from.Ticks.TryGetValue(kv.Key, out long before) ? before : 0)) / 1e7 / seconds })
+            .OrderByDescending(x => x.Cores).Take(count);
+        return string.Join("; ", used.Select(x => string.Format(CultureInfo.InvariantCulture, "{0} ({1}) {2:F2} cores", to.Names[x.Id], x.Id, x.Cores)).ToArray());
     }
 }
