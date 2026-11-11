@@ -40,7 +40,7 @@ static class Program
 
         List<BenchCase> original = Cases.All(new Files.FrozenCode()), current = Cases.All(new Files.ProductCode());
         List<int> picked = Enumerable.Range(0, current.Count).Where(i => current[i].Id.Contains(filter)).ToList();
-        Measure.PreWarm(picked.Select(i => (original[i].Op, current[i].Op)), PreWarmEach);
+        Measure.PreWarm(picked.Select(i => new[] { original[i].Op, current[i].Op }), PreWarmEach);
         List<CaseResult> results = new List<CaseResult>();
         for (int i = 0; i < current.Count; i++)
         {
