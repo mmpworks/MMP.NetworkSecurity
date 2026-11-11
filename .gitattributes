@@ -1,2 +1,4 @@
 # Git runs the hook script with sh, which fails on a CR at the end of a line.
 tools/githooks/pre-push text eol=lf
+# The AO-9 benchmark files are checked by SHA-256 (bench/files/files.tsv), so git must never change their bytes.
+bench/files/** -text
