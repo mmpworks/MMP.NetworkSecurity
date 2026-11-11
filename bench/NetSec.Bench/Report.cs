@@ -39,6 +39,8 @@ static class Report
                 Quote(r.Case.Id), Quote(r.Case.Unit), r.Case.UnitsPerOp, r.Case.BytesPerOp, r.Pair.CallsPerRound);
             s.AppendFormat(Inv, "\"originalNsPerUnit\": {0:F2}, \"newNsPerUnit\": {1:F2}, \"ratio\": {2:F4}, \"originalBytesPerUnit\": {3:F2}, \"newBytesPerUnit\": {4:F2}, ",
                 r.OriginalNsPerUnit, r.NewNsPerUnit, r.Pair.MedianRatio, r.OriginalBytesPerUnit, r.NewBytesPerUnit);
+            s.AppendFormat(Inv, "\"outsideLoad\": {0:F4}, \"coreLoad\": {1:F4}, \"cpuStart\": {2}, \"cpuEnd\": {3}, ",
+                r.Pair.OtherBusy, double.IsNaN(r.Pair.CoreBusy) ? -1 : r.Pair.CoreBusy, r.Pair.CpuStart, r.Pair.CpuEnd);
             s.AppendFormat(Inv, "\"ratioRounds\": [{0}]", string.Join(", ", r.Pair.Ratios.Select(v => v.ToString("F4", Inv))));
             s.Append(i + 1 < results.Count ? "},\n" : "}\n");
         }
