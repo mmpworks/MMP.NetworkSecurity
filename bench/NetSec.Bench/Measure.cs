@@ -38,25 +38,27 @@ sealed class Pair
 /// </summary>
 static class Measure
 {
-    public const int Rounds = 31;
+    public const int Rounds = 31;   // the default round pairs; the file rows pass their own count (FileBench.Pairs)
     public static readonly TimeSpan WarmTarget = TimeSpan.FromMilliseconds(300);
 
-    public static Pair Run(Action original, Action current, TimeSpan roundTarget)
+    public static Pair Run(Action original, Action current, TimeSpan roundTarget) => Run(original, current, roundTarget, Rounds);
+
+    public static Pair Run(Action original, Action current, TimeSpan roundTarget, int rounds)
     {
         long calls = Math.Max(CallsFor(original, roundTarget), CallsFor(current, roundTarget));
-        Side o = NewSide(), n = NewSide();
-        for (int r = 0; r < Rounds; r++)
+        Side o = NewSide(rounds), n = NewSide(rounds);
+        for (int r = 0; r < rounds; r++)
         {
             bool originalFirst = r % 2 == 0;
             TimeRound(originalFirst ? original : current, calls, originalFirst ? o : n, r);
             TimeRound(originalFirst ? current : original, calls, originalFirst ? n : o, r);
         }
-        o.BytesPerCall /= calls * Rounds;
-        n.BytesPerCall /= calls * Rounds;
+        o.BytesPerCall /= calls * rounds;
+        n.BytesPerCall /= calls * rounds;
         return new Pair
         {
             Original = o, New = n, CallsPerRound = calls, PeakWorkingSet = PeakWorkingSet(),
-            Ratios = Enumerable.Range(0, Rounds).Select(r => o.NsPerCall[r] / n.NsPerCall[r]).ToArray(),
+            Ratios = Enumerable.Range(0, rounds).Select(r => o.NsPerCall[r] / n.NsPerCall[r]).ToArray(),
         };
     }
 
@@ -112,7 +114,7 @@ static class Measure
         side.NsPerCall[round] = sw.Elapsed.TotalMilliseconds * 1e6 / calls;
     }
 
-    static Side NewSide() => new Side { NsPerCall = new double[Rounds] };
+    static Side NewSide(int rounds) => new Side { NsPerCall = new double[rounds] };
 
     public static double Median(double[] values)
     {

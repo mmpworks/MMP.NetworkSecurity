@@ -21,7 +21,7 @@ static class FileReport
         s.AppendLine("# AO-9 file benchmark: " + run.Build);
         s.AppendLine();
         s.AppendLine("- Original: " + original);
-        Report.Header(s, run, FileBench.Round, NoiseBand.Describe(rows.Select(r => r.Pair.MedianRatio).ToArray()));
+        Report.Header(s, run, FileBench.Round, FileBench.Pairs, NoiseBand.Describe(rows.Select(r => r.Pair.MedianRatio).ToArray()));
         s.AppendLine("Peak working set is the process peak after the row. Small-message rows (`64-byte message`) time one key setup plus one 64-byte seal "
             + "as one call, so MB/s there counts the 64 payload bytes.");
         s.AppendLine();
