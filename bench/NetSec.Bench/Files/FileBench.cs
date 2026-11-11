@@ -6,19 +6,14 @@ using System.Threading;
 
 namespace NetSec.Bench.Files;
 
-/// <summary>One measured row: one file, one operation, one copy of the code.</summary>
+/// <summary>One measured row: one file and one operation, timed as a pair on the original and the new copy.</summary>
 sealed class FileRow
 {
-    public string File, Operation, Code;
+    public string File, Operation;
     public int BytesPerCall;
-    public long CallsPerRun;
-    public double[] NsPerCallRuns;
-    public double BytesAllocatedPerCall;
-    public int Gen0, Gen1, Gen2;
-    public long PeakWorkingSet;
+    public Pair Pair;
 
-    public double MedianNs => NsPerCallRuns.OrderBy(v => v).ElementAt(NsPerCallRuns.Length / 2);
-    public double MegabytesPerSecond => BytesPerCall / MedianNs * 1e9 / (1024 * 1024);
+    public double MegabytesPerSecond(Side s) => BytesPerCall / s.MedianNs * 1e9 / (1024 * 1024);
 }
 
 /// <summary>The shared-key thread run of AO-9 rule 8: total throughput and peak memory with 25 pool threads on one bound key.</summary>
@@ -32,15 +27,13 @@ sealed class ThreadRow
 }
 
 /// <summary>
-/// The AO-9 file benchmark. For each file and operation it first checks that every copy of the code gives the same bytes, then times each
-/// copy in this process: a warm-up, then <see cref="Runs"/> runs of a fixed call count, each run lasting about <see cref="RunTarget"/>.
-/// The garbage collection counts and allocated bytes cover the timed runs only; the peak working set is the process peak after the row.
+/// The AO-9 file benchmark. For each file and operation it first checks that the two copies give the same bytes, then times them as a
+/// pair with <see cref="Measure"/> (alternating rounds of at least <see cref="Round"/>, a full GC before each round).
 /// </summary>
 static class FileBench
 {
-    public const int Runs = 15;
-    public static readonly TimeSpan RunTarget = TimeSpan.FromMilliseconds(60);
-    static readonly TimeSpan WarmTarget = TimeSpan.FromMilliseconds(300);
+    // 250 ms per copy per round: at 30 MB/s that is about 2 calls on the 4 MiB file, so the call count never drops to a single call.
+    public static readonly TimeSpan Round = TimeSpan.FromMilliseconds(250);
 
     static readonly byte[] AesKey = Seq(16, 0x01), HmacKey = Seq(32, 0x21), Nonce = Seq(12, 0x41), Aad = Seq(13, 0x51), Iv = Seq(16, 0x61);
     public static object Sink;
@@ -66,41 +59,38 @@ static class FileBench
         new Op("hmac-sha256", f => f.Bytes, (c, x) => c.HmacSha256(x)),
     };
 
-    public static List<FileRow> Run(IList<TestFile> files, IList<ICodeUnderTest> codes, Action<FileRow> progress)
+    public static List<FileRow> Run(IList<TestFile> files, ICodeUnderTest original, ICodeUnderTest current, Action<FileRow> progress)
     {
-        List<IBoundCode> bound = codes.Select(c => c.Bind(AesKey, HmacKey)).ToList();
+        IBoundCode o = original.Bind(AesKey, HmacKey), n = current.Bind(AesKey, HmacKey);
         List<FileRow> rows = new List<FileRow>();
         foreach (TestFile f in files)
-            foreach (Op op in Ops(bound[0]))
+            foreach (Op op in Ops(o))
             {
                 byte[] input = op.Input(f);
-                RequireSameBytes(f.Name, op.Name, codes, bound.Select(b => op.Call(b, input)).ToList());
-                for (int i = 0; i < codes.Count; i++)
+                RequireSameBytes(f.Name, op.Name, op.Call(o, input), op.Call(n, input));
+                FileRow row = new FileRow
                 {
-                    IBoundCode b = bound[i];
-                    FileRow row = Time(() => op.Call(b, input));
-                    row.File = f.Name; row.Operation = op.Name; row.Code = codes[i].Name; row.BytesPerCall = input.Length;
-                    rows.Add(row);
-                    progress(row);
-                }
+                    File = f.Name, Operation = op.Name, BytesPerCall = input.Length,
+                    Pair = Measure.Run(() => Sink = op.Call(o, input), () => Sink = op.Call(n, input), Round),
+                };
+                rows.Add(row);
+                progress(row);
             }
         return rows;
     }
 
     /// <summary>AO-9 rule 6: one key setup plus one 64-byte seal, as one call.</summary>
-    public static List<FileRow> SmallMessage(IList<ICodeUnderTest> codes, Action<FileRow> progress)
+    public static FileRow SmallMessage(ICodeUnderTest original, ICodeUnderTest current, Action<FileRow> progress)
     {
         byte[] plain = Seq(64, 0x71);
-        RequireSameBytes("64-byte message", "key-setup+gcm-seal", codes, codes.Select(c => c.KeySetupAndSeal(AesKey, Nonce, Aad, plain)).ToList());
-        List<FileRow> rows = new List<FileRow>();
-        foreach (ICodeUnderTest c in codes)
+        RequireSameBytes("64-byte message", "key-setup+gcm-seal", original.KeySetupAndSeal(AesKey, Nonce, Aad, plain), current.KeySetupAndSeal(AesKey, Nonce, Aad, plain));
+        FileRow row = new FileRow
         {
-            FileRow row = Time(() => c.KeySetupAndSeal(AesKey, Nonce, Aad, plain));
-            row.File = "64-byte message"; row.Operation = "key-setup+gcm-seal"; row.Code = c.Name; row.BytesPerCall = plain.Length;
-            rows.Add(row);
-            progress(row);
-        }
-        return rows;
+            File = "64-byte message", Operation = "key-setup+gcm-seal", BytesPerCall = plain.Length,
+            Pair = Measure.Run(() => Sink = original.KeySetupAndSeal(AesKey, Nonce, Aad, plain), () => Sink = current.KeySetupAndSeal(AesKey, Nonce, Aad, plain), Round),
+        };
+        progress(row);
+        return row;
     }
 
     /// <summary>AO-9 rule 8. Each of 25 pool work items seals the file on one shared bound key; every output must equal the one-thread output.</summary>
@@ -110,6 +100,9 @@ static class FileBench
         byte[] expected = b.GcmSeal(Nonce, Aad, f.Bytes);
         string cap = CapPool(workers);
         int mismatches = 0;
+        GC.Collect();
+        GC.WaitForPendingFinalizers();
+        GC.Collect();
         using (CountdownEvent done = new CountdownEvent(workers))
         {
             Stopwatch sw = Stopwatch.StartNew();
@@ -145,46 +138,9 @@ static class FileBench
         return "SetMaxThreads(" + n + ", " + n + ") returned " + maxSet + "; max now " + worker + " worker, " + io + " io";
     }
 
-    static void RequireSameBytes(string file, string op, IList<ICodeUnderTest> codes, IList<byte[]> outputs)
+    static void RequireSameBytes(string file, string op, byte[] original, byte[] current)
     {
-        for (int i = 1; i < outputs.Count; i++)
-            if (!outputs[i].SequenceEqual(outputs[0]))
-                throw new InvalidOperationException("BENCH_OUTPUT_DIFFERS: " + file + " " + op + ": " + codes[i].Name + " differs from " + codes[0].Name);
-    }
-
-    static FileRow Time(Func<byte[]> call)
-    {
-        long calls = Warm(call);
-        int g0 = GC.CollectionCount(0), g1 = GC.CollectionCount(1), g2 = GC.CollectionCount(2);
-        long allocBefore = Allocated.Now();
-        double[] runs = new double[Runs];
-        for (int r = 0; r < Runs; r++)
-        {
-            Stopwatch sw = Stopwatch.StartNew();
-            for (long i = 0; i < calls; i++) Sink = call();
-            runs[r] = sw.Elapsed.TotalMilliseconds * 1e6 / calls;
-        }
-        long allocAfter = Allocated.Now();
-        return new FileRow
-        {
-            CallsPerRun = calls, NsPerCallRuns = runs, BytesAllocatedPerCall = (double)(allocAfter - allocBefore) / (calls * Runs),
-            Gen0 = GC.CollectionCount(0) - g0, Gen1 = GC.CollectionCount(1) - g1, Gen2 = GC.CollectionCount(2) - g2, PeakWorkingSet = PeakWorkingSet(),
-        };
-    }
-
-    /// <summary>Calls until the warm-up time has passed, doubling the batch until one batch lasts a run target. Returns the calls for one run.</summary>
-    static long Warm(Func<byte[]> call)
-    {
-        long batch = 1;
-        Stopwatch total = Stopwatch.StartNew();
-        while (true)
-        {
-            Stopwatch one = Stopwatch.StartNew();
-            for (long i = 0; i < batch; i++) Sink = call();
-            bool longEnough = one.Elapsed >= RunTarget;
-            if (longEnough && total.Elapsed >= WarmTarget) return batch;
-            if (!longEnough) batch *= 2;
-        }
+        if (!current.SequenceEqual(original)) throw new InvalidOperationException("BENCH_OUTPUT_DIFFERS: " + file + " " + op + ": new differs from original");
     }
 
     static long PeakWorkingSet()

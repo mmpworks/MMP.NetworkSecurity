@@ -27,30 +27,39 @@ static class Program
         string refusal = Refusal();
         if (refusal != null) { Console.Error.WriteLine(refusal); return 3; }
 
-        string build = BuildName();
         a.TryGetValue("mode", out string mode);
-        if (mode == "files") return Files.FilesMode.Run(a, build, CfLine);
         if (mode == "ao-merge") return AoParts.Merge(a);
+        Run run = new Run { Build = BuildName(), Head = a["head"], Priority = Measure.RaisePriority(), CfLine = CfLine };
+        bool sameCode = a.TryGetValue("same-code", out string sc) && sc == "true";
+        if (mode == "files") return Files.FilesMode.Run(a, run, sameCode);
         string filter = a.TryGetValue("filter", out string f) ? f : "";
 
-        // Each case runs on the frozen copy, then at once on the product, so a slow spell on the machine hits both columns alike.
         List<BenchCase> original = Cases.All(new Files.FrozenCode()), current = Cases.All(new Files.ProductCode());
-        List<CaseResult> baseline = new List<CaseResult>(), results = new List<CaseResult>();
+        List<CaseResult> results = new List<CaseResult>();
         for (int i = 0; i < current.Count; i++)
         {
             if (!current[i].Id.Contains(filter)) continue;
-            baseline.Add(Measure.Run(original[i]));
-            results.Add(Measure.Run(current[i]));
-            Console.WriteLine(Row(results[results.Count - 1]) + string.Format(CultureInfo.InvariantCulture, "   original {0,10:F1} ns", baseline[baseline.Count - 1].MedianNsPerUnit));
+            results.Add(new CaseResult(current[i], Measure.Run(original[i].Op, current[i].Op, Report.BlockRound)));
+            Console.WriteLine(Row(results[results.Count - 1]));
         }
 
         Directory.CreateDirectory(a["out"]);
-        File.WriteAllText(Path.Combine(a["out"], "bench-" + build + ".json"), Report.Json(build, a["head"], results, CfLine));
-        File.WriteAllText(Path.Combine(a["out"], "bench-" + build + ".md"), Report.Markdown(build, a["head"], baseline, results, CfLine));
-        if (build == "net10") AoParts.Write(a["out"], "net10-blocks", Report.AoBlockRows(baseline, results));
+        File.WriteAllText(Path.Combine(a["out"], "bench-" + run.Build + ".json"), Report.Json(run, results));
+        File.WriteAllText(Path.Combine(a["out"], "bench-" + run.Build + ".md"), Report.Markdown(run, results));
+        if (run.Build == "net10") AoParts.Write(a["out"], "net10-blocks", Report.AoBlockRows(results));
+        double[] ratios = results.Select(r => r.Pair.MedianRatio).ToArray();
+        Console.WriteLine("BENCH_NOISE " + NoiseBand.Describe(ratios));
         Console.WriteLine(CfLine);
-        Console.WriteLine("BENCH_DONE " + build + " " + results.Count + " cases");
-        return 0;
+        Console.WriteLine("BENCH_DONE " + run.Build + " " + results.Count + " cases");
+        return SameCodeExit(sameCode, ratios);
+    }
+
+    /// <summary>With --same-code true (an S0 run, where both copies are the 5c5d4a4 code), a ratio outside the target band fails the run.</summary>
+    public static int SameCodeExit(bool sameCode, double[] ratios)
+    {
+        if (!sameCode || NoiseBand.Inside(ratios)) return 0;
+        Console.WriteLine("BENCH_NOISE_OUTSIDE_BAND: the two copies are the same code, so a ratio outside the target band is harness or machine noise");
+        return 6;
     }
 
     /// <summary>The build this process times: net10.0, or the CF binaries on the .NET Framework 4.8 desktop JIT.</summary>
@@ -83,8 +92,8 @@ static class Program
     }
 
     static string Row(CaseResult r) => string.Format(CultureInfo.InvariantCulture,
-        "{0,-34} {1,10:F1} ns/{2,-10} {3,9:F1} B/{2,-10} {4,9:F1} MB/s",
-        r.Case.Id, r.MedianNsPerUnit, r.Case.Unit, r.BytesAllocatedPerUnit, r.MegabytesPerSecond);
+        "{0,-34} original {1,10:F1} new {2,10:F1} ns/{3,-10} ratio {4,6:F3} ({5:F3} to {6:F3})  new {7,9:F1} B/{3}",
+        r.Case.Id, r.OriginalNsPerUnit, r.NewNsPerUnit, r.Case.Unit, r.Pair.MedianRatio, r.Pair.Ratios.Min(), r.Pair.Ratios.Max(), r.NewBytesPerUnit);
 
     static Dictionary<string, string> ParseArgs(string[] args)
     {
