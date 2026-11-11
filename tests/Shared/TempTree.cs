@@ -23,13 +23,17 @@ internal static class TempTree
 
     public static void Delete(string dir) => Delete(dir, Attempts, Pause, Thread.Sleep);
 
-    public static void Delete(string dir, int attempts, TimeSpan pause, Action<TimeSpan> sleep)
+    public static void Delete(string dir, int attempts, TimeSpan pause, Action<TimeSpan> sleep) =>
+        Delete(dir, attempts, pause, sleep, d => Directory.Delete(d, recursive: true));
+
+    /// <summary>The retry loop with the delete as a seam, so a test can give it an error that a real file system shows only by chance (#406).</summary>
+    internal static void Delete(string dir, int attempts, TimeSpan pause, Action<TimeSpan> sleep, Action<string> delete)
     {
         for (int attempt = 1; ; attempt++)
         {
             try
             {
-                Directory.Delete(dir, recursive: true);
+                delete(dir);
                 return;
             }
             catch (DirectoryNotFoundException) when (attempt > 1) { return; }   // An earlier run removed the folder before its error

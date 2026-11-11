@@ -69,4 +69,31 @@ public class TempTreeTests
         Assert.Throws<DirectoryNotFoundException>(() => TempTree.Delete(dir, 4, TimeSpan.FromMilliseconds(50), pauses.Add));
         Assert.Empty(pauses);
     }
+
+    // ERROR_DIR_NOT_EMPTY: another process added a file while the delete ran (the .git/gk case in #400). A real writer does not come on cue,
+    // so the delete action is the seam (#406).
+    static IOException DirNotEmpty() => new("The directory is not empty.", unchecked((int)0x80070091));
+
+    [Fact]
+    public void A_directory_not_empty_error_that_clears_is_waited_out()
+    {
+        int calls = 0;
+        List<TimeSpan> pauses = new();
+        TimeSpan pause = TimeSpan.FromMilliseconds(50);
+        TempTree.Delete("unused", 5, pause, pauses.Add, _ => { if (++calls < 3) throw DirNotEmpty(); });
+        Assert.Equal(3, calls);
+        Assert.Equal(new[] { pause, pause }, pauses);   // 2 errors, so 2 pauses before the delete that succeeds
+    }
+
+    [Fact]
+    public void A_directory_not_empty_error_that_outlasts_the_attempts_still_raises()
+    {
+        int calls = 0;
+        List<TimeSpan> pauses = new();
+        IOException caught = Assert.ThrowsAny<IOException>(() =>
+            TempTree.Delete("unused", 4, TimeSpan.FromMilliseconds(50), pauses.Add, _ => { calls++; throw DirNotEmpty(); }));
+        Assert.Equal(unchecked((int)0x80070091), caught.HResult);
+        Assert.Equal(4, calls);
+        Assert.Equal(3, pauses.Count);
+    }
 }
