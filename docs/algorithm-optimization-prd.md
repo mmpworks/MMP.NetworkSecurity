@@ -32,8 +32,8 @@ Echo writes these. Builders never write `acceptance/`.
 | AO-3 | Table proof. A test builds each constant table from the math and compares it with the constant in the product. | every table equal |
 | AO-4 | Thread test. One shared key object. A payload worker encodes and decodes on `ThreadPool.QueueUserWorkItem` with the pool capped at 25. Results equal the single-thread results. | 100,000 payloads, 0 mismatches, 10 runs |
 | AO-5 | Allocation. Bytes allocated for each block after warm-up, net10. | 0 B for AES, modes and hashes |
-| AO-6 | Speed. Baseline at 5c5d4a4 and the new code, same machine, same run. | the report shows both numbers; AES target is 5 times baseline or better |
-| AO-7 | The lesson walks still agree with the product path. | no `AES_WALK_DIVERGED`; golden files unchanged |
+| AO-6 | Speed. Baseline at 5c5d4a4 and the new code, same machine, same run. | the report shows both numbers; AES target is 5 times baseline or better. The report line "CF ARM speed: UNMEASURED" stays until a run on a CE device exists |
+| AO-7 | The lesson walks still agree with the product path. | no `AES_WALK_DIVERGED`; golden files unchanged. The byte-level helpers the walk uses today move into `AesKey.Walk.cs` unchanged. The walk calls word-path code only through `EncryptBlock` and `DecryptBlock` for the last compare |
 | AO-8 | The CF build compiles, and the CF golden labs pass. | gate green |
 
 Limit of the anchor: AO-2 uses our own old code as the reference. AO-1 (public vectors) is the independent check.
@@ -53,6 +53,9 @@ Limit of the anchor: AO-2 uses our own old code as the reference. AO-1 (public v
 11. Each hash case runs once whole and once in random chunk splits, with 0-byte updates and splits at 63, 64, 65, 127, 128 and 129. A mid-stream `Clone()` continues as two separate states. HMAC keys longer than the block and HKDF output up to the limit are included.
 12. AO-4 uses a fresh key object for each run, and the first call to each method occurs from many workers at the same time. One callback calls back into the same key. All modes, GCM and HMAC on shared keys are mixed in one run. The check asserts the result of `ThreadPool.SetMaxThreads(25, 25)` and prints the cap it got.
 13. AO-3 reads NOT RUN, PRODUCT_MISSING for each table until S1. After S1, a second row fails if table-building code runs at start-up.
+14. Each run records its seed and prints it in the report. A failed case prints the seed and the case number.
+15. AO-2 runs on .NET 10 with the net10 binaries, and on .NET Framework 4.8 with the CF binaries. The second referee (rule 2) runs on .NET 10 only.
+16. AO-4 matches each result to its payload by a payload ID, because the pool does not keep order.
 
 ### 3.2 Limits of the anchor
 
@@ -75,37 +78,44 @@ The work ends when slices S0 to S4 each show AO-1 to AO-8 green on one head of `
 
 | # | Decision | Pick | Status |
 |---|----------|------|--------|
-| 1 | D1 says both builds use C# 3. Newer-runtime fast paths (hardware AES, `Span`) need a newer language level. | Shared files stay C# 3. Fast paths for .NET 10 go in separate files behind `#if !NETCF`, and only the net10 project raises its language level. The CF build proves the shared files stay C# 3. | Steve to confirm; S0 and S1 shared-code work does not depend on it |
-| 2 | Table size for AES. | Measure two shapes on ARM-like limits: 4 tables of 1 KB for each direction, or 1 table plus rotates. Pick the smaller one if it is within 10% on speed. | Richard, with numbers |
+| 1 | Language level for the .NET 10 fast paths. | D1 stays: both builds use C# 3. The fast paths use `unsafe` pointers and the `System.Runtime.Intrinsics` types behind `#if !NETCF`. A spike on net10 with `LangVersion` 3 ran `Aes.Encrypt` and `Pclmulqdq.CarrylessMultiply` and printed `out[0]=99` (0x63, correct for a zero block and zero key). A higher level on one build can make one shared file bind in two ways, so the CF build would no longer prove what the net10 build runs. | set by review; changes only if a required API has no pointer overload |
+| 2 | Table size for AES. | Default: 1 table of 1 KB plus rotates for each direction, and a 256-byte inverse S-box. The forward S-box comes from the encrypt table. The 4-table shape (8 KB for both directions) competes with the stack and the data in a 16 KB data cache. The pick is reviewed when a CE device number exists. | set as default |
+| 4 | GHASH table. | A 4-bit table for each key: 16 entries of 4 `uint`, 256 bytes, plus one constant reduction table. | set |
 | 3 | How the long branch reaches main. | Each slice is a PR into `Algorithm-Optimization`. One PR to `main` at the end, on Steve's order. | set |
 
 ## 7. Program design
 
 ### 7.1 Shape rules for every algorithm
 
-1. Tables are constants in the source. No code builds a table at start-up.
-2. A key object is immutable after its constructor. All working state is in locals or in a buffer the caller owns. This makes a key object safe to share with no lock.
-3. No allocation in a per-block or per-message-chunk path.
-4. State is 32-bit words in locals where the algorithm allows. The CF JIT is simple, so the source does the work the JIT skips: manual inlining of tiny helpers in hot loops, loop bounds on `array.Length`, no `long` math in 32-bit hot loops. Each of these is a hypothesis until S0 numbers confirm it (unverified, from recollection of CF behaviour).
-5. One implementation of each piece of knowledge. Example: one word-load helper, one XOR-block helper, one padding helper.
-6. `#if NETCF` only at a named seam, never inside a round function.
+1. No table is built by code. Each table is an array initializer with literal values. The type has no explicit static constructor.
+2. A key object is immutable after its constructor. No instance method writes an instance array after the constructor. No per-key data is built on first use. All working state is in locals or in a buffer the caller owns. This makes a key object safe to share with no lock.
+3. No allocation in a per-block or per-message-chunk path. No static scratch buffer and no thread-static scratch buffer.
+4. State is 32-bit words in locals where the algorithm allows. Hot 32-bit loops use no `long` math. SHA-512 and Keccak are 64-bit by design; S3 measures bit interleaving for Keccak as an option.
+5. A method copies each static table reference into a local at its start.
+6. One implementation of each piece of knowledge. Example: one word-load helper, one XOR-block helper, one padding helper. A helper is inlined by hand only where S0 numbers show a gain, and AO-2 covers each inlined copy.
+7. `#if NETCF` only at a named seam, never inside a round function.
+8. Unproven for the CF JIT, so no rule depends on them: removal of bounds checks, the inline size limit, and a rotate instruction for `(x >> 8) | (x << 24)`.
 
 ### 7.2 Slices
 
 | Slice | Content | Owner | Review |
 |-------|---------|-------|--------|
 | S0 | Anchor AO-1 to AO-8, frozen reference, benchmark project, baseline numbers for net10 and CF. | Echo (anchor), Richard (benchmark) | Jared |
-| S1 | AES: constant tables, word state, no allocation, word key schedule, equivalent inverse cipher. Modes, CMAC, GCM (GHASH with a per-key 4-bit table). | Richard | Jared |
+| S1 | AES: constant tables, word state, no allocation, word key schedule, equivalent inverse cipher. Modes, CMAC, GCM with `GcmKey` (decision 4). | Richard | Jared |
 | S2 | `AesPayloadWorker`: encode and decode payloads on the thread pool, modelled on the GasPumpSimulator dispatch pattern. Bounded queue, pool cap 25, no shared scratch. | Richard | Jared, Echo runs AO-4 |
-| S3 | Hashes: MD5, SHA-1, SHA-256, SHA-512, Keccak. HMAC keeps the two padded key states. HKDF and the TLS PRFs reuse them. | Richard | Jared |
+| S3 | Hashes: MD5, SHA-1, SHA-256, SHA-512, Keccak. `HmacKey` keeps the two padded key states. HKDF and the TLS PRFs reuse them. | Richard | Jared |
 | S4 | DES and TDES with constant combined tables. DUKPT derivation and PIN block paths without per-step allocation. | Richard | Jared |
 | S5 | Big-number paths: `BigUInt`, Montgomery, RSA, P-256, 25519, ML-KEM. Highest risk. Starts only after S0 numbers show it is worth it. | to assign | Jared |
-| S6 | .NET 10 fast paths behind `#if !NETCF` (hardware AES and carry-less multiply). Needs decision 1. | Richard | Jared |
+| S6 | .NET 10 fast paths behind `#if !NETCF` (hardware AES and carry-less multiply), with pointers at C# 3 (decision 1). | Richard | Jared |
 
 ### 7.3 Types and signatures to confirm in S0 (hypothesis)
 
-1. `AesKey.EncryptBlock(byte[] i, int io, byte[] o, int oo)` and `DecryptBlock` keep their signatures.
-2. `AesPayloadWorker(AesKey key, int maxQueued)`, `bool TryEncode(byte[] plain, Action<byte[]> done)`, `bool TryDecode(byte[] wire, Action<byte[]> done)`. The payload framing follows the mode the Host already uses.
+1. `AesKey.EncryptBlock(byte[] i, int io, byte[] o, int oo)` and `DecryptBlock` keep their signatures. The constructor builds the plain key schedule (the walk reads it) and the decrypt schedule.
+2. `GcmKey` (immutable): holds an `AesKey` and the GHASH table. The static `Gcm` methods stay as wrappers.
+3. `HmacKey` (immutable): holds the inner and outer padded hash states. `IHash` gets a state copy. `Hmac.Compute` stays as a wrapper.
+4. `AesPayloadWorker(GcmKey key, int maxQueued)`. `bool TryEncode(int id, byte[] nonce, byte[] plain, Action<PayloadResult> done)` and `bool TryDecode(int id, byte[] wire, Action<PayloadResult> done)`. `PayloadResult` carries the ID, the bytes, or a machine error code.
+5. The worker catches each exception on the pool thread and reports it through `PayloadResult`. An exception that leaves a pool thread ends the process.
+6. The caller supplies the nonce for each payload. The worker holds no nonce counter. A nonce is never used two times with one key.
 
 ## 8. Boundary and failure routing
 
