@@ -83,20 +83,20 @@ AO-4.shared-gcmkey-pool-25.cf	NOT RUN	PRODUCT_MISSING	S1	suite
 AO-4.payload-worker.known-answer.cf	NOT RUN	PRODUCT_MISSING	S2	suite
 AO-4.payload-worker.round-trip-pool-25.cf	NOT RUN	PRODUCT_MISSING	S2	suite
 AO-4.payload-worker.dispose-drains-to-idle.cf	NOT RUN	PRODUCT_MISSING	S2	suite
-AO-5.aes-block.net10	FAIL	AO5_ALLOCATES	S1	bench
-AO-5.aes-ecb.net10	FAIL	AO5_ALLOCATES	S1	bench
-AO-5.aes-cbc.net10	FAIL	AO5_ALLOCATES	S1	bench
-AO-5.aes-ctr.net10	FAIL	AO5_ALLOCATES	S1	bench
-AO-5.aes-gcm.net10	FAIL	AO5_ALLOCATES	S1	bench
-AO-5.aes-cmac.net10	FAIL	AO5_ALLOCATES	S1	bench
-AO-5.md5.net10	FAIL	AO5_ALLOCATES	S3	bench
-AO-5.sha1.net10	FAIL	AO5_ALLOCATES	S3	bench
-AO-5.sha256.net10	FAIL	AO5_ALLOCATES	S3	bench
-AO-5.sha512.net10	FAIL	AO5_ALLOCATES	S3	bench
-AO-5.keccak.net10	FAIL	AO5_ALLOCATES	S3	bench
-AO-5.hmac.net10	FAIL	AO5_ALLOCATES	S3	bench
-AO-5.tdes.net10	-	-	S0	bench
-AO-5.dukpt-derive.net10	FAIL	AO5_ALLOCATES	S4	bench
+AO-5.aes-block.net10	FAIL	AO5_ALLOCATES	S1	suite
+AO-5.aes-ecb.net10	FAIL	AO5_ALLOCATES	S1	suite
+AO-5.aes-cbc.net10	FAIL	AO5_ALLOCATES	S1	suite
+AO-5.aes-ctr.net10	FAIL	AO5_ALLOCATES	S1	suite
+AO-5.aes-gcm.net10	FAIL	AO5_ALLOCATES	S1	suite
+AO-5.aes-cmac.net10	FAIL	AO5_ALLOCATES	S1	suite
+AO-5.md5.net10	-	-	S0	suite
+AO-5.sha1.net10	-	-	S0	suite
+AO-5.sha256.net10	-	-	S0	suite
+AO-5.sha512.net10	-	-	S0	suite
+AO-5.keccak.net10	FAIL	AO5_ALLOCATES	S3	suite
+AO-5.hmac.net10	FAIL	AO5_ALLOCATES	S3	suite
+AO-5.tdes.net10	-	-	S0	suite
+AO-5.dukpt-derive.net10	FAIL	AO5_ALLOCATES	S4	suite
 AO-6.aes-block.net10	-	-	S0	bench
 AO-6.aes-ecb.net10	-	-	S0	bench
 AO-6.aes-cbc.net10	-	-	S0	bench
@@ -112,20 +112,34 @@ AO-6.keccak.net10	-	-	S0	bench
 AO-6.hmac.net10	-	-	S0	bench
 AO-6.tdes.net10	-	-	S0	bench
 AO-6.dukpt-derive.net10	-	-	S0	bench
-AO-9.gcm.net10	-	-	S0	bench
-AO-9.gcm.cf	-	-	S0	bench
-AO-9.cbc.net10	-	-	S0	bench
-AO-9.cbc.cf	-	-	S0	bench
-AO-9.ctr.net10	-	-	S0	bench
-AO-9.ctr.cf	-	-	S0	bench
-AO-9.sha256.net10	-	-	S0	bench
-AO-9.sha256.cf	-	-	S0	bench
-AO-9.hmac.net10	-	-	S0	bench
-AO-9.hmac.cf	-	-	S0	bench
-AO-9.small-message.net10	-	-	S0	bench
-AO-9.small-message.cf	-	-	S0	bench
-AO-9.pool-25.net10	-	-	S0	bench
-AO-9.pool-25.cf	-	-	S0	bench
+AO-9.gcm.net10	NOT RUN	AO9_FILES_ABSENT	S1	suite
+AO-9.gcm.net10.time	-	-	S0	bench
+AO-9.gcm.cf	NOT RUN	AO9_FILES_ABSENT	S1	suite
+AO-9.gcm.cf.time	-	-	S0	bench
+AO-9.cbc.net10	NOT RUN	AO9_FILES_ABSENT	S1	suite
+AO-9.cbc.net10.time	-	-	S0	bench
+AO-9.cbc.cf	NOT RUN	AO9_FILES_ABSENT	S1	suite
+AO-9.cbc.cf.time	-	-	S0	bench
+AO-9.ctr.net10	NOT RUN	AO9_FILES_ABSENT	S1	suite
+AO-9.ctr.net10.time	-	-	S0	bench
+AO-9.ctr.cf	NOT RUN	AO9_FILES_ABSENT	S1	suite
+AO-9.ctr.cf.time	-	-	S0	bench
+AO-9.sha256.net10	NOT RUN	AO9_FILES_ABSENT	S1	suite
+AO-9.sha256.net10.time	-	-	S0	bench
+AO-9.sha256.cf	NOT RUN	AO9_FILES_ABSENT	S1	suite
+AO-9.sha256.cf.time	-	-	S0	bench
+AO-9.hmac.net10	NOT RUN	AO9_FILES_ABSENT	S1	suite
+AO-9.hmac.net10.time	-	-	S0	bench
+AO-9.hmac.cf	NOT RUN	AO9_FILES_ABSENT	S1	suite
+AO-9.hmac.cf.time	-	-	S0	bench
+AO-9.small-message.net10	NOT RUN	AO9_FILES_ABSENT	S1	suite
+AO-9.small-message.net10.time	-	-	S0	bench
+AO-9.small-message.cf	NOT RUN	AO9_FILES_ABSENT	S1	suite
+AO-9.small-message.cf.time	-	-	S0	bench
+AO-9.pool-25.net10	NOT RUN	AO9_FILES_ABSENT	S1	suite
+AO-9.pool-25.net10.time	-	-	S0	bench
+AO-9.pool-25.cf	NOT RUN	AO9_FILES_ABSENT	S1	suite
+AO-9.pool-25.cf.time	-	-	S0	bench
 AO-7.aes-walk-equals-frozen.net10	-	-	S0	suite
 AO-7.aes-walk-equals-frozen.cf	-	-	S0	suite
 AO-7.golden-and-tours-unchanged	-	-	S0	suite

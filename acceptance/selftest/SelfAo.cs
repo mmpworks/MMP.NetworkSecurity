@@ -108,6 +108,7 @@ namespace Acceptance
 
         public override byte[] Cbc(object k, byte[] iv, byte[] data, bool encrypt)
         {
+            if (Fault == "cbc-zero-iv" && encrypt && iv != null) iv = new byte[iv.Length];
             byte[] r = base.Cbc(In(k), iv, data, encrypt);
             if (Fault == "cbc-decrypt-overwrites-input" && !encrypt && data != null) Buffer.BlockCopy(r, 0, data, 0, Math.Min(r.Length, data.Length));
             return r;
@@ -137,6 +138,16 @@ namespace Acceptance
 
         public override byte[] GcmSeal(object k, byte[] nonce, byte[] aad, byte[] plain)
         {
+            if (Fault == "gcm-seal-shared-scratch" && nonce != null && nonce.Length == 12)
+            {
+                // The nonce goes through one buffer per key object, with no lock: a race when two threads seal on one key.
+                PKey p = (PKey)k;
+                Buffer.BlockCopy(nonce, 0, p.Scratch, 0, 12);
+                Thread.SpinWait(500);
+                byte[] n = new byte[12];
+                Buffer.BlockCopy(p.Scratch, 0, n, 0, 12);
+                return base.GcmSeal(p.Inner, n, aad, plain);
+            }
             byte[] r = base.GcmSeal(In(k), nonce, aad, plain);
             if (Fault == "gcm-length-17" && plain != null && plain.Length == 17) r[3] ^= 1;
             return r;
@@ -187,7 +198,18 @@ namespace Acceptance
         {
             if (Fault == "hash-drops-byte-at-block-split") return new SplitHash(alg, false);
             if (Fault == "hash-clone-shares-state") return new CloneSharer(base.NewHash(alg));
+            if (Fault == "hash-drops-last-byte") return new DropLast(base.NewHash(alg));
             return base.NewHash(alg);
+        }
+
+        /// <summary>Holds back the last byte of each Update: a tail-handling fault that hits a whole-file hash.</summary>
+        sealed class DropLast : IAoHash
+        {
+            readonly IAoHash _h;
+            public DropLast(IAoHash h) { _h = h; }
+            public void Update(byte[] b, int off, int n) { _h.Update(b, off, n > 0 ? n - 1 : 0); }
+            public byte[] Finish() { return _h.Finish(); }
+            public IAoHash Clone() { return new DropLast(_h.Clone()); }
         }
 
         sealed class CloneSharer : IAoHash
@@ -211,6 +233,7 @@ namespace Acceptance
         {
             int block = AoGrammar.BlockOf(alg);
             if (Fault == "hmac-long-key-cut" && key != null && key.Length > block) { byte[] k = new byte[block]; Array.Copy(key, k, block); key = k; }
+            if (Fault == "hmac-drops-last-byte" && data != null && data.Length > 0) { byte[] d = new byte[data.Length - 1]; Array.Copy(data, d, d.Length); data = d; }
             return base.Hmac(alg, key, data);
         }
 
@@ -273,6 +296,84 @@ namespace Acceptance
             catch (FailException e) { planted = "FAIL " + e.Reason + " " + e.Message; }
             if (!planted.StartsWith("FAIL AO_DIFFERS") || !planted.Contains("the second referee")) throw new FailException("a wrong second referee went unseen: " + planted);
             return "BCL agrees with the frozen reference on the clean cases of " + ran.Count + " algorithms (" + string.Join(", ", ran.ToArray()) + "); a wrong second referee FAILs AO_DIFFERS";
+        }
+
+        [Clause("SELF.ao5-meter-bites")]
+        public static string Ao5MeterBites(Ctx c)
+        {
+            object sink = null;
+            string none = AoAllocMeter.Judge("no allocation", AoAllocMeter.PerUnit(delegate { sink = null; }, -1, 1), "call");
+            string arrayOnly = AoAllocMeter.Judge("returns a new byte[32] only", AoAllocMeter.PerUnit(delegate { sink = new byte[32]; }, 32, 1), "call");
+            List<string> planted = new List<string>();
+            foreach (KeyValuePair<string, Action> p in new[] {
+                new KeyValuePair<string, Action>("one byte[1] per call", delegate { sink = new byte[1]; }),
+                new KeyValuePair<string, Action>("a byte[32] plus one object per call", delegate { sink = new byte[32]; sink = new object(); }),
+                new KeyValuePair<string, Action>("one byte[16] per 64 calls", MakeRare()) })
+            {
+                int outLen = p.Key.StartsWith("a byte[32]") ? 32 : -1;
+                string got;
+                try { got = "PASS " + AoAllocMeter.Judge(p.Key, AoAllocMeter.PerUnit(p.Value, outLen, 1), "call"); }
+                catch (FailException e) { got = "FAIL " + e.Reason; }
+                if (got != "FAIL AO5_ALLOCATES") throw new FailException("the meter passed a planted allocation (" + p.Key + "): " + got);
+                planted.Add(p.Key + ": FAIL");
+            }
+            GC.KeepAlive(sink);
+            return "control: " + none + "; " + arrayOnly + "; planted: " + string.Join("; ", planted.ToArray());
+        }
+
+        static Action MakeRare()
+        {
+            int n = 0;
+            object keep = null;
+            return delegate { if (++n % 64 == 0) keep = new byte[16]; GC.KeepAlive(keep); };
+        }
+
+        [Clause("SELF.ao9-files-bite", TimeoutSec = 900)]
+        public static string Ao9FilesBite(Ctx c)
+        {
+            string root = System.IO.Path.Combine(c.WorkDir, "ao9-" + Guid.NewGuid().ToString("N").Substring(0, 8));
+            string acc = System.IO.Path.Combine(root, "acceptance"), files = System.IO.Path.Combine(root, "bench", "files");
+            System.IO.Directory.CreateDirectory(acc); System.IO.Directory.CreateDirectory(files);
+            List<string> lines = new List<string> { "name\tbytes\tsha256" };
+            foreach (KeyValuePair<string, int> f in new[] { new KeyValuePair<string, int>("sample.csv", 5000), new KeyValuePair<string, int>("seventeen.bin", 17), new KeyValuePair<string, int>("empty.bin", 0) })
+            {
+                byte[] b = new Rng(0xA09F00UL + (ulong)f.Value).Bytes(f.Value);
+                System.IO.File.WriteAllBytes(System.IO.Path.Combine(files, f.Key), b);
+                using (System.Security.Cryptography.SHA256 h = System.Security.Cryptography.SHA256.Create()) lines.Add(f.Key + "\t" + f.Value + "\t" + Hex.Encode(h.ComputeHash(b)));
+            }
+            System.IO.File.WriteAllLines(System.IO.Path.Combine(acc, "ao9-files.tsv"), lines.ToArray());
+            List<AoFileSet.Entry> set = AoFileSet.Load(acc, root);
+            List<string> control = new List<string>();
+            foreach (string op in new[] { "gcm", "cbc", "ctr", "sha256", "hmac" }) control.Add(AoFileSet.Compare(op, new FrozenSide(), new FrozenSide(), set).Split(' ')[0]);
+            AoFileSet.SmallMessage(new FrozenSide(), new FrozenSide());
+            AoThreads.CapPool();
+            AoFileSet.Pool25(new FrozenSide(), new PlantedSide("none"), set);
+            string[][] planted = { new[] { "gcm", "gcm-length-17" }, new[] { "cbc", "cbc-zero-iv" }, new[] { "ctr", "ctr-advances-caller-counter" },
+                                   new[] { "sha256", "hash-drops-last-byte" }, new[] { "hmac", "hmac-drops-last-byte" } };
+            List<string> seen = new List<string>();
+            foreach (string[] p in planted)
+            {
+                string got;
+                try { got = "PASS " + AoFileSet.Compare(p[0], new FrozenSide(), new PlantedSide(p[1]), set); }
+                catch (FailException e) { got = "FAIL " + e.Reason; }
+                seen.Add(p[0] + "/" + p[1] + ": " + got);
+                if (got != "FAIL AO9_OUTPUT_DIFFERS")
+                    throw new FailException("AO-9 " + p[0] + " passed the planted fault " + p[1] + ": " + got);
+            }
+            string pool;
+            try { pool = "PASS " + AoFileSet.Pool25(new FrozenSide(), new PlantedSide("gcm-seal-shared-scratch"), set); }
+            catch (FailException e) { pool = "FAIL " + e.Reason; }
+            if (pool != "FAIL AO9_OUTPUT_DIFFERS") throw new FailException("pool-25 passed a shared nonce buffer: " + pool);
+            System.IO.File.WriteAllBytes(System.IO.Path.Combine(files, "seventeen.bin"), new byte[17]);
+            string changed;
+            try { AoFileSet.Load(acc, root); changed = "PASS"; } catch (FailException e) { changed = "FAIL " + e.Reason; }
+            if (changed != "FAIL AO9_FILE_CHANGED") throw new FailException("a changed AO-9 file passed: " + changed);
+            System.IO.File.Delete(System.IO.Path.Combine(files, "empty.bin"));
+            string absent;
+            try { AoFileSet.Load(acc, root); absent = "PASS"; } catch (NotRunException e) { absent = "NOT RUN " + e.Reason; } catch (FailException e) { absent = "FAIL " + e.Reason; }
+            if (absent != "NOT RUN AO9_FILES_ABSENT") throw new FailException("a missing AO-9 file read " + absent);
+            return "control: 5 ops, small-message and pool-25 equal on frozen and frozen; planted: " + string.Join("; ", seen.ToArray()) +
+                   "; pool-25 with a shared nonce buffer: FAIL; changed file: FAIL AO9_FILE_CHANGED; missing file: NOT RUN AO9_FILES_ABSENT";
         }
 
         [Clause("SELF.ao7-walk-helper-rule-bites")]

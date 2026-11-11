@@ -9,7 +9,7 @@
     <NoWarn>$(NoWarn);CS0162;CS0168;CS0219;CS0414;CS0649;CS1591</NoWarn>
   </PropertyGroup>
   <ItemGroup>
-    <Compile Include="..\algo\AoSide.cs;..\algo\AoSide.Product.cs;..\algo\AoCases.cs;..\algo\AoGrammar.cs" Link="algo\%(Filename)%(Extension)" />
+    <Compile Include="..\algo\AoSide.cs;..\algo\AoSide.Product.cs;..\algo\AoCases.cs;..\algo\AoGrammar.cs;..\algo\AoFileSet.cs" Link="algo\%(Filename)%(Extension)" />
     <Compile Include="..\algo\Frozen\*.cs" Link="algo\Frozen\%(Filename)%(Extension)" />
   </ItemGroup>
 </Project>
