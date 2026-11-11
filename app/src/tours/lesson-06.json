@@ -205,7 +205,7 @@
       "lesson": 6,
       "title": "The bank refuses a replayed sale",
       "text": [
-        "The bank checks each KSN against the ones it has seen. On the normal run every sale is new, so the check passes.",
+        "The bank checks each KSN against the ones it has seen. It also keeps the highest counter it took from this reader, and it refuses a counter at or below it. On the normal run every sale is new, so the check passes.",
         "Try it: send the bytes of sale 1 again. This is a {{term:replay}}. The bank has seen that counter, and the check named KSN already seen fails."
       ],
       "glossary": ["replay"],
