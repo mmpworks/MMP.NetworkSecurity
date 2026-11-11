@@ -272,3 +272,18 @@ Disposition: merge after section 15.
 Conclusion: `A19.host.practice-key-192-256` adds **1 clause**, so M is **378**. Source: `docs/walkthrough-design.md`, the "Which key runs?" row. It runs when the Host has the walk route (#178).
 
 Disposition: merge after section 16.
+
+## 18. AO: the Algorithm-Optimization anchor (added 2026-11-11)
+
+Conclusion: the AO rows are the anchor of `docs/algorithm-optimization-prd.md` section 3. They were written before any product change, and `acceptance/ao-rows.tsv` lists the state that each row must show at each slice.
+
+| Part | Where |
+|---|---|
+| AO-2 differential, AO-3 tables, AO-7 walk, frozen 5c5d4a4 copy | `groups/algo`, `groups/algo/Frozen` (made by `tools/freeze_ref.py`) |
+| AO-4 threads and the payload worker, in a process of its own | `groups/algothreads` |
+| AO-0 row-list check, AO-1 and AO-8 row sums | `run.ps1` driver rows |
+| Row list and bench report shape | `ao-rows.tsv`, `ao-bench-schema.md` |
+
+Run: `pwsh acceptance/run.ps1 -AoSlice S0 -Clauses AO [-AoBenchReport PATH]`. `-AoSlice` has no default. With no bench report, the bench rows read as absent, so AO-0 is FAIL.
+
+Disposition: merge into `Algorithm-Optimization`. The S0 close needs the bench report of the merged head.

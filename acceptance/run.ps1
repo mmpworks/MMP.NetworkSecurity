@@ -277,6 +277,14 @@ function Read-AoBench([string]$path, $list, [string]$slice, [string]$head) {
             if (-not $b -or $b.Value -isnot [ValueType]) { $out[$e.id] = [pscustomobject]@{ status = 'FAIL'; reason = 'AO_BENCH_ROW_BAD'; detail = 'bytesPerOp is missing or not a number' }; continue }
             $v = [double]$b.Value
             $out[$e.id] = if ($v -eq 0) { [pscustomobject]@{ status = 'PASS'; reason = ''; detail = "0 B per op ($($r.op))" } } else { [pscustomobject]@{ status = 'FAIL'; reason = 'AO5_ALLOCATES'; detail = "$v B per op ($($r.op))" } }
+        } elseif ($e.id -like 'AO-9.*') {
+            # PRD 3.3: outputs byte-equal on the frozen original and the head, and both numbers recorded. Five operations sum over the 7 files.
+            $q = $r.PSObject.Properties['outputsEqual']; $a0 = $r.PSObject.Properties['originalNsPerOp']; $a1 = $r.PSObject.Properties['newNsPerOp']; $nf = $r.PSObject.Properties['files']
+            $needSeven = @('gcm', 'cbc', 'ctr', 'sha256', 'hmac') -contains ($e.id.Split('.')[1])
+            $okShape = $q -and $q.Value -is [bool] -and $a0 -and $a1 -and $a0.Value -is [ValueType] -and $a1.Value -is [ValueType] -and [double]$a0.Value -gt 0 -and [double]$a1.Value -gt 0 -and $nf -and $nf.Value -is [ValueType] -and [double]$nf.Value -ge 0 -and [double]$nf.Value -eq [math]::Floor([double]$nf.Value)
+            if (-not $okShape -or ($needSeven -and [double]$nf.Value -ne 7)) { $out[$e.id] = [pscustomobject]@{ status = 'FAIL'; reason = 'AO_BENCH_ROW_BAD'; detail = 'outputsEqual (boolean), originalNsPerOp, newNsPerOp (above 0) and files (whole number; 7 for gcm, cbc, ctr, sha256, hmac) are needed' }; continue }
+            if (-not $q.Value) { $out[$e.id] = [pscustomobject]@{ status = 'FAIL'; reason = 'AO9_OUTPUT_DIFFERS'; detail = "the head's output differs from the original ($($r.op))" }; continue }
+            $out[$e.id] = [pscustomobject]@{ status = 'PASS'; reason = ''; detail = ("outputs equal over {0} files; original {1} ns, new {2} ns ({3})" -f $nf.Value, $a0.Value, $a1.Value, $r.op) }
         } else {
             $p0 = $r.PSObject.Properties['baselineNsPerOp']; $p1 = $r.PSObject.Properties['newNsPerOp']
             if (-not $p0 -or -not $p1 -or $p0.Value -isnot [ValueType] -or $p1.Value -isnot [ValueType] -or [double]$p0.Value -le 0 -or [double]$p1.Value -le 0) { $out[$e.id] = [pscustomobject]@{ status = 'FAIL'; reason = 'AO_BENCH_ROW_BAD'; detail = 'baselineNsPerOp or newNsPerOp is missing, not a number, or not above 0' }; continue }
@@ -704,10 +712,16 @@ foreach ($c in @($pending | Where-Object { $_.group -eq 'driver' -and -not $resu
             Set-Content -LiteralPath $bj -Encoding utf8 -Value '{"schema":1,"commit":"HEADX","rows":[{"id":"AO-5.x.net10","status":"PASS","bytesPerOp":16,"op":"block"}]}'
             $bv = Read-AoBench $bj $bl 'S0' 'HEADX'
             if ($bv['AO-5.x.net10'].status -ne 'FAIL' -or $bv['AO-5.x.net10'].reason -ne 'AO5_ALLOCATES') { $bad += "a bench row with 16 B that says PASS read $($bv['AO-5.x.net10'].status) $($bv['AO-5.x.net10'].reason)" }
+            $bl['AO-9.gcm.net10'] = [pscustomobject]@{ id = 'AO-9.gcm.net10'; state = '-'; reason = '-'; from = 'S0'; source = 'bench' }
+            $bl['AO-9.pool-25.net10'] = [pscustomobject]@{ id = 'AO-9.pool-25.net10'; state = '-'; reason = '-'; from = 'S0'; source = 'bench' }
+            Set-Content -LiteralPath $bj -Encoding utf8 -Value '{"schema":1,"commit":"HEADX","rows":[{"id":"AO-5.x.net10","status":"PASS","bytesPerOp":16,"op":"block"},{"id":"AO-9.gcm.net10","outputsEqual":false,"originalNsPerOp":10,"newNsPerOp":5,"files":7,"op":"seal+open"},{"id":"AO-9.pool-25.net10","outputsEqual":true,"originalNsPerOp":10,"newNsPerOp":5,"files":1,"op":"25 workers"}]}'
+            $b9 = Read-AoBench $bj $bl 'S0' 'HEADX'
+            if ($b9['AO-9.gcm.net10'].reason -ne 'AO9_OUTPUT_DIFFERS') { $bad += "an AO-9 row with outputsEqual false read $($b9['AO-9.gcm.net10'].status) $($b9['AO-9.gcm.net10'].reason)" }
+            if ($b9['AO-9.pool-25.net10'].status -ne 'PASS') { $bad += "a good AO-9 pool-25 row with files 1 read $($b9['AO-9.pool-25.net10'].status) $($b9['AO-9.pool-25.net10'].reason)" }
             $bo = Read-AoBench $bj $bl 'S0' 'OTHERHEAD'
             if ($bo['AO-5.x.net10'].reason -ne 'AO_BENCH_OTHER_COMMIT') { $bad += "a bench report for another commit read $($bo['AO-5.x.net10'].reason)" }
             if ($bad) { Set-Result $c.id 'FAIL' 'ASSERTION' ($bad -join '; ') }
-            else { Set-Result $c.id 'PASS' '' (($seen -join '; ') + '; bench 16 B claiming PASS -> FAIL AO5_ALLOCATES; bench for another commit -> AO_BENCH_OTHER_COMMIT') }
+            else { Set-Result $c.id 'PASS' '' (($seen -join '; ') + '; bench 16 B claiming PASS -> FAIL AO5_ALLOCATES; AO-9 outputsEqual false -> FAIL AO9_OUTPUT_DIFFERS; AO-9 pool-25 good -> PASS; bench for another commit -> AO_BENCH_OTHER_COMMIT') }
         }
         'SELF.ao-row-verdicts-bite' {
             # AO-1 and AO-8 read other rows. All PASS must PASS; one FAIL or one NOT RUN must FAIL; no row at all must be NOT RUN.
