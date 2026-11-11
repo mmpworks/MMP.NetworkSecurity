@@ -29,6 +29,10 @@
     <Compile Include="$(MSBuildThisFileDirectory)Program.cs" Link="Program.cs" />
     <Compile Include="$(MSBuildThisFileDirectory)..\NetSec.Bench\Measure.cs" Link="Shared\Measure.cs" />
     <Compile Include="$(MSBuildThisFileDirectory)..\NetSec.Bench\CoreMap.cs" Link="Shared\CoreMap.cs" />
+    <Compile Include="$(MSBuildThisFileDirectory)..\NetSec.Bench\Run.cs" Link="Shared\Run.cs" />
+    <Compile Include="$(MSBuildThisFileDirectory)..\NetSec.Bench\Sizes.cs" Link="Shared\Sizes.cs" />
+    <Compile Include="$(MSBuildThisFileDirectory)..\NetSec.Bench\Footprint.cs" Link="Shared\Footprint.cs" />
+    <Compile Include="$(MSBuildThisFileDirectory)..\NetSec.Bench\Files\FileSet.cs" Link="Shared\FileSet.cs" />
     <Compile Include="$(MSBuildThisFileDirectory)..\NetSec.Bench\IBlockCases.cs" Link="Shared\IBlockCases.cs" />
     <Compile Include="$(MSBuildThisFileDirectory)..\NetSec.Bench\Files\CodeUnderTest.cs" Link="Shared\CodeUnderTest.cs" />
     <Compile Include="$(MSBuildThisFileDirectory)..\NetSec.Bench\Files\FrozenCode.cs" Link="Shared\FrozenCode.cs" />
