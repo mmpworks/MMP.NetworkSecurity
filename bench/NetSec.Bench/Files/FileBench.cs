@@ -35,6 +35,9 @@ static class FileBench
     // 250 ms per copy per round: at 30 MB/s that is about 2 calls on the 4 MiB file, so the call count never drops to a single call.
     public static readonly TimeSpan Round = TimeSpan.FromMilliseconds(250);
 
+    // 15 round pairs for the file rows (31 for the block cases): 250 ms rounds make 31 pairs too long for one quiet window. The band check shows whether 15 is enough.
+    public const int Pairs = 15;
+
     static readonly byte[] AesKey = Seq(16, 0x01), HmacKey = Seq(32, 0x21), Nonce = Seq(12, 0x41), Aad = Seq(13, 0x51), Iv = Seq(16, 0x61);
     public static object Sink;
 
@@ -77,7 +80,7 @@ static class FileBench
                 FileRow row = new FileRow
                 {
                     File = f.Name, Operation = op.Name, BytesPerCall = input.Length,
-                    Pair = Measure.Run(() => Sink = op.Call(o, input), () => Sink = op.Call(n, input), Round),
+                    Pair = Measure.Run(() => Sink = op.Call(o, input), () => Sink = op.Call(n, input), Round, Pairs),
                 };
                 rows.Add(row);
                 progress(row);
@@ -93,7 +96,7 @@ static class FileBench
         FileRow row = new FileRow
         {
             File = "64-byte message", Operation = "key-setup+gcm-seal", BytesPerCall = plain.Length,
-            Pair = Measure.Run(() => Sink = original.KeySetupAndSeal(AesKey, Nonce, Aad, plain), () => Sink = current.KeySetupAndSeal(AesKey, Nonce, Aad, plain), Round),
+            Pair = Measure.Run(() => Sink = original.KeySetupAndSeal(AesKey, Nonce, Aad, plain), () => Sink = current.KeySetupAndSeal(AesKey, Nonce, Aad, plain), Round, Pairs),
         };
         progress(row);
         return row;

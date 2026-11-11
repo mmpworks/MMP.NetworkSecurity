@@ -26,7 +26,7 @@ static class Report
         Field(s, "utc", DateTime.UtcNow.ToString("yyyy-MM-ddTHH:mm:ssZ", Inv));
         Field(s, "machine", Program.Machine());
         Field(s, "allocationCounter", Allocated.Method);
-        Field(s, "timing", Settings(BlockRound));
+        Field(s, "timing", Settings(BlockRound, Measure.Rounds));
         Field(s, "priority", run.Priority);
         Field(s, "noiseBand", NoiseBand.Describe(results.Select(r => r.Pair.MedianRatio).ToArray()));
         Field(s, "cfArm", run.CfLine);
@@ -66,11 +66,11 @@ static class Report
     public static string Cpu() => (Environment.GetEnvironmentVariable("PROCESSOR_IDENTIFIER") ?? "unknown CPU") + "; " + Environment.ProcessorCount + " logical processors";
 
     /// <summary>The provenance lines both Markdown reports start with.</summary>
-    public static void Header(StringBuilder s, Run run, TimeSpan round, string noise)
+    public static void Header(StringBuilder s, Run run, TimeSpan round, int rounds, string noise)
     {
         s.AppendLine("- Head: `" + run.Head + "`");
         s.AppendLine("- Machine: " + Program.Machine());
-        s.AppendLine("- Timing: " + Settings(round));
+        s.AppendLine("- Timing: " + Settings(round, rounds));
         s.AppendLine("- Priority: " + run.Priority);
         s.AppendLine("- Allocation counter: " + Allocated.Method + ". Allocated bytes and GC counts cover the timed rounds only.");
         s.AppendLine("- Noise: " + noise);
@@ -86,7 +86,7 @@ static class Report
         StringBuilder s = new StringBuilder();
         s.AppendLine("# Benchmark: " + run.Build);
         s.AppendLine();
-        Header(s, run, BlockRound, NoiseBand.Describe(results.Select(r => r.Pair.MedianRatio).ToArray()));
+        Header(s, run, BlockRound, Measure.Rounds, NoiseBand.Describe(results.Select(r => r.Pair.MedianRatio).ToArray()));
         s.AppendLine("| Case | Unit | Original ns per unit | New ns per unit | Ratio | Ratio spread of round pairs | New spread ns | Original B per unit | New B per unit | New MB/s |");
         s.AppendLine("|---|---|---:|---:|---:|---:|---:|---:|---:|---:|");
         foreach (CaseResult r in results)
@@ -97,9 +97,9 @@ static class Report
         return s.ToString();
     }
 
-    public static string Settings(TimeSpan round) => string.Format(Inv,
+    public static string Settings(TimeSpan round, int rounds) => string.Format(Inv,
         "warm-up {0} ms per copy, then {1} round pairs of at least {2} ms per copy; original and new alternate (O,N then N,O); a full GC before each timed round; Stopwatch {3} ticks/s",
-        Measure.WarmTarget.TotalMilliseconds, Measure.Rounds, round.TotalMilliseconds, System.Diagnostics.Stopwatch.Frequency);
+        Measure.WarmTarget.TotalMilliseconds, rounds, round.TotalMilliseconds, System.Diagnostics.Stopwatch.Frequency);
 
     static void Field(StringBuilder s, string name, string value) => s.Append("  ").Append(Quote(name)).Append(": ").Append(Quote(value)).Append(",\n");
 
