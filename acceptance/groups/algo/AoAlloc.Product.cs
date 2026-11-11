@@ -224,5 +224,46 @@ namespace Acceptance
             seal(Nonce, 0, Aad, 0, 0, Data, 0, Data.Length, sealedBytes, 0);
             return Into(c, "AO-5.aes-gcm-open-into", "GcmKey.TryOpen into", delegate { open(Nonce, 0, Aad, 0, 0, sealedBytes, 0, sealedBytes.Length, plain, 0); });
         }
+
+        // ---- streamed forms and caller-buffer Verify forms (PRD 7.3 item 15): one object used again for each message, 0 B for the message ----
+
+        [Clause("AO-5.aes-cbc-stream", PerBuild = true)]
+        public static string CbcStream(Ctx c)
+        {
+            AesKey k = Aes(c);
+            var e = AoSeams.Stream(k, "CbcChain", "CbcEncrypt"); var d = AoSeams.Stream(k, "CbcChain", "CbcDecrypt");
+            string a = Into(c, "AO-5.aes-cbc-stream", "CbcChain.Init, Modes.CbcEncrypt with the CbcChain, Clear", delegate { e.Init(Iv, 0); e.Call(Data, 0, Data.Length, Out, 0); e.Clear(); });
+            return a + "; " + Into(c, "AO-5.aes-cbc-stream", "CbcChain.Init, Modes.CbcDecrypt with the CbcChain, Clear", delegate { d.Init(Iv, 0); d.Call(Data, 0, Data.Length, Out, 0); d.Clear(); });
+        }
+
+        [Clause("AO-5.aes-ctr-stream", PerBuild = true)]
+        public static string CtrStream(Ctx c)
+        {
+            AesKey k = Aes(c);
+            var f = AoSeams.Stream(k, "CtrCounter", "Ctr");
+            return Into(c, "AO-5.aes-ctr-stream", "CtrCounter.Init, Modes.Ctr with the CtrCounter, Clear", delegate { f.Init(Ctr0, 0); f.Call(Data, 0, Data.Length, Out, 0); f.Clear(); });
+        }
+
+        [Clause("AO-5.aes-cmac-verify-into", PerBuild = true)]
+        public static string CmacVerifyInto(Ctx c)
+        {
+            AesKey k = Aes(c);
+            var v = AoSeams.CmacVerifyInto(); var compute = AoSeams.CmacInto();
+            byte[] tag = new byte[16];
+            compute(k, Data, 0, Data.Length, tag, 0);
+            if (!v(k, Data, 0, Data.Length, tag, 0)) throw new FailException("Cmac.Verify refused the tag that Cmac.Compute wrote");
+            return Into(c, "AO-5.aes-cmac-verify-into", "Cmac.Verify with offsets", delegate { v(k, Data, 0, Data.Length, tag, 0); });
+        }
+
+        [Clause("AO-5.aes-cmackey-verify-into", PerBuild = true)]
+        public static string CmacKeyVerifyInto(Ctx c)
+        {
+            AesKey k = Aes(c);
+            var v = AoSeams.CmacKeyVerify(k); var compute = AoSeams.CmacKeyCompute(k);
+            byte[] tag = new byte[16];
+            compute(Data, 0, Data.Length, tag, 0);
+            if (!v(Data, 0, Data.Length, tag, 0)) throw new FailException("CmacKey.Verify refused the tag that CmacKey.Compute wrote");
+            return Into(c, "AO-5.aes-cmackey-verify-into", "CmacKey.Verify", delegate { v(Data, 0, Data.Length, tag, 0); });
+        }
     }
 }

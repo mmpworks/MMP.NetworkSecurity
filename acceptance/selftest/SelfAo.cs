@@ -627,4 +627,90 @@ namespace Acceptance
             return AoIntoDiff.Ops.Length + " caller-buffer ops: the model against itself, " + Cases + " cases each, 0 differences; planted: " + string.Join("; ", seen.ToArray());
         }
     }
+
+    /// <summary>The streamed reference model with one planted fault in the state object: each must turn its AO-2 "-stream" row red.</summary>
+    public sealed class PlantedChain : FrozenChain
+    {
+        readonly string _fault;
+        byte[] _first = new byte[16];
+        public PlantedChain(object key, string kind, string fault) : base(key, kind) { _fault = fault; }
+
+        public override void Init(byte[] b, int offset)
+        {
+            base.Init(b, offset);
+            _first = (byte[])V.Clone();
+        }
+
+        public override void Clear()
+        {
+            if (_fault == "clear-keeps-ready") return;
+            base.Clear();
+        }
+
+        public override void Call(byte[] i, int io, int n, byte[] o, int oo)
+        {
+            if (_fault == "call-before-init-accepted" && State == 0) { V = new byte[16]; State = 1; }
+            bool inPlace = ReferenceEquals(i, o) && io == oo;
+            base.Call(i, io, n, o, oo);
+            if (_fault == "chain-not-carried") V = (byte[])_first.Clone();
+            // Decrypt in place, taking the next chain value from the array after the plaintext went over the ciphertext.
+            if (_fault == "decrypt-in-place-loses-chain" && Kind == "cbc-decrypt" && inPlace && n >= 16) { V = new byte[16]; Buffer.BlockCopy(o, oo + n - 16, V, 0, 16); }
+            if (_fault == "counter-not-carried") Done = 0;
+            if (_fault == "partial-does-not-end" && State == 2) State = 1;
+        }
+    }
+
+    public sealed class PlantedStream : FrozenStream
+    {
+        readonly string _fault;
+        public PlantedStream(string fault) { _fault = fault; }
+        public override string Name { get { return "planted:" + _fault; } }
+        public override IAoChain NewChain(object k, string kind) { return new PlantedChain(k, kind, _fault); }
+
+        public override bool CmacVerify(object k, byte[] m, int mo, int n, byte[] t, int to)
+        {
+            if (_fault != "verify-skips-last-tag-byte") return base.CmacVerify(k, m, mo, n, t, to);
+            byte[] copy = (byte[])t.Clone();
+            copy[to + 15] = new FrozenSide().Cmac(k, Hex.Slice(m, mo, n))[15];
+            return base.CmacVerify(k, m, mo, n, copy, to);
+        }
+
+        public override bool CmacKeyVerify(object k, byte[] m, int mo, int n, byte[] t, int to)
+        {
+            if (_fault == "verify-reads-tag-at-0") return base.CmacVerify(k, m, mo, n, t, 0);
+            return base.CmacKeyVerify(k, m, mo, n, t, to);
+        }
+    }
+
+    public static class SelfAoStream
+    {
+        const int Cases = 20000;
+
+        [Clause("SELF.ao2-stream-control-and-planted-faults", TimeoutSec = 1800)]
+        public static string StreamBites(Ctx c)
+        {
+            foreach (string op in AoStreamDiff.Ops)
+            {
+                string r = AoStreamDiff.Run(op, new FrozenStream(), new FrozenStream(), Cases);
+                if (!r.StartsWith(Cases + " of ")) throw new FailException(op + " control gave " + r);
+            }
+            string[][] planted = {
+                new[] { "aes-cbc-stream", "chain-not-carried" }, new[] { "aes-cbc-stream", "decrypt-in-place-loses-chain" },
+                new[] { "aes-cbc-stream", "call-before-init-accepted" }, new[] { "aes-cbc-stream", "clear-keeps-ready" },
+                new[] { "aes-ctr-stream", "counter-not-carried" }, new[] { "aes-ctr-stream", "partial-does-not-end" },
+                new[] { "aes-ctr-stream", "call-before-init-accepted" }, new[] { "aes-ctr-stream", "clear-keeps-ready" },
+                new[] { "aes-cmac-verify-into", "verify-skips-last-tag-byte" }, new[] { "aes-cmackey-verify-into", "verify-reads-tag-at-0" },
+            };
+            List<string> seen = new List<string>();
+            foreach (string[] p in planted)
+            {
+                string got;
+                try { got = "PASS " + AoStreamDiff.Run(p[0], new FrozenStream(), new PlantedStream(p[1]), Cases); }
+                catch (FailException e) { got = "FAIL " + e.Reason; }
+                if (got != "FAIL AO_DIFFERS") throw new FailException(p[0] + " did not catch " + p[1] + ": " + got);
+                seen.Add(p[0] + "/" + p[1] + ": FAIL");
+            }
+            return AoStreamDiff.Ops.Length + " ops: the model against itself, " + Cases + " cases each, 0 differences; planted: " + string.Join("; ", seen.ToArray());
+        }
+    }
 }

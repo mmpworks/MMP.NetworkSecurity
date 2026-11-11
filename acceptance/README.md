@@ -303,3 +303,37 @@ Conclusion: the rows that S1 to S4 need for the zero-garbage rules of PRD 7.4 ex
 Limit of the cf meter: the counter moves in 8,192-byte steps, so an allocation total under 8,192 B over the run is unseen. Each cf row prints its call count and this limit.
 
 Disposition: merge into `Algorithm-Optimization` before S1.
+
+## 20. AO: streamed CBC and CTR, and Verify with offsets (added 2026-11-11)
+
+Conclusion: each remaining form of PRD 7.3 item 15 has an AO-2 row and an AO-5 row. They read NOT RUN PRODUCT_MISSING until their form exists.
+
+| Part | Where |
+|---|---|
+| AO-2 `aes-cbc-stream`, `aes-ctr-stream`: one `CbcChain` or `CtrCounter`, 1 or 2 messages, 1 to 4 calls for each message, each call with its own aliasing | `groups/algo/AoStream.cs`, `AoStream.Product.cs` |
+| AO-2 `aes-cmac-verify-into`, `aes-cmackey-verify-into`: the right tag at an offset, then no change, one changed tag bit, or one changed message bit | the same files |
+| AO-5 for the 4 forms: 0 B for Init, one call and Clear on one object used again; 0 B for a Verify call | `groups/algo/AoAlloc.Product.cs` |
+| The seams: the state type and the overload are found by name, and bound as typed delegates | `AoSeams.TryStream`, `TryCmacVerifyInto`, `TryCmacKeyVerify` in `groups/algo/AoSide.Product.cs` |
+| Self-check, 10 planted faults | `SELF.ao2-stream-control-and-planted-faults` in `selftest/SelfAo.cs` |
+
+The signatures that the rows bind to (the PRD names the types, and these parameter lists are the reading of it):
+
+1. `Modes.CbcEncrypt(AesKey k, CbcChain chain, byte[] input, int inOffset, int count, byte[] output, int outOffset)`, and `CbcDecrypt` with the same parameters.
+2. `Modes.Ctr(AesKey k, CtrCounter counter, byte[] input, int inOffset, int count, byte[] output, int outOffset)`.
+3. `CbcChain` and `CtrCounter`: a public constructor with no parameters, `void Init(byte[] b, int offset)`, `void Clear()`.
+4. `bool Cmac.Verify(AesKey k, byte[] message, int offset, int count, byte[] tag, int tagOffset)`, and `bool CmacKey.Verify` with the same parameters without the key.
+
+The rules of the reference model (the 5c5d4a4 code has no streamed form):
+
+1. The calls of one message give the bytes of one frozen call over the joined input.
+2. A call before Init, after Clear, or after a CTR call with a partial block throws. The PRD does not fix the exception type, so the row accepts any exception there.
+3. A CBC count that is not a multiple of 16 is refused with the exception of the frozen form.
+4. A partial overlap is refused with `ARG_RANGES_OVERLAP`.
+
+Limits:
+
+1. No case calls a state object again after a refused overlap or a refused CBC count. The PRD does not say what state the object has then.
+2. No case gives Init fewer than 16 bytes. The PRD does not name that refusal.
+3. `Tls13Records` (one direction, one thread) is a product test. It has no acceptance row.
+
+Disposition: merge into `Algorithm-Optimization` before the S1 code that adds these forms.
