@@ -3,9 +3,11 @@ import os
 import pathlib
 import subprocess
 import sys
-import tempfile
 import time
 import unittest
+
+sys.path.insert(0, str(pathlib.Path(__file__).resolve().parent))  # tools/, for the shared temp folder (#400)
+from tempdir import TempDir  # noqa: E402
 
 SCRIPT = pathlib.Path(__file__).resolve().parent / "run_status.py"
 
@@ -21,7 +23,7 @@ DOTNET_FAIL = "  Failed NetSec.Host.Tests.HostFlagTests.A_bad_flag [5 s]\nFailed
 
 class RunStatus(unittest.TestCase):
     def setUp(self):
-        self.tmp = tempfile.TemporaryDirectory()
+        self.tmp = TempDir()
 
     def tearDown(self):
         self.tmp.cleanup()

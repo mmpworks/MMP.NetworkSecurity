@@ -4,8 +4,10 @@ Run: python -I tools/test_check_acceptance_scope.py
 import pathlib
 import subprocess
 import sys
-import tempfile
 import unittest
+
+sys.path.insert(0, str(pathlib.Path(__file__).resolve().parent))  # tools/, for the shared temp folder (#400)
+from tempdir import TempDir  # noqa: E402
 
 SCRIPT = pathlib.Path(__file__).resolve().parent / "check_acceptance_scope.py"
 
@@ -18,7 +20,7 @@ def git(*args, cwd):
 
 class AcceptanceScope(unittest.TestCase):
     def setUp(self):
-        self.tmp = tempfile.TemporaryDirectory()
+        self.tmp = TempDir()
         self.repo = pathlib.Path(self.tmp.name)
         git("init", "-q", "-b", "main", cwd=self.repo)
         git("config", "user.email", "t@example.com", cwd=self.repo)

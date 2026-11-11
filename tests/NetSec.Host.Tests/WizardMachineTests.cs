@@ -80,7 +80,7 @@ public class WizardMachineTests
 
         public void Dispose()
         {
-            if (Directory.Exists(Root)) Directory.Delete(Root, true);
+            if (Directory.Exists(Root)) TempTree.Delete(Root);
         }
     }
 

@@ -145,7 +145,7 @@ public class SecurityLiveTests
             _process.WaitForExit(5000);
             _process.Dispose();
             _http.Dispose();
-            Directory.Delete(Root, true);
+            TempTree.Delete(Root);
         }
     }
 

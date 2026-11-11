@@ -240,7 +240,7 @@ namespace NetSec.Host.Tests
                 using System.Diagnostics.Process p = System.Diagnostics.Process.Start(info)!;
                 (exited, code, output, errors) = await ProcessWaits.Collect(p, TimeSpan.FromSeconds(30));
             }
-            finally { Directory.Delete(temp, true); }
+            finally { TempTree.Delete(temp); }
             Assert.True(exited, "node did not finish in 30 s");
             string line = output.Split('\n').Select(l => l.Trim()).FirstOrDefault(l => l.StartsWith("SPAWN-ENV ", StringComparison.Ordinal));
             Assert.True(line is not null, $"main.cjs never called spawn (exit {code}): {output} {errors}");

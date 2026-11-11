@@ -9,10 +9,12 @@ import pathlib
 import shutil
 import subprocess
 import sys
-import tempfile
 import threading
 import time
 import unittest
+
+sys.path.insert(0, str(pathlib.Path(__file__).resolve().parent))  # tools/, for the shared temp folder (#400)
+from tempdir import TempDir  # noqa: E402
 
 TOOL = pathlib.Path(os.environ.get("HEAVY_LOCK_TOOL") or pathlib.Path(__file__).resolve().parent / "heavy_lock.py")   # the override lets a test run against an older copy
 spec = importlib.util.spec_from_file_location("heavy_lock", TOOL)
@@ -25,7 +27,7 @@ SLEEP_60 = PY + ["import time; time.sleep(60)"]
 
 class HeavyLock(unittest.TestCase):
     def setUp(self):
-        self.tmp = tempfile.TemporaryDirectory()
+        self.tmp = TempDir()
         self.dir = pathlib.Path(self.tmp.name) / "locks"          # does not exist yet: the tool makes it
         self.procs = []
 

@@ -6,8 +6,11 @@ import json
 import os
 import pathlib
 import subprocess
-import tempfile
+import sys
 import unittest
+
+sys.path.insert(0, str(pathlib.Path(__file__).resolve().parent))  # tools/, for the shared temp folder (#400)
+from tempdir import TempDir  # noqa: E402
 
 TOOLS = pathlib.Path(__file__).resolve().parent
 LIB = TOOLS / "gate_app.ps1"
@@ -220,7 +223,7 @@ class GateScript(unittest.TestCase):
 
 class RepoFacts(unittest.TestCase):
     def setUp(self):
-        self.tmp = tempfile.TemporaryDirectory()
+        self.tmp = TempDir()
         self.repo = pathlib.Path(self.tmp.name)
         git("init", "-q", "-b", "main", cwd=self.repo)
         git("config", "user.email", "t@example.com", cwd=self.repo)
@@ -308,7 +311,7 @@ class RepoFacts(unittest.TestCase):
         self.assertNotIn("dirty", self.head())
 
     def test_head_line_outside_a_repo_says_unknown(self):
-        with tempfile.TemporaryDirectory() as other:
+        with TempDir() as other:
             self.assertEqual(ps(f"Get-HeadLine -Repo '{other}'"), "unknown")
 
     def test_no_app_change_counts_zero(self):
@@ -332,7 +335,7 @@ class RepoFacts(unittest.TestCase):
 
 class Tools(unittest.TestCase):
     def setUp(self):
-        self.tmp = tempfile.TemporaryDirectory()
+        self.tmp = TempDir()
         self.app = pathlib.Path(self.tmp.name) / "app"
         self.app.mkdir()
 
