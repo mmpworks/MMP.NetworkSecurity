@@ -36,6 +36,8 @@ static class Program
         bool sameCode = a.TryGetValue("same-code", out string sc) && sc == "true";
         if (mode == "files") return Files.FilesMode.Run(a, run, sameCode);
         if (mode == "ao5") { AoAlloc.JsonRows(new Files.ProductCode()); return 0; }
+        if (mode == "sizes") return Sizes.Run(a);
+        if (mode == "footprint") return Footprint.Run(a, run);
         string filter = a.TryGetValue("filter", out string f) ? f : "";
 
         List<BenchCase> original = Cases.All(new Files.FrozenCode()), current = Cases.All(new Files.ProductCode());
