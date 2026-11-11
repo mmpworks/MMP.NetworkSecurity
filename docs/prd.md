@@ -156,7 +156,7 @@ Cut order if time runs out: passkey and capabilities; glass TLS 1.3 server role;
 ## Non-goals
 
 1. Production use of the glass-box engine. No FIPS validation.
-2. Public release. The repo stays private until Steve says otherwise.
+2. (Removed 2026-11-10.) Steve approved the public release under the MIT licence.
 3. NuGet or any package publish.
 4. A run on a real CE device or emulator in this overnight run. No third-party CE images get downloaded.
 5. TLS 1.0, SSLv3, or attacks against any system other than our own loopback labs.
