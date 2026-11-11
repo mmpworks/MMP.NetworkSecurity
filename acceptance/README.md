@@ -74,6 +74,7 @@ Self-checks (full text in the report): 22 of 22 PASS.
 | `SELF.openssl-referee-smoke`, `SELF.openssh-key-format`, `SELF.wire-parsers`, `SELF.binproof-detector` | The process control and the parsers read real OpenSSL, ssh.exe, the Go `tap` and CF binaries: group, protocol, key log, SSH clear packets, TLS hellos, tap log with and without a flip, CF mscorlib token |
 | `SELF.referee-protocols` | The harness speaks the real referee programs: the BCL oracle JSON lines (including an unknown algorithm), `tokenverify` result events, and the `tlspeer` port line and handshake event |
 | `SELF.vector-provenance`, `SELF.clauses-json-matches-code` | Every vector group names its source. `clauses.json` equals the clause code |
+| `SELF.waits-look-after-the-limit` | Each harness wait looks one last time after its limit (`lib/Harness/Poll.cs`). With a 0 ms limit and the answer already there, `Net.WaitPort` and `Poll.Until` see it |
 
 Other proofs I ran by hand and do not keep in the repo:
 1. A BCL-backed reference product (net10.0) with the A1 and A2 shapes, run through `run.ps1`: 21 of the 26 net10.0 A1 clauses PASS, and the four A2 primitive clauses PASS with 10,000 rounds each through a BCL oracle. The other clauses are NOT RUN because the reference lacks them (PRODUCT_MISSING). This run found one bug in the oracle reader (fixed).

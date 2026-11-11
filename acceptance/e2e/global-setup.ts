@@ -28,15 +28,17 @@ function answers(port: number, host: string): Promise<boolean> {
 }
 
 /** Waits for the child's own words: vite prints the address it bound, and the Host prints HOST-READY. A port that answers proves nothing, since another tree can hold it. */
-async function childSaid(log: string, words: string, exited: () => boolean, ms: number): Promise<boolean> {
+export async function childSaid(log: string, words: string, exited: () => boolean, ms: number): Promise<boolean> {
+  // Look first, then check the limit, so a line written during the last sleep is still seen (Richard on #367). A child that has
+  // exited still counts as not ready, as before.
   const end = Date.now() + ms;
-  while (Date.now() < end) {
+  while (true) {
     if (exited()) return false;
     const text = (fs.existsSync(log) ? fs.readFileSync(log, 'utf8') : '').replace(/\x1b\[[0-9;]*m/g, '');   // vite colours the port number
     if (text.includes(words)) return true;
+    if (Date.now() >= end) return false;
     await new Promise(r => setTimeout(r, 250));
   }
-  return false;
 }
 
 /**

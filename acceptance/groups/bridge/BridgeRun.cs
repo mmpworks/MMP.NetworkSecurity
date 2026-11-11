@@ -139,15 +139,15 @@ namespace Acceptance
         /// </summary>
         static string WaitLine(Proc p, string startsWith, int ms, string what)
         {
-            DateTime end = DateTime.UtcNow.AddMilliseconds(ms);
-            while (DateTime.UtcNow < end)
+            string found = Poll.Until(delegate
             {
                 foreach (string l in p.Lines) if (l.StartsWith(startsWith)) return l;
                 string all = p.AllOutput;
                 if (all.IndexOf("_NOT_BUILT", StringComparison.Ordinal) >= 0)
                     throw new NotRunException("PRODUCT_MISSING", what + " reports a part of the product as not built yet: " + all.Trim());
-                Thread.Sleep(100);
-            }
+                return null;
+            }, ms, 100);
+            if (found != null) return found;
             throw new FailException(what + " did not print '" + startsWith + "' within " + ms + " ms. Output: " + p.AllOutput);
         }
 
@@ -241,8 +241,7 @@ namespace Acceptance
         /// </summary>
         string WaitOrCeStop(Proc p, string what, Proc ce, int ms)
         {
-            DateTime end = DateTime.UtcNow.AddMilliseconds(ms);
-            while (DateTime.UtcNow < end)
+            return Poll.Until(delegate
             {
                 foreach (string l in p.Lines) if (l.StartsWith("RESULT")) return l;
                 string cr = CeResultLine(ce);
@@ -254,9 +253,8 @@ namespace Acceptance
                     if (code != null && code.EndsWith("_NOT_BUILT", StringComparison.Ordinal))
                         throw new NotRunException("PRODUCT_MISSING", "the CE stopped before the " + what + " could finish: " + cr);
                 }
-                Thread.Sleep(100);
-            }
-            return null;
+                return null;
+            }, ms, 100);
         }
 
         // ---------------------------------------------------------------- the run

@@ -97,13 +97,11 @@ namespace Acceptance
         /// <summary>Waits for the first event with this name. Returns null on timeout.</summary>
         public Dictionary<string, object> WaitEvent(string name, int timeoutMs)
         {
-            DateTime end = DateTime.UtcNow.AddMilliseconds(timeoutMs);
-            while (DateTime.UtcNow < end)
+            return Poll.Until(delegate
             {
                 foreach (Dictionary<string, object> d in Events()) if (MiniJson.Str(d, "event") == name) return d;
-                System.Threading.Thread.Sleep(50);
-            }
-            return null;
+                return null;
+            }, timeoutMs, 50);
         }
 
         /// <summary>The code of the first error event, or null.</summary>

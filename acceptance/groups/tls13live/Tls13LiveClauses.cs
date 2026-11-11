@@ -83,13 +83,12 @@ namespace Acceptance
                 ours[m.Groups["label"].Value] = m.Groups["secret"].Value.ToLowerInvariant();
             }
             Dictionary<string, string> theirs = new Dictionary<string, string>();
-            DateTime end = DateTime.UtcNow.AddSeconds(10);
-            while (DateTime.UtcNow < end)
+            // The last read comes after the limit, so a key log line written during the last sleep is still seen.
+            Poll.Until(delegate
             {
                 theirs = OpenSslLines.KeyLog(keylogPath, clientRandom);
-                if (theirs.Count >= SharedLabels.Length) break;
-                System.Threading.Thread.Sleep(100);
-            }
+                return theirs.Count >= SharedLabels.Length;
+            }, 10000, 100);
             Check.True(theirs.Count > 0, "OpenSSL key log has no line for the client random " + clientRandom);
             Tally t = new Tally();
             foreach (string label in SharedLabels)
