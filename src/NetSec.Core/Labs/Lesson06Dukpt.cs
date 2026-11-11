@@ -20,6 +20,7 @@ namespace NetSec.Labs
     public sealed class Lesson06Dukpt : ILab
     {
         public const string ReplayCheck = "KSN already seen";
+        public const string StaleCheck = "KSN at or below the device's highest counter";
         public const string FormatCheck = "PIN block format check";
         public const string NotHeldCheck = "key not in reader state";
         public const string OptionScenario = "scenario";
@@ -215,6 +216,8 @@ namespace NetSec.Labs
             PinSale sale = DukptBank.OpenPinSale(s.BaseKey, s.Ledger, ksn, Part(m.Body, KsnSize, PinBlockSize), Pan, KeyType);
             if (sale.Code == ErrorCodes.DukptKsnReplay)
                 return StepDecision.Fail(sale.Code, ReplayCheck, "KSN " + Hex.Encode(ksn) + " was used in an earlier sale");
+            if (sale.Code == ErrorCodes.DukptKsnStale)
+                return StepDecision.Fail(sale.Code, StaleCheck, "counter " + sale.Counter + " is at or below the highest counter the bank accepted from this reader");
             if (sale.Code != null)
                 return StepDecision.Fail(sale.Code, FormatCheck, "counter " + sale.Counter + ": the opened block has the wrong shape");
 
