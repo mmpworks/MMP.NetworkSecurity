@@ -129,5 +129,24 @@ namespace NetSec.Tests
             Assert.Equal(6u, ledger.HighestCounter(DeviceA));
             Assert.False(ledger.HasMark(DeviceB));
         }
+
+        [Fact]
+        public void A_ksn_of_the_wrong_size_is_refused_before_any_byte_is_read()
+        {
+            KsnLedger ledger = new KsnLedger();
+            ledger.Record(Ksn(DeviceA, 3));
+            byte[] shortKsn = new byte[7];
+            byte[] longKsn = new byte[13];
+            Assert.Throws<ArgumentNullException>(() => ledger.RefusalFor(null));
+            Assert.Throws<ArgumentNullException>(() => ledger.Record(null));
+            Assert.Throws<ArgumentNullException>(() => ledger.Contains(null));
+            Assert.Throws<ArgumentException>(() => ledger.RefusalFor(shortKsn));
+            Assert.Throws<ArgumentException>(() => ledger.RefusalFor(longKsn));
+            Assert.Throws<ArgumentException>(() => ledger.Record(shortKsn));
+            Assert.Throws<ArgumentException>(() => ledger.Contains(shortKsn));
+            // The refused calls changed nothing.
+            Assert.Equal(3u, ledger.HighestCounter(DeviceA));
+            Assert.Null(ledger.RefusalFor(Ksn(DeviceA, 4)));
+        }
     }
 }

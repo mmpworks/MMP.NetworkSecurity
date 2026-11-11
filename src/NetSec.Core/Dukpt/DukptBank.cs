@@ -88,7 +88,7 @@ namespace NetSec.Dukpt
         readonly Dictionary<string, uint> _highest = new Dictionary<string, uint>();
 
         /// <summary>True for a KSN this ledger recorded. The exact-repeat test only; <see cref="RefusalFor"/> also applies the mark.</summary>
-        public bool Contains(byte[] ksn) { return _seen.ContainsKey(Hex.Encode(ksn)); }
+        public bool Contains(byte[] ksn) { RequireKsn(ksn); return _seen.ContainsKey(Hex.Encode(ksn)); }
 
         /// <summary>Null when the bank may accept this KSN. DUKPT_KSN_REPLAY for an exact repeat. DUKPT_KSN_STALE for a counter at or below the device's mark.</summary>
         public string RefusalFor(byte[] ksn)
@@ -118,8 +118,16 @@ namespace NetSec.Dukpt
             return _highest.TryGetValue(KeyIdHex(initialKeyId), out top) ? top : 0;
         }
 
+        /// <summary>A KSN of the wrong size fails here with the same exception CounterOf gives, before any byte is read.</summary>
+        static void RequireKsn(byte[] ksn)
+        {
+            if (ksn == null) throw new ArgumentNullException("ksn");
+            if (ksn.Length != DukptDerivation.KsnSize) throw new ArgumentException("A KSN holds 12 bytes.", "ksn");
+        }
+
         static string DeviceOf(byte[] ksn)
         {
+            RequireKsn(ksn);
             byte[] id = new byte[InitialKeyIdSize];
             Buffer.BlockCopy(ksn, 0, id, 0, InitialKeyIdSize);
             return Hex.Encode(id);
