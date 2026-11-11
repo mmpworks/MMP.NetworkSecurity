@@ -32,6 +32,7 @@ static class Program
 
         a.TryGetValue("mode", out string mode);
         if (mode == "ao-merge") return AoParts.Merge(a);
+        if (mode == "settle") return SettleCheck(a);
         Run run = new Run { Build = BuildName(), Head = a["head"], Priority = Measure.RaisePriority(a.TryGetValue("core", out string core) ? int.Parse(core) : (int?)null), CfLine = CfLine };
         bool sameCode = a.TryGetValue("same-code", out string sc) && sc == "true";
         if (mode == "files") return Files.FilesMode.Run(a, run, sameCode);
@@ -43,6 +44,7 @@ static class Program
         List<BenchCase> original = Cases.All(new Files.FrozenCode()), current = Cases.All(new Files.ProductCode());
         List<int> picked = Enumerable.Range(0, current.Count).Where(i => current[i].Id.Contains(filter)).ToList();
         Measure.PreWarm(picked.Select(i => new[] { original[i].Op, current[i].Op }), PreWarmEach);
+        if (!MachineLoad.Settle()) return MachineLoad.BusyExit;
         List<CaseResult> results = new List<CaseResult>();
         for (int i = 0; i < current.Count; i++)
         {
@@ -63,7 +65,9 @@ static class Program
         Console.WriteLine("BENCH_NOISE " + NoiseBand.Describe(ratios));
         Console.WriteLine(CfLine);
         Console.WriteLine("BENCH_DONE " + run.Build + " " + results.Count + " cases");
-        return SameCodeExit(sameCode, ratios);
+        int busy = MachineLoad.Exit(results.Select(r => r.Pair.OtherBusy).ToArray());
+        int band = SameCodeExit(sameCode, ratios);
+        return busy != 0 ? busy : band;
     }
 
     /// <summary>With --same-code true (an S0 run, where both copies are the 5c5d4a4 code), a ratio outside the target band fails the run.</summary>
@@ -104,8 +108,16 @@ static class Program
     }
 
     static string Row(CaseResult r) => string.Format(CultureInfo.InvariantCulture,
-        "{0,-34} original {1,10:F1} new {2,10:F1} ns/{3,-10} ratio {4,6:F3} ({5:F3} to {6:F3})  new {7,9:F1} B/{3}",
-        r.Case.Id, r.OriginalNsPerUnit, r.NewNsPerUnit, r.Case.Unit, r.Pair.MedianRatio, r.Pair.Ratios.Min(), r.Pair.Ratios.Max(), r.NewBytesPerUnit);
+        "{0,-34} original {1,10:F1} new {2,10:F1} ns/{3,-10} ratio {4,6:F3} ({5:F3} to {6:F3})  new {7,9:F1} B/{3}  load {8:P1}",
+        r.Case.Id, r.OriginalNsPerUnit, r.NewNsPerUnit, r.Case.Unit, r.Pair.MedianRatio, r.Pair.Ratios.Min(), r.Pair.Ratios.Max(), r.NewBytesPerUnit, r.Pair.OtherBusy);
+
+    /// <summary>The load check alone, for a run script and its self-check: settle, then with --hold N read N seconds and apply the pair rule.</summary>
+    static int SettleCheck(Dictionary<string, string> a)
+    {
+        if (!MachineLoad.Settle()) return MachineLoad.BusyExit;
+        int hold = a.TryGetValue("hold", out string h) ? int.Parse(h, CultureInfo.InvariantCulture) : 0;
+        return hold == 0 ? 0 : MachineLoad.Exit(new[] { MachineLoad.Read(TimeSpan.FromSeconds(hold)) });
+    }
 
     static Dictionary<string, string> ParseArgs(string[] args)
     {
