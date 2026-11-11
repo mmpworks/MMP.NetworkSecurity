@@ -29,8 +29,9 @@ static class FilesMode
         Action<FileRow> print = r => Console.WriteLine(string.Format(CultureInfo.InvariantCulture,
             "{0,-16} {1,-20} original {2,8:F1} new {3,8:F1} MB/s ratio {4,6:F3} ({5:F3} to {6:F3}) new {7,12:F0} B/call",
             r.File, r.Operation, r.MegabytesPerSecond(r.Pair.Original), r.MegabytesPerSecond(r.Pair.New), r.Pair.MedianRatio,
-            r.Pair.Ratios.Min(), r.Pair.Ratios.Max(), r.Pair.New.BytesPerCall));
+            r.Pair.Ratios.Min(), r.Pair.Ratios.Max(), r.Pair.New.BytesPerCall) + string.Format(CultureInfo.InvariantCulture, " load {0:P1}", r.Pair.OtherBusy));
 
+        if (!MachineLoad.Settle()) return MachineLoad.BusyExit;
         List<FileRow> fileRows = FileBench.Run(files, original, current, print);
         FileRow small = FileBench.SmallMessage(original, current, print);
         List<FileRow> rows = fileRows.Concat(new[] { small }).ToList();
@@ -46,6 +47,8 @@ static class FilesMode
         Console.WriteLine(run.CfLine);
         int bad = threads.Sum(t => t.Mismatches);
         Console.WriteLine("BENCH_FILES_DONE " + run.Build + " " + rows.Count + " rows, thread mismatches " + bad);
-        return bad != 0 ? 4 : Program.SameCodeExit(sameCode, ratios);
+        int busy = MachineLoad.Exit(rows.Select(r => r.Pair.OtherBusy).ToArray());
+        int band = Program.SameCodeExit(sameCode, ratios);
+        return bad != 0 ? 4 : busy != 0 ? busy : band;
     }
 }

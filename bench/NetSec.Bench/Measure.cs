@@ -25,6 +25,7 @@ sealed class Pair
     public double[] Ratios;
     public long CallsPerRound;
     public long PeakWorkingSet;
+    public double OtherBusy;   // CPU share outside this process over the timed rounds (MachineLoad)
 
     public double MedianRatio => Measure.Median(Ratios);
 }
@@ -47,6 +48,7 @@ static class Measure
     {
         long calls = Math.Max(CallsFor(original, roundTarget), CallsFor(current, roundTarget));
         Side o = NewSide(rounds), n = NewSide(rounds);
+        MachineLoad.Sample loadFrom = MachineLoad.Now();
         for (int r = 0; r < rounds; r++)
         {
             bool originalFirst = r % 2 == 0;
@@ -57,7 +59,7 @@ static class Measure
         n.BytesPerCall /= calls * rounds;
         return new Pair
         {
-            Original = o, New = n, CallsPerRound = calls, PeakWorkingSet = PeakWorkingSet(),
+            Original = o, New = n, CallsPerRound = calls, PeakWorkingSet = PeakWorkingSet(), OtherBusy = MachineLoad.OtherBusy(loadFrom, MachineLoad.Now()),
             Ratios = Enumerable.Range(0, rounds).Select(r => o.NsPerCall[r] / n.NsPerCall[r]).ToArray(),
         };
     }

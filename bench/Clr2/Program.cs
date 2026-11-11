@@ -17,7 +17,7 @@ static class Cases
 /// Timing is the main bench's engine (<see cref="Measure"/>, linked): the fastest core pinned, a pre-warm of every case, alternating
 /// round pairs with a full GC before each round, the median of the pair ratios, and the same-code band. CLR 2.0 has no allocation
 /// counter, so bytes per call come from a separate pass (<see cref="BytesPerCall"/>).
-/// Usage: NetSec.Bench.Clr2.exe [--same-code true]. A same-code ratio outside the band exits 6.
+/// Usage: NetSec.Bench.Clr2.exe [--same-code true]. A same-code ratio outside the band exits 6; outside load over the MachineLoad ceiling exits 8.
 /// </summary>
 static class Program
 {
@@ -50,14 +50,16 @@ static class Program
 
         List<Case> cases = All(new FrozenCode(), new ProductCode());
         Measure.PreWarm(cases.Select(c => new[] { c.Original, c.New }), PreWarmEach);
-        List<double> ratios = new List<double>();
+        if (!MachineLoad.Settle()) return MachineLoad.BusyExit;
+        List<double> ratios = new List<double>(), busy = new List<double>();
         foreach (Case c in cases)
         {
             Pair p = Measure.Run(c.Original, c.New, Round);
             ratios.Add(p.MedianRatio);
-            Console.WriteLine(string.Format(Inv, "{0,-22} original {1,10:F1} new {2,10:F1} ns per unit  ratio {3:F3} ({4:F3} to {5:F3})  original {6,8:F1} new {7,8:F1} B per unit",
+            busy.Add(p.OtherBusy);
+            Console.WriteLine(string.Format(Inv, "{0,-22} original {1,10:F1} new {2,10:F1} ns per unit  ratio {3:F3} ({4:F3} to {5:F3})  original {6,8:F1} new {7,8:F1} B per unit  load {8:P1}",
                 c.Id, p.Original.MedianNs / c.Units, p.New.MedianNs / c.Units, p.MedianRatio, p.Ratios.Min(), p.Ratios.Max(),
-                BytesPerCall(c.Original) / c.Units, BytesPerCall(c.New) / c.Units));
+                BytesPerCall(c.Original) / c.Units, BytesPerCall(c.New) / c.Units, p.OtherBusy));
             if (c.Payload > 0)
             {
                 // Steve's measure: garbage collections per megabyte processed, over the timed rounds of each copy.
@@ -68,6 +70,8 @@ static class Program
         }
         Console.WriteLine("BENCH_NOISE " + NoiseBand.Describe(ratios.ToArray()));
         Console.WriteLine("CF ARM speed: UNMEASURED");
+        int load = MachineLoad.Exit(busy.ToArray());
+        if (load != 0) return load;
         if (!sameCode || NoiseBand.Inside(ratios.ToArray())) return 0;
         Console.WriteLine("BENCH_NOISE_OUTSIDE_BAND: the two copies are the same code, so a ratio outside the target band is harness or machine noise");
         return 6;
