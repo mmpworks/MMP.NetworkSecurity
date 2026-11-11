@@ -33,6 +33,8 @@ GROUPS = {
     "a17":        {"kind": "csharp", "project": "groups/a17/a17.csproj", "assembly": "Acceptance.A17", "builds": ["net10"], "needsCore": False},
     "keys":       {"kind": "csharp", "project": "groups/keys/keys.csproj", "assembly": "Acceptance.Keys", "builds": ["net10"], "needsCore": False},
     "binproof":   {"kind": "csharp", "project": "groups/binproof/binproof.csproj", "assembly": "Acceptance.BinProof", "builds": ["net10"], "needsCore": False},
+    "algo":       {"kind": "csharp", "project": "groups/algo/algo.csproj", "assembly": "Acceptance.Algo", "builds": ["net10", "cf"], "needsCore": True},
+    "algothreads": {"kind": "csharp", "project": "groups/algothreads/algothreads.csproj", "assembly": "Acceptance.AlgoThreads", "builds": ["net10", "cf"], "needsCore": True},
     "docs":       {"kind": "python", "script": "checks/docs_checks.py"},
     "e2e":        {"kind": "e2e", "folder": "e2e"},
     "driver":     {"kind": "pwsh"},
@@ -62,12 +64,24 @@ ASSERTIONS = {
     "A19": "The AES walk shows every state of one block, encrypt and decrypt, from the real engine: states, key rows and tables equal FIPS 197, a live run equals an independent AES and the BCL, Show keys OFF closes the states, and the app holds no table",
     "A18": "Each lesson says on screen what its engine leaves out, by the gaps of docs/conformance-matrix.md; a real peer shows each named refusal beside a control that connects",
     "SELF": "Harness self-check: the suite bites",
+    # docs/algorithm-optimization-prd.md section 3. AO-5 (allocation) and AO-6 (speed) belong to the S0 benchmark project, not to this suite.
+    "AO-0": "Every AO row of the run shows the state acceptance/ao-rows.tsv lists for the slice given with -AoSlice (PRD section 4)",
+    "AO-1": "Known-answer vectors pass for each algorithm on the net10 build and the CF build (the A1, A3.vec and A3.pinblock rows of the same run)",
+    "AO-5": "Bytes allocated for each block or message after warm-up, net10, measured by the suite; the bench report is a second record",
+    "AO-9": "Each file of acceptance/ao9-files.tsv gives byte-equal output on the frozen 5c5d4a4 code and the product (gcm, cbc, ctr, sha256, hmac, small-message, pool-25)",
+    "AO-6": "Speed against the 5c5d4a4 baseline, same run, from the S0 benchmark report; record-only at S0, AES block 5 x from S1",
+    "AO-2": "1,000,000 drawn cases per algorithm give the same outcome, output, inputs afterwards and canary bytes on the product and on the frozen 5c5d4a4 reference",
+    "AO-3": "Every AES and GHASH table in the product equals a table built from the math, and no type initializer computes a table",
+    "AO-4": "100,000 payloads on shared fresh key objects, ThreadPool capped at 25, equal the single-thread run in each of 10 runs",
+    "AO-7": "The AES lesson walk equals the frozen walk step for step, and the golden traces and lesson tours are unchanged since 5c5d4a4",
+    "AO-8": "The CF build compiles and binds to the CF references (A9 rows), and the CF golden trace clause passes",
 }
 
 # Owning slice per prd.md "Acceptance assertions" and the S-table of program-design.md section 8. A1 splits by primitive.
 S4_PRIMITIVES = ("A1.md5", "A1.sha1", "A1.hmac-md5", "A1.hmac-sha1", "A1.hkdf-sha1", "A1.rsa", "A1.tdes", "A1.dh-group14")
 SLICE = {"A2": "S1", "A3": "S2", "A4": "S3", "A5": "S3", "A6": "S3", "A7": "S4", "A8": "S4", "A9": "All", "A10": "S5", "A10a": "S5",
-         "A11": "S6", "A12": "S7", "A13": "Each", "A14": "Each", "A15": "Each", "A15a": "Each", "A16": "S8", "A17": "V0", "A18": "Each", "A19": "W1", "SELF": "S0"}
+         "A11": "S6", "A12": "S7", "A13": "Each", "A14": "Each", "A15": "Each", "A15a": "Each", "A16": "S8", "A17": "V0", "A18": "Each", "A19": "W1", "SELF": "S0",
+         "AO-0": "AO", "AO-1": "AO", "AO-2": "AO", "AO-5": "AO", "AO-9": "AO", "AO-3": "AO", "AO-4": "AO", "AO-7": "AO", "AO-8": "AO"}
 
 # Clauses whose slice differs from their assertion's default. The A17 certificate clauses test V4, certificate import (docs/modes-design.md, the
 # V4 row of the clause table), not V0 (#333).
@@ -77,7 +91,14 @@ SLICE_BY_ID = {cid: "V4" for cid in ("A17.attacks.hit-named-field", "A17.attacks
 REFEREE = {"A1": "published vectors", "A2": ".NET 10 BCL oracle", "A3": "x9.org vectors", "A4": "RFC 8448", "A5": "OpenSSL 3.5.7 and Go crypto/tls", "A6": "OpenSSL 3.5.7",
            "A7": "OpenSSL 3.5.7", "A8": "Go x/crypto/ssh and ssh.exe", "A9": "CF references and System.Reflection.Metadata", "A10": "live run, Go referees and taps",
            "A10a": "Go tap", "A11": "Go tokenverify", "A12": "cl.exe and a live run", "A13": "Playwright", "A14": "test over the tour files and a live Host",
-           "A18": "script over the tour files; OpenSSL 3.5.7 and Go referees for refusals", "A19": "FIPS 197 (2001) data, the suite's RefAes, and the .NET library", "A15": "script", "A15a": "accuracy reader", "A16": "test, Playwright, OpenSSL key log", "A17": "test over HTTP and WebSocket, OpenSSL, ssh.exe, Go referees; known-answer where no outside referee exists", "SELF": "stand-ins built on the BCL, python cryptography and real OpenSSL runs"}
+           "A18": "script over the tour files; OpenSSL 3.5.7 and Go referees for refusals", "A19": "FIPS 197 (2001) data, the suite's RefAes, and the .NET library", "A15": "script", "A15a": "accuracy reader", "A16": "test, Playwright, OpenSSL key log", "A17": "test over HTTP and WebSocket, OpenSSL, ssh.exe, Go referees; known-answer where no outside referee exists", "SELF": "stand-ins built on the BCL, python cryptography and real OpenSSL runs",
+           "AO-0": "acceptance/ao-rows.tsv, and the bench report judged from its numbers",
+           "AO-5": "GC.GetAllocatedBytesForCurrentThread in the suite, against new byte[len] of the returned length",
+           "AO-9": "the frozen 5c5d4a4 copy on the file set of acceptance/ao9-files.tsv (SHA-256 checked)",
+           "AO-1": "published vectors (A1) and x9.org vectors (A3)", "AO-2": "the frozen 5c5d4a4 source (tools/freeze_ref.py)",
+           "AO-3": "tables built from the math in the suite (GF(2^8), SP 800-38D), and the IL of each type initializer",
+           "AO-4": "the product's own single-thread run, on other fresh key objects", "AO-7": "the frozen 5c5d4a4 walk, and git at 5c5d4a4",
+           "AO-8": "CF references and System.Reflection.Metadata (A9), and the CF golden traces"}
 
 # A19 started as the AES walk, so its default referee names FIPS 197. The later walks have referees of their own; the first prefix that
 # matches a clause id wins over the assertion's default (Jared, #281: the report's Referee column was wrong for these).
@@ -205,7 +226,11 @@ def scan_e2e():
 DRIVER = [("driver", "A13.fresh-clone.acceptance-unchanged", False), ("driver", "A13.fresh-clone.sibling-layout", False),
           ("driver", "SELF.clauses-json-matches-code", False), ("driver", "SELF.vectors-python", False),
           ("driver", "SELF.tool-cannot-start-still-reports", False),
-          ("driver", "SELF.summary-m-stays-a-count", False)]
+          ("driver", "SELF.summary-m-stays-a-count", False),
+          ("driver", "AO-1.vectors-pass.net10", False), ("driver", "AO-1.vectors-pass.cf", False),
+          ("driver", "AO-2.reference-frozen-from-git", False), ("driver", "AO-8.cf-compiles-and-golden-pass", False),
+          ("driver", "SELF.ao-row-verdicts-bite", False), ("driver", "SELF.ao-row-list-bites", False),
+          ("driver", "AO-0.row-list-matches", False)]
 
 
 def build():
