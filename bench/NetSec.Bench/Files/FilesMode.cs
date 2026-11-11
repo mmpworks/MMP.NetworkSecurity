@@ -47,7 +47,7 @@ static class FilesMode
         Console.WriteLine(run.CfLine);
         int bad = threads.Sum(t => t.Mismatches);
         Console.WriteLine("BENCH_FILES_DONE " + run.Build + " " + rows.Count + " rows, thread mismatches " + bad);
-        int busy = MachineLoad.Exit(rows.Select(r => r.Pair.OtherBusy).ToArray());
+        int busy = MachineLoad.Exit(rows.Select(r => r.Pair.OtherBusy).ToArray(), rows.Select(r => r.File + " " + r.Operation + ": " + r.Pair.TopOutside).ToArray());
         int band = Program.SameCodeExit(sameCode, ratios);
         return bad != 0 ? 4 : busy != 0 ? busy : band;
     }

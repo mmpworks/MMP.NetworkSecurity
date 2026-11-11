@@ -28,6 +28,7 @@ sealed class Pair
     public double OtherBusy;   // CPU share outside this process over the timed rounds, whole machine (MachineLoad)
     public double CoreBusy;    // the same, on the pinned core pair only; NaN when not pinned
     public int CpuStart, CpuEnd;   // the processor the timing thread ran on before the first round and after the last (shows the pin held)
+    public string TopOutside;      // the top 5 outside processes by CPU over the pair (MachineLoad.Top), for a BENCH_MACHINE_BUSY line
 
     public double MedianRatio => Measure.Median(Ratios);
 }
@@ -50,6 +51,7 @@ static class Measure
     {
         long calls = Math.Max(CallsFor(original, roundTarget), CallsFor(current, roundTarget));
         Side o = NewSide(rounds), n = NewSide(rounds);
+        MachineLoad.ProcessTimes processesFrom = MachineLoad.Snapshot();
         int cpuStart = CurrentProcessor();
         MachineLoad.Sample loadFrom = MachineLoad.Now();
         for (int r = 0; r < rounds; r++)
@@ -64,7 +66,7 @@ static class Measure
         return new Pair
         {
             Original = o, New = n, CallsPerRound = calls, PeakWorkingSet = PeakWorkingSet(),
-            CpuStart = cpuStart, CpuEnd = CurrentProcessor(),
+            CpuStart = cpuStart, CpuEnd = CurrentProcessor(), TopOutside = MachineLoad.Top(processesFrom, MachineLoad.Snapshot(), 5),
             OtherBusy = MachineLoad.OtherBusy(loadFrom, loadTo), CoreBusy = MachineLoad.CoreBusy(loadFrom, loadTo),
             Ratios = Enumerable.Range(0, rounds).Select(r => o.NsPerCall[r] / n.NsPerCall[r]).ToArray(),
         };
