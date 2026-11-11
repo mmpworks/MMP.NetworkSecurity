@@ -570,6 +570,31 @@ namespace NetSec.Tests
             Assert.Equal("read deadline", run.Result.FailedCheck);
         }
 
+        /// <summary>
+        /// A gate that holds no event, yet lets each one pass late, as a step does when its continuation runs late on a busy thread pool (issue #394).
+        /// IsHolding stays false, so only the pumps' own state can say the session is not quiet.
+        /// </summary>
+        sealed class LateGate : IStepGate, IGateState
+        {
+            readonly int _lateMs;
+            public LateGate(int lateMs) { _lateMs = lateMs; }
+            public IFuture Pass(TraceEvent e) { return Futures.Delay(_lateMs); }
+            public bool IsHolding { get { return false; } }
+        }
+
+        /// <summary>
+        /// Issue #394. With a flipped record length the client holds part of a record, so the stuck run must end on the client's read deadline. While
+        /// the client is still passing its events through a slow gate, the server waits on its idle limit. Neither side is quiet then, so neither
+        /// clock may count. In two gate runs the server's idle limit (3 x 600 ms) ran out first and named LINK_IDLE.
+        /// </summary>
+        [Fact]
+        public async System.Threading.Tasks.Task A_peer_still_passing_events_keeps_the_other_side_from_counting_idle()
+        {
+            LabResult result = await Run(5, Context(7, Attack("L5-flip-record-length"), new LateGate(250), 600));
+            Assert.Equal(ErrorCodes.LinkDeadline, result.FailedCode);
+            Assert.Equal("read deadline", result.FailedCheck);
+        }
+
         [Fact]
         public void In_step_mode_the_control_finishes_with_no_deadline_error()
         {
