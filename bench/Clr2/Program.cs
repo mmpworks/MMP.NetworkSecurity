@@ -57,9 +57,9 @@ static class Program
             Pair p = Measure.Run(c.Original, c.New, Round);
             ratios.Add(p.MedianRatio);
             busy.Add(p.OtherBusy);
-            Console.WriteLine(string.Format(Inv, "{0,-22} original {1,10:F1} new {2,10:F1} ns per unit  ratio {3:F3} ({4:F3} to {5:F3})  original {6,8:F1} new {7,8:F1} B per unit  load {8:P1} core {9:P1}",
+            Console.WriteLine(string.Format(Inv, "{0,-22} original {1,10:F1} new {2,10:F1} ns per unit  ratio {3:F3} ({4:F3} to {5:F3})  original {6,8:F1} new {7,8:F1} B per unit  load {8:P1} core {9:P1} cpu {10}>{11}",
                 c.Id, p.Original.MedianNs / c.Units, p.New.MedianNs / c.Units, p.MedianRatio, p.Ratios.Min(), p.Ratios.Max(),
-                BytesPerCall(c.Original) / c.Units, BytesPerCall(c.New) / c.Units, p.OtherBusy, p.CoreBusy));
+                BytesPerCall(c.Original) / c.Units, BytesPerCall(c.New) / c.Units, p.OtherBusy, p.CoreBusy, p.CpuStart, p.CpuEnd));
             if (c.Payload > 0)
             {
                 // Steve's measure: garbage collections per megabyte processed, over the timed rounds of each copy.

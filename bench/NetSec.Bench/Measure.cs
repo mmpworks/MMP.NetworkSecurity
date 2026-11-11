@@ -27,6 +27,7 @@ sealed class Pair
     public long PeakWorkingSet;
     public double OtherBusy;   // CPU share outside this process over the timed rounds, whole machine (MachineLoad)
     public double CoreBusy;    // the same, on the pinned core pair only; NaN when not pinned
+    public int CpuStart, CpuEnd;   // the processor the timing thread ran on before the first round and after the last (shows the pin held)
 
     public double MedianRatio => Measure.Median(Ratios);
 }
@@ -49,6 +50,7 @@ static class Measure
     {
         long calls = Math.Max(CallsFor(original, roundTarget), CallsFor(current, roundTarget));
         Side o = NewSide(rounds), n = NewSide(rounds);
+        int cpuStart = CurrentProcessor();
         MachineLoad.Sample loadFrom = MachineLoad.Now();
         for (int r = 0; r < rounds; r++)
         {
@@ -62,6 +64,7 @@ static class Measure
         return new Pair
         {
             Original = o, New = n, CallsPerRound = calls, PeakWorkingSet = PeakWorkingSet(),
+            CpuStart = cpuStart, CpuEnd = CurrentProcessor(),
             OtherBusy = MachineLoad.OtherBusy(loadFrom, loadTo), CoreBusy = MachineLoad.CoreBusy(loadFrom, loadTo),
             Ratios = Enumerable.Range(0, rounds).Select(r => o.NsPerCall[r] / n.NsPerCall[r]).ToArray(),
         };
@@ -165,6 +168,12 @@ static class Measure
 
     [System.Runtime.InteropServices.DllImport("kernel32.dll")]
     static extern IntPtr GetCurrentThread();
+
+    [System.Runtime.InteropServices.DllImport("kernel32.dll")]
+    static extern uint GetCurrentProcessorNumber();
+
+    /// <summary>The logical processor the calling thread runs on now (Windows; the bench runs on Windows).</summary>
+    public static int CurrentProcessor() => (int)GetCurrentProcessorNumber();
 
     [System.Runtime.InteropServices.DllImport("kernel32.dll", SetLastError = true)]
     static extern UIntPtr SetThreadAffinityMask(IntPtr thread, UIntPtr mask);
