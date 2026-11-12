@@ -125,7 +125,7 @@ namespace NetSec.Crypto
             WalkAddRoundKey(steps, state, 0);
             for (int round = 1; round <= _rounds; round++)
             {
-                Sub(state, Sbox);
+                Sub(state, AesTables.Sbox);
                 steps.Add(new AesStep(AesStepKind.SubBytes, round, state, null, null));
                 Move(state, ShiftRowsMap);
                 steps.Add(new AesStep(AesStepKind.ShiftRows, round, state, null, null));
@@ -149,7 +149,7 @@ namespace NetSec.Crypto
             {
                 Move(state, InverseShiftRowsMap);
                 steps.Add(new AesStep(AesStepKind.InvShiftRows, round, state, null, null));
-                Sub(state, InverseSbox);
+                Sub(state, AesTables.InverseSbox);
                 steps.Add(new AesStep(AesStepKind.InvSubBytes, round, state, null, null));
                 WalkAddRoundKey(steps, state, round);
                 if (round > 0) WalkMix(steps, state, round, true);
@@ -216,15 +216,24 @@ namespace NetSec.Crypto
             return made;
         }
 
+        /// <summary>Word number word of the expanded key, as its 4 bytes (FIPS 197 word order). The walk may allocate (PRD 7.4).</summary>
         byte[] ExpandedWord(int word)
         {
             byte[] w = new byte[4];
-            Buffer.BlockCopy(_roundKeys, word * 4, w, 0, 4);
+            Endian.StoreBe32(_ek[word], w, 0);
             return w;
         }
 
-        public static byte[] SubstitutionTable() { return (byte[])Sbox.Clone(); }
-        public static byte[] InverseSubstitutionTable() { return (byte[])InverseSbox.Clone(); }
+        /// <summary>The 16 bytes of round key number round, in state order.</summary>
+        byte[] RoundKeyBytes(int round)
+        {
+            byte[] key = new byte[BlockSize];
+            for (int j = 0; j < 4; j++) Endian.StoreBe32(_ek[4 * round + j], key, 4 * j);
+            return key;
+        }
+
+        public static byte[] SubstitutionTable() { return (byte[])AesTables.Sbox.Clone(); }
+        public static byte[] InverseSubstitutionTable() { return (byte[])AesTables.InverseSbox.Clone(); }
         public static int[] ShiftMap(bool inverse) { return (int[])(inverse ? InverseShiftRowsMap : ShiftRowsMap).Clone(); }
 
         /// <summary>Each value is the one before it, doubled in the field.</summary>
@@ -298,11 +307,57 @@ namespace NetSec.Crypto
 
         void WalkAddRoundKey(List<AesStep> steps, byte[] state, int round)
         {
-            AddRoundKey(state, round);
-            byte[] key = new byte[BlockSize];
-            Buffer.BlockCopy(_roundKeys, round * BlockSize, key, 0, BlockSize);
+            byte[] key = RoundKeyBytes(round);
+            AddRoundKey(state, key);
             steps.Add(new AesStep(AesStepKind.AddRoundKey, round, state, key, null));
         }
+
+        // ---- the byte-level helpers of the walk, on the FIPS 197 byte state (moved here from AesKey.cs; the block path works on words) ----
+
+        static void AddRoundKey(byte[] state, byte[] key)
+        {
+            for (int i = 0; i < BlockSize; i++) state[i] ^= key[i];
+        }
+
+        static void MixColumns(byte[] s)
+        {
+            byte[] t2 = AesTables.Times2, t3 = AesTables.Times3;
+            for (int c = 0; c < BlockSize; c += 4)
+            {
+                byte a = s[c], b = s[c + 1], d = s[c + 2], e = s[c + 3];
+                s[c] = (byte)(t2[a] ^ t3[b] ^ d ^ e);
+                s[c + 1] = (byte)(a ^ t2[b] ^ t3[d] ^ e);
+                s[c + 2] = (byte)(a ^ b ^ t2[d] ^ t3[e]);
+                s[c + 3] = (byte)(t3[a] ^ b ^ d ^ t2[e]);
+            }
+        }
+
+        static void InverseMixColumns(byte[] s)
+        {
+            byte[] t9 = AesTables.Times9, t11 = AesTables.Times11, t13 = AesTables.Times13, t14 = AesTables.Times14;
+            for (int c = 0; c < BlockSize; c += 4)
+            {
+                byte a = s[c], b = s[c + 1], d = s[c + 2], e = s[c + 3];
+                s[c] = (byte)(t14[a] ^ t11[b] ^ t13[d] ^ t9[e]);
+                s[c + 1] = (byte)(t9[a] ^ t14[b] ^ t11[d] ^ t13[e]);
+                s[c + 2] = (byte)(t13[a] ^ t9[b] ^ t14[d] ^ t11[e]);
+                s[c + 3] = (byte)(t11[a] ^ t13[b] ^ t9[d] ^ t14[e]);
+            }
+        }
+
+        static void RotWord(byte[] t)
+        {
+            byte first = t[0];
+            t[0] = t[1]; t[1] = t[2]; t[2] = t[3]; t[3] = first;
+        }
+
+        static void SubWord(byte[] t)
+        {
+            for (int i = 0; i < 4; i++) t[i] = AesTables.Sbox[t[i]];
+        }
+
+        /// <summary>Multiply by 2 in GF(2^8), modulo x^8 + x^4 + x^3 + x + 1.</summary>
+        static byte Xtime(byte a) { return (byte)((a << 1) ^ ((a & 0x80) != 0 ? 0x1b : 0)); }
 
         /// <summary>The real mix makes the state. The terms explain it, and each must give the same byte.</summary>
         static void WalkMix(List<AesStep> steps, byte[] state, int round, bool inverse)
