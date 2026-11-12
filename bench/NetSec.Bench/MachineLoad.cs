@@ -18,10 +18,10 @@ namespace NetSec.Bench;
 static class MachineLoad
 {
     // 10 points of 24 logical processors is about 2.4 busy cores: a browser drifts less, a dotnet build or test adds more.
-    // shortcut: Rise and CoreCeiling are tuned to this desktop (lead decision, 2026-11-11 Job T data): desktop-only rows reached 38.3%
-    // machine load with 11.9% on the timing core and a normal ratio; rows behind an outside rustc build read 41 to 57% machine and 19.8
-    // to 30.3% core. A pair fails above max(baseline, Floor) + Rise, or above CoreCeiling on the pinned core pair. Upgrade with Floor.
-    public const double Rise = 0.15, Steady = 0.05, CoreCeiling = 0.15;
+    // shortcut: Rise and CoreCeiling are tuned to this desktop (lead decisions, 2026-11-11 Job T data): desktop-only rows reached 45.9%
+    // machine load and 20.6% on the timing core pair; rows behind an outside rustc build read 41 to 75% machine and 30.3 to 43.4% core.
+    // A pair fails above max(baseline, Floor) + Rise, or above CoreCeiling on the pinned core pair. Upgrade with Floor.
+    public const double Rise = 0.15, Steady = 0.05, CoreCeiling = 0.25;
 
     // shortcut: a fixed floor under the baseline, from this desktop's measured normal (2026-11-11 Job T: clean rows 12 to 32%,
     // a Chrome-only row 30.3%, rustc rows 41 to 57%), so a quiet dip at settle cannot set a limit that ordinary desktop use breaks.
