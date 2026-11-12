@@ -29,8 +29,20 @@ static class Crossover
         + "Code ratio = sqrt(N / S) (above 1: the product is faster); position bias = sqrt(N x S). Pair bias k = sqrt(Nk x Sk); "
         + "drift = pair bias 1 / pair bias 2, and a drift outside the same-code band fails the run.";
 
+    // REPORT-ONLY RULE for S0 and S1 (lead decision, 2026-11-11). On the non-tiering hosts the SHA-256 family swings between fresh
+    // processes (CLR 2.0 x86 sha256.update 0.729 in one process, 1.357 in another, same arrangement), so no four-part crossover cancels it.
+    // These rows are printed with every part's ratio and process id and stay outside the band and drift checks. S0 and S1 claim no
+    // SHA-256 result on these hosts. Remove this one entry when S3's many-process measurement (12 fresh processes, median) is built.
+    static readonly Dictionary<string, string[]> ReportOnly = new[] { "cf-binaries-on-net48", "cf-binaries-on-net48-files", "cf-binaries-on-net35-clr2-x86", "cf-binaries-on-net35-clr2-x64" }
+        .ToDictionary(host => host, host => new[] { "sha256.update", "sha256.message", "hmac-sha256", "sha256" });
+
+    /// <summary>True when the row is report-only on this build: a block id in the list, or a file row ("file|op") whose op is in it.</summary>
+    static bool IsReportOnly(string build, string id) =>
+        ReportOnly.TryGetValue(build, out string[] ops) && ops.Any(op => id == op || id.EndsWith("|" + op, StringComparison.Ordinal));
+
     sealed class Combined
     {
+        public bool Gated = true;
         public string Id, Unit;
         public int UnitsPerOp, BytesPerOp;
         public double N1, S1, N2, S2, Code, Bias, Pair1, Pair2, Drift, FrozenNs, ProductNs, FrozenBytes, ProductBytes, MaxLoad, MaxCore;
@@ -68,14 +80,20 @@ static class Crossover
         for (int i = 0; i < parts[0].Rows.Count; i++)
         {
             Combined c = Combine(parts.Select(p => p.Rows[i]).ToArray());
+            c.Gated = !IsReportOnly(build, c.Id);
             rows.Add(c);
             Console.WriteLine(c.Line());
+            if (!c.Gated)
+                Console.WriteLine("  REPORT_ONLY on " + build + " until S3 (outside the band and drift checks): " + string.Join("; ",
+                    parts.Select(p => string.Format(Inv, "{0} pid {1} ratio {2:F3}", p.Tag, p.Header.TryGetValue("pid", out string pid) ? pid : "?", p.Rows[i].Ratio)).ToArray()));
         }
-        double[] codes = rows.Select(r => r.Code).ToArray();
-        List<string> drifted = rows.Where(r => !(r.Drift >= NoiseBand.Low && r.Drift <= NoiseBand.High)).Select(r => r.Id).ToList();
-        Console.WriteLine("BENCH_NOISE crossover code ratio " + NoiseBand.Describe(codes));
+        List<Combined> gated = rows.Where(r => r.Gated).ToList();
+        double[] codes = gated.Select(r => r.Code).ToArray();
+        List<string> drifted = gated.Where(r => !(r.Drift >= NoiseBand.Low && r.Drift <= NoiseBand.High)).Select(r => r.Id).ToList();
+        Console.WriteLine("BENCH_NOISE crossover code ratio " + (codes.Length == 0 ? "no gated rows" : NoiseBand.Describe(codes)) + "; report-only rows: " + (rows.Count - gated.Count));
+        if (gated.Count == 0) gated = rows;   // a check on report-only rows alone: print their bias and drift, judge nothing
         Console.WriteLine(string.Format(Inv, "BENCH_BIAS position bias {0:F3} to {1:F3}; pair-bias drift {2:F3} to {3:F3}; drift target {4:F2} to {5:F2}; rows drifting: {6}",
-            rows.Min(r => r.Bias), rows.Max(r => r.Bias), rows.Min(r => r.Drift), rows.Max(r => r.Drift), NoiseBand.Low, NoiseBand.High, drifted.Count));
+            gated.Min(r => r.Bias), gated.Max(r => r.Bias), gated.Min(r => r.Drift), gated.Max(r => r.Drift), NoiseBand.Low, NoiseBand.High, drifted.Count));
         File.WriteAllText(Path.Combine(folder, "bench-" + build + ".json"), Json(parts[0], rows));
         File.WriteAllText(Path.Combine(folder, "bench-" + build + ".md"), Markdown(parts[0], rows, codes));
 
@@ -199,7 +217,9 @@ static class Crossover
         foreach (string k in new[] { "build", "head", "machine", "priority", "allocation", "timing", "cf" }) Field(k, first.Header.TryGetValue(k, out string v) ? v : "");
         Field("utc", DateTime.UtcNow.ToString("yyyy-MM-ddTHH:mm:ssZ", Inv));
         Field("crossover", "4 processes: " + string.Join(", ", CrossoverPart.Tags) + ". " + Formula);
-        Field("noiseBand", NoiseBand.Describe(rows.Select(r => r.Code).ToArray()));
+        double[] gatedCodes = rows.Where(r => r.Gated).Select(r => r.Code).ToArray();
+        Field("noiseBand", gatedCodes.Length == 0 ? "no gated rows" : NoiseBand.Describe(gatedCodes));
+        Field("reportOnly", string.Join(", ", rows.Where(r => !r.Gated).Select(r => r.Id).ToArray()));
         s.Append("  \"cases\": [\n");
         for (int i = 0; i < rows.Count; i++)
         {
@@ -208,9 +228,9 @@ static class Crossover
                 "    {{\"id\": {0}, \"unit\": {1}, \"unitsPerOp\": {2}, \"bytesPerOp\": {3}, \"normal\": [{4:F4}, {5:F4}], \"swapped\": [{6:F4}, {7:F4}], "
                 + "\"ratio\": {8:F4}, \"positionBias\": {9:F4}, \"normalTimesSwapped\": [{10:F4}, {11:F4}], \"biasDrift\": {12:F4}, "
                 + "\"originalNsPerUnit\": {13:F2}, \"newNsPerUnit\": {14:F2}, \"originalBytesPerUnit\": {15:F2}, \"newBytesPerUnit\": {16:F2}, "
-                + "\"maxOutsideLoad\": {17:F4}, \"maxCoreLoad\": {18:F4}, \"cpu\": {19}}}",
+                + "\"maxOutsideLoad\": {17:F4}, \"maxCoreLoad\": {18:F4}, \"cpu\": {19}, \"gated\": {20}}}",
                 Report.Quote(c.Id), Report.Quote(c.Unit), c.UnitsPerOp, c.BytesPerOp, c.N1, c.N2, c.S1, c.S2, c.Code, c.Bias, c.Pair1, c.Pair2, c.Drift,
-                c.FrozenNs, c.ProductNs, c.FrozenBytes, c.ProductBytes, c.MaxLoad, c.MaxCore, Report.Quote(c.Cpus)));
+                c.FrozenNs, c.ProductNs, c.FrozenBytes, c.ProductBytes, c.MaxLoad, c.MaxCore, Report.Quote(c.Cpus), c.Gated ? "true" : "false"));
             s.Append(i + 1 < rows.Count ? ",\n" : "\n");
         }
         s.Append("  ]\n}\n");
@@ -229,7 +249,10 @@ static class Crossover
         s.AppendLine("- Priority: " + H("priority"));
         s.AppendLine("- Allocation counter: " + H("allocation"));
         s.AppendLine("- Crossover: 4 processes (" + string.Join(", ", CrossoverPart.Tags) + "). " + Formula);
-        s.AppendLine("- Noise (code ratio): " + NoiseBand.Describe(codes));
+        s.AppendLine("- Noise (code ratio, gated rows): " + (codes.Length == 0 ? "no gated rows" : NoiseBand.Describe(codes)));
+        if (rows.Any(r => !r.Gated))
+            s.AppendLine("- Report only on this host until S3: " + string.Join(", ", rows.Where(r => !r.Gated).Select(r => "`" + r.Id + "`").ToArray())
+                + ". The SHA-256 family swings between fresh processes on the non-tiering JITs, so S0 and S1 claim no SHA-256 result here.");
         s.AppendLine("- " + H("cf"));
         s.AppendLine();
         s.AppendLine("Frozen is Echo's frozen 5c5d4a4 copy; product is the code at the head. Frozen and product ns are the geometric mean over the four processes.");
@@ -237,7 +260,7 @@ static class Crossover
         s.AppendLine("| Case | Unit | Normal N1, N2 | Swapped S1, S2 | Code ratio | Position bias | N x S per pair | Bias drift | Frozen ns per unit | Product ns per unit | Product B per unit | Max outside load | CPU (start>end per part) |");
         s.AppendLine("|---|---|---:|---:|---:|---:|---:|---:|---:|---:|---:|---:|---|");
         foreach (Combined c in rows)
-            s.AppendLine(string.Format(Inv, "| `{0}` | {1} | {2:F3}, {3:F3} | {4:F3}, {5:F3} | {6:F3} | {7:F3} | {8:F3}, {9:F3} | {10:F3} | {11:F1} | {12:F1} | {13:F1} | {14:P1} | {15} |",
+            s.AppendLine(string.Format(Inv, "| `{0}`" + (c.Gated ? "" : " (report only)") + " | {1} | {2:F3}, {3:F3} | {4:F3}, {5:F3} | {6:F3} | {7:F3} | {8:F3}, {9:F3} | {10:F3} | {11:F1} | {12:F1} | {13:F1} | {14:P1} | {15} |",
                 c.Id, c.Unit, c.N1, c.N2, c.S1, c.S2, c.Code, c.Bias, c.Pair1, c.Pair2, c.Drift, c.FrozenNs, c.ProductNs, c.ProductBytes, c.MaxLoad, c.Cpus));
         return s.ToString();
     }
