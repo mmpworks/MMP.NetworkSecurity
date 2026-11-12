@@ -366,6 +366,11 @@ function Get-AoBenchCodeVerdict([string]$repo, [string]$commit) {
     return $null
 }
 
+# The rows of schema rule 3 and their target. A change of this row set or of 5.00 is a decision of the lead or of the owner, recorded
+# before the PR that makes it merges.
+$AoSpeedTargetRows = 'AO-6.aes-block.net10', 'AO-6.aes-ecb.net10', 'AO-6.aes-cbc.net10', 'AO-6.aes-ctr.net10', 'AO-6.aes-gcm.net10', 'AO-6.aes-cmac.net10'
+$AoSpeedTargetRatio = 5.0
+
 # The bench rows, judged by the suite from the numbers (acceptance/ao-bench-schema.md). Returns id -> result. $codeJudge takes the report's
 # commit and gives $null (the measured code is the head's) or an object with reason and detail; then every bench row reads that FAIL.
 $script:aoBenchCommitNote = ''
@@ -398,9 +403,11 @@ function Read-AoBench([string]$path, $list, [string]$slice, [scriptblock]$codeJu
             $p0 = $r.PSObject.Properties['baselineNsPerOp']; $p1 = $r.PSObject.Properties['newNsPerOp']
             if (-not $p0 -or -not $p1 -or $p0.Value -isnot [ValueType] -or $p1.Value -isnot [ValueType] -or [double]$p0.Value -le 0 -or [double]$p1.Value -le 0) { $out[$e.id] = [pscustomobject]@{ status = 'FAIL'; reason = 'AO_BENCH_ROW_BAD'; detail = 'baselineNsPerOp or newNsPerOp is missing, not a number, or not above 0' }; continue }
             $ratio = [double]$p0.Value / [double]$p1.Value
-            $judge = $e.id -eq 'AO-6.aes-block.net10' -and [array]::IndexOf($AoSlices, $slice) -ge 1
-            if ($judge -and $ratio -lt 5) { $out[$e.id] = [pscustomobject]@{ status = 'FAIL'; reason = 'AO6_BELOW_TARGET'; detail = ("{0:N2} x baseline, target 5 x" -f $ratio) }; continue }
-            $out[$e.id] = [pscustomobject]@{ status = 'PASS'; reason = ''; detail = ("recorded: baseline {0} ns, new {1} ns, {2:N2} x" -f $p0.Value, $p1.Value, $ratio) }
+            # Schema rule 3: from slice S1 the 6 net10 AES throughput rows need a code ratio of 5.00 or more. The ratio is not rounded
+            # for the compare, and the detail prints 3 decimals, so a fail never shows as 5.00.
+            $judge = ($AoSpeedTargetRows -contains $e.id) -and [array]::IndexOf($AoSlices, $slice) -ge 1
+            if ($judge -and $ratio -lt $AoSpeedTargetRatio) { $out[$e.id] = [pscustomobject]@{ status = 'FAIL'; reason = 'AO6_BELOW_TARGET'; detail = ("{0:N3} x baseline, target {1:N2} x" -f $ratio, $AoSpeedTargetRatio) }; continue }
+            $out[$e.id] = [pscustomobject]@{ status = 'PASS'; reason = ''; detail = ("recorded: baseline {0} ns, new {1} ns, {2:N3} x" -f $p0.Value, $p1.Value, $ratio) }
         }
     }
     return $out
@@ -421,6 +428,7 @@ function Get-AoBudgetReds([string]$path, $list) {
         $b = 0.0
         if (-not [double]::TryParse($f[1], [System.Globalization.NumberStyles]::Float, [System.Globalization.CultureInfo]::InvariantCulture, [ref]$b) -or $b -lt 0) { $reds += "ao-budgets.tsv: ${id} budget_bytes '$($f[1])' is not a number of 0 or more" }
         elseif ($b -gt 0 -and -not $f[4].Trim()) { $reds += "ao-budgets.tsv: ${id} has a budget above 0 and no tradeoff PR" }
+        elseif ($b -gt 0 -and $f[4].Trim() -notmatch '^#(?<number>[0-9]+)$') { $reds += "ao-budgets.tsv: ${id} has the tradeoff_pr '$($f[4].Trim())', which is not a PR number (# and digits)" }
     }
     return $reds
 }
@@ -933,10 +941,17 @@ foreach ($c in @($pending | Where-Object { $_.group -eq 'driver' -and -not $resu
             Set-Content -LiteralPath $bt -Encoding utf8 -Value @("id`tbudget_bytes`tunit`tfrom_slice`ttradeoff_pr", "X.a`t64`tmessage`tS1`t#420", "X.a`t32`tmessage`tS1`t#421", "X.z`t0`tmessage`tS1`t", "X.b`t16`tblock`tS1`t ")
             $budBad = @(Get-AoBudgetReds $bt $l)
             if (-not ($budBad -match 'second line') -or -not ($budBad -match 'not a row') -or -not ($budBad -match 'no tradeoff PR')) { $bad += "the budget check missed a bad line: " + ($budBad -join ' | ') }
+            # The tradeoff_pr field is a PR number: "#" and digits. A text that stands for a number that is still to come is a red.
+            foreach ($notNumber in '#S1-PR-NUMBER-PENDING', '#', '420', '#420 and more', 'PR 420') {
+                Set-Content -LiteralPath $bt -Encoding utf8 -Value @("id`tbudget_bytes`tunit`tfrom_slice`ttradeoff_pr", "X.a`t64`tmessage`tS1`t$notNumber")
+                if (-not (@(Get-AoBudgetReds $bt $l) -match 'is not a PR number')) { $bad += "the budget check took '$notNumber' as a tradeoff PR" }
+            }
+            Set-Content -LiteralPath $bt -Encoding utf8 -Value @("id`tbudget_bytes`tunit`tfrom_slice`ttradeoff_pr", "X.a`t0`tmessage`tS1`tnone")
+            if (@(Get-AoBudgetReds $bt $l).Count -ne 0) { $bad += "a budget of 0 needs no tradeoff PR, and the check went red" }
             $bo = Read-AoBench $bj $bl 'S0' { param($commit) [pscustomobject]@{ reason = 'AO_BENCH_OTHER_COMMIT'; detail = "the measured code differs from $commit" } }
             if ($bo['AO-5.x.net10'].reason -ne 'AO_BENCH_OTHER_COMMIT') { $bad += "a bench report for another commit read $($bo['AO-5.x.net10'].reason)" }
             if ($bad) { Set-Result $c.id 'FAIL' 'ASSERTION' ($bad -join '; ') }
-            else { Set-Result $c.id 'PASS' '' (($seen -join '; ') + '; bench 16 B claiming PASS -> FAIL AO5_ALLOCATES; AO-9 timing row -> PASS; bench 0 B against a suite FAIL -> AO5_BENCH_DISAGREES; bench outputsEqual false against a suite PASS -> AO9_BENCH_DISAGREES; agreeing records -> no red; bench for another commit -> AO_BENCH_OTHER_COMMIT; budget file: a good line passes, an unknown id, a second line and a budget with no tradeoff PR each go red') }
+            else { Set-Result $c.id 'PASS' '' (($seen -join '; ') + '; bench 16 B claiming PASS -> FAIL AO5_ALLOCATES; AO-9 timing row -> PASS; bench 0 B against a suite FAIL -> AO5_BENCH_DISAGREES; bench outputsEqual false against a suite PASS -> AO9_BENCH_DISAGREES; agreeing records -> no red; bench for another commit -> AO_BENCH_OTHER_COMMIT; budget file: a good line passes, an unknown id, a second line and a budget with no tradeoff PR each go red; a tradeoff_pr that is no PR number (#S1-PR-NUMBER-PENDING and 4 more texts) goes red; a budget of 0 needs none') }
         }
         'SELF.ao-bench-same-code-rule-bites' {
             # A small git repository with the measured paths and 2 paths that are not measured. The bench report names commit A.
@@ -1027,6 +1042,29 @@ foreach ($c in @($pending | Where-Object { $_.group -eq 'driver' -and -not $resu
             } catch { $script:benchSelfBad += "the self-check stopped: $($_.Exception.Message)" }
             if ($script:benchSelfBad.Count -gt 0) { Set-Result $c.id 'FAIL' 'ASSERTION' ($script:benchSelfBad -join '; ') }
             else { Set-Result $c.id 'PASS' '' (($script:benchSelfSeen -join '; ') + '; through Read-AoBench: a valid report is judged from its numbers, a stale one reads AO_BENCH_OTHER_COMMIT') }
+        }
+        'SELF.ao6-speed-target-bites' {
+            # Schema rule 3 on each of its 6 rows: 4.99 x reads FAIL AO6_BELOW_TARGET from S1, 5.00 x reads PASS, and at S0 the row only records.
+            $bad = @(); $seen = @()
+            $list3 = [ordered]@{}
+            foreach ($id in @($AoSpeedTargetRows) + 'AO-6.aes-key-setup.net10' + 'AO-6.sha256.net10') { $list3[$id] = [pscustomobject]@{ id = $id; state = '-'; reason = '-'; from = 'S0'; source = 'bench' } }
+            $json3 = Join-Path $work ("ao-bench-speed-{0}.json" -f [guid]::NewGuid().ToString('N').Substring(0, 8))
+            $read3 = { param([double]$baseline, [string]$slice)
+                $rows3 = @($list3.Keys | ForEach-Object { '{"id":"' + $_ + '","baselineNsPerOp":' + $baseline.ToString([System.Globalization.CultureInfo]::InvariantCulture) + ',"newNsPerOp":100,"op":"x"}' }) -join ','
+                Set-Content -LiteralPath $json3 -Encoding utf8 -Value ('{"schema":1,"commit":"HEADX","rows":[' + $rows3 + ']}')
+                return (Read-AoBench $json3 $list3 $slice { param($commit) $null }) }
+            $below = & $read3 499 'S1'; $at = & $read3 500 'S1'; $before = & $read3 499 'S0'; $later = & $read3 499 'S4'
+            foreach ($id in $AoSpeedTargetRows) {
+                if ($below[$id].status -ne 'FAIL' -or $below[$id].reason -ne 'AO6_BELOW_TARGET') { $bad += "${id} at 4.99 x and S1 read $($below[$id].status) $($below[$id].reason)" }
+                if ($at[$id].status -ne 'PASS') { $bad += "${id} at 5.00 x and S1 read $($at[$id].status) $($at[$id].reason)" }
+                if ($before[$id].status -ne 'PASS') { $bad += "${id} at 4.99 x and S0 read $($before[$id].status) $($before[$id].reason)" }
+                if ($later[$id].reason -ne 'AO6_BELOW_TARGET') { $bad += "${id} at 4.99 x and S4 read $($later[$id].status) $($later[$id].reason)" }
+                $seen += $id
+            }
+            foreach ($id in 'AO-6.aes-key-setup.net10', 'AO-6.sha256.net10') { if ($below[$id].status -ne 'PASS') { $bad += "${id} is no row of rule 3, and at 4.99 x it read $($below[$id].status) $($below[$id].reason)" } }
+            if ($AoSpeedTargetRows.Count -ne 6) { $bad += "rule 3 names $($AoSpeedTargetRows.Count) rows, wanted 6" }
+            if ($bad) { Set-Result $c.id 'FAIL' 'ASSERTION' ($bad -join '; ') }
+            else { Set-Result $c.id 'PASS' '' ('6 rows (' + ($seen -join ', ') + '): 4.99 x -> FAIL AO6_BELOW_TARGET at S1 and at S4; 5.00 x -> PASS; 4.99 x at S0 -> PASS (recorded); AO-6.aes-key-setup.net10 and AO-6.sha256.net10 at 4.99 x -> PASS (no row of rule 3)') }
         }
         'SELF.run-report-has-no-local-path' {
             $bad = @()

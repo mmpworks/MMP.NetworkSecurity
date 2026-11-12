@@ -24,7 +24,8 @@ namespace Acceptance
     /// The reference for the caller-buffer forms. The 5c5d4a4 code has none (each mode returns a new array), so the reference is the frozen
     /// allocating op plus the rules of PRD 7.1.9, 7.3 item 15 and 7.4 rule 3, written here:
     /// 1. The same array at the same index, and ranges that do not overlap, are legal and give the separate-buffer result.
-    /// 2. Any other overlap of input and output throws NetSecException ARG_RANGES_OVERLAP before any write.
+    /// 2. Any other overlap of input and output throws NetSecException ARG_RANGES_OVERLAP before any write. For CMAC the input is the
+    ///    message range and the output is the 16-byte tag range.
     /// 3. GCM reads 12 nonce bytes at the offset; fewer than 12 throws NetSecException GCM_NONCE_LENGTH.
     /// 4. GCM open checks the tag first. On a failure it sets the whole output range to 0 and returns false.
     /// 5. No input, IV, counter, nonce or AAD byte changes.
@@ -77,6 +78,8 @@ namespace Acceptance
 
         public virtual void Cmac(object k, byte[] m, int mo, int n, byte[] t, int to)
         {
+            // PRD 7.1.9: the tag range may start at the index of the message range, or lie apart from it. Any other overlap is refused.
+            Overlap(m, mo, n, t, to, 16);
             Buffer.BlockCopy(_f.Cmac(k, Slice(m, mo, n)), 0, t, to, 16);
         }
 
@@ -204,14 +207,16 @@ namespace Acceptance
                 case "aes-cmac-into":
                 case "aes-cmackey-into":
                     {
-                        int n = AoDraw.Len(r, 2048), mo = r.Int(8), to = r.Int(8);
-                        byte[] m = r.Bytes(mo + n + r.Int(8)), t = r.Bytes(to + 16 + r.Int(8));
+                        // The message range and the 16-byte tag range by a drawn aliasing: separate arrays, the same index, apart in one
+                        // array, or a partial overlap (which must be refused).
+                        int n = AoDraw.Len(r, 2048);
+                        Place p = Place.Draw(r, n, 16, true);
                         return delegate (IAoInto s, AoRec rec)
                         {
                             object k = s.NewKey(C(key));
-                            byte[] mb = C(m), tb = C(t);
-                            Try(rec, delegate { if (op == "aes-cmac-into") s.Cmac(k, mb, mo, n, tb, to); else s.CmacKey(k, mb, mo, n, tb, to); });
-                            rec.Add(mb); rec.Add(tb);
+                            byte[] mb = C(p.In), tb = p.Mode == 0 ? C(p.Out) : mb;
+                            Try(rec, delegate { if (op == "aes-cmac-into") s.Cmac(k, mb, p.Io, n, tb, p.Oo); else s.CmacKey(k, mb, p.Io, n, tb, p.Oo); });
+                            rec.Add(mb); if (p.Mode == 0) rec.Add(tb);
                         };
                     }
                 default:
@@ -277,7 +282,7 @@ namespace Acceptance
             string tail = op + ": seed 0x" + seed.ToString("x16") + ", cases " + cases + ", cases with a refusal on the reference " + refused +
                           ", reference " + reference.Name + ", subject " + subject.Name;
             if (bad > 0) throw new FailException("AO_DIFFERS", bad + " of " + cases + " cases differ (" + tail + "). First: " + string.Join(" | ", first.ToArray()));
-            if (refused == 0 && op != "aes-cmac-into" && op != "aes-cmackey-into") throw new FailException("AO_GRAMMAR_ONE_SIDED", "no case drew a refusal, so the overlap rule went untested (" + tail + ")");
+            if (refused == 0) throw new FailException("AO_GRAMMAR_ONE_SIDED", "no case drew a refusal, so the overlap rule went untested (" + tail + ")");
             return cases + " of " + cases + " cases equal (" + tail + ")";
         }
     }

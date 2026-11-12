@@ -77,6 +77,16 @@ namespace Acceptance
             return AoAllocMeter.Judge("Gcm.Seal (static wrapper)", PerUnit(delegate { Gcm.Seal(k, Nonce, Aad, Data); }, Data.Length + 16, Blocks), "block", AoBudgets.For(c, "AO-5.aes-gcm-static.net10"));
         }
 
+        /// <summary>The static Gcm.TryOpen wrapper. It builds the same GcmKey on each call as Gcm.Seal, so it has its own row and the same budget.</summary>
+        [Clause("AO-5.aes-gcm-static-open.net10")]
+        public static string AesGcmStaticOpen(Ctx c)
+        {
+            if (AoAllocMeter.OnCf) throw new NotRunException("NOT_THIS_BUILD", "the static wrapper's budget is judged on net10 only");
+            AesKey k = Aes(c);
+            byte[] sealedBytes = Gcm.Seal(k, Nonce, Aad, Data);
+            return AoAllocMeter.Judge("Gcm.TryOpen (static wrapper)", PerUnit(delegate { byte[] plain; if (!Gcm.TryOpen(k, Nonce, Aad, sealedBytes, out plain)) throw new FailException("Gcm.TryOpen refused what Gcm.Seal wrote"); }, Data.Length, Blocks), "block", AoBudgets.For(c, "AO-5.aes-gcm-static-open.net10"));
+        }
+
         [Clause("AO-5.aes-cmac", PerBuild = true)]
         public static string AesCmac(Ctx c) { AesKey k = Aes(c); return Judge(c, "AO-5.aes-cmac", "Cmac.Compute", PerUnit(delegate { Cmac.Compute(k, Data); }, 16, Blocks), "block"); }
 
