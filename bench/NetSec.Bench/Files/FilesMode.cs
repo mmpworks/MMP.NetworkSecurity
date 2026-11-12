@@ -79,7 +79,7 @@ static class FilesMode
             return bad != 0 ? 4 : busy;
         }
 
-        AoParts.Write(a["out"], run.Build + "-files", AoFileRows.Rows(run.Build, fileRows, small, threads));
+        AoParts.Write(a["out"], run.Build + "-files", run.Head, AoFileRows.Rows(run.Build, fileRows, small, threads));
         File.WriteAllText(Path.Combine(a["out"], "files-" + run.Build + ".md"), FileReport.Markdown(run, OriginalNote, rows, threads));
         double[] ratios = rows.Select(r => r.Pair.MedianRatio).ToArray();
         Console.WriteLine("BENCH_NOISE " + NoiseBand.Describe(ratios));
