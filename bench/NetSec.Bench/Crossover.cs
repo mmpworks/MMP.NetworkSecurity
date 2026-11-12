@@ -104,18 +104,18 @@ static class Crossover
             exit = DriftExit;
         }
         else exit = Program.SameCodeExit(sameCode, codes);
-        if (exit == 0) exit = WriteAo(folder, build, rows);
+        if (exit == 0) exit = WriteAo(folder, build, parts[0].Header["head"], rows);   // Mismatch() checked one head across the parts
         Console.WriteLine("BENCH_CROSSOVER_DONE " + build + " " + rows.Count + " cases, exit " + exit);
         return exit;
     }
 
     /// <summary>The AO part of a build, from the code ratios. Returns non-zero when a needed input (the thread part) is missing.</summary>
-    static int WriteAo(string folder, string build, List<Combined> rows)
+    static int WriteAo(string folder, string build, string head, List<Combined> rows)
     {
         if (build == "net10")
         {
-            AoParts.Write(folder, "net10-blocks", AoBlockRows(rows));
-            AoParts.Write(folder, "net10-alloc", AoAlloc.JsonRows(new Files.ProductCode()));
+            AoParts.Write(folder, "net10-blocks", head, AoBlockRows(rows));
+            AoParts.Write(folder, "net10-alloc", head, AoAlloc.JsonRows(new Files.ProductCode()));
         }
         else if (build.EndsWith("-files", StringComparison.Ordinal))
         {
@@ -135,7 +135,7 @@ static class Crossover
             };
             Combined small = rows.Single(r => r.Id == Files.FilesMode.SmallId);
             int files = rows.Where(r => r.Id != Files.FilesMode.SmallId).Select(r => r.Id.Split('|')[0]).Distinct().Count();
-            AoParts.Write(folder, runtime + "-files", Files.AoFileRows.Rows(runtime, sums, files, small.FrozenNs, small.FrozenNs / small.Code, threads));
+            AoParts.Write(folder, runtime + "-files", head, Files.AoFileRows.Rows(runtime, sums, files, small.FrozenNs, small.FrozenNs / small.Code, threads));
         }
         return 0;
     }
