@@ -62,7 +62,24 @@ static class FileBench
         new Op("hmac-sha256", f => f.Bytes, (c, x) => c.HmacSha256(x)),
     };
 
-    public static List<FileRow> Run(IList<TestFile> files, ICodeUnderTest original, ICodeUnderTest current, Action<FileRow> progress)
+    /// <summary>
+    /// One call of every operation and of the small-message call on <paramref name="first"/>, then on <paramref name="second"/>, on the
+    /// smallest file, so the first copy's methods are compiled first. A crossover part runs it before anything else (CrossoverPart).
+    /// </summary>
+    public static void CompileFirst(IList<TestFile> files, ICodeUnderTest first, ICodeUnderTest second)
+    {
+        TestFile smallest = files.OrderBy(f => f.Bytes.Length).First();
+        byte[] plain = Seq(64, 0x71);
+        foreach (ICodeUnderTest code in new[] { first, second })
+        {
+            IBoundCode b = code.Bind(AesKey, HmacKey);
+            foreach (Op op in Ops(b)) Sink = op.Call(b, op.Input(smallest));
+            Sink = code.KeySetupAndSeal(AesKey, Nonce, Aad, plain);
+        }
+    }
+
+    /// <param name="only">Operation names to time (a short check); null for all of AO-9.</param>
+    public static List<FileRow> Run(IList<TestFile> files, ICodeUnderTest original, ICodeUnderTest current, Action<FileRow> progress, int pairs, string[] only = null)
     {
         IBoundCode o = original.Bind(AesKey, HmacKey), n = current.Bind(AesKey, HmacKey);
         TestFile smallest = files.OrderBy(f => f.Bytes.Length).First();
@@ -73,14 +90,14 @@ static class FileBench
         }).ToList(), Program.PreWarmEach);
         List<FileRow> rows = new List<FileRow>();
         foreach (TestFile f in files)
-            foreach (Op op in Ops(o))
+            foreach (Op op in Ops(o).Where(op => only == null || only.Contains(op.Name)))
             {
                 byte[] input = op.Input(f);
                 RequireSameBytes(f.Name, op.Name, op.Call(o, input), op.Call(n, input));
                 FileRow row = new FileRow
                 {
                     File = f.Name, Operation = op.Name, BytesPerCall = input.Length,
-                    Pair = Measure.Run(() => Sink = op.Call(o, input), () => Sink = op.Call(n, input), Round, Pairs),
+                    Pair = Measure.Run(() => Sink = op.Call(o, input), () => Sink = op.Call(n, input), Round, pairs),
                 };
                 rows.Add(row);
                 progress(row);
@@ -89,14 +106,14 @@ static class FileBench
     }
 
     /// <summary>AO-9 rule 6: one key setup plus one 64-byte seal, as one call.</summary>
-    public static FileRow SmallMessage(ICodeUnderTest original, ICodeUnderTest current, Action<FileRow> progress)
+    public static FileRow SmallMessage(ICodeUnderTest original, ICodeUnderTest current, Action<FileRow> progress, int pairs)
     {
         byte[] plain = Seq(64, 0x71);
         RequireSameBytes("64-byte message", "key-setup+gcm-seal", original.KeySetupAndSeal(AesKey, Nonce, Aad, plain), current.KeySetupAndSeal(AesKey, Nonce, Aad, plain));
         FileRow row = new FileRow
         {
             File = "64-byte message", Operation = "key-setup+gcm-seal", BytesPerCall = plain.Length,
-            Pair = Measure.Run(() => Sink = original.KeySetupAndSeal(AesKey, Nonce, Aad, plain), () => Sink = current.KeySetupAndSeal(AesKey, Nonce, Aad, plain), Round, Pairs),
+            Pair = Measure.Run(() => Sink = original.KeySetupAndSeal(AesKey, Nonce, Aad, plain), () => Sink = current.KeySetupAndSeal(AesKey, Nonce, Aad, plain), Round, pairs),
         };
         progress(row);
         return row;

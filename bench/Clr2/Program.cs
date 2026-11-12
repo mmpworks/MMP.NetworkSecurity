@@ -42,20 +42,41 @@ static class Program
         if (a.ContainsKey("mode") && a["mode"] == "footprint")
             return Footprint.Run(a, new Run { Build = build, Head = a.ContainsKey("head") ? a["head"] : "", Priority = "normal (footprint does no timing)", CfLine = "CF ARM speed: UNMEASURED" });
         bool sameCode = a.ContainsKey("same-code") && a["same-code"] == "true";
+        // --part TAG [--pairs N] --out DIR --head SHA: one part of the balanced crossover; the tag sets the swap and the JIT order (CrossoverPart).
+        string part = a.ContainsKey("part") ? a["part"] : null;
+        if (part != null && (!CrossoverPart.IsTag(part) || !a.ContainsKey("out") || !a.ContainsKey("head"))) { Console.Error.WriteLine("BENCH_USAGE: --part (" + string.Join(", ", CrossoverPart.Tags) + ") needs --out DIR --head SHA"); return 2; }
+        bool swap = part != null && CrossoverPart.Swapped(part);
+        int pairs = a.ContainsKey("pairs") ? int.Parse(a["pairs"], Inv) : Measure.Rounds;
         Console.WriteLine("RUNTIME CLR " + Environment.Version + ", " + (IntPtr.Size * 8) + "-bit process");
         Console.WriteLine("NETSEC_CORE " + typeof(NetSec.Crypto.AesKey).Assembly.FullName);
         Console.WriteLine("FROZEN " + typeof(Acceptance.Frozen.Crypto.AesKey).Assembly.FullName);
-        Console.WriteLine("PRIORITY " + Measure.RaisePriority(null));
-        Console.WriteLine("TIMING " + Measure.Rounds + " round pairs of at least " + Round.TotalMilliseconds + " ms per copy, pre-warm " + PreWarmEach.TotalMilliseconds + " ms per copy per case");
+        string priority = Measure.RaisePriority(null);
+        string timing = pairs + " round pairs of at least " + Round.TotalMilliseconds + " ms per copy, pre-warm " + PreWarmEach.TotalMilliseconds + " ms per copy per case";
+        Console.WriteLine("PRIORITY " + priority);
+        Console.WriteLine("TIMING " + timing);
 
-        List<Case> cases = All(new FrozenCode(), new ProductCode());
+        FrozenCode frozen = new FrozenCode();
+        ProductCode product = new ProductCode();
+        List<Case> cases = swap ? All(product, frozen) : All(frozen, product);
+        if (swap) Console.WriteLine("BENCH_SWAP original = product, new = frozen copy");
+        if (part != null)
+        {
+            // Compile one copy first: one call of every case on it, then on the other. In a swapped part the product is "original".
+            bool productFirst = CrossoverPart.JitFirst(part) == "product";
+            bool originalFirst = productFirst == swap;
+            foreach (Case c in cases) (originalFirst ? c.Original : c.New)();
+            foreach (Case c in cases) (originalFirst ? c.New : c.Original)();
+            Console.WriteLine("BENCH_JIT_FIRST " + CrossoverPart.JitFirst(part));
+        }
         Measure.PreWarm(cases.Select(c => new[] { c.Original, c.New }), PreWarmEach);
         if (!MachineLoad.Settle()) return MachineLoad.BusyExit;
         List<double> ratios = new List<double>(), busy = new List<double>();
         List<string> detail = new List<string>();
+        List<PartRow> partRows = new List<PartRow>();
         foreach (Case c in cases)
         {
-            Pair p = Measure.Run(c.Original, c.New, Round);
+            Pair p = Measure.Run(c.Original, c.New, Round, pairs);
+            if (part != null) partRows.Add(CrossoverPart.FromPair(c.Id, "unit", c.Units, c.Payload, p, swap, BytesPerCall(c.Original), BytesPerCall(c.New)));
             ratios.Add(p.MedianRatio);
             busy.Add(p.OtherBusy);
             detail.Add(c.Id + ": " + p.TopOutside);
@@ -65,7 +86,7 @@ static class Program
             if (c.Payload > 0)
             {
                 // Steve's measure: garbage collections per megabyte processed, over the timed rounds of each copy.
-                double mb = (double)p.CallsPerRound * Measure.Rounds * c.Payload / 1048576.0;
+                double mb = (double)p.CallsPerRound * pairs * c.Payload / 1048576.0;
                 Console.WriteLine(string.Format(Inv, "  GC per MB  {0,-22} original gen0 {1:F3} gen1 {2:F4} gen2 {3:F4}   new gen0 {4:F3} gen1 {5:F4} gen2 {6:F4}   ({7:F1} MB per copy)",
                     c.Id, p.Original.Gen0 / mb, p.Original.Gen1 / mb, p.Original.Gen2 / mb, p.New.Gen0 / mb, p.New.Gen1 / mb, p.New.Gen2 / mb, mb));
             }
@@ -73,6 +94,18 @@ static class Program
         Console.WriteLine("BENCH_NOISE " + NoiseBand.Describe(ratios.ToArray()));
         Console.WriteLine("CF ARM speed: UNMEASURED");
         int load = MachineLoad.Exit(busy.ToArray(), detail.ToArray());
+        if (part != null)
+        {
+            // One crossover part: the band does not apply to one arrangement; the net10 combine judges the code ratio.
+            Dictionary<string, string> header = new Dictionary<string, string>
+            {
+                { "head", a["head"] }, { "machine", Machine() }, { "priority", priority }, { "allocation", "GC.GetTotalMemory pass outside the timed rounds (CLR 2.0 has no allocation counter)" },
+                { "timing", timing }, { "cf", "CF ARM speed: UNMEASURED" },
+            };
+            CrossoverPart.Write(a["out"], build, part, header, partRows);
+            Console.WriteLine("BENCH_PART_DONE " + build + " " + part + " " + partRows.Count + " cases");
+            return load;
+        }
         if (load != 0) return load;
         if (!sameCode || NoiseBand.Inside(ratios.ToArray())) return 0;
         Console.WriteLine("BENCH_NOISE_OUTSIDE_BAND: the two copies are the same code, so a ratio outside the target band is harness or machine noise");
