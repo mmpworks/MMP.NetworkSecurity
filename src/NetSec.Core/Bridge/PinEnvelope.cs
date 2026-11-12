@@ -112,9 +112,13 @@ namespace NetSec.Bridge
     {
         public const string MacCheck = "PIN block MAC at bank";
         public const string ReplayCheck = "KSN already seen";
+        public const string StaleCheck = "KSN at or below the device's highest counter";
         public const string FormatCheck = "PIN block format check";
 
-        /// <summary>The MAC, then the KSN, then the PIN block's shape. The KSN enters the ledger only after all three pass, so a refused envelope burns no KSN.</summary>
+        /// <summary>
+        /// The MAC, then the KSN, then the PIN block's shape. The KSN enters the ledger only after all three pass, so a refused envelope burns no KSN.
+        /// The KSN check refuses an exact repeat and also an older counter from the same device that the bank never saw (KsnLedger.RefusalFor).
+        /// </summary>
         public static BankDecision Decide(byte[] bdk, KsnLedger ledger, byte[] envelopeBytes)
         {
             PinEnvelope envelope;
@@ -129,8 +133,11 @@ namespace NetSec.Bridge
             catch (NetSecException failure) { return Refuse(null, ErrorCodes.DukptMacMismatch, MacCheck, failure.Error.Message + claimed); }
             if (!Cmac.Verify(new AesKey(macKey), envelope.Covered, envelope.Mac))
                 return Refuse(null, ErrorCodes.DukptMacMismatch, MacCheck, "the MAC does not fit this envelope." + claimed);
-            if (ledger.Contains(envelope.Ksn))
+            string ksnRefusal = ledger.RefusalFor(envelope.Ksn);
+            if (ksnRefusal == ErrorCodes.DukptKsnReplay)
                 return Refuse(envelope.TraceId, ErrorCodes.DukptKsnReplay, ReplayCheck, "the bank has seen this KSN before");
+            if (ksnRefusal != null)
+                return Refuse(envelope.TraceId, ksnRefusal, StaleCheck, "the bank has accepted a higher counter from this reader, so this one was held back or replayed");
 
             byte[] pinKey = DukptBank.DeriveWorkingKey(bdk, envelope.Ksn, DukptKeyUsage.PinEncryption, DukptKeyType.Aes128);
             byte[] field;

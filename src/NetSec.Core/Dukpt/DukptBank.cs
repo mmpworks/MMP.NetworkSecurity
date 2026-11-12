@@ -30,18 +30,26 @@ namespace NetSec.Dukpt
             return DukptDerivation.Working(derivationKey, initialKeyId, counter, u, t);
         }
 
-        /// <summary>Makes the bank's checks on one PIN sale and changes nothing, so a trace can show the outcome before the rule acts.</summary>
+        /// <summary>
+        /// Makes the bank's checks on one PIN sale and changes nothing, so a trace can show the outcome before the rule acts.
+        /// The PIN block is opened first and the ledger asked second. A block that fails gets the format code whether or not the
+        /// bank has seen its KSN, so a forged block cannot ask which KSNs the bank holds. A refused sale carries no PIN and no key.
+        /// </summary>
         public static PinSale CheckPinSale(byte[] bdk, KsnLedger ledger, byte[] ksn, byte[] block, string pan, DukptKeyType t)
         {
             PinSale sale = new PinSale();
             sale.Counter = DukptDerivation.CounterOf(ksn);
-            if (ledger.Contains(ksn))
+            byte[] key = DeriveWorkingKey(bdk, ksn, DukptKeyUsage.PinEncryption, t);
+            string pin;
+            if (!PinBlock.TryDecryptFormat4(key, block, pan, out pin)) sale.Code = ErrorCodes.DukptPinBlockFormat;
+            else sale.Code = ledger.RefusalFor(ksn);
+            if (sale.Code != null)
             {
-                sale.Code = ErrorCodes.DukptKsnReplay;
+                Array.Clear(key, 0, key.Length);
                 return sale;
             }
-            sale.Key = DeriveWorkingKey(bdk, ksn, DukptKeyUsage.PinEncryption, t);
-            if (!PinBlock.TryDecryptFormat4(sale.Key, block, pan, out sale.Pin)) sale.Code = ErrorCodes.DukptPinBlockFormat;
+            sale.Key = key;
+            sale.Pin = pin;
             return sale;
         }
 
@@ -66,13 +74,69 @@ namespace NetSec.Dukpt
         public string Pin;
     }
 
-    /// <summary>The KSNs of the sales a bank has accepted. A repeat means a replayed sale.</summary>
+    /// <summary>
+    /// The KSNs of the sales a bank has accepted, and a high-water mark per device. A KSN names its device by its first 8 bytes
+    /// (the initial key ID) and its counter by the last 4. A reader never reuses a counter and only counts up, so the bank refuses
+    /// an exact repeat (a replayed sale) and also any counter at or below the highest one it accepted from that device, seen or
+    /// not (a recorded sale held back and sent late). A gap ahead is accepted: a sale that never reached the bank leaves one.
+    /// Record only a sale that passed every check, so a forged message cannot raise the mark.
+    /// </summary>
     public sealed class KsnLedger
     {
+        const int InitialKeyIdSize = 8;
         readonly Dictionary<string, bool> _seen = new Dictionary<string, bool>();
+        readonly Dictionary<string, uint> _highest = new Dictionary<string, uint>();
 
-        public bool Contains(byte[] ksn) { return _seen.ContainsKey(Hex.Encode(ksn)); }
+        /// <summary>True for a KSN this ledger recorded. The exact-repeat test only; <see cref="RefusalFor"/> also applies the mark.</summary>
+        public bool Contains(byte[] ksn) { RequireKsn(ksn); return _seen.ContainsKey(Hex.Encode(ksn)); }
 
-        public void Record(byte[] ksn) { _seen[Hex.Encode(ksn)] = true; }
+        /// <summary>Null when the bank may accept this KSN. DUKPT_KSN_REPLAY for an exact repeat. DUKPT_KSN_STALE for a counter at or below the device's mark.</summary>
+        public string RefusalFor(byte[] ksn)
+        {
+            if (Contains(ksn)) return ErrorCodes.DukptKsnReplay;
+            uint top;
+            if (_highest.TryGetValue(DeviceOf(ksn), out top) && DukptDerivation.CounterOf(ksn) <= top) return ErrorCodes.DukptKsnStale;
+            return null;
+        }
+
+        public void Record(byte[] ksn)
+        {
+            uint counter = DukptDerivation.CounterOf(ksn);
+            _seen[Hex.Encode(ksn)] = true;
+            string device = DeviceOf(ksn);
+            uint top;
+            if (!_highest.TryGetValue(device, out top) || counter > top) _highest[device] = counter;
+        }
+
+        /// <summary>True once the ledger accepted a KSN from the device with this 8-byte initial key ID.</summary>
+        public bool HasMark(byte[] initialKeyId) { return _highest.ContainsKey(KeyIdHex(initialKeyId)); }
+
+        /// <summary>The highest counter accepted from the device. Zero when <see cref="HasMark"/> is false.</summary>
+        public uint HighestCounter(byte[] initialKeyId)
+        {
+            uint top;
+            return _highest.TryGetValue(KeyIdHex(initialKeyId), out top) ? top : 0;
+        }
+
+        /// <summary>A KSN of the wrong size fails here with the same exception CounterOf gives, before any byte is read.</summary>
+        static void RequireKsn(byte[] ksn)
+        {
+            if (ksn == null) throw new ArgumentNullException("ksn");
+            if (ksn.Length != DukptDerivation.KsnSize) throw new ArgumentException("A KSN holds 12 bytes.", "ksn");
+        }
+
+        static string DeviceOf(byte[] ksn)
+        {
+            RequireKsn(ksn);
+            byte[] id = new byte[InitialKeyIdSize];
+            Buffer.BlockCopy(ksn, 0, id, 0, InitialKeyIdSize);
+            return Hex.Encode(id);
+        }
+
+        static string KeyIdHex(byte[] initialKeyId)
+        {
+            DukptDerivation.RequireInitialKeyId(initialKeyId);
+            return Hex.Encode(initialKeyId);
+        }
     }
 }

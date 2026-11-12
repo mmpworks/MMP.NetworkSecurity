@@ -69,7 +69,7 @@
     { "attackId": "L6-flip-pin-block", "name": "Flip a bit in the PIN block", "kind": "tamper", "tourStep": "L6-S11",
       "guard": "The bank decrypts the PIN block and checks its format, so a changed bit gives a block that fails the format check." },
     { "attackId": "L6-replay-sale", "name": "Send a sale again", "kind": "replay", "tourStep": "L6-S10",
-      "guard": "The bank records each key serial number it has seen and refuses a sale that reuses one." },
+      "guard": "The bank records each key serial number it has seen and refuses a sale that reuses one. It also refuses a counter at or below the highest one it took from that reader." },
     { "attackId": "L7-decrypt-recording", "name": "Open a recording with a stolen key", "kind": "stolen-key", "tourStep": null,
       "guard": "A stolen server key opens a recorded RSA session. The same key opens nothing on ECDHE, because neither side stores the private halves of the shares that made its keys." },
     { "attackId": "L7-downgrade", "name": "Force a TLS 1.3 server to an old version", "kind": "downgrade", "tourStep": "L7-S08",
