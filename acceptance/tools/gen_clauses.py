@@ -230,6 +230,7 @@ DRIVER = [("driver", "A13.fresh-clone.acceptance-unchanged", False), ("driver", 
           ("driver", "AO-1.vectors-pass.net10", False), ("driver", "AO-1.vectors-pass.cf", False),
           ("driver", "AO-2.reference-frozen-from-git", False), ("driver", "AO-8.cf-compiles-and-golden-pass", False),
           ("driver", "SELF.ao-row-verdicts-bite", False), ("driver", "SELF.ao-row-list-bites", False),
+          ("driver", "SELF.suite-compile-break-is-a-fail", False),
           ("driver", "AO-0.row-list-matches", False)]
 
 

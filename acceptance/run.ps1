@@ -485,6 +485,59 @@ function Read-ClauseLines([string]$text) {
 
 $missingSymbolCodes = 'CS0246', 'CS0234', 'CS0103', 'CS1061', 'CS0117', 'CS0122', 'CS1503', 'CS1729', 'CS7036', 'CS0070', 'CS0200', 'CS0535', 'CS0305', 'CS0308', 'CS0266', 'CS0029', 'CS1579'
 
+# CONTRACT.md rule 4: only a missing type or member OF NetSec.Core is NOT RUN PRODUCT_MISSING. The compiler gives the same error codes
+# when the missing name is the suite's own (for example a file that a group project does not link). That is a break in acceptance/, so
+# it is a FAIL in every slice, never a NOT RUN that a row list can expect.
+$missingNameCodes = 'CS0246', 'CS0234', 'CS0103', 'CS1061', 'CS0117'
+$script:suiteTypeNames = $null
+
+# The type names that the clause groups and the shared library declare themselves (acceptance/groups and acceptance/lib). A name that
+# contract/ or a Frozen/ folder also declares is left out: those folders hold copies of product names, and a product name must stay
+# NOT RUN PRODUCT_MISSING. selftest/ is not read: it holds stand-ins with product names on purpose.
+function Get-SuiteTypeNames {
+    if ($null -eq $script:suiteTypeNames) {
+        $set = [System.Collections.Generic.HashSet[string]]::new()
+        $product = [System.Collections.Generic.HashSet[string]]::new()
+        $decl = [regex]'\b(?:class|interface|struct|enum)\s+(?<name>[A-Za-z_]\w*)'
+        foreach ($rootName in 'groups', 'lib', 'contract') {
+            $rootDir = Join-Path $acc $rootName
+            if (-not (Test-Path -LiteralPath $rootDir)) { continue }
+            foreach ($f in (Get-ChildItem -LiteralPath $rootDir -Recurse -Filter *.cs -File)) {
+                if ($f.FullName -match '[\\/](?:bin|obj)[\\/]') { continue }
+                # No "$x = if (...) { $set }": PowerShell unrolls an empty set to $null there.
+                $isProduct = $rootName -eq 'contract' -or $f.FullName -match '[\\/]Frozen[\\/]'
+                foreach ($m in $decl.Matches([System.IO.File]::ReadAllText($f.FullName))) {
+                    if ($isProduct) { [void]$product.Add($m.Groups['name'].Value) } else { [void]$set.Add($m.Groups['name'].Value) }
+                }
+            }
+        }
+        $set.ExceptWith($product)
+        $script:suiteTypeNames = $set
+    }
+    return , $script:suiteTypeNames
+}
+
+# The verdict for a clause group whose build failed, from the compiler output: status, reason, detail.
+function Get-GroupBuildVerdict([string]$output) {
+    $lines = @([regex]::Matches($output, '(?m)^.*error (?<code>CS\d{4}):.*$') | ForEach-Object { ($_.Value -replace '\[.*\]\s*$', '').Trim() } | Sort-Object -Unique)
+    $codes = @($lines | ForEach-Object { [regex]::Match($_, 'error (?<code>CS\d{4}):').Groups['code'].Value } | Sort-Object -Unique)
+    $firstErrors = @($lines | Select-Object -First 3) -join ' | '
+    $surface = $codes.Count -gt 0 -and (@($codes | Where-Object { $missingSymbolCodes -notcontains $_ }).Count -eq 0)
+    if (-not $surface) { return @('FAIL', 'ACCEPTANCE_COMPILE_ERROR', ("the group failed to build for a reason outside the product surface: " + $firstErrors + " " + (Tail $output 300))) }
+    $names = Get-SuiteTypeNames
+    $own = @()
+    foreach ($line in $lines) {
+        $code = [regex]::Match($line, 'error (?<code>CS\d{4}):').Groups['code'].Value
+        if ($missingNameCodes -notcontains $code) { continue }
+        # The first quoted text is the missing name (CS0246, CS0234, CS0103) or the type that lacks the member (CS1061, CS0117).
+        $quoted = [regex]::Match($line.Substring($line.IndexOf("error $code")), "'(?<quoted>[^']+)'").Groups['quoted'].Value
+        $simple = (($quoted -replace '<.*$', '') -split '\.')[-1]
+        if ($simple -and $names.Contains($simple) -and $own -notcontains $simple) { $own += $simple }
+    }
+    if ($own.Count -gt 0) { return @('FAIL', 'ACCEPTANCE_COMPILE_ERROR', ("the group does not compile, and the name it lacks is the suite's own (" + ($own -join ', ') + "): a file is not linked into the group project, or the suite code is wrong. " + $firstErrors)) }
+    return @('NOT RUN', 'PRODUCT_MISSING', ("the group does not compile against the built NetSec.Core: a type or member the contract names is missing or differs. " + $firstErrors))
+}
+
 function Run-CSharpGroup($name, $g, $build, $ids) {
     $list = @($pending | Where-Object { $ids -contains $_.id })
     $tfm = if ($build -eq 'cf') { 'net48' } else { 'net10.0' }
@@ -504,11 +557,8 @@ function Run-CSharpGroup($name, $g, $build, $ids) {
     }
     $b = Invoke-Tool 'dotnet' $buildArgs -TimeoutSec 1200
     if ($b.ExitCode -ne 0) {
-        $codes = @([regex]::Matches($b.Output, 'error (CS\d{4})') | ForEach-Object { $_.Groups[1].Value } | Sort-Object -Unique)
-        $firstErrors = @([regex]::Matches($b.Output, '(?m)^.*error CS\d{4}:.*$') | Select-Object -First 3 | ForEach-Object { ($_.Value -replace '\[.*\]\s*$', '').Trim() }) -join ' | '
-        $surface = $codes.Count -gt 0 -and (@($codes | Where-Object { $missingSymbolCodes -notcontains $_ }).Count -eq 0)
-        if ($surface) { Set-All $list 'NOT RUN' 'PRODUCT_MISSING' ("the group does not compile against the built NetSec.Core: a type or member the contract names is missing or differs. " + $firstErrors) }
-        else { Set-All $list 'FAIL' 'ACCEPTANCE_COMPILE_ERROR' ("the group failed to build for a reason outside the product surface: " + $firstErrors + " " + (Tail $b.Output 300)) }
+        $verdict = Get-GroupBuildVerdict $b.Output
+        Set-All $list $verdict[0] $verdict[1] $verdict[2]
         return
     }
     $outDir = Join-Path $acc ("groups\" + (Split-Path (Split-Path $g.project -Parent) -Leaf) + "\bin\Release\$tfm")
@@ -778,6 +828,40 @@ foreach ($c in @($pending | Where-Object { $_.group -eq 'driver' -and -not $resu
             if ($bo['AO-5.x.net10'].reason -ne 'AO_BENCH_OTHER_COMMIT') { $bad += "a bench report for another commit read $($bo['AO-5.x.net10'].reason)" }
             if ($bad) { Set-Result $c.id 'FAIL' 'ASSERTION' ($bad -join '; ') }
             else { Set-Result $c.id 'PASS' '' (($seen -join '; ') + '; bench 16 B claiming PASS -> FAIL AO5_ALLOCATES; AO-9 timing row -> PASS; bench 0 B against a suite FAIL -> AO5_BENCH_DISAGREES; bench outputsEqual false against a suite PASS -> AO9_BENCH_DISAGREES; agreeing records -> no red; bench for another commit -> AO_BENCH_OTHER_COMMIT; budget file: a good line passes, an unknown id, a second line and a budget with no tradeoff PR each go red') }
+        }
+        'SELF.suite-compile-break-is-a-fail' {
+            # A real break: a project that names a suite type (AoStreamSeam) and does not compile its file. This is the break that made
+            # the thread group read NOT RUN PRODUCT_MISSING on 2026-11-11. The verdict must be FAIL ACCEPTANCE_COMPILE_ERROR.
+            $bad = @()
+            $probe = Join-Path $work ("suite-break-" + [guid]::NewGuid().ToString('N').Substring(0, 8))
+            New-Item -ItemType Directory -Force -Path $probe | Out-Null
+            Set-Content -LiteralPath (Join-Path $probe 'Directory.Build.props') -Encoding utf8 -Value '<Project />'
+            Set-Content -LiteralPath (Join-Path $probe 'Directory.Build.targets') -Encoding utf8 -Value '<Project />'
+            Set-Content -LiteralPath (Join-Path $probe 'probe.csproj') -Encoding utf8 -Value '<Project Sdk="Microsoft.NET.Sdk"><PropertyGroup><TargetFramework>net10.0</TargetFramework><Nullable>disable</Nullable></PropertyGroup></Project>'
+            Set-Content -LiteralPath (Join-Path $probe 'Probe.cs') -Encoding utf8 -Value 'namespace Acceptance { public static class Probe { public static AoStreamSeam Seam; } }'
+            $pb = Invoke-Tool 'dotnet' @('build', (Join-Path $probe 'probe.csproj'), '-c', 'Release', '--nologo', '-v', 'q') -TimeoutSec 600
+            if ($pb.ExitCode -eq 0) { $bad += 'the broken project built' }
+            else {
+                $v = Get-GroupBuildVerdict $pb.Output
+                if ($v[0] -ne 'FAIL' -or $v[1] -ne 'ACCEPTANCE_COMPILE_ERROR' -or $v[2] -notmatch 'AoStreamSeam') { $bad += "a real break of the suite read $($v[0]) $($v[1]): $($v[2])" }
+            }
+            # Recorded compiler lines, one verdict each.
+            $cases = @(
+                @('suite type not linked', "AoSide.Product.cs(217,23): error CS0246: The type or namespace name 'AoStreamSeam' could not be found (are you missing a using directive or an assembly reference?)", 'FAIL', 'ACCEPTANCE_COMPILE_ERROR'),
+                @('member missing on a suite type', "X.cs(1,1): error CS1061: 'FrozenChain' does not contain a definition for 'Reset' and no accessible extension method 'Reset' accepting a first argument of type 'FrozenChain' could be found", 'FAIL', 'ACCEPTANCE_COMPILE_ERROR'),
+                @('product type missing', "X.cs(1,1): error CS0246: The type or namespace name 'CbcChain' could not be found (are you missing a using directive or an assembly reference?)", 'NOT RUN', 'PRODUCT_MISSING'),
+                @('product member missing', "X.cs(1,1): error CS1061: 'AesKey' does not contain a definition for 'EncryptBlocks' and no accessible extension method 'EncryptBlocks' accepting a first argument of type 'AesKey' could be found", 'NOT RUN', 'PRODUCT_MISSING'),
+                @('product and suite names together', "X.cs(1,1): error CS0246: The type or namespace name 'CbcChain' could not be found`nY.cs(2,2): error CS0234: The type or namespace name 'AoStreamSeam' does not exist in the namespace 'Acceptance'", 'FAIL', 'ACCEPTANCE_COMPILE_ERROR'),
+                @('syntax error', "X.cs(1,1): error CS1002: ; expected", 'FAIL', 'ACCEPTANCE_COMPILE_ERROR')
+            )
+            $seen = @()
+            foreach ($case in $cases) {
+                $v = Get-GroupBuildVerdict $case[1]
+                if ($v[0] -ne $case[2] -or $v[1] -ne $case[3]) { $bad += "$($case[0]) read $($v[0]) $($v[1]), wanted $($case[2]) $($case[3])" }
+                $seen += "$($case[0]) -> $($case[2]) $($case[3])"
+            }
+            if ($bad) { Set-Result $c.id 'FAIL' 'ASSERTION' ($bad -join '; ') }
+            else { Set-Result $c.id 'PASS' '' ('a real project that names AoStreamSeam without its file -> FAIL ACCEPTANCE_COMPILE_ERROR; ' + ($seen -join '; ')) }
         }
         'SELF.ao-row-verdicts-bite' {
             # AO-1 and AO-8 read other rows. All PASS must PASS; one FAIL or one NOT RUN must FAIL; no row at all must be NOT RUN.

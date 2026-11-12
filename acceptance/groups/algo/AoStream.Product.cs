@@ -6,8 +6,8 @@ namespace Acceptance
     /// <summary>One product state object (CbcChain or CtrCounter) and the Modes overload that takes it, bound through AoSeams.</summary>
     public sealed class ProductChain : IAoChain
     {
-        readonly AoSeams.StreamSeam _s;
-        public ProductChain(AoSeams.StreamSeam s) { _s = s; }
+        readonly AoStreamSeam _s;
+        public ProductChain(AoStreamSeam s) { _s = s; }
         public void Init(byte[] b, int offset) { _s.Init(b, offset); }
         public void Clear() { _s.Clear(); }
         public void Call(byte[] i, int io, int n, byte[] o, int oo) { _s.Call(i, io, n, o, oo); }
