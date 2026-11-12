@@ -353,3 +353,27 @@ What happened: the thread group links `groups/algo/AoSide.Product.cs`. That file
 Limit: the check reads the first quoted name of the errors CS0246, CS0234, CS0103, CS1061 and CS0117. A break of the suite that gives only another missing-symbol code (for example CS1503, a wrong argument type) still reads NOT RUN `PRODUCT_MISSING`.
 
 Disposition: keep. A group build that fails for a missing product name stays NOT RUN `PRODUCT_MISSING`, as before.
+
+## 22. A bench report is judged by the code it measured (added 2026-11-12)
+
+Conclusion: a bench report is valid on a head that has the same measured code and data as the commit the report names. The rule no longer compares the commit id with the head.
+
+Why: the old rule (the report's `commit` equals the head) could never hold for a report that is committed on its branch. The commit that adds the report changes the head, and a rebase does the same. Every bench row then read FAIL `AO_BENCH_OTHER_COMMIT`.
+
+| Part | Where |
+|---|---|
+| The rule: equal git object ids at the measured paths; `bench/files` by content | `Get-AoBenchCodeVerdict` in `run.ps1`; rule 6 of `ao-bench-schema.md` |
+| A report whose commit the repository does not hold reads FAIL `AO_BENCH_COMMIT_UNKNOWN` | the same function |
+| Self-check on a small git repository, 15 cases, and 2 more through `Read-AoBench` | `SELF.ao-bench-same-code-rule-bites` in `run.ps1` |
+| The 2 random test files have the names `large-4mib.dat` and `small-1k.dat` (they were `.bin`) | `ao9-files.tsv` |
+
+The measured paths: `src/NetSec.Core`, `src/NetSec.Core.NetCF`, `src/AsyncProxy.Local`, `src/AsyncProxy.Local.NetCF`, `acceptance/groups/algo/Frozen`, `Directory.Build.props`, and each entry of `bench/` but `bench/files`. They are the projects that the bench projects reference, the frozen original they compile, and the bench code.
+
+Limits:
+
+1. The report states its commit. The suite cannot prove that the benchmark ran on that commit. This is the same as before.
+2. The whole product project folders count. A change in `src/NetSec.Core` outside the crypto code makes the report stale.
+3. The sibling MMP.AsyncProxy repository is outside this repository, and the rule does not see it.
+4. The measured commit must stay in the repository. After a rebase it is on no branch, so the benchmark owner pushes a tag on it. A later bench schema can write the tree ids into the report, and then no tag is needed.
+
+Disposition: keep.
