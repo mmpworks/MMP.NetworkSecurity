@@ -3,39 +3,23 @@ using System;
 namespace NetSec.Crypto
 {
     /// <summary>
-    /// AES, FIPS 197, with 128, 192 or 256 bit keys. The step names follow the standard. The state is 16 bytes,
-    /// column by column, so row r of column c is state[r + 4c]. An instance holds only the round keys and is safe to share.
+    /// AES, FIPS 197, with 128, 192 or 256 bit keys. The state is four 32-bit words, column c in word c with row 0 in the high byte, so a
+    /// block loads and stores big-endian. Each round is one table lookup per state byte (AesTables.Te or Td) with the column rotations done
+    /// by shifts, so a block allocates nothing. Decrypt uses the equivalent inverse cipher (FIPS 197 section 5.3.5), with its round keys
+    /// built in the constructor. An instance holds only the two schedules and is safe to share between threads.
     /// The table lookups use secret indexes, which can leak through a CPU cache. Production AES uses hardware instructions.
     /// </summary>
     public sealed partial class AesKey
     {
         const int BlockSize = 16;
 
-        static readonly byte[] Sbox = new byte[256];
-        static readonly byte[] InverseSbox = new byte[256];
-        static readonly byte[] Times2 = new byte[256], Times3 = new byte[256];
-        static readonly byte[] Times9 = new byte[256], Times11 = new byte[256], Times13 = new byte[256], Times14 = new byte[256];
-
-        // state[i] takes the byte from state[map[i]].
+        // state[i] takes the byte from state[map[i]] (the walk and ShiftMap read these; the word path does ShiftRows by its index choice).
         static readonly int[] ShiftRowsMap = { 0, 5, 10, 15, 4, 9, 14, 3, 8, 13, 2, 7, 12, 1, 6, 11 };
         static readonly int[] InverseShiftRowsMap = { 0, 13, 10, 7, 4, 1, 14, 11, 8, 5, 2, 15, 12, 9, 6, 3 };
 
-        readonly byte[] _roundKeys;
+        readonly uint[] _ek;     // encrypt round keys: 4 (Nr + 1) words in FIPS 197 order
+        readonly uint[] _dk;     // decrypt round keys of the equivalent inverse cipher
         readonly int _rounds;
-
-        static AesKey()
-        {
-            BuildSbox();
-            for (int a = 0; a < 256; a++)
-            {
-                Times2[a] = Multiply((byte)a, 2);
-                Times3[a] = Multiply((byte)a, 3);
-                Times9[a] = Multiply((byte)a, 9);
-                Times11[a] = Multiply((byte)a, 11);
-                Times13[a] = Multiply((byte)a, 13);
-                Times14[a] = Multiply((byte)a, 14);
-            }
-        }
 
         public AesKey(byte[] key)
         {
@@ -43,163 +27,138 @@ namespace NetSec.Crypto
             if (key.Length != 16 && key.Length != 24 && key.Length != 32)
                 throw new ArgumentException("an AES key is 16, 24 or 32 bytes", "key");
             _rounds = key.Length / 4 + 6;
-            _roundKeys = ExpandKey(key, _rounds);
+            _ek = ExpandWords(key, _rounds);
+            _dk = InverseSchedule(_ek, _rounds);
         }
 
         public void EncryptBlock(byte[] i, int io, byte[] o, int oo)
         {
             Arg.Range(i, io, BlockSize);
             Arg.Range(o, oo, BlockSize);
-            byte[] state = new byte[BlockSize];
-            byte[] scratch = new byte[BlockSize];
-            Buffer.BlockCopy(i, io, state, 0, BlockSize);
-
-            AddRoundKey(state, 0);
-            for (int round = 1; round < _rounds; round++)
-            {
-                SubstituteAndMove(state, scratch, Sbox, ShiftRowsMap);
-                MixColumns(state);
-                AddRoundKey(state, round);
-            }
-            SubstituteAndMove(state, scratch, Sbox, ShiftRowsMap);
-            AddRoundKey(state, _rounds);
-
-            Buffer.BlockCopy(state, 0, o, oo, BlockSize);
+            // All 16 input bytes are read before the first output byte is written, so the same or an overlapping array is safe.
+            uint s0 = Endian.LoadBe32(i, io), s1 = Endian.LoadBe32(i, io + 4), s2 = Endian.LoadBe32(i, io + 8), s3 = Endian.LoadBe32(i, io + 12);
+            EncryptWords(ref s0, ref s1, ref s2, ref s3);
+            StoreBlock(s0, s1, s2, s3, o, oo);
         }
 
         public void DecryptBlock(byte[] i, int io, byte[] o, int oo)
         {
             Arg.Range(i, io, BlockSize);
             Arg.Range(o, oo, BlockSize);
-            byte[] state = new byte[BlockSize];
-            byte[] scratch = new byte[BlockSize];
-            Buffer.BlockCopy(i, io, state, 0, BlockSize);
+            uint s0 = Endian.LoadBe32(i, io), s1 = Endian.LoadBe32(i, io + 4), s2 = Endian.LoadBe32(i, io + 8), s3 = Endian.LoadBe32(i, io + 12);
+            DecryptWords(ref s0, ref s1, ref s2, ref s3);
+            StoreBlock(s0, s1, s2, s3, o, oo);
+        }
 
-            AddRoundKey(state, _rounds);
-            for (int round = _rounds - 1; round > 0; round--)
+        internal static void StoreBlock(uint s0, uint s1, uint s2, uint s3, byte[] o, int oo)
+        {
+            Endian.StoreBe32(s0, o, oo);
+            Endian.StoreBe32(s1, o, oo + 4);
+            Endian.StoreBe32(s2, o, oo + 8);
+            Endian.StoreBe32(s3, o, oo + 12);
+        }
+
+        /// <summary>One block, in words. The modes, CMAC and GCM call this, so their blocks allocate nothing either.</summary>
+        internal void EncryptWords(ref uint s0, ref uint s1, ref uint s2, ref uint s3)
+        {
+            uint[] rk = _ek, te = AesTables.Te;
+            byte[] sb = AesTables.Sbox;
+            s0 ^= rk[0]; s1 ^= rk[1]; s2 ^= rk[2]; s3 ^= rk[3];
+            int k = 4;
+            for (int round = 1; round < _rounds; round++, k += 4)
             {
-                SubstituteAndMove(state, scratch, InverseSbox, InverseShiftRowsMap);
-                AddRoundKey(state, round);
-                InverseMixColumns(state);
+                // Column c takes row r from column c + r (ShiftRows); row r's column of products is Te rotated right by 8 r bits.
+                uint t0 = te[s0 >> 24] ^ Ror8(te[(s1 >> 16) & 0xFF]) ^ Ror16(te[(s2 >> 8) & 0xFF]) ^ Ror24(te[s3 & 0xFF]) ^ rk[k];
+                uint t1 = te[s1 >> 24] ^ Ror8(te[(s2 >> 16) & 0xFF]) ^ Ror16(te[(s3 >> 8) & 0xFF]) ^ Ror24(te[s0 & 0xFF]) ^ rk[k + 1];
+                uint t2 = te[s2 >> 24] ^ Ror8(te[(s3 >> 16) & 0xFF]) ^ Ror16(te[(s0 >> 8) & 0xFF]) ^ Ror24(te[s1 & 0xFF]) ^ rk[k + 2];
+                uint t3 = te[s3 >> 24] ^ Ror8(te[(s0 >> 16) & 0xFF]) ^ Ror16(te[(s1 >> 8) & 0xFF]) ^ Ror24(te[s2 & 0xFF]) ^ rk[k + 3];
+                s0 = t0; s1 = t1; s2 = t2; s3 = t3;
             }
-            SubstituteAndMove(state, scratch, InverseSbox, InverseShiftRowsMap);
-            AddRoundKey(state, 0);
-
-            Buffer.BlockCopy(state, 0, o, oo, BlockSize);
+            // The last round has no MixColumns: SubBytes and ShiftRows byte by byte.
+            uint u0 = ((uint)sb[s0 >> 24] << 24) ^ ((uint)sb[(s1 >> 16) & 0xFF] << 16) ^ ((uint)sb[(s2 >> 8) & 0xFF] << 8) ^ sb[s3 & 0xFF] ^ rk[k];
+            uint u1 = ((uint)sb[s1 >> 24] << 24) ^ ((uint)sb[(s2 >> 16) & 0xFF] << 16) ^ ((uint)sb[(s3 >> 8) & 0xFF] << 8) ^ sb[s0 & 0xFF] ^ rk[k + 1];
+            uint u2 = ((uint)sb[s2 >> 24] << 24) ^ ((uint)sb[(s3 >> 16) & 0xFF] << 16) ^ ((uint)sb[(s0 >> 8) & 0xFF] << 8) ^ sb[s1 & 0xFF] ^ rk[k + 2];
+            uint u3 = ((uint)sb[s3 >> 24] << 24) ^ ((uint)sb[(s0 >> 16) & 0xFF] << 16) ^ ((uint)sb[(s1 >> 8) & 0xFF] << 8) ^ sb[s2 & 0xFF] ^ rk[k + 3];
+            s0 = u0; s1 = u1; s2 = u2; s3 = u3;
         }
 
-        void AddRoundKey(byte[] state, int round)
+        internal void DecryptWords(ref uint s0, ref uint s1, ref uint s2, ref uint s3)
         {
-            int offset = round * BlockSize;
-            for (int i = 0; i < BlockSize; i++) state[i] ^= _roundKeys[offset + i];
-        }
-
-        /// <summary>SubBytes and ShiftRows, or their inverses. The order of the two makes no difference to the result.</summary>
-        static void SubstituteAndMove(byte[] state, byte[] scratch, byte[] box, int[] map)
-        {
-            for (int i = 0; i < BlockSize; i++) scratch[i] = box[state[map[i]]];
-            Buffer.BlockCopy(scratch, 0, state, 0, BlockSize);
-        }
-
-        static void MixColumns(byte[] s)
-        {
-            for (int c = 0; c < BlockSize; c += 4)
+            uint[] rk = _dk, td = AesTables.Td;
+            byte[] ib = AesTables.InverseSbox;
+            s0 ^= rk[0]; s1 ^= rk[1]; s2 ^= rk[2]; s3 ^= rk[3];
+            int k = 4;
+            for (int round = 1; round < _rounds; round++, k += 4)
             {
-                byte a = s[c], b = s[c + 1], d = s[c + 2], e = s[c + 3];
-                s[c] = (byte)(Times2[a] ^ Times3[b] ^ d ^ e);
-                s[c + 1] = (byte)(a ^ Times2[b] ^ Times3[d] ^ e);
-                s[c + 2] = (byte)(a ^ b ^ Times2[d] ^ Times3[e]);
-                s[c + 3] = (byte)(Times3[a] ^ b ^ d ^ Times2[e]);
+                // Column c takes row r from column c - r (InvShiftRows).
+                uint t0 = td[s0 >> 24] ^ Ror8(td[(s3 >> 16) & 0xFF]) ^ Ror16(td[(s2 >> 8) & 0xFF]) ^ Ror24(td[s1 & 0xFF]) ^ rk[k];
+                uint t1 = td[s1 >> 24] ^ Ror8(td[(s0 >> 16) & 0xFF]) ^ Ror16(td[(s3 >> 8) & 0xFF]) ^ Ror24(td[s2 & 0xFF]) ^ rk[k + 1];
+                uint t2 = td[s2 >> 24] ^ Ror8(td[(s1 >> 16) & 0xFF]) ^ Ror16(td[(s0 >> 8) & 0xFF]) ^ Ror24(td[s3 & 0xFF]) ^ rk[k + 2];
+                uint t3 = td[s3 >> 24] ^ Ror8(td[(s2 >> 16) & 0xFF]) ^ Ror16(td[(s1 >> 8) & 0xFF]) ^ Ror24(td[s0 & 0xFF]) ^ rk[k + 3];
+                s0 = t0; s1 = t1; s2 = t2; s3 = t3;
             }
+            uint u0 = ((uint)ib[s0 >> 24] << 24) ^ ((uint)ib[(s3 >> 16) & 0xFF] << 16) ^ ((uint)ib[(s2 >> 8) & 0xFF] << 8) ^ ib[s1 & 0xFF] ^ rk[k];
+            uint u1 = ((uint)ib[s1 >> 24] << 24) ^ ((uint)ib[(s0 >> 16) & 0xFF] << 16) ^ ((uint)ib[(s3 >> 8) & 0xFF] << 8) ^ ib[s2 & 0xFF] ^ rk[k + 1];
+            uint u2 = ((uint)ib[s2 >> 24] << 24) ^ ((uint)ib[(s1 >> 16) & 0xFF] << 16) ^ ((uint)ib[(s0 >> 8) & 0xFF] << 8) ^ ib[s3 & 0xFF] ^ rk[k + 2];
+            uint u3 = ((uint)ib[s3 >> 24] << 24) ^ ((uint)ib[(s2 >> 16) & 0xFF] << 16) ^ ((uint)ib[(s1 >> 8) & 0xFF] << 8) ^ ib[s0 & 0xFF] ^ rk[k + 3];
+            s0 = u0; s1 = u1; s2 = u2; s3 = u3;
         }
 
-        static void InverseMixColumns(byte[] s)
-        {
-            for (int c = 0; c < BlockSize; c += 4)
-            {
-                byte a = s[c], b = s[c + 1], d = s[c + 2], e = s[c + 3];
-                s[c] = (byte)(Times14[a] ^ Times11[b] ^ Times13[d] ^ Times9[e]);
-                s[c + 1] = (byte)(Times9[a] ^ Times14[b] ^ Times11[d] ^ Times13[e]);
-                s[c + 2] = (byte)(Times13[a] ^ Times9[b] ^ Times14[d] ^ Times11[e]);
-                s[c + 3] = (byte)(Times11[a] ^ Times13[b] ^ Times9[d] ^ Times14[e]);
-            }
-        }
+        static uint Ror8(uint x) { return (x >> 8) | (x << 24); }
+        static uint Ror16(uint x) { return (x >> 16) | (x << 16); }
+        static uint Ror24(uint x) { return (x >> 24) | (x << 8); }
 
-        /// <summary>KeyExpansion, FIPS 197 section 5.2, on bytes. Each word is the word before it, changed at key-length steps, xor the word one key back.</summary>
-        static byte[] ExpandKey(byte[] key, int rounds)
+        /// <summary>KeyExpansion, FIPS 197 section 5.2, on words. Word i is the word before it, changed at key-length steps, xor the word one key back.</summary>
+        static uint[] ExpandWords(byte[] key, int rounds)
         {
             int keyWords = key.Length / 4;
-            int totalWords = 4 * (rounds + 1);
-            byte[] w = new byte[totalWords * 4];
-            Buffer.BlockCopy(key, 0, w, 0, key.Length);
-
-            byte[] temp = new byte[4];
-            byte rcon = 1;
-            for (int word = keyWords; word < totalWords; word++)
+            uint[] w = new uint[4 * (rounds + 1)];
+            for (int i = 0; i < keyWords; i++) w[i] = Endian.LoadBe32(key, 4 * i);
+            uint rcon = 1;
+            for (int i = keyWords; i < w.Length; i++)
             {
-                Buffer.BlockCopy(w, (word - 1) * 4, temp, 0, 4);
-                if (word % keyWords == 0)
+                uint temp = w[i - 1];
+                if (i % keyWords == 0)
                 {
-                    RotWord(temp);
-                    SubWord(temp);
-                    temp[0] ^= rcon;
-                    rcon = Times2[rcon];
+                    temp = SubstituteWord((temp << 8) | (temp >> 24)) ^ (rcon << 24);   // RotWord, SubWord, xor Rcon
+                    rcon = (rcon << 1) ^ ((rcon & 0x80) != 0 ? 0x11Bu : 0u);          // the next Rcon: doubled in GF(2^8)
                 }
-                else if (keyWords > 6 && word % keyWords == 4)
+                else if (keyWords > 6 && i % keyWords == 4)
                 {
-                    SubWord(temp);
+                    temp = SubstituteWord(temp);
                 }
-                for (int i = 0; i < 4; i++) w[word * 4 + i] = (byte)(w[(word - keyWords) * 4 + i] ^ temp[i]);
+                w[i] = w[i - keyWords] ^ temp;
             }
             return w;
         }
 
-        static void RotWord(byte[] t)
+        static uint SubstituteWord(uint w)
         {
-            byte first = t[0];
-            t[0] = t[1]; t[1] = t[2]; t[2] = t[3]; t[3] = first;
+            byte[] sb = AesTables.Sbox;
+            return ((uint)sb[w >> 24] << 24) | ((uint)sb[(w >> 16) & 0xFF] << 16) | ((uint)sb[(w >> 8) & 0xFF] << 8) | sb[w & 0xFF];
         }
 
-        static void SubWord(byte[] t)
+        /// <summary>
+        /// The equivalent inverse cipher's round keys (FIPS 197 section 5.3.5): the encrypt keys in reverse round order, with InvMixColumns
+        /// on every round key but the first and the last. InvMixColumns of a byte b is Td(S(b)), because Td holds the products of I(x).
+        /// </summary>
+        static uint[] InverseSchedule(uint[] ek, int rounds)
         {
-            for (int i = 0; i < 4; i++) t[i] = Sbox[t[i]];
+            uint[] dk = new uint[ek.Length];
+            for (int round = 0; round <= rounds; round++)
+                for (int j = 0; j < 4; j++)
+                {
+                    uint w = ek[4 * (rounds - round) + j];
+                    dk[4 * round + j] = round == 0 || round == rounds ? w : InverseMixWord(w);
+                }
+            return dk;
         }
 
-        /// <summary>The S-box is the inverse in GF(2^8), then an affine map (FIPS 197 section 5.1.1). 3 generates the field, so powers of 3 give the inverses.</summary>
-        static void BuildSbox()
+        static uint InverseMixWord(uint w)
         {
-            byte[] power = new byte[255];
-            int[] log = new int[256];
-            byte x = 1;
-            for (int i = 0; i < 255; i++)
-            {
-                power[i] = x;
-                log[x] = i;
-                x = (byte)(x ^ Xtime(x));
-            }
-            for (int a = 0; a < 256; a++)
-            {
-                byte inverse = a == 0 ? (byte)0 : power[(255 - log[a]) % 255];
-                byte s = (byte)(inverse ^ Rotl8(inverse, 1) ^ Rotl8(inverse, 2) ^ Rotl8(inverse, 3) ^ Rotl8(inverse, 4) ^ 0x63);
-                Sbox[a] = s;
-                InverseSbox[s] = (byte)a;
-            }
-        }
-
-        static byte Rotl8(byte v, int n) { return (byte)((v << n) | (v >> (8 - n))); }
-
-        /// <summary>Multiply by 2 in GF(2^8), modulo x^8 + x^4 + x^3 + x + 1.</summary>
-        static byte Xtime(byte a) { return (byte)((a << 1) ^ ((a & 0x80) != 0 ? 0x1b : 0)); }
-
-        static byte Multiply(byte a, int b)
-        {
-            byte product = 0;
-            for (byte shifted = a; b != 0; b >>= 1)
-            {
-                if ((b & 1) != 0) product ^= shifted;
-                shifted = Xtime(shifted);
-            }
-            return product;
+            uint[] td = AesTables.Td;
+            byte[] sb = AesTables.Sbox;
+            return td[sb[w >> 24]] ^ Ror8(td[sb[(w >> 16) & 0xFF]]) ^ Ror16(td[sb[(w >> 8) & 0xFF]]) ^ Ror24(td[sb[w & 0xFF]]);
         }
     }
 }
