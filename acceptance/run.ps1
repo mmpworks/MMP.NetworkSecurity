@@ -1022,7 +1022,8 @@ if ($sel | Where-Object { $_.id -eq 'AO-0.row-list-matches' }) {
         $v = Get-AoRowListVerdict $aoList $aoRun $AoSlice
         $dis = @(Get-AoBenchDisagreements $AoBenchReport $aoRun)
         $bud = @(Get-AoBudgetReds (Join-Path $acc 'ao-budgets.tsv') $aoList)
-        $benchNote = if ($AoBenchReport) { " Bench report: $AoBenchReport ($script:aoBenchCommitNote)." } else { ' No bench report (-AoBenchReport), so the bench rows are absent.' }
+        # The file name only: the run report goes into a public repository, and the folder of the bench report is a local path.
+        $benchNote = if ($AoBenchReport) { " Bench report: $(Split-Path -Leaf $AoBenchReport) ($script:aoBenchCommitNote)." } else { ' No bench report (-AoBenchReport), so the bench rows are absent.' }
         $extra = ''
         if ($dis.Count -gt 0) { $extra += '. Bench disagrees with the suite: ' + ($dis -join '; ') }
         if ($bud.Count -gt 0) { $extra += '. Budget file: ' + ($bud -join '; ') }
