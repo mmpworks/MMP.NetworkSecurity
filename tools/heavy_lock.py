@@ -33,7 +33,12 @@ with the prefix proceeds as before, and it does not wait behind the waiters that
 3. A hold file that cannot be read stays closed for every run until its expiry, when the expiry can still be read. With no readable expiry, or
    an expiry more than 720 minutes ahead, the file is ignored (open). `status` says which.
 4. `status` keeps its exit code (0 free, 2 held) and names the hold on a second line.
-5. Each worktree runs its own copy of this file. A copy from before the hold switch does not read the hold file, so a run started from such a
+5. A window that runs longer than planned: set --minutes with a margin, and run `hold` again to extend it. A new `hold` replaces the old one.
+6. A read of the hold file that the OS refuses (another process has the file) is tried 3 times, 50 ms apart. When all 3 fail, no run takes
+   the lock on that pass, and `status` says the file cannot be read now. `hold` and `release` try a rename or a delete 5 times before they
+   stop with LOCK_ERROR.
+7. Any run can pass a hold with a label that starts with the prefix. The hold is a tool for runs that cooperate, not a guard.
+8. Each worktree runs its own copy of this file. A copy from before the hold switch does not read the hold file, so a run started from such a
    worktree ignores the hold.
 """
 import argparse
@@ -65,6 +70,9 @@ LOCK_NAME = "heavy-run.lock"
 INFO_NAME = "heavy-run.info"
 HOLD_NAME = "heavy-run.hold"
 MAX_HOLD_MINUTES = 720.0                                                # 12 hours: no quiet window is longer, so a larger expiry is a mistake
+HOLD_IO_TRIES = 3                                                       # reads of the hold file before "unreadable"
+HOLD_WRITE_TRIES = 5                                                    # renames or deletes of the hold file before LOCK_ERROR
+HOLD_IO_PAUSE_SECONDS = 0.05
 
 
 def process_start(pid):
@@ -199,18 +207,40 @@ def tie_children_to_this_process():
     # The job handle stays open until this process ends; closing it (at exit or by a kill) is what kills the members.
 
 
+def read_hold_bytes(path):
+    return path.read_bytes()
+
+
+def retry_in_use(action):
+    """Runs a write on the hold file again when Windows says the file is in use (a waiter reads it, a scanner has it). Python opens files
+    without FILE_SHARE_DELETE, so a rename or a delete can meet a reader. The last PermissionError goes to the caller."""
+    for attempt in range(HOLD_WRITE_TRIES):
+        try:
+            return action()
+        except PermissionError:
+            if attempt == HOLD_WRITE_TRIES - 1:
+                raise
+            time.sleep(HOLD_IO_PAUSE_SECONDS)
+
+
 def read_hold(directory, now=None):
     """The hold (a quiet window) as a dict with "state" and, when it has them, "label", "allow" and "expires" (epoch seconds).
     States: "none" (no file); "active"; "expired" (past its expiry, so it counts as gone: a forgotten hold never stops the machine for ever);
     "closed" (the file cannot be read, but its expiry can, and that is in the future: the hold stays on until then, for every label);
-    "open" (the file cannot be read and names no usable expiry, or the expiry is more than MAX_HOLD_MINUTES ahead: ignored)."""
+    "open" (the content cannot be read and names no usable expiry, or the expiry is more than MAX_HOLD_MINUTES ahead: ignored);
+    "unreadable" (the file exists and the OS refuses the read, 3 times: another process has it. No run takes the lock on that pass, because
+    one failed read must not open a window. This lasts only while the file stays unreadable, and `status` names it)."""
     now = time.time() if now is None else now
-    try:
-        text = (directory / HOLD_NAME).read_text(encoding="utf-8")
-    except FileNotFoundError:
-        return {"state": "none"}
-    except (OSError, ValueError) as e:
-        return {"state": "open", "why": f"the hold file cannot be read ({e})"}
+    for attempt in range(HOLD_IO_TRIES):
+        try:
+            text = read_hold_bytes(directory / HOLD_NAME).decode("utf-8", errors="replace")
+            break
+        except FileNotFoundError:
+            return {"state": "none"}
+        except OSError as e:
+            if attempt == HOLD_IO_TRIES - 1:
+                return {"state": "unreadable", "why": f"the hold file cannot be read now ({e})"}
+            time.sleep(HOLD_IO_PAUSE_SECONDS)
     try:
         data = json.loads(text)
         if not isinstance(data, dict) or isinstance(data.get("expires"), bool) or not isinstance(data.get("expires"), (int, float)):
@@ -229,10 +259,20 @@ def read_hold(directory, now=None):
 
 
 def stops(hold, label):
-    """True when this hold makes a run with this label wait. An empty allowed prefix lets no run through."""
+    """True when this hold makes a run with this label wait. An empty allowed prefix lets no run through. A hold file that the OS refuses
+    to read stops every label: its allowed prefix is unknown."""
+    if hold["state"] == "unreadable":
+        return True
     if hold["state"] not in ("active", "closed"):
         return False
     return not (hold["allow"] and label.startswith(hold["allow"]))
+
+
+def held_text(hold):
+    """What a stopped run prints after "HEAVY_LOCK " and after "LOCK_TIMEOUT: "."""
+    if hold["state"] == "unreadable":
+        return f"held: {hold['why']}; no run takes the lock while this lasts"
+    return f"held for window '{hold['label']}' until {until(hold)}"
 
 
 def until(hold):
@@ -246,6 +286,8 @@ def describe_hold(hold):
         return None
     if state == "open":
         return f"heavy-run hold: {hold['why']}: ignored (open)"
+    if state == "unreadable":
+        return f"heavy-run hold: {hold['why']}: no run takes the lock while this lasts"
     if state == "expired":
         return f"heavy-run hold: '{hold['label']}' expired at {until(hold)}: it counts as gone"
     if state == "closed":
@@ -266,7 +308,7 @@ def set_hold(directory, label, allow, minutes):
         directory.mkdir(parents=True, exist_ok=True)
         temp = path.with_suffix(".tmp")
         temp.write_text(json.dumps(data), encoding="utf-8")
-        os.replace(temp, path)                                           # a reader never sees a half-written hold
+        retry_in_use(lambda: os.replace(temp, path))                     # a rename: a reader never sees a half-written hold
     except OSError as e:
         raise LockError(f"cannot write the hold file in {directory}: {e}") from e
     print(f"HEAVY_LOCK hold set: {describe_hold(read_hold(directory))}. A run that holds the lock now goes on to its end.")
@@ -275,7 +317,7 @@ def set_hold(directory, label, allow, minutes):
 
 def release_hold(directory):
     try:
-        (directory / HOLD_NAME).unlink()
+        retry_in_use(lambda: os.unlink(directory / HOLD_NAME))
     except FileNotFoundError:
         print("HEAVY_LOCK no hold was set")
         return 0
@@ -389,7 +431,7 @@ def run(directory, label, wait_minutes, command):
                 break
             if stopped != last_stopped or time.time() - last_print >= PRINT_EVERY_SECONDS:      # a hold that begins or ends is named at once
                 if stopped:
-                    print(f"HEAVY_LOCK held for window '{hold['label']}' until {until(hold)}; this run keeps its place in line", flush=True)
+                    print(f"HEAVY_LOCK {held_text(hold)}; this run keeps its place in line", flush=True)
                 else:
                     line = f"{ahead} earlier waiting run(s) first, then " if ahead else ""
                     print(f"HEAVY_LOCK waiting on {line}{describe(info)}", flush=True)
@@ -397,7 +439,7 @@ def run(directory, label, wait_minutes, command):
                 last_stopped = stopped
             if deadline is not None and time.time() >= deadline:
                 if stopped:
-                    print(f"LOCK_TIMEOUT: held for window '{hold['label']}' until {until(hold)}, after {wait_minutes:g} min", flush=True)
+                    print(f"LOCK_TIMEOUT: {held_text(hold)}, after {wait_minutes:g} min", flush=True)
                 else:
                     print(f"LOCK_TIMEOUT: still held by {describe(read_info(directory))} after {wait_minutes:g} min", flush=True)
                 return EXIT_TIMEOUT

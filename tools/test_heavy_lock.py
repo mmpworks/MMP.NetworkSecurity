@@ -550,6 +550,103 @@ class HeavyLock(unittest.TestCase):
         self.assertEqual(r.returncode, 0, r.stdout + r.stderr)
         self.assertIn("ignored", self.tool("status").stdout)
 
+    # The hold file while another process touches it (a scanner, or the writer's rename): a read that fails is tried again, and a read that
+    # keeps failing stops every run on that pass. Before this rule, one failed read opened the window for one pass.
+    @unittest.skipUnless(os.name == "nt", "the test opens the file with no sharing through the Windows API")
+    def test_a_hold_file_that_another_process_keeps_closed_stops_every_run(self):
+        import ctypes
+        from ctypes import wintypes
+        self.write_hold("bench window", "richard")
+        kernel32 = ctypes.WinDLL("kernel32", use_last_error=True)
+        kernel32.CreateFileW.restype = wintypes.HANDLE
+        kernel32.CreateFileW.argtypes = [wintypes.LPCWSTR, wintypes.DWORD, wintypes.DWORD, ctypes.c_void_p, wintypes.DWORD, wintypes.DWORD, wintypes.HANDLE]
+        kernel32.CloseHandle.argtypes = [wintypes.HANDLE]
+        handle = kernel32.CreateFileW(str(self.dir / "heavy-run.hold"), 0x80000000, 0, None, 3, 0, None)      # GENERIC_READ, share nothing, OPEN_EXISTING
+        self.assertNotEqual(handle, wintypes.HANDLE(-1).value, f"CreateFileW failed: {ctypes.get_last_error()}")
+        try:
+            r = self.tool("run", "--label", "richard s0 bench T", "--wait-minutes", "0.05", "--", *PY, "print('must not run')")
+            self.assertEqual(r.returncode, 75, r.stdout + r.stderr)
+            self.assertNotIn("must not run", r.stdout)
+            self.assertIn("HEAVY_LOCK held: the hold file cannot be read now", r.stdout)
+            self.assertIn("cannot be read now", self.tool("status").stdout)
+        finally:
+            kernel32.CloseHandle(handle)
+        r = self.tool("run", "--label", "richard s0 bench T", "--wait-minutes", "0.2", "--", *PY, "print('bench ran')")
+        self.assertEqual(r.returncode, 0, "the same file is read again once the other process lets go: " + r.stdout + r.stderr)
+
+    def test_a_hold_read_that_fails_once_is_read_again(self):
+        from unittest import mock
+        self.write_hold("bench window", "richard")
+        real = (self.dir / "heavy-run.hold").read_bytes()
+        with mock.patch.object(heavy_lock, "read_hold_bytes", side_effect=[PermissionError(13, "in use"), real]) as reader:
+            hold = heavy_lock.read_hold(self.dir)
+        self.assertEqual(reader.call_count, 2)
+        self.assertEqual((hold["state"], hold["label"]), ("active", "bench window"))
+        self.assertTrue(heavy_lock.stops(hold, "gate S0"))
+        self.assertFalse(heavy_lock.stops(hold, "richard s0 bench T"))
+
+    def test_a_hold_read_that_fails_three_times_stops_every_label_on_that_pass(self):
+        from unittest import mock
+        self.write_hold("bench window", "richard")
+        with mock.patch.object(heavy_lock, "read_hold_bytes", side_effect=PermissionError(13, "in use")) as reader:
+            hold = heavy_lock.read_hold(self.dir)
+        self.assertEqual(reader.call_count, 3)
+        self.assertEqual(hold["state"], "unreadable")
+        self.assertTrue(heavy_lock.stops(hold, "richard s0 bench T"), "no label passes a hold file that cannot be read")
+        self.assertIn("cannot be read now", heavy_lock.describe_hold(hold))
+
+    def test_hold_and_release_try_again_when_the_file_is_in_use(self):
+        from unittest import mock
+        real_replace, real_unlink = os.replace, os.unlink
+        calls = {"replace": 0, "unlink": 0}
+
+        def replace_once_busy(src, dst):
+            calls["replace"] += 1
+            if calls["replace"] == 1:
+                raise PermissionError(13, "in use")
+            return real_replace(src, dst)
+
+        def unlink_once_busy(path):
+            calls["unlink"] += 1
+            if calls["unlink"] == 1:
+                raise PermissionError(13, "in use")
+            return real_unlink(path)
+
+        with mock.patch.object(heavy_lock.os, "replace", side_effect=replace_once_busy):
+            self.assertEqual(heavy_lock.set_hold(self.dir, "bench window", "richard", 30.0), 0)
+        self.assertEqual(calls["replace"], 2)
+        self.assertEqual(heavy_lock.read_hold(self.dir)["state"], "active")
+        with mock.patch.object(heavy_lock.os, "unlink", side_effect=unlink_once_busy):
+            self.assertEqual(heavy_lock.release_hold(self.dir), 0)
+        self.assertEqual(calls["unlink"], 2)
+        self.assertEqual(heavy_lock.read_hold(self.dir)["state"], "none")
+
+    def test_hold_and_release_give_a_lock_error_when_the_file_stays_in_use(self):
+        from unittest import mock
+        with mock.patch.object(heavy_lock.os, "replace", side_effect=PermissionError(13, "in use")):
+            with self.assertRaises(heavy_lock.LockError):
+                heavy_lock.set_hold(self.dir, "bench window", "richard", 30.0)
+        self.write_hold("bench window", "richard")
+        with mock.patch.object(heavy_lock.os, "unlink", side_effect=PermissionError(13, "in use")):
+            with self.assertRaises(heavy_lock.LockError):
+                heavy_lock.release_hold(self.dir)
+        self.assertEqual(heavy_lock.read_hold(self.dir)["state"], "active", "a release that failed leaves the hold on")
+
+    def test_an_allowed_run_passes_a_live_ticket_of_the_old_format_during_a_hold(self):
+        # A waiter started from a worktree whose copy of the tool is from before the hold writes a ticket with no label.
+        folder = self.dir / "tickets"
+        folder.mkdir(parents=True)
+        sleeper = subprocess.Popen(SLEEP_60)
+        self.procs.append(sleeper)
+        (folder / f"{1:020d}-{sleeper.pid}.json").write_text(json.dumps({"pid": sleeper.pid, "start": heavy_lock.process_start(sleeper.pid)}), encoding="utf-8")
+        self.write_hold("bench window", "richard")
+        r = self.tool("run", "--label", "richard s0 bench T", "--wait-minutes", "0.2", "--", *PY, "print('bench ran')")
+        self.assertEqual(r.returncode, 0, r.stdout + r.stderr)
+        self.assertIn("bench ran", r.stdout)
+        self.assertEqual(self.tool("release").returncode, 0)
+        r = self.tool("run", "--label", "richard s0 bench T", "--wait-minutes", "0.05", "--", *PY, "print('must not run')")
+        self.assertEqual(r.returncode, 75, "with no hold, the same ticket goes first: " + r.stdout + r.stderr)
+
     def test_process_start_is_stable_for_a_live_process_and_none_for_a_dead_one(self):
         p = subprocess.Popen(SLEEP_60)
         self.procs.append(p)
