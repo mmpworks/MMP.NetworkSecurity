@@ -796,7 +796,7 @@ Later checks, 2026-11-06:
 
 ## 5.21 Sealed chain cases, run (2026-11-06, verifier 6469627)
 
-Sample and commands: `C:/Users/smuch/AppData/Local/Temp/claude/3097a1816bc1384a/cb141024-1785-4e15-96bb-23f4155ffdf2/scratchpad/sealed-sample/COMMANDS.txt`.
+Sample and commands: `<temp>/claude/3097a1816bc1384a/cb141024-1785-4e15-96bb-23f4155ffdf2/scratchpad/sealed-sample/COMMANDS.txt`.
 
 | Case | Section 7 walk | Command line, `verify --ledger` |
 |---|---|---|
@@ -822,4 +822,4 @@ Limits:
 
 ## 5.23 Hidden wire ranges, checked by decryption (2026-11-06, main 4f90948, seed 7)
 
-Lesson 1: 6 of 6. Lesson 6 `pinBlock` 16 to 31: 4 of 4, ISO 9564 format 4, with PAN block from 4111111111111111. Lesson 7 TLS 1.1 `cipher` after header and IV: 5 of 5, holding text, 20-byte MAC and padding. Lesson 8 SSH `encryptedPacket`: 40 of 40, 24 CTR then 16 CBC, length inside. Lesson 9 SSH: 11 of 11. Scripts: `C:/Users/smuch/AppData/Local/Temp/claude/3097a1816bc1384a/cb141024-1785-4e15-96bb-23f4155ffdf2/scratchpad/r182/decrypt.py`, `more.py`, `ssh2.py`.
+Lesson 1: 6 of 6. Lesson 6 `pinBlock` 16 to 31: 4 of 4, ISO 9564 format 4, with PAN block from 4111111111111111. Lesson 7 TLS 1.1 `cipher` after header and IV: 5 of 5, holding text, 20-byte MAC and padding. Lesson 8 SSH `encryptedPacket`: 40 of 40, 24 CTR then 16 CBC, length inside. Lesson 9 SSH: 11 of 11. Scripts: `<temp>/claude/3097a1816bc1384a/cb141024-1785-4e15-96bb-23f4155ffdf2/scratchpad/r182/decrypt.py`, `more.py`, `ssh2.py`.
