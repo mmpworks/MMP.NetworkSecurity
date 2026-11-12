@@ -413,6 +413,8 @@ Conclusion: 4 changes from the design review of slice S1 are in the suite before
 | The bench schema field `runtime` has the name `mergeRuntime`: it is the runtime of the process that merged the parts. The runtime of a row is in its id. The suite does not read the field | `ao-bench-schema.md` |
 | A row for the static `Gcm.TryOpen` wrapper, with the budget of the static `Gcm.Seal` wrapper (PRD 7.3 item 16): both build a `GcmKey` on each call | `AO-5.aes-gcm-static-open.net10` in `groups/algo/AoAlloc.Product.cs`, `ao-rows.tsv`, `ao-budgets.tsv` |
 
+| The `tradeoff_pr` field of a budget line above 0 is a PR number (`#` and digits). Any other text is a red, in the AO-5 clause (`AO_BUDGET_NO_TRADEOFF`) and in `AO-0`. So a text that stands for a number that is still to come cannot merge | `AoBudgets.IsPrNumber` in `groups/algo/AoBudgets.cs`, `Get-AoBudgetReds` in `run.ps1`, condition 4 in the header of `ao-budgets.tsv`; self-check cases in `SELF.ao-row-list-bites` and `SELF.ao5-meter-bites` |
+
 The row list has 210 rows (209 before).
 
 The row set of rule 3 and the value 5.00 were fixed on 2026-11-12, before any S1 code. A change of either is a decision of the lead or of the owner, recorded before the PR that makes it merges.

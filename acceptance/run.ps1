@@ -428,6 +428,7 @@ function Get-AoBudgetReds([string]$path, $list) {
         $b = 0.0
         if (-not [double]::TryParse($f[1], [System.Globalization.NumberStyles]::Float, [System.Globalization.CultureInfo]::InvariantCulture, [ref]$b) -or $b -lt 0) { $reds += "ao-budgets.tsv: ${id} budget_bytes '$($f[1])' is not a number of 0 or more" }
         elseif ($b -gt 0 -and -not $f[4].Trim()) { $reds += "ao-budgets.tsv: ${id} has a budget above 0 and no tradeoff PR" }
+        elseif ($b -gt 0 -and $f[4].Trim() -notmatch '^#(?<number>[0-9]+)$') { $reds += "ao-budgets.tsv: ${id} has the tradeoff_pr '$($f[4].Trim())', which is not a PR number (# and digits)" }
     }
     return $reds
 }
@@ -940,10 +941,17 @@ foreach ($c in @($pending | Where-Object { $_.group -eq 'driver' -and -not $resu
             Set-Content -LiteralPath $bt -Encoding utf8 -Value @("id`tbudget_bytes`tunit`tfrom_slice`ttradeoff_pr", "X.a`t64`tmessage`tS1`t#420", "X.a`t32`tmessage`tS1`t#421", "X.z`t0`tmessage`tS1`t", "X.b`t16`tblock`tS1`t ")
             $budBad = @(Get-AoBudgetReds $bt $l)
             if (-not ($budBad -match 'second line') -or -not ($budBad -match 'not a row') -or -not ($budBad -match 'no tradeoff PR')) { $bad += "the budget check missed a bad line: " + ($budBad -join ' | ') }
+            # The tradeoff_pr field is a PR number: "#" and digits. A text that stands for a number that is still to come is a red.
+            foreach ($notNumber in '#S1-PR-NUMBER-PENDING', '#', '420', '#420 and more', 'PR 420') {
+                Set-Content -LiteralPath $bt -Encoding utf8 -Value @("id`tbudget_bytes`tunit`tfrom_slice`ttradeoff_pr", "X.a`t64`tmessage`tS1`t$notNumber")
+                if (-not (@(Get-AoBudgetReds $bt $l) -match 'is not a PR number')) { $bad += "the budget check took '$notNumber' as a tradeoff PR" }
+            }
+            Set-Content -LiteralPath $bt -Encoding utf8 -Value @("id`tbudget_bytes`tunit`tfrom_slice`ttradeoff_pr", "X.a`t0`tmessage`tS1`tnone")
+            if (@(Get-AoBudgetReds $bt $l).Count -ne 0) { $bad += "a budget of 0 needs no tradeoff PR, and the check went red" }
             $bo = Read-AoBench $bj $bl 'S0' { param($commit) [pscustomobject]@{ reason = 'AO_BENCH_OTHER_COMMIT'; detail = "the measured code differs from $commit" } }
             if ($bo['AO-5.x.net10'].reason -ne 'AO_BENCH_OTHER_COMMIT') { $bad += "a bench report for another commit read $($bo['AO-5.x.net10'].reason)" }
             if ($bad) { Set-Result $c.id 'FAIL' 'ASSERTION' ($bad -join '; ') }
-            else { Set-Result $c.id 'PASS' '' (($seen -join '; ') + '; bench 16 B claiming PASS -> FAIL AO5_ALLOCATES; AO-9 timing row -> PASS; bench 0 B against a suite FAIL -> AO5_BENCH_DISAGREES; bench outputsEqual false against a suite PASS -> AO9_BENCH_DISAGREES; agreeing records -> no red; bench for another commit -> AO_BENCH_OTHER_COMMIT; budget file: a good line passes, an unknown id, a second line and a budget with no tradeoff PR each go red') }
+            else { Set-Result $c.id 'PASS' '' (($seen -join '; ') + '; bench 16 B claiming PASS -> FAIL AO5_ALLOCATES; AO-9 timing row -> PASS; bench 0 B against a suite FAIL -> AO5_BENCH_DISAGREES; bench outputsEqual false against a suite PASS -> AO9_BENCH_DISAGREES; agreeing records -> no red; bench for another commit -> AO_BENCH_OTHER_COMMIT; budget file: a good line passes, an unknown id, a second line and a budget with no tradeoff PR each go red; a tradeoff_pr that is no PR number (#S1-PR-NUMBER-PENDING and 4 more texts) goes red; a budget of 0 needs none') }
         }
         'SELF.ao-bench-same-code-rule-bites' {
             # A small git repository with the measured paths and 2 paths that are not measured. The bench report names commit A.
