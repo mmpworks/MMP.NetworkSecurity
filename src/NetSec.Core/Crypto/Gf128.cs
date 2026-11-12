@@ -46,31 +46,35 @@ namespace NetSec.Crypto
             v0 = (v0 >> 1) ^ fold;
         }
 
-        /// <summary>y = y H, with t the table of H. Reads the 16 bytes of y from the last to the first, low nibble then high.</summary>
+        /// <summary>
+        /// y = y H, with t the table of H. Reads the 16 bytes of y from the last to the first, low nibble then high: each nibble shifts
+        /// the running product right by 4 bits (folding back the 4 bits that fall off) and adds the table entry of that nibble. The words
+        /// go last to first and each word's bytes low to high by shifts, so no byte index is computed.
+        /// </summary>
         public static void Multiply(uint[] t, ref uint y0, ref uint y1, ref uint y2, ref uint y3)
         {
+            uint z0 = 0, z1 = 0, z2 = 0, z3 = 0;
+            Fold(t, y3, ref z0, ref z1, ref z2, ref z3);
+            Fold(t, y2, ref z0, ref z1, ref z2, ref z3);
+            Fold(t, y1, ref z0, ref z1, ref z2, ref z3);
+            Fold(t, y0, ref z0, ref z1, ref z2, ref z3);
+            y0 = z0; y1 = z1; y2 = z2; y3 = z3;
+        }
+
+        /// <summary>The 8 nibble steps of one word of y: bytes low to high, each low nibble then high nibble.</summary>
+        static void Fold(uint[] t, uint word, ref uint z0, ref uint z1, ref uint z2, ref uint z3)
+        {
             ushort[] r = Reduce4;
-            uint x0 = y0, x1 = y1, x2 = y2, x3 = y3;
-            int b = (int)(x3 & 0xFF);
-            int at = 4 * (b & 0xF);
-            uint z0 = t[at], z1 = t[at + 1], z2 = t[at + 2], z3 = t[at + 3];
-            int nibbleHigh = b >> 4;
-            for (int byteIndex = 15; ; )
+            for (int shift = 0; shift < 32; shift += 4)
             {
                 uint fall = z3 & 0xF;
-                z3 = (z3 >> 4) | (z2 << 28); z2 = (z2 >> 4) | (z1 << 28); z1 = (z1 >> 4) | (z0 << 28); z0 = (z0 >> 4) ^ ((uint)r[fall] << 16);
-                at = 4 * nibbleHigh;
-                z0 ^= t[at]; z1 ^= t[at + 1]; z2 ^= t[at + 2]; z3 ^= t[at + 3];
-                if (--byteIndex < 0) break;
-                uint word = byteIndex < 4 ? x0 : byteIndex < 8 ? x1 : byteIndex < 12 ? x2 : x3;
-                b = (int)((word >> (24 - 8 * (byteIndex % 4))) & 0xFF);
-                nibbleHigh = b >> 4;
-                fall = z3 & 0xF;
-                z3 = (z3 >> 4) | (z2 << 28); z2 = (z2 >> 4) | (z1 << 28); z1 = (z1 >> 4) | (z0 << 28); z0 = (z0 >> 4) ^ ((uint)r[fall] << 16);
-                at = 4 * (b & 0xF);
+                z3 = (z3 >> 4) | (z2 << 28);
+                z2 = (z2 >> 4) | (z1 << 28);
+                z1 = (z1 >> 4) | (z0 << 28);
+                z0 = (z0 >> 4) ^ ((uint)r[fall] << 16);
+                int at = (int)((word >> shift) & 0xF) << 2;
                 z0 ^= t[at]; z1 ^= t[at + 1]; z2 ^= t[at + 2]; z3 ^= t[at + 3];
             }
-            y0 = z0; y1 = z1; y2 = z2; y3 = z3;
         }
     }
 }
