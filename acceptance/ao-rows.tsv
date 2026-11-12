@@ -142,6 +142,7 @@ AO-5.hmac.cf	FAIL	AO5_ALLOCATES	S3	suite
 AO-5.tdes.cf	-	-	S0	suite
 AO-5.dukpt-derive.cf	FAIL	AO5_ALLOCATES	S4	suite
 AO-5.aes-gcm-static.net10	FAIL	AO5_ALLOCATES	S1	suite
+AO-5.aes-gcm-static-open.net10	FAIL	AO5_ALLOCATES	S1	suite
 AO-5.aes-ecb-into.net10	NOT RUN	PRODUCT_MISSING	S1	suite
 AO-5.aes-ecb-into.cf	NOT RUN	PRODUCT_MISSING	S1	suite
 AO-5.aes-cbc-into.net10	NOT RUN	PRODUCT_MISSING	S1	suite

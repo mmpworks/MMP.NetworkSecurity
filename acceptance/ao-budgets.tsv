@@ -11,5 +11,9 @@
 #   2. The AO-5 clause judges against the budget, so the row's state stays inside the closed rule of PRD 4.2.
 #   3. This file sits inside acceptance/ (PIN and the scope check cover it). A line with budget_bytes above 0 and an empty tradeoff_pr
 #      is a red.
+#   4. tradeoff_pr of a line with budget_bytes above 0 is a PR number: "#" and digits (for example #420). Any other text is a red, so a
+#      text that stands for a number that is still to come cannot merge (the lead, 2026-11-12).
 # A row with no line here is held to 0 bytes.
 id	budget_bytes	unit	from_slice	tradeoff_pr
+AO-5.aes-gcm-static.net10	4.875	block	S1	#433
+AO-5.aes-gcm-static-open.net10	4.875	block	S1	#433

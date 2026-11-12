@@ -326,7 +326,11 @@ namespace Acceptance
             string over;
             try { over = "PASS " + AoAllocMeter.Judge("ten bytes", ten, "call", 8); } catch (FailException e) { over = "FAIL " + e.Reason; }
             if (!within.Contains("within the budget") || over != "FAIL AO5_ALLOCATES") throw new FailException("the budget judge gave '" + within + "' and '" + over + "'");
-            return "control: " + none + "; " + arrayOnly + "; planted: " + string.Join("; ", planted.ToArray()) + "; budget: 10 B within 16 -> PASS, 10 B over 8 -> FAIL";
+            // The tradeoff_pr field of a budget line is a PR number. A text that stands for a number that is still to come is not one.
+            foreach (string notNumber in new[] { "#S1-PR-NUMBER-PENDING", "#", "420", "#420 and more", "PR 420", "" })
+                if (AoBudgets.IsPrNumber(notNumber)) throw new FailException("the budget file took '" + notNumber + "' as a tradeoff PR number");
+            if (!AoBudgets.IsPrNumber("#420")) throw new FailException("the budget file refused '#420' as a tradeoff PR number");
+            return "control: " + none + "; " + arrayOnly + "; planted: " + string.Join("; ", planted.ToArray()) + "; budget: 10 B within 16 -> PASS, 10 B over 8 -> FAIL; tradeoff PR: '#420' is a number, '#S1-PR-NUMBER-PENDING' and 5 more texts are not";
         }
 
         static Action MakeRare(int every)
@@ -622,6 +626,8 @@ namespace Acceptance
                 new[] { "aes-ctr-into", "ctr-moves-caller-counter" }, new[] { "aes-gcm-into", "gcm-open-bad-tag-keeps-output" },
                 new[] { "aes-gcm-into", "gcm-short-nonce-padded" }, new[] { "aes-cmackey-into", "cmackey-tag-short" },
                 new[] { "aes-gcm-into", "gcm-overlap-checked-before-nonce" },
+                // A product that skips the overlap check of the CMAC tag range (PRD 7.1.9).
+                new[] { "aes-cmac-into", "accepts-partial-overlap" }, new[] { "aes-cmackey-into", "accepts-partial-overlap" },
             };
             List<string> seen = new List<string>();
             foreach (string[] p in planted)

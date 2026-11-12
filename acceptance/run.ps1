@@ -115,6 +115,43 @@ $work = Join-Path $acc ".work\run-$stamp"
 New-Item -ItemType Directory -Force -Path $work | Out-Null
 New-Item -ItemType Directory -Force -Path $OutDir | Out-Null
 
+# ------------------------------------------------------------------ no local path in a run report
+# A run report goes into a public repository. A detail must not hold a path of this machine (a drive, the user folder, the user name).
+# Hide-LocalPaths makes the known folders relative before a result is stored: the product root becomes ".", and each other folder gets a
+# name. Find-LocalPaths gives what is still a local path. A run whose report still holds one is a failed run (REPORT_HOLDS_LOCAL_PATH).
+function Get-LocalRoots {
+    $roots = @(
+        @($work, '<work>'), @($ProductRoot, '.'), @($AsyncProxyRoot, '<asyncproxy>'), @($NetCFRefDir, '<netcf-ref>'),
+        @([System.IO.Path]::GetTempPath(), '<temp>'), @($env:LOCALAPPDATA, '<localappdata>'), @($env:APPDATA, '<appdata>'), @($env:USERPROFILE, '<home>')
+    )
+    # The longest folder first, so a folder inside another one gets its own name.
+    return @($roots | Where-Object { $_[0] } | ForEach-Object { , @(([string]$_[0]).TrimEnd('\', '/'), $_[1]) } | Sort-Object { -$_[0].Length })
+}
+
+function Hide-LocalPaths([string]$text, $roots = $null) {
+    if (-not $text) { return $text }
+    if ($null -eq $roots) { $roots = Get-LocalRoots }
+    foreach ($root in $roots) {
+        # Each separator of the folder matches \ or / (and the doubled \\ of a JSON text).
+        $pattern = (($root[0] -split '[\\/]+' | ForEach-Object { [regex]::Escape($_) }) -join '[\\/]+') + '(?![A-Za-z0-9_.-])'
+        $text = [regex]::Replace($text, $pattern, $root[1].Replace('$', '$$'), 'IgnoreCase')
+    }
+    return $text
+}
+
+# The texts in $text that are still a local path: a drive path, a path under a Users folder, or the user name.
+function Find-LocalPaths([string]$text, [string]$userName = $env:USERNAME) {
+    $found = @()
+    if (-not $text) { return $found }
+    foreach ($m in [regex]::Matches($text, '(?<![A-Za-z0-9])(?<path>[A-Za-z]:[\\/][^\s"''|;,<>)]*)')) { $found += $m.Groups['path'].Value }
+    foreach ($m in [regex]::Matches($text, '(?<path>[\\/]Users[\\/][^\s"''|;,<>)]*)', 'IgnoreCase')) { $found += $m.Groups['path'].Value }
+    if ($userName -and $userName.Length -ge 3) {
+        foreach ($m in [regex]::Matches($text, '(?<![A-Za-z0-9])(?<path>' + [regex]::Escape($userName) + ')(?![A-Za-z0-9])', 'IgnoreCase')) { $found += $m.Groups['path'].Value }
+    }
+    return @($found | Sort-Object -Unique)
+}
+$script:localRoots = Get-LocalRoots
+
 # ------------------------------------------------------------------ tools
 function Invoke-Tool {
     param([string]$Exe, [string[]]$ToolArgs, [string]$Dir = $null, [int]$TimeoutSec = 1800)
@@ -329,6 +366,11 @@ function Get-AoBenchCodeVerdict([string]$repo, [string]$commit) {
     return $null
 }
 
+# The rows of schema rule 3 and their target. A change of this row set or of 5.00 is a decision of the lead or of the owner, recorded
+# before the PR that makes it merges.
+$AoSpeedTargetRows = 'AO-6.aes-block.net10', 'AO-6.aes-ecb.net10', 'AO-6.aes-cbc.net10', 'AO-6.aes-ctr.net10', 'AO-6.aes-gcm.net10', 'AO-6.aes-cmac.net10'
+$AoSpeedTargetRatio = 5.0
+
 # The bench rows, judged by the suite from the numbers (acceptance/ao-bench-schema.md). Returns id -> result. $codeJudge takes the report's
 # commit and gives $null (the measured code is the head's) or an object with reason and detail; then every bench row reads that FAIL.
 $script:aoBenchCommitNote = ''
@@ -361,9 +403,11 @@ function Read-AoBench([string]$path, $list, [string]$slice, [scriptblock]$codeJu
             $p0 = $r.PSObject.Properties['baselineNsPerOp']; $p1 = $r.PSObject.Properties['newNsPerOp']
             if (-not $p0 -or -not $p1 -or $p0.Value -isnot [ValueType] -or $p1.Value -isnot [ValueType] -or [double]$p0.Value -le 0 -or [double]$p1.Value -le 0) { $out[$e.id] = [pscustomobject]@{ status = 'FAIL'; reason = 'AO_BENCH_ROW_BAD'; detail = 'baselineNsPerOp or newNsPerOp is missing, not a number, or not above 0' }; continue }
             $ratio = [double]$p0.Value / [double]$p1.Value
-            $judge = $e.id -eq 'AO-6.aes-block.net10' -and [array]::IndexOf($AoSlices, $slice) -ge 1
-            if ($judge -and $ratio -lt 5) { $out[$e.id] = [pscustomobject]@{ status = 'FAIL'; reason = 'AO6_BELOW_TARGET'; detail = ("{0:N2} x baseline, target 5 x" -f $ratio) }; continue }
-            $out[$e.id] = [pscustomobject]@{ status = 'PASS'; reason = ''; detail = ("recorded: baseline {0} ns, new {1} ns, {2:N2} x" -f $p0.Value, $p1.Value, $ratio) }
+            # Schema rule 3: from slice S1 the 6 net10 AES throughput rows need a code ratio of 5.00 or more. The ratio is not rounded
+            # for the compare, and the detail prints 3 decimals, so a fail never shows as 5.00.
+            $judge = ($AoSpeedTargetRows -contains $e.id) -and [array]::IndexOf($AoSlices, $slice) -ge 1
+            if ($judge -and $ratio -lt $AoSpeedTargetRatio) { $out[$e.id] = [pscustomobject]@{ status = 'FAIL'; reason = 'AO6_BELOW_TARGET'; detail = ("{0:N3} x baseline, target {1:N2} x" -f $ratio, $AoSpeedTargetRatio) }; continue }
+            $out[$e.id] = [pscustomobject]@{ status = 'PASS'; reason = ''; detail = ("recorded: baseline {0} ns, new {1} ns, {2:N3} x" -f $p0.Value, $p1.Value, $ratio) }
         }
     }
     return $out
@@ -384,6 +428,7 @@ function Get-AoBudgetReds([string]$path, $list) {
         $b = 0.0
         if (-not [double]::TryParse($f[1], [System.Globalization.NumberStyles]::Float, [System.Globalization.CultureInfo]::InvariantCulture, [ref]$b) -or $b -lt 0) { $reds += "ao-budgets.tsv: ${id} budget_bytes '$($f[1])' is not a number of 0 or more" }
         elseif ($b -gt 0 -and -not $f[4].Trim()) { $reds += "ao-budgets.tsv: ${id} has a budget above 0 and no tradeoff PR" }
+        elseif ($b -gt 0 -and $f[4].Trim() -notmatch '^#(?<number>[0-9]+)$') { $reds += "ao-budgets.tsv: ${id} has the tradeoff_pr '$($f[4].Trim())', which is not a PR number (# and digits)" }
     }
     return $reds
 }
@@ -446,7 +491,7 @@ Say ("{0} clauses selected of M = {1} (+ {2} self-checks in the file)" -f @($sel
 # ------------------------------------------------------------------ results
 $results = @{}
 function Set-Result([string]$id, [string]$status, [string]$reason = '', [string]$detail = '', [long]$ms = 0, [int]$budgetSec = 0) {
-    $results[$id] = [pscustomobject]@{ id = $id; status = $status; reason = $reason; detail = $detail; ms = $ms; budgetSec = $budgetSec }
+    $results[$id] = [pscustomobject]@{ id = $id; status = $status; reason = $reason; detail = (Hide-LocalPaths $detail $script:localRoots); ms = $ms; budgetSec = $budgetSec }
 }
 # A clause line's own time budget (#327). A line from a group that sends none reads 0, which the slow warning takes as 900 s.
 function BudgetOf($line) { $p = $line.PSObject.Properties['budgetSec']; if ($p) { [int]$p.Value } else { 0 } }
@@ -896,10 +941,17 @@ foreach ($c in @($pending | Where-Object { $_.group -eq 'driver' -and -not $resu
             Set-Content -LiteralPath $bt -Encoding utf8 -Value @("id`tbudget_bytes`tunit`tfrom_slice`ttradeoff_pr", "X.a`t64`tmessage`tS1`t#420", "X.a`t32`tmessage`tS1`t#421", "X.z`t0`tmessage`tS1`t", "X.b`t16`tblock`tS1`t ")
             $budBad = @(Get-AoBudgetReds $bt $l)
             if (-not ($budBad -match 'second line') -or -not ($budBad -match 'not a row') -or -not ($budBad -match 'no tradeoff PR')) { $bad += "the budget check missed a bad line: " + ($budBad -join ' | ') }
+            # The tradeoff_pr field is a PR number: "#" and digits. A text that stands for a number that is still to come is a red.
+            foreach ($notNumber in '#S1-PR-NUMBER-PENDING', '#', '420', '#420 and more', 'PR 420') {
+                Set-Content -LiteralPath $bt -Encoding utf8 -Value @("id`tbudget_bytes`tunit`tfrom_slice`ttradeoff_pr", "X.a`t64`tmessage`tS1`t$notNumber")
+                if (-not (@(Get-AoBudgetReds $bt $l) -match 'is not a PR number')) { $bad += "the budget check took '$notNumber' as a tradeoff PR" }
+            }
+            Set-Content -LiteralPath $bt -Encoding utf8 -Value @("id`tbudget_bytes`tunit`tfrom_slice`ttradeoff_pr", "X.a`t0`tmessage`tS1`tnone")
+            if (@(Get-AoBudgetReds $bt $l).Count -ne 0) { $bad += "a budget of 0 needs no tradeoff PR, and the check went red" }
             $bo = Read-AoBench $bj $bl 'S0' { param($commit) [pscustomobject]@{ reason = 'AO_BENCH_OTHER_COMMIT'; detail = "the measured code differs from $commit" } }
             if ($bo['AO-5.x.net10'].reason -ne 'AO_BENCH_OTHER_COMMIT') { $bad += "a bench report for another commit read $($bo['AO-5.x.net10'].reason)" }
             if ($bad) { Set-Result $c.id 'FAIL' 'ASSERTION' ($bad -join '; ') }
-            else { Set-Result $c.id 'PASS' '' (($seen -join '; ') + '; bench 16 B claiming PASS -> FAIL AO5_ALLOCATES; AO-9 timing row -> PASS; bench 0 B against a suite FAIL -> AO5_BENCH_DISAGREES; bench outputsEqual false against a suite PASS -> AO9_BENCH_DISAGREES; agreeing records -> no red; bench for another commit -> AO_BENCH_OTHER_COMMIT; budget file: a good line passes, an unknown id, a second line and a budget with no tradeoff PR each go red') }
+            else { Set-Result $c.id 'PASS' '' (($seen -join '; ') + '; bench 16 B claiming PASS -> FAIL AO5_ALLOCATES; AO-9 timing row -> PASS; bench 0 B against a suite FAIL -> AO5_BENCH_DISAGREES; bench outputsEqual false against a suite PASS -> AO9_BENCH_DISAGREES; agreeing records -> no red; bench for another commit -> AO_BENCH_OTHER_COMMIT; budget file: a good line passes, an unknown id, a second line and a budget with no tradeoff PR each go red; a tradeoff_pr that is no PR number (#S1-PR-NUMBER-PENDING and 4 more texts) goes red; a budget of 0 needs none') }
         }
         'SELF.ao-bench-same-code-rule-bites' {
             # A small git repository with the measured paths and 2 paths that are not measured. The bench report names commit A.
@@ -990,6 +1042,70 @@ foreach ($c in @($pending | Where-Object { $_.group -eq 'driver' -and -not $resu
             } catch { $script:benchSelfBad += "the self-check stopped: $($_.Exception.Message)" }
             if ($script:benchSelfBad.Count -gt 0) { Set-Result $c.id 'FAIL' 'ASSERTION' ($script:benchSelfBad -join '; ') }
             else { Set-Result $c.id 'PASS' '' (($script:benchSelfSeen -join '; ') + '; through Read-AoBench: a valid report is judged from its numbers, a stale one reads AO_BENCH_OTHER_COMMIT') }
+        }
+        'SELF.ao6-speed-target-bites' {
+            # Schema rule 3 on each of its 6 rows: 4.99 x reads FAIL AO6_BELOW_TARGET from S1, 5.00 x reads PASS, and at S0 the row only records.
+            $bad = @(); $seen = @()
+            $list3 = [ordered]@{}
+            foreach ($id in @($AoSpeedTargetRows) + 'AO-6.aes-key-setup.net10' + 'AO-6.sha256.net10') { $list3[$id] = [pscustomobject]@{ id = $id; state = '-'; reason = '-'; from = 'S0'; source = 'bench' } }
+            $json3 = Join-Path $work ("ao-bench-speed-{0}.json" -f [guid]::NewGuid().ToString('N').Substring(0, 8))
+            $read3 = { param([double]$baseline, [string]$slice)
+                $rows3 = @($list3.Keys | ForEach-Object { '{"id":"' + $_ + '","baselineNsPerOp":' + $baseline.ToString([System.Globalization.CultureInfo]::InvariantCulture) + ',"newNsPerOp":100,"op":"x"}' }) -join ','
+                Set-Content -LiteralPath $json3 -Encoding utf8 -Value ('{"schema":1,"commit":"HEADX","rows":[' + $rows3 + ']}')
+                return (Read-AoBench $json3 $list3 $slice { param($commit) $null }) }
+            $below = & $read3 499 'S1'; $at = & $read3 500 'S1'; $before = & $read3 499 'S0'; $later = & $read3 499 'S4'
+            foreach ($id in $AoSpeedTargetRows) {
+                if ($below[$id].status -ne 'FAIL' -or $below[$id].reason -ne 'AO6_BELOW_TARGET') { $bad += "${id} at 4.99 x and S1 read $($below[$id].status) $($below[$id].reason)" }
+                if ($at[$id].status -ne 'PASS') { $bad += "${id} at 5.00 x and S1 read $($at[$id].status) $($at[$id].reason)" }
+                if ($before[$id].status -ne 'PASS') { $bad += "${id} at 4.99 x and S0 read $($before[$id].status) $($before[$id].reason)" }
+                if ($later[$id].reason -ne 'AO6_BELOW_TARGET') { $bad += "${id} at 4.99 x and S4 read $($later[$id].status) $($later[$id].reason)" }
+                $seen += $id
+            }
+            foreach ($id in 'AO-6.aes-key-setup.net10', 'AO-6.sha256.net10') { if ($below[$id].status -ne 'PASS') { $bad += "${id} is no row of rule 3, and at 4.99 x it read $($below[$id].status) $($below[$id].reason)" } }
+            if ($AoSpeedTargetRows.Count -ne 6) { $bad += "rule 3 names $($AoSpeedTargetRows.Count) rows, wanted 6" }
+            if ($bad) { Set-Result $c.id 'FAIL' 'ASSERTION' ($bad -join '; ') }
+            else { Set-Result $c.id 'PASS' '' ('6 rows (' + ($seen -join ', ') + '): 4.99 x -> FAIL AO6_BELOW_TARGET at S1 and at S4; 5.00 x -> PASS; 4.99 x at S0 -> PASS (recorded); AO-6.aes-key-setup.net10 and AO-6.sha256.net10 at 4.99 x -> PASS (no row of rule 3)') }
+        }
+        'SELF.run-report-has-no-local-path' {
+            $bad = @()
+            # Made-up folders, so the check does not rest on this machine: a worktree, a home folder, and a temp folder inside the home.
+            $roots = @(, @('C:\Users\name\AppData\Local\Temp', '<temp>')) + @(, @('C:\Users\name', '<home>')) + @(, @('E:\dev\wt', '.'))
+            $hide = @(
+                @('E:\dev\wt\bench\files: 7 files', '.\bench\files: 7 files'),
+                @('E:/dev/wt/acceptance/x.cs(1,2): error', './acceptance/x.cs(1,2): error'),
+                @('"E:\\dev\\wt\\a"', '".\\a"'),
+                @('e:\DEV\WT\a and E:\dev\wt', '.\a and .'),
+                @('C:\Users\name\AppData\Local\Temp\run-1\x', '<temp>\run-1\x'),
+                @('C:\Users\name\notes.txt', '<home>\notes.txt'),
+                @('E:\dev\wt2\a stays', 'E:\dev\wt2\a stays')
+            )
+            foreach ($h in $hide) {
+                $got = Hide-LocalPaths $h[0] $roots
+                if ($got -cne $h[1]) { $bad += "Hide-LocalPaths gave '$got' for '$($h[0])', wanted '$($h[1])'" }
+            }
+            $find = @(
+                @('E:\dev\wt2\a stays', 'E:\dev\wt2\a'),
+                @('see D:\other\x.txt, and /Users/name/x', 'D:\other\x.txt'),
+                @('a path /Users/somebody/x in a text', '/Users/somebody/x'),
+                @('written by name on Monday', 'name'),
+                @('https://example.com/a and AO-2: ok and a ratio of 1:/2 and .\bench\files and <temp>\x', '')
+            )
+            foreach ($f in $find) {
+                $got = @(Find-LocalPaths $f[0] 'name')
+                if ($f[1] -and $got -notcontains $f[1]) { $bad += "Find-LocalPaths missed '$($f[1])' in '$($f[0])' (found: $($got -join ', '))" }
+                if (-not $f[1] -and $got.Count -gt 0) { $bad += "Find-LocalPaths found '$($got -join ', ')' in a text with no local path: '$($f[0])'" }
+            }
+            # The real folders of this run, through Set-Result: the stored detail holds none of them.
+            $probeId = 'SELF.run-report-has-no-local-path.probe'
+            $real = @((Join-Path $ProductRoot 'bench\files'), (Join-Path $work 'tool.out'), $NetCFRefDir, (Join-Path ([System.IO.Path]::GetTempPath()) 'x.tmp'), (Join-Path $env:USERPROFILE 'notes.txt'))
+            Set-Result $probeId 'PASS' '' ("files in " + ($real -join '; ') + " and " + ($real[0] -replace '\\', '/'))
+            $stored = [string]$results[$probeId].detail
+            $results.Remove($probeId)
+            $left = @(Find-LocalPaths $stored)
+            if ($left.Count -gt 0) { $bad += "a detail stored through Set-Result still holds: " + ($left -join ', ') }
+            if ($stored -notmatch [regex]::Escape('.\bench\files')) { $bad += "the product root did not become '.': $stored" }
+            if ($bad) { Set-Result $c.id 'FAIL' 'ASSERTION' ($bad -join '; ') }
+            else { Set-Result $c.id 'PASS' '' ("$($hide.Count) texts made relative as wanted (both separators, the doubled separator of JSON, any case, a folder inside another one, another folder left alone); $($find.Count) texts searched as wanted (a drive path, a Users path, the user name, and a text with none); the folders of this run, stored through Set-Result, leave no local path") }
         }
         'SELF.suite-compile-break-is-a-fail' {
             # A real break: a project that names a suite type (AoStreamSeam) and does not compile its file. This is the break that made
@@ -1083,6 +1199,14 @@ $rows = foreach ($c in $sel) {
 }
 # One selected clause makes foreach return a single object. The report keeps results as an array, so a reader never has to guess the shape.
 $rows = @($rows)
+# The last look before the report is written: a detail that still holds a local path loses it, and the run fails by name.
+$localPathLeaks = @()
+foreach ($r in $rows) {
+    $left = @(Find-LocalPaths ([string]$r.detail))
+    if ($left.Count -eq 0) { continue }
+    $localPathLeaks += $r.id
+    foreach ($p in ($left | Sort-Object { -$_.Length })) { $r.detail = ([string]$r.detail).Replace($p, '<local path>') }
+}
 $prodRows = @($rows | Where-Object { $_.assertion -ne 'SELF' })
 $selfRows = @($rows | Where-Object { $_.assertion -eq 'SELF' })
 $nPass = @($prodRows | Where-Object { $_.status -eq 'PASS' }).Count
@@ -1118,14 +1242,23 @@ $jsonPath = Join-Path $OutDir "acceptance-$stamp.json"
 $mdPath = Join-Path $OutDir "acceptance-$stamp.md"
 $summary = [ordered]@{
     schema = 1; timestamp = (Get-Date).ToString('o'); machine = $env:COMPUTERNAME; command = ('run.ps1 -Clauses ' + ($Clauses -join ',') + $(if ($Fresh -or $FreshChild) { ' -Fresh' } else { '' }) + $(if ($SelfTest) { ' -SelfTest' } else { '' }))
-    productRoot = $ProductRoot; productCommit = (Git-Head $ProductRoot); acceptanceCommit = (git -C $ProductRoot log -1 --format=%h -- acceptance 2>$null)
+    productRoot = '.'; localPathLeaks = @($localPathLeaks); productCommit = (Git-Head $ProductRoot); acceptanceCommit = (git -C $ProductRoot log -1 --format=%h -- acceptance 2>$null)
     freshClone = [bool]$FreshChild; productPresent = $productExists
     M = $M; selected = $mSel; pass = $nPass; fail = $nFail; notRun = $nNot; reasons = $reasons
     activeEnv = $activeEnv; slowWarnSeconds = $slowSec; slow = $slow
     dirtyKnown = $dirtyKnown; dirtyCount = $(if ($dirtyKnown) { $dirty.Count } else { $null }); dirty = @($dirty | Select-Object -First 20)
     selfChecks = [ordered]@{ selected = $selfRows.Count; pass = @($selfRows | Where-Object { $_.status -eq 'PASS' }).Count; fail = @($selfRows | Where-Object { $_.status -eq 'FAIL' }).Count; notRun = @($selfRows | Where-Object { $_.status -eq 'NOT RUN' }).Count }
 }
-([ordered]@{ summary = $summary; results = $rows } | ConvertTo-Json -Depth 6) | Set-Content -Path $jsonPath -Encoding utf8
+# The whole text gets the same look as the details: a summary field or a table line may hold a path too.
+function Remove-LocalPathsFromReport([string]$text, [string]$what) {
+    $left = @(Find-LocalPaths $text)
+    if ($left.Count -eq 0) { return $text }
+    $script:localPathLeaks += $what
+    foreach ($p in ($left | Sort-Object { -$_.Length })) { $text = $text.Replace($p, '<local path>') }
+    return $text
+}
+$script:localPathLeaks = @($localPathLeaks)
+(Remove-LocalPathsFromReport ([ordered]@{ summary = $summary; results = $rows } | ConvertTo-Json -Depth 6) 'the json text outside the details') | Set-Content -Path $jsonPath -Encoding utf8
 
 $md = [System.Text.StringBuilder]::new()
 $null = $md.AppendLine("# Acceptance run $stamp")
@@ -1193,10 +1326,12 @@ $null = $md.AppendLine('## Every clause')
 $null = $md.AppendLine()
 $null = $md.AppendLine('| Clause | Status | Reason |'); $null = $md.AppendLine('|---|---|---|')
 foreach ($o in $prodRows) { $null = $md.AppendLine("| $($o.id) | $($o.status) | $($o.reason) |") }
-$md.ToString() | Set-Content -Path $mdPath -Encoding utf8
+(Remove-LocalPathsFromReport $md.ToString() 'the md text outside the details') | Set-Content -Path $mdPath -Encoding utf8
+$localPathLeaks = @($script:localPathLeaks)
 
 Say ("{0} of {1} clauses PASS ({2} FAIL, {3} NOT RUN); M = {4}" -f $nPass, $mSel, $nFail, $nNot, $M)
 if ($selfRows.Count -gt 0) { Say ("self-checks: {0} of {1} PASS" -f $summary.selfChecks.pass, $selfRows.Count) }
 Say "report: $mdPath"
 Say "json:   $jsonPath"
-if (($nFail -gt 0) -or ($nNot -gt 0) -or ($summary.selfChecks.fail -gt 0)) { exit 1 } else { exit 0 }
+if ($localPathLeaks.Count -gt 0) { Say ("REPORT_HOLDS_LOCAL_PATH: {0} detail(s) held a path of this machine; each was replaced by '<local path>': {1}" -f $localPathLeaks.Count, ($localPathLeaks -join ', ')) }
+if (($nFail -gt 0) -or ($nNot -gt 0) -or ($summary.selfChecks.fail -gt 0) -or ($localPathLeaks.Count -gt 0)) { exit 1 } else { exit 0 }
