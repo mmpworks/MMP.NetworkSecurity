@@ -377,3 +377,25 @@ Limits:
 4. The measured commit must stay in the repository. After a rebase it is on no branch, so the benchmark owner pushes a tag on it. A later bench schema can write the tree ids into the report, and then no tag is needed.
 
 Disposition: keep.
+
+## 23. A run report holds no path of the machine (added 2026-11-12)
+
+Conclusion: a detail is stored with its local folders made relative, and a run whose report still holds a local path fails by name.
+
+Why: each run report goes into a public repository. On 2026-11-12 one detail printed the folder of a bench report, with the user folder in it. That report was not committed. Each report before held the worktree root as a drive path in 3 kinds of place.
+
+| Part | Where |
+|---|---|
+| A detail is made relative before it is stored: the product root becomes `.`, and the work folder, the AsyncProxy folder, the CF reference folder, the temp folder and the user folders each get a name such as `<work>` or `<home>` | `Hide-LocalPaths`, called by `Set-Result`, in `run.ps1` |
+| The summary field `productRoot` is `.` | `run.ps1` |
+| The last look: a drive path, a path under a `Users` folder, or the user name that is still in a detail, or in the json or md text, is replaced by `<local path>`. The run prints `REPORT_HOLDS_LOCAL_PATH` with the clause ids, the summary lists them in `localPathLeaks`, and the exit code is 1 | `Find-LocalPaths` in `run.ps1` |
+| Self-check: 7 texts made relative, 5 texts searched, and the real folders of the run through `Set-Result` | `SELF.run-report-has-no-local-path` in `run.ps1` |
+
+Limits:
+
+1. The machine name stays in the summary field `machine`.
+2. The lines that the run prints on the console (`report:`, `json:`) hold the full path. A log of a run is not a run report.
+3. The reports from before this change keep their paths.
+4. A path with a space ends at the space for the last look, so the text after the space stays.
+
+Disposition: keep.

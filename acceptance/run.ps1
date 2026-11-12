@@ -115,6 +115,43 @@ $work = Join-Path $acc ".work\run-$stamp"
 New-Item -ItemType Directory -Force -Path $work | Out-Null
 New-Item -ItemType Directory -Force -Path $OutDir | Out-Null
 
+# ------------------------------------------------------------------ no local path in a run report
+# A run report goes into a public repository. A detail must not hold a path of this machine (a drive, the user folder, the user name).
+# Hide-LocalPaths makes the known folders relative before a result is stored: the product root becomes ".", and each other folder gets a
+# name. Find-LocalPaths gives what is still a local path. A run whose report still holds one is a failed run (REPORT_HOLDS_LOCAL_PATH).
+function Get-LocalRoots {
+    $roots = @(
+        @($work, '<work>'), @($ProductRoot, '.'), @($AsyncProxyRoot, '<asyncproxy>'), @($NetCFRefDir, '<netcf-ref>'),
+        @([System.IO.Path]::GetTempPath(), '<temp>'), @($env:LOCALAPPDATA, '<localappdata>'), @($env:APPDATA, '<appdata>'), @($env:USERPROFILE, '<home>')
+    )
+    # The longest folder first, so a folder inside another one gets its own name.
+    return @($roots | Where-Object { $_[0] } | ForEach-Object { , @(([string]$_[0]).TrimEnd('\', '/'), $_[1]) } | Sort-Object { -$_[0].Length })
+}
+
+function Hide-LocalPaths([string]$text, $roots = $null) {
+    if (-not $text) { return $text }
+    if ($null -eq $roots) { $roots = Get-LocalRoots }
+    foreach ($root in $roots) {
+        # Each separator of the folder matches \ or / (and the doubled \\ of a JSON text).
+        $pattern = (($root[0] -split '[\\/]+' | ForEach-Object { [regex]::Escape($_) }) -join '[\\/]+') + '(?![A-Za-z0-9_.-])'
+        $text = [regex]::Replace($text, $pattern, $root[1].Replace('$', '$$'), 'IgnoreCase')
+    }
+    return $text
+}
+
+# The texts in $text that are still a local path: a drive path, a path under a Users folder, or the user name.
+function Find-LocalPaths([string]$text, [string]$userName = $env:USERNAME) {
+    $found = @()
+    if (-not $text) { return $found }
+    foreach ($m in [regex]::Matches($text, '(?<![A-Za-z0-9])(?<path>[A-Za-z]:[\\/][^\s"''|;,<>)]*)')) { $found += $m.Groups['path'].Value }
+    foreach ($m in [regex]::Matches($text, '(?<path>[\\/]Users[\\/][^\s"''|;,<>)]*)', 'IgnoreCase')) { $found += $m.Groups['path'].Value }
+    if ($userName -and $userName.Length -ge 3) {
+        foreach ($m in [regex]::Matches($text, '(?<![A-Za-z0-9])(?<path>' + [regex]::Escape($userName) + ')(?![A-Za-z0-9])', 'IgnoreCase')) { $found += $m.Groups['path'].Value }
+    }
+    return @($found | Sort-Object -Unique)
+}
+$script:localRoots = Get-LocalRoots
+
 # ------------------------------------------------------------------ tools
 function Invoke-Tool {
     param([string]$Exe, [string[]]$ToolArgs, [string]$Dir = $null, [int]$TimeoutSec = 1800)
@@ -446,7 +483,7 @@ Say ("{0} clauses selected of M = {1} (+ {2} self-checks in the file)" -f @($sel
 # ------------------------------------------------------------------ results
 $results = @{}
 function Set-Result([string]$id, [string]$status, [string]$reason = '', [string]$detail = '', [long]$ms = 0, [int]$budgetSec = 0) {
-    $results[$id] = [pscustomobject]@{ id = $id; status = $status; reason = $reason; detail = $detail; ms = $ms; budgetSec = $budgetSec }
+    $results[$id] = [pscustomobject]@{ id = $id; status = $status; reason = $reason; detail = (Hide-LocalPaths $detail $script:localRoots); ms = $ms; budgetSec = $budgetSec }
 }
 # A clause line's own time budget (#327). A line from a group that sends none reads 0, which the slow warning takes as 900 s.
 function BudgetOf($line) { $p = $line.PSObject.Properties['budgetSec']; if ($p) { [int]$p.Value } else { 0 } }
@@ -991,6 +1028,47 @@ foreach ($c in @($pending | Where-Object { $_.group -eq 'driver' -and -not $resu
             if ($script:benchSelfBad.Count -gt 0) { Set-Result $c.id 'FAIL' 'ASSERTION' ($script:benchSelfBad -join '; ') }
             else { Set-Result $c.id 'PASS' '' (($script:benchSelfSeen -join '; ') + '; through Read-AoBench: a valid report is judged from its numbers, a stale one reads AO_BENCH_OTHER_COMMIT') }
         }
+        'SELF.run-report-has-no-local-path' {
+            $bad = @()
+            # Made-up folders, so the check does not rest on this machine: a worktree, a home folder, and a temp folder inside the home.
+            $roots = @(, @('C:\Users\name\AppData\Local\Temp', '<temp>')) + @(, @('C:\Users\name', '<home>')) + @(, @('E:\dev\wt', '.'))
+            $hide = @(
+                @('E:\dev\wt\bench\files: 7 files', '.\bench\files: 7 files'),
+                @('E:/dev/wt/acceptance/x.cs(1,2): error', './acceptance/x.cs(1,2): error'),
+                @('"E:\\dev\\wt\\a"', '".\\a"'),
+                @('e:\DEV\WT\a and E:\dev\wt', '.\a and .'),
+                @('C:\Users\name\AppData\Local\Temp\run-1\x', '<temp>\run-1\x'),
+                @('C:\Users\name\notes.txt', '<home>\notes.txt'),
+                @('E:\dev\wt2\a stays', 'E:\dev\wt2\a stays')
+            )
+            foreach ($h in $hide) {
+                $got = Hide-LocalPaths $h[0] $roots
+                if ($got -cne $h[1]) { $bad += "Hide-LocalPaths gave '$got' for '$($h[0])', wanted '$($h[1])'" }
+            }
+            $find = @(
+                @('E:\dev\wt2\a stays', 'E:\dev\wt2\a'),
+                @('see D:\other\x.txt, and /Users/name/x', 'D:\other\x.txt'),
+                @('a path /Users/somebody/x in a text', '/Users/somebody/x'),
+                @('written by name on Monday', 'name'),
+                @('https://example.com/a and AO-2: ok and a ratio of 1:/2 and .\bench\files and <temp>\x', '')
+            )
+            foreach ($f in $find) {
+                $got = @(Find-LocalPaths $f[0] 'name')
+                if ($f[1] -and $got -notcontains $f[1]) { $bad += "Find-LocalPaths missed '$($f[1])' in '$($f[0])' (found: $($got -join ', '))" }
+                if (-not $f[1] -and $got.Count -gt 0) { $bad += "Find-LocalPaths found '$($got -join ', ')' in a text with no local path: '$($f[0])'" }
+            }
+            # The real folders of this run, through Set-Result: the stored detail holds none of them.
+            $probeId = 'SELF.run-report-has-no-local-path.probe'
+            $real = @((Join-Path $ProductRoot 'bench\files'), (Join-Path $work 'tool.out'), $NetCFRefDir, (Join-Path ([System.IO.Path]::GetTempPath()) 'x.tmp'), (Join-Path $env:USERPROFILE 'notes.txt'))
+            Set-Result $probeId 'PASS' '' ("files in " + ($real -join '; ') + " and " + ($real[0] -replace '\\', '/'))
+            $stored = [string]$results[$probeId].detail
+            $results.Remove($probeId)
+            $left = @(Find-LocalPaths $stored)
+            if ($left.Count -gt 0) { $bad += "a detail stored through Set-Result still holds: " + ($left -join ', ') }
+            if ($stored -notmatch [regex]::Escape('.\bench\files')) { $bad += "the product root did not become '.': $stored" }
+            if ($bad) { Set-Result $c.id 'FAIL' 'ASSERTION' ($bad -join '; ') }
+            else { Set-Result $c.id 'PASS' '' ("$($hide.Count) texts made relative as wanted (both separators, the doubled separator of JSON, any case, a folder inside another one, another folder left alone); $($find.Count) texts searched as wanted (a drive path, a Users path, the user name, and a text with none); the folders of this run, stored through Set-Result, leave no local path") }
+        }
         'SELF.suite-compile-break-is-a-fail' {
             # A real break: a project that names a suite type (AoStreamSeam) and does not compile its file. This is the break that made
             # the thread group read NOT RUN PRODUCT_MISSING on 2026-11-11. The verdict must be FAIL ACCEPTANCE_COMPILE_ERROR.
@@ -1083,6 +1161,14 @@ $rows = foreach ($c in $sel) {
 }
 # One selected clause makes foreach return a single object. The report keeps results as an array, so a reader never has to guess the shape.
 $rows = @($rows)
+# The last look before the report is written: a detail that still holds a local path loses it, and the run fails by name.
+$localPathLeaks = @()
+foreach ($r in $rows) {
+    $left = @(Find-LocalPaths ([string]$r.detail))
+    if ($left.Count -eq 0) { continue }
+    $localPathLeaks += $r.id
+    foreach ($p in ($left | Sort-Object { -$_.Length })) { $r.detail = ([string]$r.detail).Replace($p, '<local path>') }
+}
 $prodRows = @($rows | Where-Object { $_.assertion -ne 'SELF' })
 $selfRows = @($rows | Where-Object { $_.assertion -eq 'SELF' })
 $nPass = @($prodRows | Where-Object { $_.status -eq 'PASS' }).Count
@@ -1118,14 +1204,23 @@ $jsonPath = Join-Path $OutDir "acceptance-$stamp.json"
 $mdPath = Join-Path $OutDir "acceptance-$stamp.md"
 $summary = [ordered]@{
     schema = 1; timestamp = (Get-Date).ToString('o'); machine = $env:COMPUTERNAME; command = ('run.ps1 -Clauses ' + ($Clauses -join ',') + $(if ($Fresh -or $FreshChild) { ' -Fresh' } else { '' }) + $(if ($SelfTest) { ' -SelfTest' } else { '' }))
-    productRoot = $ProductRoot; productCommit = (Git-Head $ProductRoot); acceptanceCommit = (git -C $ProductRoot log -1 --format=%h -- acceptance 2>$null)
+    productRoot = '.'; localPathLeaks = @($localPathLeaks); productCommit = (Git-Head $ProductRoot); acceptanceCommit = (git -C $ProductRoot log -1 --format=%h -- acceptance 2>$null)
     freshClone = [bool]$FreshChild; productPresent = $productExists
     M = $M; selected = $mSel; pass = $nPass; fail = $nFail; notRun = $nNot; reasons = $reasons
     activeEnv = $activeEnv; slowWarnSeconds = $slowSec; slow = $slow
     dirtyKnown = $dirtyKnown; dirtyCount = $(if ($dirtyKnown) { $dirty.Count } else { $null }); dirty = @($dirty | Select-Object -First 20)
     selfChecks = [ordered]@{ selected = $selfRows.Count; pass = @($selfRows | Where-Object { $_.status -eq 'PASS' }).Count; fail = @($selfRows | Where-Object { $_.status -eq 'FAIL' }).Count; notRun = @($selfRows | Where-Object { $_.status -eq 'NOT RUN' }).Count }
 }
-([ordered]@{ summary = $summary; results = $rows } | ConvertTo-Json -Depth 6) | Set-Content -Path $jsonPath -Encoding utf8
+# The whole text gets the same look as the details: a summary field or a table line may hold a path too.
+function Remove-LocalPathsFromReport([string]$text, [string]$what) {
+    $left = @(Find-LocalPaths $text)
+    if ($left.Count -eq 0) { return $text }
+    $script:localPathLeaks += $what
+    foreach ($p in ($left | Sort-Object { -$_.Length })) { $text = $text.Replace($p, '<local path>') }
+    return $text
+}
+$script:localPathLeaks = @($localPathLeaks)
+(Remove-LocalPathsFromReport ([ordered]@{ summary = $summary; results = $rows } | ConvertTo-Json -Depth 6) 'the json text outside the details') | Set-Content -Path $jsonPath -Encoding utf8
 
 $md = [System.Text.StringBuilder]::new()
 $null = $md.AppendLine("# Acceptance run $stamp")
@@ -1193,10 +1288,12 @@ $null = $md.AppendLine('## Every clause')
 $null = $md.AppendLine()
 $null = $md.AppendLine('| Clause | Status | Reason |'); $null = $md.AppendLine('|---|---|---|')
 foreach ($o in $prodRows) { $null = $md.AppendLine("| $($o.id) | $($o.status) | $($o.reason) |") }
-$md.ToString() | Set-Content -Path $mdPath -Encoding utf8
+(Remove-LocalPathsFromReport $md.ToString() 'the md text outside the details') | Set-Content -Path $mdPath -Encoding utf8
+$localPathLeaks = @($script:localPathLeaks)
 
 Say ("{0} of {1} clauses PASS ({2} FAIL, {3} NOT RUN); M = {4}" -f $nPass, $mSel, $nFail, $nNot, $M)
 if ($selfRows.Count -gt 0) { Say ("self-checks: {0} of {1} PASS" -f $summary.selfChecks.pass, $selfRows.Count) }
 Say "report: $mdPath"
 Say "json:   $jsonPath"
-if (($nFail -gt 0) -or ($nNot -gt 0) -or ($summary.selfChecks.fail -gt 0)) { exit 1 } else { exit 0 }
+if ($localPathLeaks.Count -gt 0) { Say ("REPORT_HOLDS_LOCAL_PATH: {0} detail(s) held a path of this machine; each was replaced by '<local path>': {1}" -f $localPathLeaks.Count, ($localPathLeaks -join ', ')) }
+if (($nFail -gt 0) -or ($nNot -gt 0) -or ($summary.selfChecks.fail -gt 0) -or ($localPathLeaks.Count -gt 0)) { exit 1 } else { exit 0 }
