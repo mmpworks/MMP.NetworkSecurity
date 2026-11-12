@@ -50,6 +50,16 @@ static class Program
         List<BenchCase> original = Cases.All(swap ? (IBlockCases)new Files.ProductCode() : new Files.FrozenCode()), current = Cases.All(swap ? (IBlockCases)new Files.FrozenCode() : new Files.ProductCode());
         if (swap) Console.WriteLine("BENCH_SWAP original = product, new = frozen copy");
         List<int> picked = Enumerable.Range(0, current.Count).Where(i => current[i].Id.Contains(filter)).ToList();
+        // --jit-first frozen|product: one call of every picked case on that copy before the pre-warm, so its methods are compiled first.
+        // Without it the copy in the "original" position compiles first, so JIT order and position are one variable; this separates them.
+        if (a.TryGetValue("jit-first", out string jitFirst))
+        {
+            bool productFirst = jitFirst == "product";
+            List<BenchCase> first = productFirst == swap ? original : current, second = productFirst == swap ? current : original;
+            foreach (int i in picked) first[i].Op();
+            foreach (int i in picked) second[i].Op();
+            Console.WriteLine("BENCH_JIT_FIRST " + jitFirst + " (compiled before the " + (productFirst ? "frozen copy" : "product") + ")");
+        }
         Measure.PreWarm(picked.Select(i => new[] { original[i].Op, current[i].Op }), PreWarmEach);
         if (!MachineLoad.Settle()) return MachineLoad.BusyExit;
         List<CaseResult> results = new List<CaseResult>();
