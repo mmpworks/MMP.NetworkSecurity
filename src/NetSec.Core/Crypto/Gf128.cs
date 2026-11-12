@@ -62,29 +62,10 @@ namespace NetSec.Crypto
         public static void Multiply(uint[] t, ref uint y0, ref uint y1, ref uint y2, ref uint y3)
         {
             uint z0 = 0, z1 = 0, z2 = 0, z3 = 0;
-#if NETCF
             Fold(t, y3, ref z0, ref z1, ref z2, ref z3);
             Fold(t, y2, ref z0, ref z1, ref z2, ref z3);
             Fold(t, y1, ref z0, ref z1, ref z2, ref z3);
             Fold(t, y0, ref z0, ref z1, ref z2, ref z3);
-#else
-            // All 16 byte steps in this method, so z0 to z3 stay locals; through a ref call they live in memory.
-            uint[] r = Reduce8;
-            for (int k = 0; k < 4; k++)
-            {
-                uint word = k == 0 ? y3 : k == 1 ? y2 : k == 2 ? y1 : y0;
-                for (int b = 0; b < 4; b++, word >>= 8)
-                {
-                    uint fall = z3 & 0xFF;
-                    z3 = (z3 >> 8) | (z2 << 24);
-                    z2 = (z2 >> 8) | (z1 << 24);
-                    z1 = (z1 >> 8) | (z0 << 24);
-                    z0 = (z0 >> 8) ^ (r[fall] << 12);
-                    int at = (int)(word & 0xFF) << 2;
-                    z0 ^= t[at]; z1 ^= t[at + 1]; z2 ^= t[at + 2]; z3 ^= t[at + 3];
-                }
-            }
-#endif
             y0 = z0; y1 = z1; y2 = z2; y3 = z3;
         }
 
@@ -139,6 +120,21 @@ namespace NetSec.Crypto
             0xBCF80, 0xBD3A0, 0xBF7C0, 0xBEBE0,
         };
 
+        /// <summary>The 4 byte steps of one word of y, low byte to high.</summary>
+        static void Fold(uint[] t, uint word, ref uint z0, ref uint z1, ref uint z2, ref uint z3)
+        {
+            uint[] r = Reduce8;
+            for (int shift = 0; shift < 32; shift += 8)
+            {
+                uint fall = z3 & 0xFF;
+                z3 = (z3 >> 8) | (z2 << 24);
+                z2 = (z2 >> 8) | (z1 << 24);
+                z1 = (z1 >> 8) | (z0 << 24);
+                z0 = (z0 >> 8) ^ (r[fall] << 12);
+                int at = (int)((word >> shift) & 0xFF) << 2;
+                z0 ^= t[at]; z1 ^= t[at + 1]; z2 ^= t[at + 2]; z3 ^= t[at + 3];
+            }
+        }
 #endif
     }
 }
