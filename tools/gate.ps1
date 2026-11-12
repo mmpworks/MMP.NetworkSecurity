@@ -17,8 +17,15 @@
   The lesson whose app/e2e/lesson-<n>.spec.ts the gate runs. Default: none. When app/ changed and no lesson is named, the gate runs typecheck, build
   and the full Playwright suite on NETSEC_PORT_BASE=auto. Naming a lesson narrows that suite to the one spec, and the report says "narrowed".
   The gate never installs packages: a missing node_modules or Electron binary stops with TOOL_MISSING and the command to run yourself.
+.PARAMETER Base
+  The ref the acceptance-scope step diffs against (tools/check_acceptance_scope.py --base). Default origin/main. A PR into an integration branch
+  passes that branch (for example -Base origin/Algorithm-Optimization): against main, the branch's own merged acceptance/ history reads as part of
+  the change. The step name prints the base, so every report shows what it judged. The app-proof decision (gate_app.ps1, Get-AppDiffFiles) keeps
+  origin/main; -Base does not reach it.
 .EXAMPLE
   pwsh tools/gate.ps1 -Slice S0 -Clauses A9
+.EXAMPLE
+  pwsh tools/gate.ps1 -Slice S0 -SkipApp -Base origin/Algorithm-Optimization
 #>
 [CmdletBinding()]
 param(
@@ -27,7 +34,8 @@ param(
     [string]$NetCFRefDir = 'E:\dev\tools\netcf35-ref',
     [string]$HangLimit = '3m',
     [string]$Lesson,
-    [switch]$SkipApp
+    [switch]$SkipApp,
+    [string]$Base = 'origin/main'
 )
 $ErrorActionPreference = 'Continue'
 $root = Split-Path -Parent $PSScriptRoot
@@ -131,7 +139,7 @@ Step 'every tools test has a gate step' { python -I tools/check_tests_wired.py }
 Step 'tests-wired check tests' { python -I tools/test_check_tests_wired.py }
 Step 'tool temp folder tests' { python -I tools/test_tempdir.py }
 # A change to acceptance/ may touch only acceptance/ and docs/ (tools/check_acceptance_scope.py names each other path).
-Step 'acceptance scope (acceptance/ and docs/ only)' { python -I tools/check_acceptance_scope.py }
+Step "acceptance scope (acceptance/ and docs/ only) against $Base" { python -I tools/check_acceptance_scope.py --base $Base }
 Step 'acceptance scope check tests' { python -I tools/test_check_acceptance_scope.py }
 # A PR that changes acceptance/ bumps acceptance/PIN in the same PR (python -I acceptance/tools/pin.py --write).
 Step 'acceptance PIN current' { python -W ignore -I acceptance/tools/pin.py --check }       # -W ignore keeps a Python warning off line 1, where PIN_OFF must stay
