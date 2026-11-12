@@ -14,6 +14,8 @@
     <NoWarn>$(NoWarn);CS1685</NoWarn>
     <Optimize>true</Optimize>
     <TieredPGO>true</TieredPGO>
+    <!-- The SDK that built this binary, read back by CrossoverPart.BuildSdk() into every part header and report. -->
+    <Description>sdk $(NETCoreSdkVersion)</Description>
   </PropertyGroup>
 
   <ItemGroup Condition="'$(TargetFramework)' == 'net10.0'">
