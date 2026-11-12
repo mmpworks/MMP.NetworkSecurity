@@ -364,7 +364,7 @@ Why: the old rule (the report's `commit` equals the head) could never hold for a
 |---|---|
 | The rule: equal git object ids at the measured paths; `bench/files` by content | `Get-AoBenchCodeVerdict` in `run.ps1`; rule 6 of `ao-bench-schema.md` |
 | A report whose commit the repository does not hold reads FAIL `AO_BENCH_COMMIT_UNKNOWN` | the same function |
-| Self-check on a small git repository, 15 cases, and 2 more through `Read-AoBench` | `SELF.ao-bench-same-code-rule-bites` in `run.ps1` |
+| Self-check on a small git repository, 16 cases, and 2 more through `Read-AoBench` | `SELF.ao-bench-same-code-rule-bites` in `run.ps1` |
 | The 2 random test files have the names `large-4mib.dat` and `small-1k.dat` (they were `.bin`) | `ao9-files.tsv` |
 
 The measured paths: `src/NetSec.Core`, `src/NetSec.Core.NetCF`, `src/AsyncProxy.Local`, `src/AsyncProxy.Local.NetCF`, `acceptance/groups/algo/Frozen`, `Directory.Build.props`, and each entry of `bench/` but `bench/files`. They are the projects that the bench projects reference, the frozen original they compile, and the bench code.

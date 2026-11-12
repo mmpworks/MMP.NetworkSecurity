@@ -935,6 +935,8 @@ foreach ($c in @($pending | Where-Object { $_.group -eq 'driver' -and -not $resu
                 & $put 'acceptance/ao9-files.tsv' "# the file set`nname`tbytes`tsha256`none.dat`t12`tx`ntwo.txt`t12`ty"
                 $null = & $commitAll 'a data file gets a new name'
                 & $expect 'a data file with a new name and the same bytes' $a 'valid' ''
+                & $put 'bench/files/files.tsv' 'one.dat, two.txt, with a note'; & $put 'bench/files/make_files.py' 'a new script'; $null = & $commitAll 'the list and a script under bench/files change'
+                & $expect 'a change under bench/files that leaves the bytes of the listed files' $a 'valid' ''
                 & $put 'bench/files/two.txt' 'other bytes'; $null = & $commitAll 'a data file changes'
                 & $expect 'a data file with other bytes' $a 'AO_BENCH_OTHER_COMMIT' 'bench/files/two.txt'
                 & $git checkout -q --detach $rebased
