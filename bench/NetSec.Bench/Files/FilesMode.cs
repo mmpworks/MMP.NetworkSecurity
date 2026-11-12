@@ -55,7 +55,7 @@ static class FilesMode
         List<FileRow> fileRows = FileBench.Run(files, original, current, print, pairs, only);
         FileRow small = FileBench.SmallMessage(original, current, print, pairs);
         List<FileRow> rows = fileRows.Concat(new[] { small }).ToList();
-        int busy = MachineLoad.Exit(rows.Select(r => r.Pair.OtherBusy).ToArray(), rows.Select(r => r.File + " " + r.Operation + ": " + r.Pair.TopOutside).ToArray());
+        int busy = MachineLoad.Exit(rows.Select(r => r.Pair.OtherBusy).ToArray(), rows.Select(r => r.File + " " + r.Operation + ": " + r.Pair.TopOutside).ToArray(), rows.Select(r => r.Pair.CoreBusy).ToArray());
 
         // The thread rows run once per crossover (in part normal1), last, as in a one-order run: they are not a paired measurement.
         List<ThreadRow> threads = new List<ThreadRow>();
