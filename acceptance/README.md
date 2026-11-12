@@ -398,6 +398,8 @@ Limits:
 3. The reports from before this change keep their paths.
 4. A path with a space ends at the space for the last look, so the text after the space stays.
 
+After the review of this change (2026-11-12): the json is written last, and its summary field `localPathLeaks` lists every leak, also one that the last look finds in the md text or in a summary field (`Get-ReportTexts` in `run.ps1`). Before, the field listed the detail leaks only.
+
 Disposition: keep.
 
 ## 24. Before S1 code: the 5x test on 6 rows, the CMAC tag overlap, the static GCM open row (added 2026-11-12)

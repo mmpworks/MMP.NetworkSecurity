@@ -152,6 +152,22 @@ function Find-LocalPaths([string]$text, [string]$userName = $env:USERNAME) {
 }
 $script:localRoots = Get-LocalRoots
 
+# The 2 report texts with no local path, and the full list of leaks. The list starts with the clause ids whose detail held a path. A
+# path in the md text, or in the json text outside the details (a summary field), adds one entry each. The json text is made one time
+# to search it and a second time with the full list, so the summary field localPathLeaks names every leak.
+function Get-ReportTexts($summary, $rows, [string]$mdText, $detailLeaks) {
+    $leaks = @($detailLeaks)
+    $mdLeft = @(Find-LocalPaths $mdText)
+    if ($mdLeft.Count -gt 0) { $leaks += 'the md text outside the details' }
+    foreach ($p in ($mdLeft | Sort-Object { -$_.Length })) { $mdText = $mdText.Replace($p, '<local path>') }
+    $jsonLeft = @(Find-LocalPaths ([ordered]@{ summary = $summary; results = $rows } | ConvertTo-Json -Depth 6))
+    if ($jsonLeft.Count -gt 0) { $leaks += 'the json text outside the details' }
+    $summary.localPathLeaks = @($leaks)
+    $jsonText = ([ordered]@{ summary = $summary; results = $rows } | ConvertTo-Json -Depth 6)
+    foreach ($p in ($jsonLeft | Sort-Object { -$_.Length })) { $jsonText = $jsonText.Replace($p, '<local path>') }
+    return [pscustomobject]@{ json = $jsonText; md = $mdText; leaks = @($leaks) }
+}
+
 # ------------------------------------------------------------------ tools
 function Invoke-Tool {
     param([string]$Exe, [string[]]$ToolArgs, [string]$Dir = $null, [int]$TimeoutSec = 1800)
@@ -1104,8 +1120,21 @@ foreach ($c in @($pending | Where-Object { $_.group -eq 'driver' -and -not $resu
             $left = @(Find-LocalPaths $stored)
             if ($left.Count -gt 0) { $bad += "a detail stored through Set-Result still holds: " + ($left -join ', ') }
             if ($stored -notmatch [regex]::Escape('.\bench\files')) { $bad += "the product root did not become '.': $stored" }
+            # The report texts: a path in a summary field and a path in the md text are each replaced, and the summary of the json lists
+            # both beside the clause id of a detail leak.
+            $sum2 = [ordered]@{ command = 'run.ps1 -AoBenchReport D:\other\ao-bench.json'; localPathLeaks = @() }
+            $rows2 = @([pscustomobject]@{ id = 'X.a'; detail = 'ok' })
+            $texts2 = Get-ReportTexts $sum2 $rows2 "a table line with D:\other\x.md in it" @('X.detail')
+            $back = $texts2.json | ConvertFrom-Json
+            $wantLeaks = @('X.detail', 'the md text outside the details', 'the json text outside the details')
+            if ((@($back.summary.localPathLeaks) -join ' | ') -ne ($wantLeaks -join ' | ')) { $bad += "the summary of the json lists '$(@($back.summary.localPathLeaks) -join ' | ')', wanted '$($wantLeaks -join ' | ')'" }
+            if ((@($texts2.leaks) -join ' | ') -ne ($wantLeaks -join ' | ')) { $bad += "the leak list is '$(@($texts2.leaks) -join ' | ')'" }
+            if (@(Find-LocalPaths $texts2.json).Count -gt 0 -or @(Find-LocalPaths $texts2.md).Count -gt 0) { $bad += "a report text still holds a local path" }
+            if ($back.summary.command -ne 'run.ps1 -AoBenchReport <local path>') { $bad += "the summary field reads '$($back.summary.command)'" }
+            $clean = Get-ReportTexts ([ordered]@{ command = 'run.ps1 -Clauses A9'; localPathLeaks = @() }) $rows2 'a table line' @()
+            if (@($clean.leaks).Count -ne 0 -or @(($clean.json | ConvertFrom-Json).summary.localPathLeaks).Count -ne 0) { $bad += "a report with no path lists a leak" }
             if ($bad) { Set-Result $c.id 'FAIL' 'ASSERTION' ($bad -join '; ') }
-            else { Set-Result $c.id 'PASS' '' ("$($hide.Count) texts made relative as wanted (both separators, the doubled separator of JSON, any case, a folder inside another one, another folder left alone); $($find.Count) texts searched as wanted (a drive path, a Users path, the user name, and a text with none); the folders of this run, stored through Set-Result, leave no local path") }
+            else { Set-Result $c.id 'PASS' '' ("the report texts: a path in a summary field and a path in the md text are replaced, and the json summary lists both beside the clause id of a detail leak; $($hide.Count) texts made relative as wanted (both separators, the doubled separator of JSON, any case, a folder inside another one, another folder left alone); $($find.Count) texts searched as wanted (a drive path, a Users path, the user name, and a text with none); the folders of this run, stored through Set-Result, leave no local path") }
         }
         'SELF.suite-compile-break-is-a-fail' {
             # A real break: a project that names a suite type (AoStreamSeam) and does not compile its file. This is the break that made
@@ -1249,16 +1278,7 @@ $summary = [ordered]@{
     dirtyKnown = $dirtyKnown; dirtyCount = $(if ($dirtyKnown) { $dirty.Count } else { $null }); dirty = @($dirty | Select-Object -First 20)
     selfChecks = [ordered]@{ selected = $selfRows.Count; pass = @($selfRows | Where-Object { $_.status -eq 'PASS' }).Count; fail = @($selfRows | Where-Object { $_.status -eq 'FAIL' }).Count; notRun = @($selfRows | Where-Object { $_.status -eq 'NOT RUN' }).Count }
 }
-# The whole text gets the same look as the details: a summary field or a table line may hold a path too.
-function Remove-LocalPathsFromReport([string]$text, [string]$what) {
-    $left = @(Find-LocalPaths $text)
-    if ($left.Count -eq 0) { return $text }
-    $script:localPathLeaks += $what
-    foreach ($p in ($left | Sort-Object { -$_.Length })) { $text = $text.Replace($p, '<local path>') }
-    return $text
-}
-$script:localPathLeaks = @($localPathLeaks)
-(Remove-LocalPathsFromReport ([ordered]@{ summary = $summary; results = $rows } | ConvertTo-Json -Depth 6) 'the json text outside the details') | Set-Content -Path $jsonPath -Encoding utf8
+# The json is written with the md, at the end of the report code (Get-ReportTexts), so that its summary lists every leak.
 
 $md = [System.Text.StringBuilder]::new()
 $null = $md.AppendLine("# Acceptance run $stamp")
@@ -1326,8 +1346,11 @@ $null = $md.AppendLine('## Every clause')
 $null = $md.AppendLine()
 $null = $md.AppendLine('| Clause | Status | Reason |'); $null = $md.AppendLine('|---|---|---|')
 foreach ($o in $prodRows) { $null = $md.AppendLine("| $($o.id) | $($o.status) | $($o.reason) |") }
-(Remove-LocalPathsFromReport $md.ToString() 'the md text outside the details') | Set-Content -Path $mdPath -Encoding utf8
-$localPathLeaks = @($script:localPathLeaks)
+# The whole text gets the same look as the details: a summary field or a table line may hold a path too.
+$texts = Get-ReportTexts $summary $rows $md.ToString() $localPathLeaks
+$localPathLeaks = @($texts.leaks)
+$texts.json | Set-Content -Path $jsonPath -Encoding utf8
+$texts.md | Set-Content -Path $mdPath -Encoding utf8
 
 Say ("{0} of {1} clauses PASS ({2} FAIL, {3} NOT RUN); M = {4}" -f $nPass, $mSel, $nFail, $nNot, $M)
 if ($selfRows.Count -gt 0) { Say ("self-checks: {0} of {1} PASS" -f $summary.selfChecks.pass, $selfRows.Count) }
