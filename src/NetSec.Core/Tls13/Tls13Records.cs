@@ -13,34 +13,56 @@ namespace NetSec.Tls13
         public const int ApplicationData = 23;
     }
 
-    /// <summary>One direction's AEAD state. The nonce is the IV xor the record count (RFC 8446 section 5.3), so the count must advance once per record.</summary>
+    /// <summary>
+    /// One direction's AEAD state. The nonce is the IV xor the record count (RFC 8446 section 5.3), so the count must advance once per record.
+    /// It holds one GcmKey for all its records (PRD 7.3 item 12) and one 12-byte nonce buffer that every record uses again.
+    /// Contract: one direction, one thread at a time. Two calls that overlap would share the nonce buffer and the count, so a second call
+    /// while one runs throws InvalidOperationException (a test holds this). Calls from different threads one after another are fine.
+    /// </summary>
     public sealed class RecordProtection
     {
         public const int MaxPlain = 16384;
         const int TagSize = 16;
         const int HeaderSize = 5;
 
-        readonly AesKey _key;
+        readonly GcmKey _gcm;
         readonly byte[] _iv;
+        readonly byte[] _nonce;
         long _count;
+        int _inUse;
 
         public RecordProtection(byte[] key, byte[] iv)
         {
-            _key = new AesKey(key);
+            _gcm = new GcmKey(new AesKey(key));
             _iv = (byte[])iv.Clone();
+            _nonce = new byte[_iv.Length];
         }
+
+        /// <summary>Takes the one-call-at-a-time guard; throws when another call holds it. Internal so a test can hold it.</summary>
+        internal void Enter()
+        {
+            if (System.Threading.Interlocked.CompareExchange(ref _inUse, 1, 0) != 0)
+                throw new InvalidOperationException("one RecordProtection serves one direction on one thread at a time, and two calls overlapped");
+        }
+
+        internal void Exit() { System.Threading.Interlocked.Exchange(ref _inUse, 0); }
 
         public long Count { get { return _count; } }
 
         /// <summary>TLSInnerPlaintext = content + 1-byte real type. The outer type always reads application_data.</summary>
         public byte[] Seal(int contentType, byte[] content, int off, int n)
         {
-            byte[] inner = new byte[n + 1];
-            Buffer.BlockCopy(content, off, inner, 0, n);
-            inner[n] = (byte)contentType;
-            byte[] header = new ByteWriter().U8(ContentType.ApplicationData).U16(0x0303).U16(inner.Length + TagSize).ToArray();
-            byte[] sealedBytes = Gcm.Seal(_key, NextNonce(), header, inner);
-            return new ByteWriter().Put(header).Put(sealedBytes).ToArray();
+            Enter();
+            try
+            {
+                byte[] inner = new byte[n + 1];
+                Buffer.BlockCopy(content, off, inner, 0, n);
+                inner[n] = (byte)contentType;
+                byte[] header = new ByteWriter().U8(ContentType.ApplicationData).U16(0x0303).U16(inner.Length + TagSize).ToArray();
+                byte[] sealedBytes = _gcm.Seal(NextNonce(), header, inner);
+                return new ByteWriter().Put(header).Put(sealedBytes).ToArray();
+            }
+            finally { Exit(); }
         }
 
         /// <summary>Opens one record. False means the tag failed. On success, zero padding is gone and the real type is out.</summary>
@@ -49,7 +71,12 @@ namespace NetSec.Tls13
             contentType = 0;
             content = null;
             byte[] inner;
-            if (!Gcm.TryOpen(_key, NextNonce(), header, payload, out inner)) return false;
+            Enter();
+            try
+            {
+                if (!_gcm.TryOpen(NextNonce(), header, payload, out inner)) return false;
+            }
+            finally { Exit(); }
             int end = inner.Length - 1;
             while (end >= 0 && inner[end] == 0) end--;
             if (end < 0) throw new ParseFailure(ErrorCodes.UnexpectedMessage, "a protected record holds only padding");
@@ -60,12 +87,13 @@ namespace NetSec.Tls13
             return true;
         }
 
+        /// <summary>The next record's nonce, in the one buffer this direction owns (safe under the one-call-at-a-time contract).</summary>
         byte[] NextNonce()
         {
-            byte[] nonce = (byte[])_iv.Clone();
+            Buffer.BlockCopy(_iv, 0, _nonce, 0, _iv.Length);
             long count = _count++;
-            for (int i = 0; i < 8; i++) nonce[nonce.Length - 1 - i] ^= (byte)(count >> (8 * i));
-            return nonce;
+            for (int i = 0; i < 8; i++) _nonce[_nonce.Length - 1 - i] ^= (byte)(count >> (8 * i));
+            return _nonce;
         }
 
         public static byte[] PlainRecord(int contentType, int version, byte[] content, int off, int n)
