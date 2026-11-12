@@ -47,7 +47,7 @@ static class AoParts
         StringBuilder s = new StringBuilder();
         s.Append("{\n  \"schema\": 1,\n");
         s.Append("  \"commit\": ").Append(Report.Quote(head)).Append(",\n");
-        s.Append("  \"runtime\": ").Append(Report.Quote(System.Runtime.InteropServices.RuntimeInformation.FrameworkDescription)).Append(",\n");
+        s.Append("  \"mergeRuntime\": ").Append(Report.Quote(System.Runtime.InteropServices.RuntimeInformation.FrameworkDescription)).Append(",\n");
         s.Append("  \"machine\": ").Append(Report.Quote(Report.Cpu())).Append(",\n");
         s.Append("  \"rows\": [\n").Append(string.Join(",\n", rows)).Append("\n  ]\n}\n");
         File.WriteAllText(Path.Combine(folder, "ao-bench.json"), s.ToString(), new UTF8Encoding(false));
