@@ -265,7 +265,10 @@ function Read-AoRowList([string]$path) {
 # at the report's commit (acceptance/ao-bench-schema.md rule 6). A bare commit id cannot be the rule: the commit that adds the report
 # changes the head. bench/files is data, judged by content: each file that acceptance/ao9-files.tsv names must have, at the head, bytes
 # that are in bench/files at the report's commit. A data file may get a new name; its bytes may not change.
-$AoBenchMeasuredPaths = 'src/NetSec.Core', 'src/NetSec.Core.NetCF', 'src/AsyncProxy.Local', 'src/AsyncProxy.Local.NetCF', 'acceptance/groups/algo/Frozen', 'Directory.Build.props'
+$AoBenchMeasuredPaths = 'src/NetSec.Core', 'src/NetSec.Core.NetCF', 'src/AsyncProxy.Local', 'src/AsyncProxy.Local.NetCF', 'acceptance/groups/algo/Frozen',
+                        # The build files that MSBuild and NuGet read from outside the project folders. A path that both sides lack is equal.
+                        'Directory.Build.props', 'Directory.Build.targets', 'src/Directory.Build.props', 'src/Directory.Build.targets',
+                        'Directory.Packages.props', 'global.json', 'NuGet.config'
 
 # The id of a git object (a commit, or the tree or blob at commit:path), or '' when the repository does not hold it.
 function Get-GitObjectId([string]$repo, [string]$rev) {
@@ -301,14 +304,22 @@ function Get-AoBenchCodeVerdict([string]$repo, [string]$commit) {
             return [pscustomobject]@{ reason = 'AO_BENCH_OTHER_COMMIT'; detail = "the measured code differs between the bench report's commit $short and the head: $p" }
         }
     }
-    $thenBytes = @((Get-GitTreeEntries $repo ($full + ':bench/files') -Recurse).Values)
+    # bench/files, one to one: a listed name that the report's commit has keeps its bytes. A listed name that is new takes the bytes of
+    # a file whose name is gone at the head, and each such file is used one time. So two files cannot trade bytes, and no file can take
+    # the bytes of a file that is still there.
+    $thenFiles = Get-GitTreeEntries $repo ($full + ':bench/files') -Recurse
+    $nowFiles = Get-GitTreeEntries $repo 'HEAD:bench/files' -Recurse
+    $gone = [System.Collections.Generic.List[string]]::new()
+    foreach ($n in $thenFiles.Keys) { if (-not $nowFiles.ContainsKey($n)) { $gone.Add($thenFiles[$n]) } }
     foreach ($line in @(git -C $repo show 'HEAD:acceptance/ao9-files.tsv' 2>$null)) {
         if ($line -match '^\s*#' -or $line -match '^name\t' -or -not ([string]$line).Trim()) { continue }
         $name = ([string]$line -split "`t")[0]
-        $now = Get-GitObjectId $repo ("HEAD:bench/files/$name")
-        if (-not $now) { return [pscustomobject]@{ reason = 'AO_BENCH_OTHER_COMMIT'; detail = "the head has no bench/files/$name, a file of acceptance/ao9-files.tsv" } }
-        if ($thenBytes -notcontains $now) {
-            return [pscustomobject]@{ reason = 'AO_BENCH_OTHER_COMMIT'; detail = "the bytes of bench/files/$name at the head are in no file of bench/files at the bench report's commit $short" }
+        if (-not $nowFiles.ContainsKey($name)) { return [pscustomobject]@{ reason = 'AO_BENCH_OTHER_COMMIT'; detail = "the head has no bench/files/$name, a file of acceptance/ao9-files.tsv" } }
+        $now = $nowFiles[$name]
+        if ($thenFiles.ContainsKey($name)) {
+            if ($thenFiles[$name] -ne $now) { return [pscustomobject]@{ reason = 'AO_BENCH_OTHER_COMMIT'; detail = "the bytes of bench/files/$name differ between the bench report's commit $short and the head" } }
+        } elseif (-not $gone.Remove($now)) {
+            return [pscustomobject]@{ reason = 'AO_BENCH_OTHER_COMMIT'; detail = "bench/files/$name is a new name, and its bytes are not the bytes of a file that the bench report's commit $short has and the head lacks" }
         }
     }
     $dirty = @(git -C $repo status --porcelain -- (@($AoBenchMeasuredPaths) + 'bench') 2>$null)
@@ -912,6 +923,7 @@ foreach ($c in @($pending | Where-Object { $_.group -eq 'driver' -and -not $resu
                 & $git config user.email 'self-check@example.invalid'; & $git config user.name 'self-check'
                 & $git config commit.gpgsign false; & $git config core.autocrlf false; & $git config core.hooksPath 'no-hooks'
                 & $put 'src/NetSec.Core/A.cs' 'a'; & $put 'src/NetSec.Core.NetCF/N.csproj' 'n'; & $put 'bench/B.cs' 'b'
+                & $put 'src/AsyncProxy.Local/P.cs' 'p'; & $put 'src/AsyncProxy.Local.NetCF/Q.cs' 'q'
                 & $put 'acceptance/groups/algo/Frozen/F.cs' 'f'; & $put 'Directory.Build.props' 'p'; & $put 'docs/d.md' 'd'; & $put 'acceptance/README.md' 'r'
                 & $put 'bench/files/one.bin' 'bytes of one'; & $put 'bench/files/two.txt' 'bytes of two'; & $put 'bench/files/files.tsv' 'one.bin, two.txt'
                 & $put 'acceptance/ao9-files.tsv' "# the file set`nname`tbytes`tsha256`none.bin`t12`tx`ntwo.txt`t12`ty"
@@ -925,6 +937,9 @@ foreach ($c in @($pending | Where-Object { $_.group -eq 'driver' -and -not $resu
                 & $git checkout -q --detach $rebased
                 & $expect 'the same content after a rebase (another parent)' $a 'valid' ''
                 foreach ($change in @(@('src/NetSec.Core/A.cs', 'src/NetSec.Core'), @('src/NetSec.Core.NetCF/N.csproj', 'src/NetSec.Core.NetCF'), @('bench/B.cs', 'bench'),
+                                      @('src/AsyncProxy.Local/P.cs', 'src/AsyncProxy.Local'), @('src/AsyncProxy.Local.NetCF/Q.cs', 'src/AsyncProxy.Local.NetCF'),
+                                      # A path that the report's commit lacks: a new build file, and a new entry of bench/ at the head only.
+                                      @('src/Directory.Build.props', 'src/Directory.Build.props'), @('global.json', 'global.json'), @('bench/New.cs', 'bench/New.cs'),
                                       @('acceptance/groups/algo/Frozen/F.cs', 'acceptance/groups/algo/Frozen'), @('Directory.Build.props', 'Directory.Build.props'))) {
                     & $put $change[0] 'changed'; $null = & $commitAll "change $($change[0])"
                     & $expect "a change under $($change[1])" $a 'AO_BENCH_OTHER_COMMIT' $change[1]
@@ -943,6 +958,21 @@ foreach ($c in @($pending | Where-Object { $_.group -eq 'driver' -and -not $resu
                 & $git rm -q 'bench/files/two.txt'; $null = & $commitAll 'a data file goes'
                 & $expect 'a data file that the head lacks' $a 'AO_BENCH_OTHER_COMMIT' 'bench/files/two.txt'
                 & $git checkout -q --detach $rebased
+                # One to one: two listed files cannot trade bytes, one cannot take the bytes of the other, and a new name cannot take
+                # the bytes of a file that is still there.
+                & $put 'bench/files/one.bin' 'bytes of two'; & $put 'bench/files/two.txt' 'bytes of one'; $null = & $commitAll 'two data files trade bytes'
+                & $expect 'two data files that trade bytes' $a 'AO_BENCH_OTHER_COMMIT' 'bench/files/'
+                & $git checkout -q --detach $rebased
+                & $put 'bench/files/two.txt' 'bytes of one'; $null = & $commitAll 'a data file takes the bytes of another'
+                & $expect 'a data file with the bytes of another listed file' $a 'AO_BENCH_OTHER_COMMIT' 'bench/files/two.txt'
+                & $git checkout -q --detach $rebased
+                & $put 'bench/files/three.txt' 'bytes of two'; & $put 'acceptance/ao9-files.tsv' "# the file set`nname`tbytes`tsha256`none.bin`t12`tx`ntwo.txt`t12`ty`nthree.txt`t12`ty"
+                $null = & $commitAll 'a new listed name copies a file that is still there'
+                & $expect 'a new name with the bytes of a file that is still there' $a 'AO_BENCH_OTHER_COMMIT' 'three.txt is a new name'
+                & $git checkout -q --detach $rebased
+                & $put 'src/NetSec.Core/Untracked.cs' 'not added'
+                & $expect 'an untracked file in the measured code' $a 'AO_BENCH_OTHER_COMMIT' 'uncommitted'
+                & $git clean -fdq
                 & $put 'src/NetSec.Core/A.cs' 'not committed'
                 & $expect 'an uncommitted change in the measured code' $a 'AO_BENCH_OTHER_COMMIT' 'uncommitted'
                 & $git checkout -q -- .

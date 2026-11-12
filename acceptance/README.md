@@ -362,12 +362,12 @@ Why: the old rule (the report's `commit` equals the head) could never hold for a
 
 | Part | Where |
 |---|---|
-| The rule: equal git object ids at the measured paths; `bench/files` by content | `Get-AoBenchCodeVerdict` in `run.ps1`; rule 6 of `ao-bench-schema.md` |
+| The rule: equal git object ids at the measured paths; `bench/files` by content, one to one | `Get-AoBenchCodeVerdict` in `run.ps1`; rule 6 of `ao-bench-schema.md` |
 | A report whose commit the repository does not hold reads FAIL `AO_BENCH_COMMIT_UNKNOWN` | the same function |
-| Self-check on a small git repository, 16 cases, and 2 more through `Read-AoBench` | `SELF.ao-bench-same-code-rule-bites` in `run.ps1` |
+| Self-check on a small git repository, 25 cases, and 2 more through `Read-AoBench` | `SELF.ao-bench-same-code-rule-bites` in `run.ps1` |
 | The 2 random test files have the names `large-4mib.dat` and `small-1k.dat` (they were `.bin`) | `ao9-files.tsv` |
 
-The measured paths: `src/NetSec.Core`, `src/NetSec.Core.NetCF`, `src/AsyncProxy.Local`, `src/AsyncProxy.Local.NetCF`, `acceptance/groups/algo/Frozen`, `Directory.Build.props`, and each entry of `bench/` but `bench/files`. They are the projects that the bench projects reference, the frozen original they compile, and the bench code.
+The measured paths: `src/NetSec.Core`, `src/NetSec.Core.NetCF`, `src/AsyncProxy.Local`, `src/AsyncProxy.Local.NetCF`, `acceptance/groups/algo/Frozen`, the build files `Directory.Build.props`, `Directory.Build.targets`, `src/Directory.Build.props`, `src/Directory.Build.targets`, `Directory.Packages.props`, `global.json` and `NuGet.config` (a file that both sides lack is equal), and each entry of `bench/` but `bench/files`. They are the projects that the bench projects reference, the frozen original they compile, the build files that MSBuild and NuGet read from outside those folders, and the bench code. 6 of the 7 build files do not exist today; they are on the list so that a new one makes a report stale.
 
 Limits:
 
