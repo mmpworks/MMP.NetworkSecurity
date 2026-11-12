@@ -125,44 +125,22 @@ namespace NetSec.Crypto
 
         void Absorb(byte[] data, int off, int length, ref uint y0, ref uint y1, ref uint y2, ref uint y3)
         {
-            uint[] t = _table;
-            ushort[] r = Gf128.Reduce4;
-            uint a0 = y0, a1 = y1, a2 = y2, a3 = y3;
             for (int at = 0; at < length; at += BlockSize)
             {
                 int take = Math.Min(BlockSize, length - at);
                 if (take == BlockSize)
                 {
-                    a0 ^= Endian.LoadBe32(data, off + at); a1 ^= Endian.LoadBe32(data, off + at + 4);
-                    a2 ^= Endian.LoadBe32(data, off + at + 8); a3 ^= Endian.LoadBe32(data, off + at + 12);
+                    y0 ^= Endian.LoadBe32(data, off + at); y1 ^= Endian.LoadBe32(data, off + at + 4);
+                    y2 ^= Endian.LoadBe32(data, off + at + 8); y3 ^= Endian.LoadBe32(data, off + at + 12);
                 }
                 else
                 {
                     // A partial last block loads byte by byte with zero fill, so there is no temp block.
-                    a0 ^= PartWord(data, off + at, take, 0); a1 ^= PartWord(data, off + at, take, 1);
-                    a2 ^= PartWord(data, off + at, take, 2); a3 ^= PartWord(data, off + at, take, 3);
+                    y0 ^= PartWord(data, off + at, take, 0); y1 ^= PartWord(data, off + at, take, 1);
+                    y2 ^= PartWord(data, off + at, take, 2); y3 ^= PartWord(data, off + at, take, 3);
                 }
-                // BEND (PRD 7.5; bent rule: DRY). Gf128.Multiply is written out here, on locals, with no call and no ref parameters per
-                // block, because GHASH is the larger half of a GCM block and the net10 code ratio stood at 4.40 against the 5x target.
-                // Gf128.Multiply stays the reference copy: Tag uses it for the length block, so AO-2 runs both copies on every call.
-                uint z0 = 0, z1 = 0, z2 = 0, z3 = 0;
-                for (int w = 3; w >= 0; w--)
-                {
-                    uint word = w == 3 ? a3 : w == 2 ? a2 : w == 1 ? a1 : a0;
-                    for (int shift = 0; shift < 32; shift += 4)
-                    {
-                        uint fall = z3 & 0xF;
-                        z3 = (z3 >> 4) | (z2 << 28);
-                        z2 = (z2 >> 4) | (z1 << 28);
-                        z1 = (z1 >> 4) | (z0 << 28);
-                        z0 = (z0 >> 4) ^ ((uint)r[fall] << 16);
-                        int e = (int)((word >> shift) & 0xF) << 2;
-                        z0 ^= t[e]; z1 ^= t[e + 1]; z2 ^= t[e + 2]; z3 ^= t[e + 3];
-                    }
-                }
-                a0 = z0; a1 = z1; a2 = z2; a3 = z3;
+                Gf128.Multiply(_table, ref y0, ref y1, ref y2, ref y3);
             }
-            y0 = a0; y1 = a1; y2 = a2; y3 = a3;
         }
 
         static uint PartWord(byte[] b, int off, int length, int w)
