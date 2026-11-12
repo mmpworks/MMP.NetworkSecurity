@@ -260,17 +260,89 @@ function Read-AoRowList([string]$path) {
     }
     return $list
 }
-# The bench rows, judged by the suite from the numbers (acceptance/ao-bench-schema.md). Returns id -> result.
-function Read-AoBench([string]$path, $list, [string]$slice, [string]$head) {
+# The code the benchmark builds from: the product projects it references, the frozen original it compiles, the shared build file, and
+# its own code (each entry of bench/ but bench/files). A bench report is valid on a head whose content at these paths equals the content
+# at the report's commit (acceptance/ao-bench-schema.md rule 6). A bare commit id cannot be the rule: the commit that adds the report
+# changes the head. bench/files is data, judged by content: each file that acceptance/ao9-files.tsv names must have, at the head, bytes
+# that are in bench/files at the report's commit. A data file may get a new name; its bytes may not change.
+$AoBenchMeasuredPaths = 'src/NetSec.Core', 'src/NetSec.Core.NetCF', 'src/AsyncProxy.Local', 'src/AsyncProxy.Local.NetCF', 'acceptance/groups/algo/Frozen',
+                        # The build files that MSBuild and NuGet read from outside the project folders. A path that both sides lack is equal.
+                        'Directory.Build.props', 'Directory.Build.targets', 'src/Directory.Build.props', 'src/Directory.Build.targets',
+                        'Directory.Packages.props', 'global.json', 'NuGet.config'
+
+# The id of a git object (a commit, or the tree or blob at commit:path), or '' when the repository does not hold it.
+function Get-GitObjectId([string]$repo, [string]$rev) {
+    $id = (git -C $repo rev-parse --verify --quiet $rev 2>$null)
+    if ($LASTEXITCODE -ne 0 -or -not $id) { return '' }
+    return ([string]$id).Trim()
+}
+
+# The entries of a tree as name -> object id (with -r: every blob under it as path -> id). Empty when the tree does not exist.
+function Get-GitTreeEntries([string]$repo, [string]$rev, [switch]$Recurse) {
+    $map = @{}
+    $listed = if ($Recurse) { @(git -C $repo ls-tree -r $rev 2>$null) } else { @(git -C $repo ls-tree $rev 2>$null) }
+    if ($LASTEXITCODE -ne 0) { return $map }
+    foreach ($line in $listed) {
+        $m = [regex]::Match([string]$line, '^\S+ \S+ (?<id>[0-9a-f]{40,64})\t(?<name>.+)$')
+        if ($m.Success) { $map[$m.Groups['name'].Value] = $m.Groups['id'].Value }
+    }
+    return $map
+}
+
+# $null when the measured code and data are the same at the report's commit and at the head of $repo. Else an object with reason and detail.
+function Get-AoBenchCodeVerdict([string]$repo, [string]$commit) {
+    $full = if ($commit -match '^[0-9a-fA-F]{7,40}$') { Get-GitObjectId $repo ($commit + '^{commit}') } else { '' }
+    if (-not $full) {
+        return [pscustomobject]@{ reason = 'AO_BENCH_COMMIT_UNKNOWN'; detail = "the repository does not hold the commit '$commit' that the bench report names: fetch it, or keep a tag on the measured commit" }
+    }
+    $short = $full.Substring(0, 7)
+    $thenBench = Get-GitTreeEntries $repo ($full + ':bench')
+    $nowBench = Get-GitTreeEntries $repo 'HEAD:bench'
+    $paths = @($AoBenchMeasuredPaths) + @(@($thenBench.Keys) + @($nowBench.Keys) | Where-Object { $_ -ne 'files' } | Sort-Object -Unique | ForEach-Object { "bench/$_" })
+    foreach ($p in $paths) {
+        if ((Get-GitObjectId $repo ($full + ':' + $p)) -ne (Get-GitObjectId $repo ('HEAD:' + $p))) {
+            return [pscustomobject]@{ reason = 'AO_BENCH_OTHER_COMMIT'; detail = "the measured code differs between the bench report's commit $short and the head: $p" }
+        }
+    }
+    # bench/files, one to one: a listed name that the report's commit has keeps its bytes. A listed name that is new takes the bytes of
+    # a file whose name is gone at the head, and each such file is used one time. So two files cannot trade bytes, and no file can take
+    # the bytes of a file that is still there.
+    $thenFiles = Get-GitTreeEntries $repo ($full + ':bench/files') -Recurse
+    $nowFiles = Get-GitTreeEntries $repo 'HEAD:bench/files' -Recurse
+    $gone = [System.Collections.Generic.List[string]]::new()
+    foreach ($n in $thenFiles.Keys) { if (-not $nowFiles.ContainsKey($n)) { $gone.Add($thenFiles[$n]) } }
+    foreach ($line in @(git -C $repo show 'HEAD:acceptance/ao9-files.tsv' 2>$null)) {
+        if ($line -match '^\s*#' -or $line -match '^name\t' -or -not ([string]$line).Trim()) { continue }
+        $name = ([string]$line -split "`t")[0]
+        if (-not $nowFiles.ContainsKey($name)) { return [pscustomobject]@{ reason = 'AO_BENCH_OTHER_COMMIT'; detail = "the head has no bench/files/$name, a file of acceptance/ao9-files.tsv" } }
+        $now = $nowFiles[$name]
+        if ($thenFiles.ContainsKey($name)) {
+            if ($thenFiles[$name] -ne $now) { return [pscustomobject]@{ reason = 'AO_BENCH_OTHER_COMMIT'; detail = "the bytes of bench/files/$name differ between the bench report's commit $short and the head" } }
+        } elseif (-not $gone.Remove($now)) {
+            return [pscustomobject]@{ reason = 'AO_BENCH_OTHER_COMMIT'; detail = "bench/files/$name is a new name, and its bytes are not the bytes of a file that the bench report's commit $short has and the head lacks" }
+        }
+    }
+    $dirty = @(git -C $repo status --porcelain -- (@($AoBenchMeasuredPaths) + 'bench') 2>$null)
+    if ($dirty.Count -gt 0) {
+        return [pscustomobject]@{ reason = 'AO_BENCH_OTHER_COMMIT'; detail = "the working tree has uncommitted changes in the measured code: " + (($dirty | Select-Object -First 3) -join '; ') }
+    }
+    return $null
+}
+
+# The bench rows, judged by the suite from the numbers (acceptance/ao-bench-schema.md). Returns id -> result. $codeJudge takes the report's
+# commit and gives $null (the measured code is the head's) or an object with reason and detail; then every bench row reads that FAIL.
+$script:aoBenchCommitNote = ''
+function Read-AoBench([string]$path, $list, [string]$slice, [scriptblock]$codeJudge) {
     $out = @{}
     if (-not $path) { return $out }
     $doc = Get-Content -LiteralPath $path -Raw -Encoding utf8 | ConvertFrom-Json
     $byId = @{}
     foreach ($r in @($doc.rows)) { $byId[[string]$r.id] = $r }
-    $other = ([string]$doc.commit) -ne $head
+    $stale = & $codeJudge ([string]$doc.commit)
+    $script:aoBenchCommitNote = if ($stale) { "$($stale.reason): $($stale.detail)" } else { "the report's commit $($doc.commit) has the measured code and data of the head (" + ($AoBenchMeasuredPaths -join ', ') + ", bench; bench/files by content)" }
     foreach ($e in @($list.Values | Where-Object { $_.source -eq 'bench' })) {
         $r = $byId[$e.id]
-        if ($other) { $out[$e.id] = [pscustomobject]@{ status = 'FAIL'; reason = 'AO_BENCH_OTHER_COMMIT'; detail = "the bench report is for $($doc.commit), the run is on $head" }; continue }
+        if ($stale) { $out[$e.id] = [pscustomobject]@{ status = 'FAIL'; reason = $stale.reason; detail = $stale.detail }; continue }
         if (-not $r) { $out[$e.id] = [pscustomobject]@{ status = 'FAIL'; reason = 'AO_BENCH_ROW_BAD'; detail = 'no row in the bench report' }; continue }
         if ($e.id -like 'AO-5.*') {
             $b = $r.PSObject.Properties['bytesPerOp']
@@ -803,12 +875,12 @@ foreach ($c in @($pending | Where-Object { $_.group -eq 'driver' -and -not $resu
             $bl['AO-5.x.net10'] = [pscustomobject]@{ id = 'AO-5.x.net10'; state = 'FAIL'; reason = 'AO5_ALLOCATES'; from = 'S1'; source = 'bench' }
             $bj = Join-Path $work ("ao-bench-self-{0}.json" -f [guid]::NewGuid().ToString('N').Substring(0, 8))
             Set-Content -LiteralPath $bj -Encoding utf8 -Value '{"schema":1,"commit":"HEADX","rows":[{"id":"AO-5.x.net10","status":"PASS","bytesPerOp":16,"op":"block"}]}'
-            $bv = Read-AoBench $bj $bl 'S0' 'HEADX'
+            $bv = Read-AoBench $bj $bl 'S0' { param($commit) $null }
             if ($bv['AO-5.x.net10'].status -ne 'FAIL' -or $bv['AO-5.x.net10'].reason -ne 'AO5_ALLOCATES') { $bad += "a bench row with 16 B that says PASS read $($bv['AO-5.x.net10'].status) $($bv['AO-5.x.net10'].reason)" }
             $bl['AO-9.pool-25.net10.time'] = [pscustomobject]@{ id = 'AO-9.pool-25.net10.time'; state = '-'; reason = '-'; from = 'S0'; source = 'bench' }
             $bl['AO-9.gcm.net10.time'] = [pscustomobject]@{ id = 'AO-9.gcm.net10.time'; state = '-'; reason = '-'; from = 'S0'; source = 'bench' }
             Set-Content -LiteralPath $bj -Encoding utf8 -Value '{"schema":1,"commit":"HEADX","rows":[{"id":"AO-5.x.net10","bytesPerOp":0,"op":"block"},{"id":"AO-9.gcm.net10.time","outputsEqual":false,"originalNsPerOp":10,"newNsPerOp":5,"files":7,"op":"seal+open"},{"id":"AO-9.pool-25.net10.time","outputsEqual":true,"originalNsPerOp":10,"newNsPerOp":5,"files":1,"op":"25 workers"},{"id":"AO-9.gcm.net10.time.extra","outputsEqual":true}]}'
-            $b9 = Read-AoBench $bj $bl 'S0' 'HEADX'
+            $b9 = Read-AoBench $bj $bl 'S0' { param($commit) $null }
             if ($b9['AO-9.pool-25.net10.time'].status -ne 'PASS') { $bad += "a good AO-9 pool-25 timing row with files 1 read $($b9['AO-9.pool-25.net10.time'].status) $($b9['AO-9.pool-25.net10.time'].reason)" }
             # Second record against the suite's own rows: the suite FAILs AO-5.x while the bench says 0 B; the suite PASSes AO-9.gcm while the bench says outputs differ.
             $suiteRun = @{ 'AO-5.x.net10' = (New-AoRow 'FAIL' 'AO5_ALLOCATES'); 'AO-9.gcm.net10' = (New-AoRow 'PASS' ''); 'AO-9.pool-25.net10' = (New-AoRow 'PASS' '') }
@@ -824,10 +896,100 @@ foreach ($c in @($pending | Where-Object { $_.group -eq 'driver' -and -not $resu
             Set-Content -LiteralPath $bt -Encoding utf8 -Value @("id`tbudget_bytes`tunit`tfrom_slice`ttradeoff_pr", "X.a`t64`tmessage`tS1`t#420", "X.a`t32`tmessage`tS1`t#421", "X.z`t0`tmessage`tS1`t", "X.b`t16`tblock`tS1`t ")
             $budBad = @(Get-AoBudgetReds $bt $l)
             if (-not ($budBad -match 'second line') -or -not ($budBad -match 'not a row') -or -not ($budBad -match 'no tradeoff PR')) { $bad += "the budget check missed a bad line: " + ($budBad -join ' | ') }
-            $bo = Read-AoBench $bj $bl 'S0' 'OTHERHEAD'
+            $bo = Read-AoBench $bj $bl 'S0' { param($commit) [pscustomobject]@{ reason = 'AO_BENCH_OTHER_COMMIT'; detail = "the measured code differs from $commit" } }
             if ($bo['AO-5.x.net10'].reason -ne 'AO_BENCH_OTHER_COMMIT') { $bad += "a bench report for another commit read $($bo['AO-5.x.net10'].reason)" }
             if ($bad) { Set-Result $c.id 'FAIL' 'ASSERTION' ($bad -join '; ') }
             else { Set-Result $c.id 'PASS' '' (($seen -join '; ') + '; bench 16 B claiming PASS -> FAIL AO5_ALLOCATES; AO-9 timing row -> PASS; bench 0 B against a suite FAIL -> AO5_BENCH_DISAGREES; bench outputsEqual false against a suite PASS -> AO9_BENCH_DISAGREES; agreeing records -> no red; bench for another commit -> AO_BENCH_OTHER_COMMIT; budget file: a good line passes, an unknown id, a second line and a budget with no tradeoff PR each go red') }
+        }
+        'SELF.ao-bench-same-code-rule-bites' {
+            # A small git repository with the measured paths and 2 paths that are not measured. The bench report names commit A.
+            $bad = @(); $seen = @()
+            $repo = Join-Path $work ("bench-code-" + [guid]::NewGuid().ToString('N').Substring(0, 8))
+            New-Item -ItemType Directory -Force -Path $repo | Out-Null
+            $git = { git -C $repo @args 2>&1 | Out-Null; if ($LASTEXITCODE -ne 0) { throw "git $($args -join ' ') failed in the self-check repository" } }
+            $put = { param([string]$rel, [string]$text)
+                $full = Join-Path $repo $rel
+                New-Item -ItemType Directory -Force -Path (Split-Path -Parent $full) | Out-Null
+                Set-Content -LiteralPath $full -Encoding utf8 -Value $text }
+            $commitAll = { param([string]$message) & $git add -A; & $git commit -q -m $message; return (Get-GitObjectId $repo 'HEAD') }
+            $expect = { param([string]$case, [string]$commit, [string]$wantReason, [string]$wantText)
+                $v = Get-AoBenchCodeVerdict $repo $commit
+                $got = if ($v) { $v.reason } else { 'valid' }
+                if ($got -ne $wantReason -or ($wantText -and $v.detail -notmatch [regex]::Escape($wantText))) { $script:benchSelfBad += "${case}: read $got$(if ($v) { ' (' + $v.detail + ')' }), wanted $wantReason $wantText" }
+                $script:benchSelfSeen += "$case -> $wantReason" }
+            $script:benchSelfBad = @(); $script:benchSelfSeen = @()
+            try {
+                & $git init -q
+                & $git config user.email 'self-check@example.invalid'; & $git config user.name 'self-check'
+                & $git config commit.gpgsign false; & $git config core.autocrlf false; & $git config core.hooksPath 'no-hooks'
+                & $put 'src/NetSec.Core/A.cs' 'a'; & $put 'src/NetSec.Core.NetCF/N.csproj' 'n'; & $put 'bench/B.cs' 'b'
+                & $put 'src/AsyncProxy.Local/P.cs' 'p'; & $put 'src/AsyncProxy.Local.NetCF/Q.cs' 'q'
+                & $put 'acceptance/groups/algo/Frozen/F.cs' 'f'; & $put 'Directory.Build.props' 'p'; & $put 'docs/d.md' 'd'; & $put 'acceptance/README.md' 'r'
+                & $put 'bench/files/one.bin' 'bytes of one'; & $put 'bench/files/two.txt' 'bytes of two'; & $put 'bench/files/files.tsv' 'one.bin, two.txt'
+                & $put 'acceptance/ao9-files.tsv' "# the file set`nname`tbytes`tsha256`none.bin`t12`tx`ntwo.txt`t12`ty"
+                $a = & $commitAll 'A'
+                & $expect 'the report commit is the head' $a 'valid' ''
+                & $expect 'a short id of the report commit' $a.Substring(0, 7) 'valid' ''
+                & $put 'docs/d.md' 'the report'; & $put 'acceptance/README.md' 'rows'; $docs = & $commitAll 'docs and acceptance text only'
+                & $expect 'a report commit on top (docs and acceptance text only)' $a 'valid' ''
+                $tree = Get-GitObjectId $repo 'HEAD^{tree}'
+                $rebased = ([string](git -C $repo commit-tree $tree -m 'the same content on another parent')).Trim()
+                & $git checkout -q --detach $rebased
+                & $expect 'the same content after a rebase (another parent)' $a 'valid' ''
+                foreach ($change in @(@('src/NetSec.Core/A.cs', 'src/NetSec.Core'), @('src/NetSec.Core.NetCF/N.csproj', 'src/NetSec.Core.NetCF'), @('bench/B.cs', 'bench'),
+                                      @('src/AsyncProxy.Local/P.cs', 'src/AsyncProxy.Local'), @('src/AsyncProxy.Local.NetCF/Q.cs', 'src/AsyncProxy.Local.NetCF'),
+                                      # A path that the report's commit lacks: a new build file, and a new entry of bench/ at the head only.
+                                      @('src/Directory.Build.props', 'src/Directory.Build.props'), @('global.json', 'global.json'), @('bench/New.cs', 'bench/New.cs'),
+                                      @('acceptance/groups/algo/Frozen/F.cs', 'acceptance/groups/algo/Frozen'), @('Directory.Build.props', 'Directory.Build.props'))) {
+                    & $put $change[0] 'changed'; $null = & $commitAll "change $($change[0])"
+                    & $expect "a change under $($change[1])" $a 'AO_BENCH_OTHER_COMMIT' $change[1]
+                    & $git checkout -q --detach $rebased
+                }
+                # bench/files is data, judged by content: a new name with the same bytes is valid; other bytes and a missing file are not.
+                & $git mv 'bench/files/one.bin' 'bench/files/one.dat'; & $put 'bench/files/files.tsv' 'one.dat, two.txt'
+                & $put 'acceptance/ao9-files.tsv' "# the file set`nname`tbytes`tsha256`none.dat`t12`tx`ntwo.txt`t12`ty"
+                $null = & $commitAll 'a data file gets a new name'
+                & $expect 'a data file with a new name and the same bytes' $a 'valid' ''
+                & $put 'bench/files/files.tsv' 'one.dat, two.txt, with a note'; & $put 'bench/files/make_files.py' 'a new script'; $null = & $commitAll 'the list and a script under bench/files change'
+                & $expect 'a change under bench/files that leaves the bytes of the listed files' $a 'valid' ''
+                & $put 'bench/files/two.txt' 'other bytes'; $null = & $commitAll 'a data file changes'
+                & $expect 'a data file with other bytes' $a 'AO_BENCH_OTHER_COMMIT' 'bench/files/two.txt'
+                & $git checkout -q --detach $rebased
+                & $git rm -q 'bench/files/two.txt'; $null = & $commitAll 'a data file goes'
+                & $expect 'a data file that the head lacks' $a 'AO_BENCH_OTHER_COMMIT' 'bench/files/two.txt'
+                & $git checkout -q --detach $rebased
+                # One to one: two listed files cannot trade bytes, one cannot take the bytes of the other, and a new name cannot take
+                # the bytes of a file that is still there.
+                & $put 'bench/files/one.bin' 'bytes of two'; & $put 'bench/files/two.txt' 'bytes of one'; $null = & $commitAll 'two data files trade bytes'
+                & $expect 'two data files that trade bytes' $a 'AO_BENCH_OTHER_COMMIT' 'bench/files/'
+                & $git checkout -q --detach $rebased
+                & $put 'bench/files/two.txt' 'bytes of one'; $null = & $commitAll 'a data file takes the bytes of another'
+                & $expect 'a data file with the bytes of another listed file' $a 'AO_BENCH_OTHER_COMMIT' 'bench/files/two.txt'
+                & $git checkout -q --detach $rebased
+                & $put 'bench/files/three.txt' 'bytes of two'; & $put 'acceptance/ao9-files.tsv' "# the file set`nname`tbytes`tsha256`none.bin`t12`tx`ntwo.txt`t12`ty`nthree.txt`t12`ty"
+                $null = & $commitAll 'a new listed name copies a file that is still there'
+                & $expect 'a new name with the bytes of a file that is still there' $a 'AO_BENCH_OTHER_COMMIT' 'three.txt is a new name'
+                & $git checkout -q --detach $rebased
+                & $put 'src/NetSec.Core/Untracked.cs' 'not added'
+                & $expect 'an untracked file in the measured code' $a 'AO_BENCH_OTHER_COMMIT' 'uncommitted'
+                & $git clean -fdq
+                & $put 'src/NetSec.Core/A.cs' 'not committed'
+                & $expect 'an uncommitted change in the measured code' $a 'AO_BENCH_OTHER_COMMIT' 'uncommitted'
+                & $git checkout -q -- .
+                & $expect 'a commit the repository does not hold' ('0123456789abcdef0123456789abcdef01234567') 'AO_BENCH_COMMIT_UNKNOWN' ''
+                & $expect 'a commit field that is no id' 'HEAD' 'AO_BENCH_COMMIT_UNKNOWN' ''
+                # End to end through Read-AoBench: the report of commit A, read on the rebased head, is judged from its numbers.
+                $bl2 = [ordered]@{ 'AO-6.x.net10' = [pscustomobject]@{ id = 'AO-6.x.net10'; state = '-'; reason = '-'; from = 'S0'; source = 'bench' } }
+                $bj2 = Join-Path $work ("ao-bench-code-{0}.json" -f [guid]::NewGuid().ToString('N').Substring(0, 8))
+                Set-Content -LiteralPath $bj2 -Encoding utf8 -Value ('{"schema":1,"commit":"' + $a + '","rows":[{"id":"AO-6.x.net10","baselineNsPerOp":10,"newNsPerOp":5,"op":"block"}]}')
+                $rows = Read-AoBench $bj2 $bl2 'S0' { param($commit) Get-AoBenchCodeVerdict $repo $commit }
+                if ($rows['AO-6.x.net10'].status -ne 'PASS') { $script:benchSelfBad += "a valid report read $($rows['AO-6.x.net10'].status) $($rows['AO-6.x.net10'].reason)" }
+                & $put 'bench/B.cs' 'changed again'; $null = & $commitAll 'change bench'
+                $rows = Read-AoBench $bj2 $bl2 'S0' { param($commit) Get-AoBenchCodeVerdict $repo $commit }
+                if ($rows['AO-6.x.net10'].reason -ne 'AO_BENCH_OTHER_COMMIT') { $script:benchSelfBad += "a stale report read $($rows['AO-6.x.net10'].status) $($rows['AO-6.x.net10'].reason) through Read-AoBench" }
+            } catch { $script:benchSelfBad += "the self-check stopped: $($_.Exception.Message)" }
+            if ($script:benchSelfBad.Count -gt 0) { Set-Result $c.id 'FAIL' 'ASSERTION' ($script:benchSelfBad -join '; ') }
+            else { Set-Result $c.id 'PASS' '' (($script:benchSelfSeen -join '; ') + '; through Read-AoBench: a valid report is judged from its numbers, a stale one reads AO_BENCH_OTHER_COMMIT') }
         }
         'SELF.suite-compile-break-is-a-fail' {
             # A real break: a project that names a suite type (AoStreamSeam) and does not compile its file. This is the break that made
@@ -887,13 +1049,13 @@ if ($sel | Where-Object { $_.id -eq 'AO-0.row-list-matches' }) {
         $aoList = Read-AoRowList (Join-Path $acc 'ao-rows.tsv')
         $aoRun = @{}
         foreach ($k in @($results.Keys | Where-Object { $_ -like 'AO-*' -and $_ -ne 'AO-0.row-list-matches' })) { $aoRun[$k] = $results[$k] }
-        $headSha = (git -C $ProductRoot rev-parse HEAD 2>$null)
-        $bench = Read-AoBench $AoBenchReport $aoList $AoSlice $headSha
+        $bench = Read-AoBench $AoBenchReport $aoList $AoSlice { param($commit) Get-AoBenchCodeVerdict $ProductRoot $commit }
         foreach ($k in $bench.Keys) { $aoRun[$k] = $bench[$k] }
         $v = Get-AoRowListVerdict $aoList $aoRun $AoSlice
         $dis = @(Get-AoBenchDisagreements $AoBenchReport $aoRun)
         $bud = @(Get-AoBudgetReds (Join-Path $acc 'ao-budgets.tsv') $aoList)
-        $benchNote = if ($AoBenchReport) { " Bench report: $AoBenchReport." } else { ' No bench report (-AoBenchReport), so the bench rows are absent.' }
+        # The file name only: the run report goes into a public repository, and the folder of the bench report is a local path.
+        $benchNote = if ($AoBenchReport) { " Bench report: $(Split-Path -Leaf $AoBenchReport) ($script:aoBenchCommitNote)." } else { ' No bench report (-AoBenchReport), so the bench rows are absent.' }
         $extra = ''
         if ($dis.Count -gt 0) { $extra += '. Bench disagrees with the suite: ' + ($dis -join '; ') }
         if ($bud.Count -gt 0) { $extra += '. Budget file: ' + ($bud -join '; ') }
