@@ -74,7 +74,7 @@ static class Program
         }
 
         Directory.CreateDirectory(a["out"]);
-        int load = MachineLoad.Exit(results.Select(r => r.Pair.OtherBusy).ToArray(), results.Select(r => r.Case.Id + ": " + r.Pair.TopOutside).ToArray());
+        int load = MachineLoad.Exit(results.Select(r => r.Pair.OtherBusy).ToArray(), results.Select(r => r.Case.Id + ": " + r.Pair.TopOutside).ToArray(), results.Select(r => r.Pair.CoreBusy).ToArray());
         if (part != null)
         {
             // One crossover part: the band does not apply to one order; Crossover.Combine judges the code ratio.
