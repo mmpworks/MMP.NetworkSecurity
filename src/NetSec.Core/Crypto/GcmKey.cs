@@ -4,7 +4,7 @@ using NetSec.Errors;
 namespace NetSec.Crypto
 {
     /// <summary>
-    /// An AES-GCM key (SP 800-38D, 12-byte nonce, 16-byte tag): the AES key with its hash key H and H's 4-bit table, made once (PRD 7.3
+    /// An AES-GCM key (SP 800-38D, 12-byte nonce, 16-byte tag): the AES key with its hash key H and H's GHASH table (Gf128: 4-bit on CF, 8-bit on net10), made once (PRD 7.3
     /// items 2 and 15). Immutable after the constructor, so one instance serves any number of threads (AO-4). Code that seals many records
     /// under one key holds a GcmKey; the static Gcm forms build one per call.
     /// Rule: use one key and nonce pair for one message only. A second message under the same pair exposes the xor of the two plaintexts
@@ -17,7 +17,7 @@ namespace NetSec.Crypto
         const int TagSize = 16;
 
         readonly AesKey _key;
-        readonly uint[] _table;   // 16 products i H, 4 words each (Gf128.Table)
+        readonly uint[] _table;   // the products i H of the build's width, 4 words each (Gf128.Table): 16 on CF (256 B), 256 on net10 (4 KB)
 
         public GcmKey(AesKey key)
         {
