@@ -38,6 +38,15 @@ static class CrossoverPart
 
     public static bool IsTag(string tag) => Array.IndexOf(Tags, tag) >= 0;
 
+    /// <summary>The .NET SDK that built this bench binary ("10.0.204"), from the AssemblyDescription the project sets to
+    /// "sdk $(NETCoreSdkVersion)"; "unknown" when the build did not set it.</summary>
+    public static string BuildSdk()
+    {
+        object[] found = typeof(CrossoverPart).Assembly.GetCustomAttributes(typeof(System.Reflection.AssemblyDescriptionAttribute), false);
+        string text = found.Length > 0 ? ((System.Reflection.AssemblyDescriptionAttribute)found[0]).Description : "";
+        return text.StartsWith("sdk ", StringComparison.Ordinal) && text.Length > 4 ? text.Substring(4) : "unknown";
+    }
+
     public static bool Swapped(string tag) => tag.StartsWith("swapped", StringComparison.Ordinal);
 
     /// <summary>"frozen" for the first pair of parts, "product" for the second.</summary>
@@ -65,6 +74,7 @@ static class CrossoverPart
         all["tag"] = tag;
         all["order"] = Swapped(tag) ? "swapped" : "normal";
         all["jit-first"] = JitFirst(tag);
+        all["sdk"] = BuildSdk();
         using (System.Diagnostics.Process self = System.Diagnostics.Process.GetCurrentProcess()) all["pid"] = self.Id.ToString(Inv);
         foreach (KeyValuePair<string, string> kv in all) s.Append("# ").Append(kv.Key).Append('\t').Append(kv.Value.Replace('\t', ' ')).Append('\n');
         s.Append(Columns).Append('\n');

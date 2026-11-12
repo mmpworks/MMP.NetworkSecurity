@@ -214,7 +214,7 @@ static class Crossover
         StringBuilder s = new StringBuilder("{\n");
         void Field(string name, string value) => s.Append("  ").Append(Report.Quote(name)).Append(": ").Append(Report.Quote(value)).Append(",\n");
         Field("schema", "netsec-bench/4-crossover");
-        foreach (string k in new[] { "build", "head", "machine", "priority", "allocation", "timing", "cf" }) Field(k, first.Header.TryGetValue(k, out string v) ? v : "");
+        foreach (string k in new[] { "build", "head", "machine", "sdk", "priority", "allocation", "timing", "cf" }) Field(k, first.Header.TryGetValue(k, out string v) ? v : "");
         Field("utc", DateTime.UtcNow.ToString("yyyy-MM-ddTHH:mm:ssZ", Inv));
         Field("crossover", "4 processes: " + string.Join(", ", CrossoverPart.Tags) + ". " + Formula);
         double[] gatedCodes = rows.Where(r => r.Gated).Select(r => r.Code).ToArray();
@@ -245,6 +245,7 @@ static class Crossover
         s.AppendLine();
         s.AppendLine("- Head: `" + H("head") + "`");
         s.AppendLine("- Machine: " + H("machine"));
+        s.AppendLine("- .NET SDK that built the bench: " + H("sdk"));
         s.AppendLine("- Timing per process: " + H("timing"));
         s.AppendLine("- Priority: " + H("priority"));
         s.AppendLine("- Allocation counter: " + H("allocation"));
