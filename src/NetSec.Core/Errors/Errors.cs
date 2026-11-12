@@ -43,6 +43,12 @@ namespace NetSec.Errors
         public const string MessageRefused = "MESSAGE_REFUSED";
         public const string AesGcmTag = "AES_GCM_TAG";
         public const string AesGcmNonceReuse = "AES_GCM_NONCE_REUSE";
+
+        /// <summary>A caller-buffer form refused input and output ranges that overlap and do not start at the same index (PRD 7.1.9).</summary>
+        public const string ArgRangesOverlap = "ARG_RANGES_OVERLAP";
+
+        /// <summary>A GCM caller-buffer form found fewer than 12 nonce bytes at the offset (PRD 7.3 item 15).</summary>
+        public const string GcmNonceLength = "GCM_NONCE_LENGTH";
         public const string SealHashMismatch = "SEAL_HASH_MISMATCH";
         public const string SealKeyedHashMismatch = "SEAL_KEYED_HASH_MISMATCH";
         public const string SealHmacMismatch = "SEAL_HMAC_MISMATCH";
