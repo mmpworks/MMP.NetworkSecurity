@@ -18,7 +18,10 @@ namespace NetSec.Bench;
 static class MachineLoad
 {
     // 10 points of 24 logical processors is about 2.4 busy cores: a browser drifts less, a dotnet build or test adds more.
-    public const double Rise = 0.10, Steady = 0.05;
+    // shortcut: Rise and CoreCeiling are tuned to this desktop (lead decision, 2026-11-11 Job T data): desktop-only rows reached 38.3%
+    // machine load with 11.9% on the timing core and a normal ratio; rows behind an outside rustc build read 41 to 57% machine and 19.8
+    // to 30.3% core. A pair fails above max(baseline, Floor) + Rise, or above CoreCeiling on the pinned core pair. Upgrade with Floor.
+    public const double Rise = 0.15, Steady = 0.05, CoreCeiling = 0.15;
 
     // shortcut: a fixed floor under the baseline, from this desktop's measured normal (2026-11-11 Job T: clean rows 12 to 32%,
     // a Chrome-only row 30.3%, rustc rows 41 to 57%), so a quiet dip at settle cannot set a limit that ordinary desktop use breaks.
@@ -138,13 +141,19 @@ static class MachineLoad
     /// over the limit with <paramref name="detail"/> for that row (its id and the top outside processes), and returns 8.
     /// A NaN limit (no settle ran) fails every row, so a host that skips the settle cannot pass.
     /// </summary>
-    public static int Exit(double[] busy, string[] detail = null)
+    public static int Exit(double[] busy, string[] detail = null, double[] core = null)
     {
         Console.WriteLine("BENCH_LOAD " + Describe(busy));
-        if (busy.All(b => b <= Limit)) return 0;
-        Console.WriteLine("BENCH_MACHINE_BUSY: other work started during timed rounds, so their ratios are not evidence");
-        for (int i = 0; detail != null && i < busy.Length; i++)
-            if (!(busy[i] <= Limit)) Console.WriteLine(string.Format(CultureInfo.InvariantCulture, "  over the limit: {0} ({1:P1})", detail[i], busy[i]));
+        if (core != null)
+            Console.WriteLine(string.Format(CultureInfo.InvariantCulture, "BENCH_CORE_LOAD core-pair load per row: max {0:P1} over {1} rows; ceiling {2:P0}; rows over the ceiling: {3}",
+                core.Max(), core.Length, CoreCeiling, core.Count(c => !(c <= CoreCeiling))));
+        // A NaN core figure (pair not read) fails closed, like a NaN limit.
+        Func<int, bool> over = i => !(busy[i] <= Limit) || (core != null && !(core[i] <= CoreCeiling));
+        if (!Enumerable.Range(0, busy.Length).Any(over)) return 0;
+        Console.WriteLine("BENCH_MACHINE_BUSY: other work ran during timed rounds (machine or timing-core load), so their ratios are not evidence");
+        for (int i = 0; i < busy.Length; i++)
+            if (over(i)) Console.WriteLine(string.Format(CultureInfo.InvariantCulture, "  over the limit: {0} (machine {1:P1}, core {2:P1})",
+                detail != null ? detail[i] : "row " + i, busy[i], core != null ? core[i] : double.NaN));
         return BusyExit;
     }
 

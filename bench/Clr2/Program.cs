@@ -70,7 +70,7 @@ static class Program
         }
         Measure.PreWarm(cases.Select(c => new[] { c.Original, c.New }), PreWarmEach);
         if (!MachineLoad.Settle()) return MachineLoad.BusyExit;
-        List<double> ratios = new List<double>(), busy = new List<double>();
+        List<double> ratios = new List<double>(), busy = new List<double>(), coreBusy = new List<double>();
         List<string> detail = new List<string>();
         List<PartRow> partRows = new List<PartRow>();
         foreach (Case c in cases)
@@ -79,6 +79,7 @@ static class Program
             if (part != null) partRows.Add(CrossoverPart.FromPair(c.Id, "unit", c.Units, c.Payload, p, swap, BytesPerCall(c.Original), BytesPerCall(c.New)));
             ratios.Add(p.MedianRatio);
             busy.Add(p.OtherBusy);
+            coreBusy.Add(p.CoreBusy);
             detail.Add(c.Id + ": " + p.TopOutside);
             Console.WriteLine(string.Format(Inv, "{0,-22} original {1,10:F1} new {2,10:F1} ns per unit  ratio {3:F3} ({4:F3} to {5:F3})  original {6,8:F1} new {7,8:F1} B per unit  load {8:P1} core {9:P1} cpu {10}>{11}",
                 c.Id, p.Original.MedianNs / c.Units, p.New.MedianNs / c.Units, p.MedianRatio, p.Ratios.Min(), p.Ratios.Max(),
@@ -93,7 +94,7 @@ static class Program
         }
         Console.WriteLine("BENCH_NOISE " + NoiseBand.Describe(ratios.ToArray()));
         Console.WriteLine("CF ARM speed: UNMEASURED");
-        int load = MachineLoad.Exit(busy.ToArray(), detail.ToArray());
+        int load = MachineLoad.Exit(busy.ToArray(), detail.ToArray(), coreBusy.ToArray());
         if (part != null)
         {
             // One crossover part: the band does not apply to one arrangement; the net10 combine judges the code ratio.
