@@ -1,30 +1,76 @@
 namespace NetSec.Crypto
 {
     /// <summary>
-    /// Multiplication in the GCM field, SP 800-38D algorithm 1. A value is two ulongs, big-endian, and bit 0 of the
-    /// standard is the top bit of Hi. The masks replace branches, so this source has no branch on the bits of H or X.
-    /// This is managed code, and the JIT and the CPU give no constant-time guarantee. Lesson 11 measures that.
+    /// Multiplication in the GCM field, SP 800-38D, by Shoup's 4-bit table method. A value is four uint words, big-endian, and bit 0 of the
+    /// standard is the top bit of the first word (rule 7.1.4: no long in a 32-bit loop). Each key builds a table of the 16 products i H,
+    /// one 4-bit i at a time; a multiply then takes the value 4 bits at a time from its last byte, shifting right and folding the 4 bits
+    /// that fall off back in with the reduction table.
+    /// The table lookups use secret indexes, which can leak through a CPU cache, like the AES tables. Lesson 11 measures timing.
     /// </summary>
     static class Gf128
     {
-        const ulong Reduction = 0xE100000000000000;
-
-        public static void Multiply(ulong xHi, ulong xLo, ulong hHi, ulong hLo, out ulong zHi, out ulong zLo)
+        /// <summary>Entry i: the xor, over the set bits b of i, of 0xE100 shifted right by 3 - b (the reduction of 4 bits that fall off).</summary>
+        internal static readonly ushort[] Reduce4 =
         {
-            zHi = 0;
-            zLo = 0;
-            ulong vHi = hHi, vLo = hLo;
-            for (int i = 0; i < 128; i++)
-            {
-                ulong bit = (i < 64 ? xHi >> (63 - i) : xLo >> (127 - i)) & 1;
-                ulong take = 0UL - bit;
-                zHi ^= vHi & take;
-                zLo ^= vLo & take;
+            0x0000, 0x1C20, 0x3840, 0x2460, 0x7080, 0x6CA0, 0x48C0, 0x54E0, 0xE100, 0xFD20, 0xD940, 0xC560, 0x9180, 0x8DA0, 0xA9C0, 0xB5E0,
+        };
 
-                ulong reduce = 0UL - (vLo & 1);
-                vLo = (vLo >> 1) | (vHi << 63);
-                vHi = (vHi >> 1) ^ (Reduction & reduce);
+        /// <summary>The 16 products i H, as 64 words: entry i in words 4i to 4i + 3. Entry 8 is H, because the top bit of a nibble is x^0.</summary>
+        public static uint[] Table(uint h0, uint h1, uint h2, uint h3)
+        {
+            uint[] t = new uint[64];
+            Set(t, 8, h0, h1, h2, h3);
+            for (int i = 4; i > 0; i >>= 1)
+            {
+                Halve(ref h0, ref h1, ref h2, ref h3);   // each step multiplies by x
+                Set(t, i, h0, h1, h2, h3);
             }
+            for (int i = 2; i < 16; i <<= 1)
+                for (int j = 1; j < i; j++)
+                    Set(t, i + j, t[4 * i] ^ t[4 * j], t[4 * i + 1] ^ t[4 * j + 1], t[4 * i + 2] ^ t[4 * j + 2], t[4 * i + 3] ^ t[4 * j + 3]);
+            return t;
+        }
+
+        static void Set(uint[] t, int i, uint w0, uint w1, uint w2, uint w3)
+        {
+            t[4 * i] = w0; t[4 * i + 1] = w1; t[4 * i + 2] = w2; t[4 * i + 3] = w3;
+        }
+
+        /// <summary>Times x: shift right one bit, and fold the bit that fell off back in as 0xE1 at the top (a mask, no branch on H).</summary>
+        static void Halve(ref uint v0, ref uint v1, ref uint v2, ref uint v3)
+        {
+            uint fold = 0xE1000000u & (0u - (v3 & 1u));
+            v3 = (v3 >> 1) | (v2 << 31);
+            v2 = (v2 >> 1) | (v1 << 31);
+            v1 = (v1 >> 1) | (v0 << 31);
+            v0 = (v0 >> 1) ^ fold;
+        }
+
+        /// <summary>y = y H, with t the table of H. Reads the 16 bytes of y from the last to the first, low nibble then high.</summary>
+        public static void Multiply(uint[] t, ref uint y0, ref uint y1, ref uint y2, ref uint y3)
+        {
+            ushort[] r = Reduce4;
+            uint x0 = y0, x1 = y1, x2 = y2, x3 = y3;
+            int b = (int)(x3 & 0xFF);
+            int at = 4 * (b & 0xF);
+            uint z0 = t[at], z1 = t[at + 1], z2 = t[at + 2], z3 = t[at + 3];
+            int nibbleHigh = b >> 4;
+            for (int byteIndex = 15; ; )
+            {
+                uint fall = z3 & 0xF;
+                z3 = (z3 >> 4) | (z2 << 28); z2 = (z2 >> 4) | (z1 << 28); z1 = (z1 >> 4) | (z0 << 28); z0 = (z0 >> 4) ^ ((uint)r[fall] << 16);
+                at = 4 * nibbleHigh;
+                z0 ^= t[at]; z1 ^= t[at + 1]; z2 ^= t[at + 2]; z3 ^= t[at + 3];
+                if (--byteIndex < 0) break;
+                uint word = byteIndex < 4 ? x0 : byteIndex < 8 ? x1 : byteIndex < 12 ? x2 : x3;
+                b = (int)((word >> (24 - 8 * (byteIndex % 4))) & 0xFF);
+                nibbleHigh = b >> 4;
+                fall = z3 & 0xF;
+                z3 = (z3 >> 4) | (z2 << 28); z2 = (z2 >> 4) | (z1 << 28); z1 = (z1 >> 4) | (z0 << 28); z0 = (z0 >> 4) ^ ((uint)r[fall] << 16);
+                at = 4 * (b & 0xF);
+                z0 ^= t[at]; z1 ^= t[at + 1]; z2 ^= t[at + 2]; z3 ^= t[at + 3];
+            }
+            y0 = z0; y1 = z1; y2 = z2; y3 = z3;
         }
     }
 }
