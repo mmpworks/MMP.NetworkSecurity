@@ -409,6 +409,147 @@ class HeavyLock(unittest.TestCase):
         self.assertEqual(r.returncode, 0, r.stdout + r.stderr)
         self.assertTrue(other.exists())
 
+    # A hold: a quiet window (a benchmark that needs the whole machine). While it is active, only a run whose label starts with the allowed
+    # prefix may take the lock. Every other run waits and keeps its place in line. The file format is the contract, so the tests write it.
+    def write_hold(self, label, allow, seconds=300.0):
+        self.dir.mkdir(parents=True, exist_ok=True)
+        (self.dir / "heavy-run.hold").write_text(json.dumps({"label": label, "allow": allow, "set": "2026-11-11T21:00:00",
+                                                             "expires": time.time() + seconds}), encoding="utf-8")
+
+    def marker_run(self, label, marks, wait=None):
+        script = "import sys\nopen(sys.argv[1], 'a').write(sys.argv[2] + '\\n')\n"
+        return self.start_run(label, sys.executable, "-I", "-c", script, str(marks), label, wait=wait)
+
+    def test_a_waiter_queued_before_a_hold_does_not_take_the_lock_during_it(self):
+        # 2026-11-11, 20:12: a run that was queued before a quiet window took the lock inside it, when the holder ended.
+        marks = pathlib.Path(self.tmp.name) / "hold-queued.txt"
+        holder, release = self.start_release_holder("holder")
+        self.wait_until_held()
+        waiter = self.marker_run("odd work", marks)
+        self.wait_for_tickets(1)
+        self.write_hold("bench window", "richard")
+        release.write_text("go", encoding="utf-8")                          # the lock is free now, and the waiter is first in line
+        holder.communicate(timeout=60)
+        seen = self.read_until(waiter, "HEAVY_LOCK held for window 'bench window' until")
+        self.assertFalse(marks.exists(), "the queued waiter ran inside the hold")
+        self.assertEqual(self.tool("status").returncode, 0, "the lock itself stays free during a hold")
+        self.assertTrue(list((self.dir / "tickets").glob("*.json")), "the waiter keeps its ticket during the hold")
+        r = self.tool("release")
+        self.assertEqual(r.returncode, 0, r.stdout + r.stderr)
+        rest, _ = waiter.communicate(timeout=90)
+        self.assertEqual(waiter.returncode, 0, seen + rest)
+        self.assertEqual(marks.read_text(encoding="utf-8").splitlines(), ["odd work"])
+
+    def test_a_run_started_during_a_hold_waits_and_times_out_with_the_window_named(self):
+        self.write_hold("bench window", "richard")
+        r = self.tool("run", "--label", "gate S0", "--wait-minutes", "0.05", "--", *PY, "print('must not run')")
+        self.assertEqual(r.returncode, 75, r.stdout + r.stderr)
+        self.assertIn("HEAVY_LOCK held for window 'bench window' until", r.stdout)
+        self.assertIn("LOCK_TIMEOUT", r.stdout)
+        self.assertNotIn("must not run", r.stdout)
+
+    def test_a_run_with_the_allowed_prefix_passes_a_hold(self):
+        self.write_hold("bench window", "richard")
+        r = self.tool("run", "--label", "richard s0 bench T", "--wait-minutes", "0.2", "--", *PY, "print('bench ran')")
+        self.assertEqual(r.returncode, 0, r.stdout + r.stderr)
+        self.assertIn("bench ran", r.stdout)
+
+    def test_a_hold_with_no_allowed_prefix_stops_every_run(self):
+        self.write_hold("bench window", "")
+        r = self.tool("run", "--label", "richard s0 bench T", "--wait-minutes", "0.05", "--", *PY, "print('must not run')")
+        self.assertEqual(r.returncode, 75, r.stdout + r.stderr)
+        self.assertNotIn("must not run", r.stdout)
+
+    def test_an_allowed_run_passes_a_stopped_waiter_that_is_ahead_in_line(self):
+        marks = pathlib.Path(self.tmp.name) / "hold-order.txt"
+        self.write_hold("bench window", "richard")
+        stopped = self.marker_run("odd work", marks)
+        self.wait_for_tickets(1)
+        allowed = self.marker_run("richard s0 bench T", marks, wait=1)
+        out, _ = allowed.communicate(timeout=90)
+        self.assertEqual(allowed.returncode, 0, out)
+        self.assertEqual(marks.read_text(encoding="utf-8").splitlines(), ["richard s0 bench T"], "only the allowed run ran during the hold")
+        self.assertIsNone(stopped.poll(), "the stopped waiter still waits")
+        self.assertEqual(self.tool("release").returncode, 0)
+        stopped.communicate(timeout=90)
+        self.assertEqual(stopped.returncode, 0)
+        self.assertEqual(marks.read_text(encoding="utf-8").splitlines(), ["richard s0 bench T", "odd work"])
+
+    def test_a_run_inside_an_allowed_holder_proceeds_during_a_hold(self):
+        self.write_hold("bench window", "outer")
+        holder = self.start_run("outer gate", *PY, "import os, subprocess, sys, time; "
+                                "r = subprocess.run([sys.executable, '-I', %r, 'run', '--label', 'inner suite', '--lock-dir', %r, '--wait-minutes', '0.05', '--', "
+                                "sys.executable, '-I', '-c', 'print(\"inner ran\")']); print('inner exit', r.returncode)" % (str(TOOL), str(self.dir)))
+        out, _ = holder.communicate(timeout=90)
+        self.assertIn("inner ran", out)
+        self.assertIn("inner exit 0", out)
+
+    def test_an_expired_hold_counts_as_gone(self):
+        self.write_hold("old window", "richard", seconds=-1.0)
+        r = self.tool("run", "--label", "gate S0", "--wait-minutes", "0.2", "--", *PY, "print('ran')")
+        self.assertEqual(r.returncode, 0, r.stdout + r.stderr)
+        self.assertIn("ran", r.stdout)
+        self.assertIn("expired", self.tool("status").stdout)
+
+    def test_a_waiter_runs_when_the_hold_expires(self):
+        marks = pathlib.Path(self.tmp.name) / "hold-expiry.txt"
+        self.write_hold("short window", "richard", seconds=4.0)
+        waiter = self.marker_run("odd work", marks, wait=2)
+        seen = self.read_until(waiter, "HEAVY_LOCK held for window 'short window' until")
+        self.assertFalse(marks.exists(), "the waiter ran before the hold expired")
+        rest, _ = waiter.communicate(timeout=90)
+        self.assertEqual(waiter.returncode, 0, seen + rest)
+        self.assertEqual(marks.read_text(encoding="utf-8").splitlines(), ["odd work"])
+
+    def test_hold_writes_the_window_and_status_names_it_and_release_removes_it(self):
+        r = self.tool("hold", "--label", "bench window", "--allow", "richard", "--minutes", "30")
+        self.assertEqual(r.returncode, 0, r.stdout + r.stderr)
+        data = json.loads((self.dir / "heavy-run.hold").read_text(encoding="utf-8"))
+        self.assertEqual((data["label"], data["allow"]), ("bench window", "richard"))
+        self.assertAlmostEqual(data["expires"], time.time() + 30 * 60, delta=60)
+        status = self.tool("status")
+        self.assertEqual(status.returncode, 0, "status still judges the lock: free is 0")
+        self.assertIn("hold 'bench window' until", status.stdout)
+        self.assertIn("'richard'", status.stdout)
+        r = self.tool("release")
+        self.assertEqual(r.returncode, 0, r.stdout + r.stderr)
+        self.assertFalse((self.dir / "heavy-run.hold").exists())
+        self.assertNotIn("hold", self.tool("status").stdout)
+        again = self.tool("release")
+        self.assertEqual(again.returncode, 0, "a release with no hold is not an error")
+        self.assertIn("no hold", again.stdout)
+
+    def test_hold_refuses_minutes_that_are_zero_or_above_the_limit(self):
+        for minutes in ("0", "-5", "100000"):
+            r = self.tool("hold", "--label", "bad window", "--allow", "richard", "--minutes", minutes)
+            self.assertEqual(r.returncode, 2, f"minutes={minutes}: {r.stdout + r.stderr}")
+            self.assertFalse((self.dir / "heavy-run.hold").exists(), f"minutes={minutes} wrote a hold")
+
+    def test_a_hold_file_that_cannot_be_read_stays_closed_for_its_readable_expiry(self):
+        self.dir.mkdir(parents=True)
+        (self.dir / "heavy-run.hold").write_text('{"label": "bench window", "expires": %r, "allow": ' % (time.time() + 300), encoding="utf-8")
+        r = self.tool("run", "--label", "richard s0 bench T", "--wait-minutes", "0.05", "--", *PY, "print('must not run')")
+        self.assertEqual(r.returncode, 75, r.stdout + r.stderr)
+        self.assertNotIn("must not run", r.stdout)
+        status = self.tool("status").stdout
+        self.assertIn("cannot be read", status)
+        self.assertIn("closed until", status)
+
+    def test_a_hold_file_that_cannot_be_read_and_names_no_expiry_is_open_and_status_says_so(self):
+        self.dir.mkdir(parents=True)
+        (self.dir / "heavy-run.hold").write_text("not a hold", encoding="utf-8")
+        r = self.tool("run", "--label", "gate S0", "--wait-minutes", "0.2", "--", *PY, "print('ran')")
+        self.assertEqual(r.returncode, 0, r.stdout + r.stderr)
+        status = self.tool("status").stdout
+        self.assertIn("cannot be read", status)
+        self.assertIn("ignored", status)
+
+    def test_a_hold_file_with_an_expiry_above_the_limit_is_open_and_status_says_so(self):
+        self.write_hold("endless window", "richard", seconds=10 * 24 * 3600.0)
+        r = self.tool("run", "--label", "gate S0", "--wait-minutes", "0.2", "--", *PY, "print('ran')")
+        self.assertEqual(r.returncode, 0, r.stdout + r.stderr)
+        self.assertIn("ignored", self.tool("status").stdout)
+
     def test_process_start_is_stable_for_a_live_process_and_none_for_a_dead_one(self):
         p = subprocess.Popen(SLEEP_60)
         self.procs.append(p)

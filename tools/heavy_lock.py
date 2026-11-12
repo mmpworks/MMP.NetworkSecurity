@@ -8,6 +8,8 @@ that noise. Small targeted runs stay unlocked. A load burner or a hang loop coun
   python -I tools/heavy_lock.py run --label "gate AppProof" [--wait-minutes M] -- <command> [args]   take the lock, run the command, release
   python -I tools/heavy_lock.py status                                                               exit 0 free, 2 held (names the holder)
   python -I tools/heavy_lock.py holds                                                                exit 0 only inside the live holder, else 1
+  python -I tools/heavy_lock.py hold --label "bench window" --allow "richard" --minutes 60           start a hold (a quiet window)
+  python -I tools/heavy_lock.py release                                                              end the hold
 
 The lock is an OS file lock on <lock dir>\\heavy-run.lock, held by the `run` process for as long as it lives (msvcrt.locking on Windows, fcntl.flock
 elsewhere). The OS drops it when that process ends, including a crash or a kill, so nothing is ever stale and nothing needs cleanup: there is no pid
@@ -21,6 +23,18 @@ exits 1 with the same text); 77 COMMAND_NOT_FOUND (checked before the lock is to
 Waiters run in arrival order: each writes a ticket file under <lock dir>\tickets, and only the oldest live ticket may try the OS lock. The OS lock still
 decides who holds; tickets of dead processes and junk files are skipped.
 The command is resolved with shutil.which first, so `npm` finds npm.cmd on Windows.
+
+A hold is a quiet window, for a measurement that needs the whole machine. `hold` writes <lock dir>\\heavy-run.hold (label, allowed prefix, set time,
+expiry). While the hold is active, a run whose label does not start with the allowed prefix waits, prints "HEAVY_LOCK held for window '<label>'
+until HH:MM", and keeps its ticket. This holds for a run that starts in the window and for a waiter that queued before it. A run whose label starts
+with the prefix proceeds as before, and it does not wait behind the waiters that the hold stops. With no --allow, no run proceeds.
+1. A run that holds the lock when the hold starts goes on to its end. The hold stops the next taker, not the present holder.
+2. Past its expiry a hold counts as gone, so a forgotten hold never stops the machine for ever. --minutes is at most 720.
+3. A hold file that cannot be read stays closed for every run until its expiry, when the expiry can still be read. With no readable expiry, or
+   an expiry more than 720 minutes ahead, the file is ignored (open). `status` says which.
+4. `status` keeps its exit code (0 free, 2 held) and names the hold on a second line.
+5. Each worktree runs its own copy of this file. A copy from before the hold switch does not read the hold file, so a run started from such a
+   worktree ignores the hold.
 """
 import argparse
 import ctypes
@@ -28,6 +42,7 @@ import errno
 import json
 import os
 import pathlib
+import re
 import shutil
 import subprocess
 import sys
@@ -48,6 +63,8 @@ PRINT_EVERY_SECONDS = 30.0
 ENV_HELD = "NETSEC_HEAVY_LOCK_HELD"
 LOCK_NAME = "heavy-run.lock"
 INFO_NAME = "heavy-run.info"
+HOLD_NAME = "heavy-run.hold"
+MAX_HOLD_MINUTES = 720.0                                                # 12 hours: no quiet window is longer, so a larger expiry is a mistake
 
 
 def process_start(pid):
@@ -182,17 +199,103 @@ def tie_children_to_this_process():
     # The job handle stays open until this process ends; closing it (at exit or by a kill) is what kills the members.
 
 
-def make_ticket(directory):
+def read_hold(directory, now=None):
+    """The hold (a quiet window) as a dict with "state" and, when it has them, "label", "allow" and "expires" (epoch seconds).
+    States: "none" (no file); "active"; "expired" (past its expiry, so it counts as gone: a forgotten hold never stops the machine for ever);
+    "closed" (the file cannot be read, but its expiry can, and that is in the future: the hold stays on until then, for every label);
+    "open" (the file cannot be read and names no usable expiry, or the expiry is more than MAX_HOLD_MINUTES ahead: ignored)."""
+    now = time.time() if now is None else now
+    try:
+        text = (directory / HOLD_NAME).read_text(encoding="utf-8")
+    except FileNotFoundError:
+        return {"state": "none"}
+    except (OSError, ValueError) as e:
+        return {"state": "open", "why": f"the hold file cannot be read ({e})"}
+    try:
+        data = json.loads(text)
+        if not isinstance(data, dict) or isinstance(data.get("expires"), bool) or not isinstance(data.get("expires"), (int, float)):
+            raise ValueError("no expiry")
+        hold = {"state": "active", "label": str(data.get("label", "?")), "allow": str(data.get("allow") or ""), "expires": float(data["expires"])}
+    except ValueError:
+        found = re.search(r'"expires"\s*:\s*(?P<expires>\d+(?:\.\d+)?)', text)
+        if not found:
+            return {"state": "open", "why": "the hold file cannot be read and names no expiry"}
+        hold = {"state": "closed", "label": "(a hold file that cannot be read)", "allow": "", "expires": float(found.group("expires"))}
+    if hold["expires"] <= now:
+        hold["state"] = "expired"
+    elif hold["expires"] - now > MAX_HOLD_MINUTES * 60:
+        return {"state": "open", "why": f"the hold file names an expiry more than {MAX_HOLD_MINUTES:g} minutes ahead"}
+    return hold
+
+
+def stops(hold, label):
+    """True when this hold makes a run with this label wait. An empty allowed prefix lets no run through."""
+    if hold["state"] not in ("active", "closed"):
+        return False
+    return not (hold["allow"] and label.startswith(hold["allow"]))
+
+
+def until(hold):
+    return datetime.fromtimestamp(hold["expires"]).strftime("%H:%M")
+
+
+def describe_hold(hold):
+    """The status line for a hold, or None when no hold file exists."""
+    state = hold["state"]
+    if state == "none":
+        return None
+    if state == "open":
+        return f"heavy-run hold: {hold['why']}: ignored (open)"
+    if state == "expired":
+        return f"heavy-run hold: '{hold['label']}' expired at {until(hold)}: it counts as gone"
+    if state == "closed":
+        return f"heavy-run hold: the hold file cannot be read, but its expiry can: closed until {until(hold)} for every run"
+    allowed = f"only labels that start with '{hold['allow']}' run" if hold["allow"] else "no run is allowed"
+    return f"heavy-run hold '{hold['label']}' until {until(hold)}: {allowed}"
+
+
+def set_hold(directory, label, allow, minutes):
+    if not 0 < minutes <= MAX_HOLD_MINUTES:
+        print(f"usage: heavy_lock.py hold --label L [--allow PREFIX] --minutes N, with N above 0 and at most {MAX_HOLD_MINUTES:g}. No hold was written.")
+        return 2
+    now = time.time()
+    data = {"label": label, "allow": allow or "", "set": datetime.fromtimestamp(now).isoformat(timespec="seconds"), "expires": now + minutes * 60,
+            "until": datetime.fromtimestamp(now + minutes * 60).isoformat(timespec="seconds")}
+    path = directory / HOLD_NAME
+    try:
+        directory.mkdir(parents=True, exist_ok=True)
+        temp = path.with_suffix(".tmp")
+        temp.write_text(json.dumps(data), encoding="utf-8")
+        os.replace(temp, path)                                           # a reader never sees a half-written hold
+    except OSError as e:
+        raise LockError(f"cannot write the hold file in {directory}: {e}") from e
+    print(f"HEAVY_LOCK hold set: {describe_hold(read_hold(directory))}. A run that holds the lock now goes on to its end.")
+    return 0
+
+
+def release_hold(directory):
+    try:
+        (directory / HOLD_NAME).unlink()
+    except FileNotFoundError:
+        print("HEAVY_LOCK no hold was set")
+        return 0
+    except OSError as e:
+        raise LockError(f"cannot remove the hold file in {directory}: {e}") from e
+    print("HEAVY_LOCK hold released")
+    return 0
+
+
+def make_ticket(directory, label=""):
     """A waiter's place in line: a file named by arrival time (nanoseconds, then pid), written under a temporary name and renamed, so a reader never
     sees a half-written ticket. The ticket only decides who MAY TRY the OS lock. The OS lock alone decides who holds it, so a wrong ticket costs
-    fairness and can never put two runs in at once."""
+    fairness and can never put two runs in at once. The label lets a run that a hold allows step past the waiters that the hold stops."""
     folder = directory / TICKET_DIR
     me = os.getpid()
     path = folder / f"{time.time_ns():020d}-{me}.json"
     try:
         folder.mkdir(parents=True, exist_ok=True)
         temp = path.with_suffix(".tmp")
-        temp.write_text(json.dumps({"pid": me, "start": process_start(me)}), encoding="utf-8")
+        temp.write_text(json.dumps({"pid": me, "start": process_start(me), "label": label}), encoding="utf-8")
         os.replace(temp, path)
     except OSError as e:
         raise LockError(f"cannot write a ticket in {folder}: {e}") from e
@@ -206,23 +309,30 @@ def drop_ticket(path):
         pass
 
 
-def ticket_is_live(path):
-    """True when the ticket names a process that is still the one that wrote it. Unreadable, junk and dead tickets count as not live."""
+def live_ticket_label(path):
+    """The label of a ticket whose process is still the one that wrote it ("" when the ticket has none), or None. Unreadable, junk and dead
+    tickets count as not live."""
     try:
         data = json.loads(path.read_text(encoding="utf-8"))
         pid, start = data["pid"], data["start"]
     except (OSError, ValueError, KeyError, TypeError):
-        return False
-    return process_start(pid) == start
+        return None
+    return str(data.get("label") or "") if process_start(pid) == start else None
 
 
-def earlier_live_tickets(directory, mine):
-    """How many live waiters hold a ticket older than mine. Zero means it is my turn to try the lock."""
+def ticket_is_live(path):
+    return live_ticket_label(path) is not None
+
+
+def earlier_live_tickets(directory, mine, hold=None):
+    """How many live waiters hold a ticket older than mine. Zero means it is my turn to try the lock. With a hold, a waiter that the hold stops
+    is not counted: it keeps its ticket and its place, and a run that the hold allows does not wait behind it."""
     count = 0
     for path in sorted((directory / TICKET_DIR).glob("*.json")):
         if path == mine:
             return count
-        count += ticket_is_live(path)
+        label = live_ticket_label(path)
+        count += label is not None and not (hold is not None and stops(hold, label))
     return count                                                      # my ticket is gone: do not block on others
 
 
@@ -258,9 +368,10 @@ def run(directory, label, wait_minutes, command):
     command = [found, *command[1:]]
     fd = open_lock(directory)
     tie_children_to_this_process()
-    mine = make_ticket(directory)
+    mine = make_ticket(directory, label)
     deadline = None if wait_minutes is None else time.time() + wait_minutes * 60
     last_print = 0.0
+    last_stopped = None
     env = dict(os.environ)
     held = False
     try:
@@ -269,16 +380,26 @@ def run(directory, label, wait_minutes, command):
             if names_live_holder(info):
                 print(f"HEAVY_LOCK already held by an ancestor: {describe(info)}", flush=True)
                 break
-            ahead = earlier_live_tickets(directory, mine)
-            if ahead == 0 and try_os_lock(fd):
+            # The hold is read on every pass, so a waiter that queued before the hold began also obeys it (the case of 2026-11-11, 20:12).
+            hold = read_hold(directory)
+            stopped = stops(hold, label)
+            ahead = 0 if stopped else earlier_live_tickets(directory, mine, hold)
+            if not stopped and ahead == 0 and try_os_lock(fd):
                 held = True
                 break
-            if time.time() - last_print >= PRINT_EVERY_SECONDS:
-                line = f"{ahead} earlier waiting run(s) first, then " if ahead else ""
-                print(f"HEAVY_LOCK waiting on {line}{describe(info)}", flush=True)
+            if stopped != last_stopped or time.time() - last_print >= PRINT_EVERY_SECONDS:      # a hold that begins or ends is named at once
+                if stopped:
+                    print(f"HEAVY_LOCK held for window '{hold['label']}' until {until(hold)}; this run keeps its place in line", flush=True)
+                else:
+                    line = f"{ahead} earlier waiting run(s) first, then " if ahead else ""
+                    print(f"HEAVY_LOCK waiting on {line}{describe(info)}", flush=True)
                 last_print = time.time()
+                last_stopped = stopped
             if deadline is not None and time.time() >= deadline:
-                print(f"LOCK_TIMEOUT: still held by {describe(read_info(directory))} after {wait_minutes:g} min", flush=True)
+                if stopped:
+                    print(f"LOCK_TIMEOUT: held for window '{hold['label']}' until {until(hold)}, after {wait_minutes:g} min", flush=True)
+                else:
+                    print(f"LOCK_TIMEOUT: still held by {describe(read_info(directory))} after {wait_minutes:g} min", flush=True)
                 return EXIT_TIMEOUT
             time.sleep(POLL_SECONDS)
         drop_ticket(mine)                                             # a holder or ancestor-run is no longer in line
@@ -304,15 +425,21 @@ def run(directory, label, wait_minutes, command):
 
 
 def status(directory):
+    """Exit 0 free, 2 held: the code judges the lock only. A hold is named on a second line and does not change the code."""
     try:
         fd = open_lock(directory)
         try:
             if try_os_lock(fd):
                 unlock(fd)
                 print("heavy-run lock: free")
-                return 0
-            print(f"heavy-run lock: held by {describe(read_info(directory))}")
-            return 2
+                code = 0
+            else:
+                print(f"heavy-run lock: held by {describe(read_info(directory))}")
+                code = 2
+            line = describe_hold(read_hold(directory))
+            if line:
+                print(line)
+            return code
         finally:
             os.close(fd)
     except LockError as e:
@@ -330,15 +457,21 @@ def main(argv):
 
 def dispatch(argv):
     ap = argparse.ArgumentParser(description=__doc__.split("\n")[0])
-    ap.add_argument("action", choices=["status", "run", "holds"])
+    ap.add_argument("action", choices=["status", "run", "holds", "hold", "release"])
     ap.add_argument("--label", default="heavy run")
     ap.add_argument("--wait-minutes", type=float, default=None, help="give up after this long (default: wait without limit)")
     ap.add_argument("--lock-dir", default=None)
+    ap.add_argument("--allow", default="", help="hold: the label prefix that may run during the hold (default: no run)")
+    ap.add_argument("--minutes", type=float, default=None, help="hold: how long the hold lasts")
     args, rest = ap.parse_known_args(argv)
     directory = lock_dir(args.lock_dir)
-    if args.action in ("status", "holds"):
+    if args.action in ("status", "holds", "hold", "release"):
         if rest:
             ap.error(f"unrecognized arguments: {' '.join(rest)}")
+        if args.action == "hold":
+            return set_hold(directory, args.label, args.allow, args.minutes if args.minutes is not None else 0.0)
+        if args.action == "release":
+            return release_hold(directory)
         return status(directory) if args.action == "status" else holds(directory)
     command = rest[1:] if rest[:1] == ["--"] else rest
     if not command:
