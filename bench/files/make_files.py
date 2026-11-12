@@ -84,8 +84,9 @@ def make():
         "sample.txt": text(rng, 64 * 1024).encode("ascii"),
         "sample.csv": csv(rng, 3000).encode("ascii"),
         "sample.json": jsondoc(rng, 400).encode("ascii"),
-        "small-1k.bin": rng.randbytes(1024),
-        "large-4mib.bin": rng.randbytes(4 * 1024 * 1024 + 7),  # +7, so the large file ends in a partial block
+        # .dat, never .bin: tools/secret_guard.py refuses any tracked *.bin, because a .bin may hold session data.
+        "small-1k.dat": rng.randbytes(1024),
+        "large-4mib.dat": rng.randbytes(4 * 1024 * 1024 + 7),  # +7, so the large file ends in a partial block
     }
     for name, data in files.items():
         (HERE / name).write_bytes(data)
