@@ -44,15 +44,18 @@ static class Program
 
         // --swap true times the product as "original" and the frozen copy as "new". A bias that follows the position is the harness; the
         // crossover (Crossover.Combine) cancels it from a normal and a swapped part. --part TAG writes this process's rows as one part.
-        bool swap = a.TryGetValue("swap", out string sw) && sw == "true";
         a.TryGetValue("part", out string part);
+        if (part != null && !CrossoverPart.IsTag(part)) { Console.Error.WriteLine("BENCH_USAGE: --part is one of " + string.Join(", ", CrossoverPart.Tags)); return 2; }
+        // A crossover part takes its arrangement from the tag; --swap and --jit-first are for a one-off check outside a crossover.
+        bool swap = part != null ? CrossoverPart.Swapped(part) : a.TryGetValue("swap", out string sw) && sw == "true";
+        string jitFirst = part != null ? CrossoverPart.JitFirst(part) : a.TryGetValue("jit-first", out string jf) ? jf : null;
         int pairs = a.TryGetValue("pairs", out string pr) ? int.Parse(pr, CultureInfo.InvariantCulture) : Measure.Rounds;
         List<BenchCase> original = Cases.All(swap ? (IBlockCases)new Files.ProductCode() : new Files.FrozenCode()), current = Cases.All(swap ? (IBlockCases)new Files.FrozenCode() : new Files.ProductCode());
         if (swap) Console.WriteLine("BENCH_SWAP original = product, new = frozen copy");
         List<int> picked = Enumerable.Range(0, current.Count).Where(i => current[i].Id.Contains(filter)).ToList();
         // --jit-first frozen|product: one call of every picked case on that copy before the pre-warm, so its methods are compiled first.
         // Without it the copy in the "original" position compiles first, so JIT order and position are one variable; this separates them.
-        if (a.TryGetValue("jit-first", out string jitFirst))
+        if (jitFirst != null)
         {
             bool productFirst = jitFirst == "product";
             List<BenchCase> first = productFirst == swap ? original : current, second = productFirst == swap ? current : original;
@@ -75,7 +78,9 @@ static class Program
         if (part != null)
         {
             // One crossover part: the band does not apply to one order; Crossover.Combine judges the code ratio.
-            Crossover.WritePart(a["out"], run, part, swap, pairs, results);
+            CrossoverPart.Write(a["out"], run.Build, part, PartHeader(run, Report.Settings(Report.BlockRound, pairs)),
+                results.Select(r => CrossoverPart.FromPair(r.Case.Id, r.Case.Unit, r.Case.UnitsPerOp, r.Case.BytesPerOp, r.Pair, swap,
+                    r.Pair.Original.BytesPerCall, r.Pair.New.BytesPerCall)).ToList());
             Console.WriteLine("BENCH_PART_DONE " + run.Build + " " + part + " " + results.Count + " cases");
             return load;
         }
@@ -134,6 +139,12 @@ static class Program
     static string Row(CaseResult r) => string.Format(CultureInfo.InvariantCulture,
         "{0,-34} original {1,10:F1} new {2,10:F1} ns/{3,-10} ratio {4,6:F3} ({5:F3} to {6:F3})  new {7,9:F1} B/{3}  load {8:P1} core {9:P1} cpu {10}>{11}",
         r.Case.Id, r.OriginalNsPerUnit, r.NewNsPerUnit, r.Case.Unit, r.Pair.MedianRatio, r.Pair.Ratios.Min(), r.Pair.Ratios.Max(), r.NewBytesPerUnit, r.Pair.OtherBusy, r.Pair.CoreBusy, r.Pair.CpuStart, r.Pair.CpuEnd);
+
+    /// <summary>The provenance lines of a crossover part from this host (net10 or net48).</summary>
+    public static Dictionary<string, string> PartHeader(Run run, string timing) => new Dictionary<string, string>
+    {
+        ["head"] = run.Head, ["machine"] = Machine(), ["priority"] = run.Priority, ["allocation"] = Allocated.Method, ["timing"] = timing, ["cf"] = run.CfLine,
+    };
 
     /// <summary>The load check alone, for a run script and its self-check: settle, then with --hold N read N seconds and apply the pair rule.</summary>
     static int SettleCheck(Dictionary<string, string> a)

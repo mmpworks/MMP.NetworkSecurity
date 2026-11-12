@@ -24,13 +24,23 @@ static class AoFileRows
         ("hmac", new[] { "hmac-sha256" }, "HMAC-SHA256 of each file, summed over the file set"),
     };
 
-    public static List<string> Rows(string build, IList<FileRow> fileRows, FileRow small, IList<ThreadRow> threads)
+    /// <summary>Every operation an AO-9 row sums over.</summary>
+    public static IEnumerable<string> AllOps => Groups.SelectMany(g => g.Ops);
+
+    /// <summary>The rows of a one-order run: each ns number is the median ns per call of each copy, summed per group.</summary>
+    public static List<string> Rows(string build, IList<FileRow> fileRows, FileRow small, IList<ThreadRow> threads) =>
+        Rows(build, ops => (Sum(fileRows, ops, r => r.Pair.Original), Sum(fileRows, ops, r => r.Pair.New)),
+            fileRows.Select(r => r.File).Distinct().Count(), small.Pair.Original.MedianNs, small.Pair.New.MedianNs, threads);
+
+    /// <summary>
+    /// The rows from per-group totals: <paramref name="sums"/> gives (original ns, new ns) summed over the file rows of the given
+    /// operations. The crossover passes frozen ns and frozen ns / code ratio, so each row's ratio is the code ratio.
+    /// </summary>
+    public static List<string> Rows(string build, System.Func<string[], (double Original, double New)> sums, int files, double smallOriginal, double smallNew, IList<ThreadRow> threads)
     {
         string suffix = build == "net10" ? "net10" : "cf";
-        int files = fileRows.Select(r => r.File).Distinct().Count();
-        List<string> rows = Groups.Select(g => Row("AO-9." + g.Row + "." + suffix + ".time", true,
-            Sum(fileRows, g.Ops, r => r.Pair.Original), Sum(fileRows, g.Ops, r => r.Pair.New), files, g.Op)).ToList();
-        rows.Add(Row("AO-9.small-message." + suffix + ".time", true, small.Pair.Original.MedianNs, small.Pair.New.MedianNs, 0,
+        List<string> rows = Groups.Select(g => { var s = sums(g.Ops); return Row("AO-9." + g.Row + "." + suffix + ".time", true, s.Original, s.New, files, g.Op); }).ToList();
+        rows.Add(Row("AO-9.small-message." + suffix + ".time", true, smallOriginal, smallNew, 0,
             "one AES-128 key setup plus one GCM seal of 64 bytes"));
         ThreadRow last = threads.Last();
         rows.Add(Row("AO-9.pool-25." + suffix + ".time", threads.All(t => t.Mismatches == 0), MeanWall(threads, "original"), MeanWall(threads, "new"), 1,
