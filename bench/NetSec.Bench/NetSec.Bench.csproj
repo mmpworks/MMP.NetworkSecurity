@@ -1,0 +1,33 @@
+<Project Sdk="Microsoft.NET.Sdk">
+
+  <!-- The algorithm benchmark (Algorithm-Optimization slice S0). It sits outside acceptance/ and outside the gate.
+       net10.0 times the net10.0 build of NetSec.Core. net48 times the CF binaries by HintPath, the same route as
+       tests/NetSec.Tests, so its numbers are "CF binaries on the .NET Framework 4.8 desktop JIT", never CF numbers.
+       No benchmark package: a Stopwatch loop and the runtime's own allocation counters, so the CF-binary run needs nothing new. -->
+
+  <PropertyGroup>
+    <OutputType>Exe</OutputType>
+    <TargetFrameworks>net10.0;net48</TargetFrameworks>
+    <LangVersion>latest</LangVersion>
+    <IsPackable>false</IsPackable>
+    <RootNamespace>NetSec.Bench</RootNamespace>
+    <NoWarn>$(NoWarn);CS1685</NoWarn>
+    <Optimize>true</Optimize>
+    <TieredPGO>true</TieredPGO>
+  </PropertyGroup>
+
+  <ItemGroup Condition="'$(TargetFramework)' == 'net10.0'">
+    <ProjectReference Include="..\..\src\NetSec.Core\NetSec.Core.csproj" />
+    <ProjectReference Include="..\Frozen\NetSec.Bench.Frozen.csproj" />
+  </ItemGroup>
+
+  <ItemGroup Condition="'$(TargetFramework)' == 'net48'">
+    <PackageReference Include="Microsoft.NETFramework.ReferenceAssemblies" Version="1.0.3" PrivateAssets="all" />
+    <ProjectReference Include="..\..\src\NetSec.Core.NetCF\NetSec.Core.NetCF.csproj" ReferenceOutputAssembly="false" SetTargetFramework="TargetFramework=net35" />
+    <Reference Include="NetSec.Core"><HintPath>..\..\src\NetSec.Core.NetCF\bin\$(Configuration)\net35\NetSec.Core.dll</HintPath><Private>true</Private></Reference>
+    <Reference Include="MMP.AsyncProxy"><HintPath>..\..\src\NetSec.Core.NetCF\bin\$(Configuration)\net35\MMP.AsyncProxy.dll</HintPath><Private>true</Private></Reference>
+    <ProjectReference Include="..\Frozen.NetCF\NetSec.Bench.Frozen.NetCF.csproj" ReferenceOutputAssembly="false" SetTargetFramework="TargetFramework=net35" />
+    <Reference Include="Acceptance.Frozen"><HintPath>..\Frozen.NetCF\bin\$(Configuration)\net35\Acceptance.Frozen.dll</HintPath><Private>true</Private></Reference>
+  </ItemGroup>
+
+</Project>
