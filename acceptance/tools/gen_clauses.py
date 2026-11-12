@@ -233,6 +233,7 @@ DRIVER = [("driver", "A13.fresh-clone.acceptance-unchanged", False), ("driver", 
           ("driver", "SELF.suite-compile-break-is-a-fail", False),
           ("driver", "SELF.ao-bench-same-code-rule-bites", False),
           ("driver", "SELF.run-report-has-no-local-path", False),
+          ("driver", "SELF.ao6-speed-target-bites", False),
           ("driver", "AO-0.row-list-matches", False)]
 
 

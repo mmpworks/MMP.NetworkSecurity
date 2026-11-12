@@ -399,3 +399,28 @@ Limits:
 4. A path with a space ends at the space for the last look, so the text after the space stays.
 
 Disposition: keep.
+
+## 24. Before S1 code: the 5x test on 6 rows, the CMAC tag overlap, the static GCM open row (added 2026-11-12)
+
+Conclusion: 4 changes from the design review of slice S1 are in the suite before any S1 code exists.
+
+| Change | Where |
+|---|---|
+| Schema rule 3: from slice S1, each of the 6 net10 AES throughput rows needs a code ratio of 5.00 or more, else FAIL `AO6_BELOW_TARGET`: `AO-6.aes-block.net10`, `AO-6.aes-ecb.net10`, `AO-6.aes-cbc.net10`, `AO-6.aes-ctr.net10`, `AO-6.aes-gcm.net10`, `AO-6.aes-cmac.net10`. Before, the rule judged `AO-6.aes-block.net10` only | `$AoSpeedTargetRows` and `Read-AoBench` in `run.ps1`; rule 3 of `ao-bench-schema.md` |
+| Self-check of rule 3: 4.99 x reads FAIL on each of the 6 rows at S1 and at S4, 5.00 x reads PASS, 4.99 x at S0 only records, and 2 rows outside the rule stay PASS | `SELF.ao6-speed-target-bites` in `run.ps1` |
+| The CMAC tag range against the message range (PRD 7.1.9): the same index and ranges apart are legal, any other overlap is `ARG_RANGES_OVERLAP`. The cases of `aes-cmac-into` and `aes-cmackey-into` draw the 4 aliasings | `FrozenInto.Cmac` and `AoIntoDiff` in `groups/algo/AoInto.cs` |
+| A planted product that skips that check goes red, for `Cmac.Compute` and for `CmacKey.Compute` | `accepts-partial-overlap` in `SELF.ao2-into-control-and-planted-faults` |
+| The bench schema field `runtime` has the name `mergeRuntime`: it is the runtime of the process that merged the parts. The runtime of a row is in its id. The suite does not read the field | `ao-bench-schema.md` |
+| A row for the static `Gcm.TryOpen` wrapper, with the budget of the static `Gcm.Seal` wrapper (PRD 7.3 item 16): both build a `GcmKey` on each call | `AO-5.aes-gcm-static-open.net10` in `groups/algo/AoAlloc.Product.cs`, `ao-rows.tsv`, `ao-budgets.tsv` |
+
+The row list has 210 rows (209 before).
+
+The row set of rule 3 and the value 5.00 were fixed on 2026-11-12, before any S1 code. A change of either is a decision of the lead or of the owner, recorded before the PR that makes it merges.
+
+Limits:
+
+1. Rule 3 judges the numbers of the bench report. The suite cannot prove them; it checks that the report is for the measured code (section 22).
+2. `AO-6.aes-key-setup.net10` is an AES row and no throughput row. Rule 3 does not judge it.
+3. No product has the caller-buffer CMAC forms yet, so the overlap cases have run against the reference model and the planted fault only.
+
+Disposition: keep.

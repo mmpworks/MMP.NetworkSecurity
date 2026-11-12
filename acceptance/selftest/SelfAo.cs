@@ -622,6 +622,8 @@ namespace Acceptance
                 new[] { "aes-ctr-into", "ctr-moves-caller-counter" }, new[] { "aes-gcm-into", "gcm-open-bad-tag-keeps-output" },
                 new[] { "aes-gcm-into", "gcm-short-nonce-padded" }, new[] { "aes-cmackey-into", "cmackey-tag-short" },
                 new[] { "aes-gcm-into", "gcm-overlap-checked-before-nonce" },
+                // A product that skips the overlap check of the CMAC tag range (PRD 7.1.9).
+                new[] { "aes-cmac-into", "accepts-partial-overlap" }, new[] { "aes-cmackey-into", "accepts-partial-overlap" },
             };
             List<string> seen = new List<string>();
             foreach (string[] p in planted)
