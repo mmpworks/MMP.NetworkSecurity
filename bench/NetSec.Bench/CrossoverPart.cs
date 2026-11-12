@@ -65,6 +65,7 @@ static class CrossoverPart
         all["tag"] = tag;
         all["order"] = Swapped(tag) ? "swapped" : "normal";
         all["jit-first"] = JitFirst(tag);
+        using (System.Diagnostics.Process self = System.Diagnostics.Process.GetCurrentProcess()) all["pid"] = self.Id.ToString(Inv);
         foreach (KeyValuePair<string, string> kv in all) s.Append("# ").Append(kv.Key).Append('\t').Append(kv.Value.Replace('\t', ' ')).Append('\n');
         s.Append(Columns).Append('\n');
         foreach (PartRow r in rows)
