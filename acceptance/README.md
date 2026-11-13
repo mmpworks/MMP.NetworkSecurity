@@ -428,3 +428,26 @@ Limits:
 3. No product has the caller-buffer CMAC forms yet, so the overlap cases have run against the reference model and the planted fault only.
 
 Disposition: keep.
+
+## 25. What the row AO-6.aes-gcm.net10 times (added 2026-11-13)
+
+Conclusion: the row `AO-6.aes-gcm.net10` times a held `GcmKey`. The key object is built outside the timed loop.
+
+| Item | Value |
+|---|---|
+| Decision | the owner, 2026-11-13, recorded before the merge of #433 (the S1 code) |
+| The timed call | the seal of a 1024-byte message with no AAD on one `GcmKey`; the unit is one 16-byte block |
+| The baseline | the static `Gcm.Seal` of the 5c5d4a4 code on the same message |
+| Not in this row | the static `Gcm.Seal` and `Gcm.TryOpen` wrappers of the head. They build a `GcmKey` on each call |
+| Where the wrappers are held | `AO-5.aes-gcm-static.net10` and `AO-5.aes-gcm-static-open.net10`, budget 4.875 B per block, tradeoff PR #433. No change |
+| Rule 3 | no change: the 6 rows, a code ratio of 5.00 or more from slice S1 |
+| Where | rule 3 of `ao-bench-schema.md` |
+
+Why this is a rule change and no edit inside a PR: section 24 says that a change of the row set of rule 3 or of 5.00 is a decision of the lead or of the owner. This change keeps both. It changes what one of the 6 rows times, after numbers of the first form were seen. So the owner made the decision, and it was recorded before the S1 code merged.
+
+Limits:
+
+1. The suite reads the numbers of the bench report. It cannot see which call the benchmark timed. The benchmark code and its review hold that.
+2. The S0 bench report (commit 46b2a41) timed the static `Gcm.Seal`, because the S0 code has no `GcmKey`. At S0 the row only records, so that report stays valid for S0.
+
+Disposition: keep.
