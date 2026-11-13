@@ -398,6 +398,8 @@ Limits:
 3. The reports from before this change keep their paths.
 4. A path with a space ends at the space for the last look, so the text after the space stays.
 
+After the review of this change (2026-11-12): the json is written last, and its summary field `localPathLeaks` lists every leak, also one that the last look finds in the md text or in a summary field (`Get-ReportTexts` in `run.ps1`). Before, the field listed the detail leaks only.
+
 Disposition: keep.
 
 ## 24. Before S1 code: the 5x test on 6 rows, the CMAC tag overlap, the static GCM open row (added 2026-11-12)
@@ -424,5 +426,28 @@ Limits:
 1. Rule 3 judges the numbers of the bench report. The suite cannot prove them; it checks that the report is for the measured code (section 22).
 2. `AO-6.aes-key-setup.net10` is an AES row and no throughput row. Rule 3 does not judge it.
 3. No product has the caller-buffer CMAC forms yet, so the overlap cases have run against the reference model and the planted fault only.
+
+Disposition: keep.
+
+## 25. What the row AO-6.aes-gcm.net10 times (added 2026-11-13)
+
+Conclusion: the row `AO-6.aes-gcm.net10` times a held `GcmKey`. The key object is built outside the timed loop.
+
+| Item | Value |
+|---|---|
+| Decision | the owner, 2026-11-13, recorded before the merge of #433 (the S1 code) |
+| The timed call | the seal of a 1024-byte message with no AAD on one `GcmKey`; the unit is one 16-byte block |
+| The baseline | the static `Gcm.Seal` of the 5c5d4a4 code on the same message |
+| Not in this row | the static `Gcm.Seal` and `Gcm.TryOpen` wrappers of the head. They build a `GcmKey` on each call |
+| Where the wrappers are held | `AO-5.aes-gcm-static.net10` and `AO-5.aes-gcm-static-open.net10`, budget 4.875 B per block, tradeoff PR #433. No change |
+| Rule 3 | no change: the 6 rows, a code ratio of 5.00 or more from slice S1 |
+| Where | rule 3 of `ao-bench-schema.md` |
+
+Why this is a rule change and no edit inside a PR: section 24 says that a change of the row set of rule 3 or of 5.00 is a decision of the lead or of the owner. This change keeps both. It changes what one of the 6 rows times, after numbers of the first form were seen. So the owner made the decision, and it was recorded before the S1 code merged.
+
+Limits:
+
+1. The suite reads the numbers of the bench report. It cannot see which call the benchmark timed. The benchmark code and its review hold that.
+2. The S0 bench report (commit 46b2a41) timed the static `Gcm.Seal`, because the S0 code has no `GcmKey`. At S0 the row only records, so that report stays valid for S0.
 
 Disposition: keep.
