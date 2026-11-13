@@ -173,9 +173,10 @@ test('[A17.ui.show-keys-switch] on by default; off replaces key bytes with finge
   await expect(sw, 'the switch can be used. A disabled switch means the app still locks it (V0_LOCKED in ShowKeysSwitch.vue)').toBeEnabled({ timeout: 5_000 });
   await sw.click();
   await expect.poll(async () => (await hostGet('/api/security/show-keys')).body?.on, { timeout: 15_000, message: 'the Host follows the switch to OFF' }).toBe(false);
-  expect(await isOn(), 'the switch reads OFF after the click').toBe(false);
+  await expect.poll(isOn, { timeout: 15_000, message: 'the switch reads OFF after the click' }).toBe(false);
   await expect.poll(async () => /[0-9a-f]{32,}/i.test(await textOf()), { timeout: 15_000, message: 'key bytes leave the panel at once when the switch goes OFF' }).toBe(false);
-  expect(await textOf(), 'OFF: a row shows a fingerprint').toMatch(/fp:[0-9a-f]{8,}/i);
+  // An empty panel also has no key bytes, so the poll above does not prove the fingerprint row has drawn. Poll it too (#424).
+  await expect.poll(textOf, { timeout: 15_000, message: 'OFF: a row shows a fingerprint' }).toMatch(/fp:[0-9a-f]{8,}/i);
   await expect(page.getByText(/Show keys is off/i).first(), 'the OFF banner').toBeVisible();
 
   await sw.click();
