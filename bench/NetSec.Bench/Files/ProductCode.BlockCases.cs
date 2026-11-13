@@ -21,13 +21,15 @@ sealed partial class ProductCode : IBlockCases
     }
 
     public Action Ctr(byte[] key, byte[] counter, byte[] message) { AesKey k = new AesKey(key); return () => Cases.Sink = Modes.Ctr(k, counter, message); }
-    public Action GcmSeal(byte[] key, byte[] nonce, byte[] aad, byte[] message) { AesKey k = new AesKey(key); return () => Cases.Sink = Gcm.Seal(k, nonce, aad, message); }
+    // The GCM rows hold one GcmKey built outside the timed call (AO-6 shape, Steve 2026-11-13); the static form is the 64-byte message row.
+    public Action GcmSeal(byte[] key, byte[] nonce, byte[] aad, byte[] message) { GcmKey g = new GcmKey(new AesKey(key)); return () => Cases.Sink = g.Seal(nonce, aad, message); }
 
     public Action GcmOpen(byte[] key, byte[] nonce, byte[] aad, byte[] message)
     {
         AesKey k = new AesKey(key);
         byte[] sealedBytes = Gcm.Seal(k, nonce, aad, message);
-        return () => { Gcm.TryOpen(k, nonce, aad, sealedBytes, out byte[] plain); Cases.Sink = plain; };
+        GcmKey g = new GcmKey(k);
+        return () => { g.TryOpen(nonce, aad, sealedBytes, out byte[] plain); Cases.Sink = plain; };
     }
 
     public Action Cmac(byte[] key, byte[] message) { AesKey k = new AesKey(key); return () => Cases.Sink = NetSec.Crypto.Cmac.Compute(k, message); }

@@ -14,6 +14,8 @@
     <NoWarn>$(NoWarn);CS1685</NoWarn>
     <Optimize>true</Optimize>
     <EnableDefaultCompileItems>false</EnableDefaultCompileItems>
+    <!-- The SDK that built this binary, read back by CrossoverPart.BuildSdk() into every part header. -->
+    <Description>sdk $(NETCoreSdkVersion)</Description>
   </PropertyGroup>
 
   <ItemGroup>

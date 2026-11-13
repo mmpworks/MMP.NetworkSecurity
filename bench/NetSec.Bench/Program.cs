@@ -88,8 +88,8 @@ static class Program
         File.WriteAllText(Path.Combine(a["out"], "bench-" + run.Build + ".md"), Report.Markdown(run, results));
         if (run.Build == "net10" && filter.Length == 0)
         {
-            AoParts.Write(a["out"], "net10-blocks", Report.AoBlockRows(results));
-            AoParts.Write(a["out"], "net10-alloc", AoAlloc.JsonRows(new Files.ProductCode()));
+            AoParts.Write(a["out"], "net10-blocks", run.Head, Report.AoBlockRows(results));
+            AoParts.Write(a["out"], "net10-alloc", run.Head, AoAlloc.JsonRows(new Files.ProductCode()));
         }
         double[] ratios = results.Select(r => r.Pair.MedianRatio).ToArray();
         Console.WriteLine("BENCH_NOISE " + NoiseBand.Describe(ratios));
