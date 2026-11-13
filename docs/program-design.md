@@ -36,7 +36,7 @@ Consultation. Gems used: `server-replaces-never-merges`, `fail-soft-must-count`,
 
 Root `Directory.Build.props`: `ShouldUnsetParentConfigurationAndPlatform=false`, `Nullable=disable`, `ImplicitUsings=disable`, `TreatWarningsAsErrors=true`, `AsyncProxyRoot` (default `..\MMP.AsyncProxy`). `LangVersion` stays per project. `.gitignore` keeps `bin/`, `obj/`, and CF binaries out (A9). MMP.AsyncProxy stays unchanged.
 
-Folders inside `NetSec.Core`. Dependencies point down the table. `tools/layer_check.py` reads `using` lines and fails on an upward edge, or on `#if NETCF` outside `Platform`.
+Folders inside `NetSec.Core`. Dependencies point down the table. `tools/layer_check.py` reads `using` lines and fails on an upward edge, or on `#if NETCF` outside `Platform`. One named exception: `Crypto/Gf128.cs` may use `#if NETCF` for the GHASH table width (PRD 7.1.7, the lead's ruling on #433).
 | Folder | Public surface | May use |
 |---|---|---|
 | `Bytes`, `Errors` | `ByteReader`, `ByteWriter`, `Hex`, `MiniJson`, `NetSecError`, `ErrorCodes` | nothing |

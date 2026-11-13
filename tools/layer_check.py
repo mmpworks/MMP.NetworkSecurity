@@ -6,6 +6,8 @@ A folder may use folders of its own row and of earlier rows. Three named excepti
   2. Machine/IStepGate.cs uses MMP.AsyncProxy, because the contract keeps IStepGate in Machine.
   3. Bridge, Labs and Native sit above Io and may use it. Only Io, Bridge and Labs may use MMP.AsyncProxy or System.Net.Sockets.
 #if NETCF stays in Platform.
+One named exception comes from PRD 7.1.7 (a NETCF seam at a named place) and the lead's ruling on #433, not from the contract:
+  Crypto/Gf128.cs may use #if NETCF, because the GHASH table width is a build choice and Crypto sits below Platform.
 
 Usage: python tools/layer_check.py src/NetSec.Core
 """
@@ -35,6 +37,8 @@ FULL_BRIDGE = re.compile(r"NetSec\.Bridge\.(?P<member>[A-Za-z0-9_]+)")
 FULL_LABS = re.compile(r"NetSec\.Labs\.(?P<member>[A-Za-z0-9_]+)")
 SIBLING_REFERENCE = re.compile(r"<ProjectReference[^>]*AsyncProxyRoot")
 IF_NETCF = re.compile(r"^\s*#\s*(?:if|elif)\b.*\bNETCF\b", re.M)
+# The GHASH table width: 4-bit on CF for memory on CE, 8-bit on net10 for the AES 5x target (Steve, 2026-11-13); Crypto sits below Platform.
+IF_NETCF_ALLOWED_FILES = {"Crypto/Gf128.cs"}
 
 
 def problems_in(rel, folder, text):
@@ -61,7 +65,7 @@ def problems_in(rel, folder, text):
         for match in FULL_LABS.finditer(text):
             if match.group("member") != "TamperPlan":
                 found.append("%s: Io names NetSec.Labs.%s; only TamperPlan is allowed" % (rel, match.group("member")))
-    if folder != "Platform" and IF_NETCF.search(text):
+    if folder != "Platform" and rel not in IF_NETCF_ALLOWED_FILES and IF_NETCF.search(text):
         found.append("%s: #if NETCF outside Platform" % rel)
     return found
 
