@@ -1,4 +1,4 @@
-"""Builds vectors/x9-24-3-aes-dukpt.nsv from the X9.24-3-2017 test-vector PDF.
+"""Builds vectors/x9-24-3-aes-dukpt.nsv from the X9.24-3-2017 test-vector PDF, or checks the committed file against it.
 
 Source: https://x9.org/wp-content/uploads/2018/03/X9.24-3-2017-Test-Vectors-20180129-1.pdf
 (the PDF is fetched by fetch-x9.ps1 into _cache, hash recorded in sources.lock.json).
@@ -10,8 +10,15 @@ independent AES-ECB implementation (python "cryptography"), then REQUIRES that e
 A value that the PDF does not contain stops the script. So each byte written here is both
 read from the source and reproduced by a second implementation.
 
+The committed file holds only the inputs and expected outputs that the A3 and A17 clauses read (Steve's decision of
+2026-11-11, on Dave's memo: the middle route). The PIN field and PAN field of each PIN block are still checked against
+the PDF, but they are not written. Section 2.3 (the full internal-state traces) is never written to the file.
+
 Run: python -I extract_x9.py <pdf> <out.nsv>
+     python -I extract_x9.py --check <pdf> <committed.nsv>   # the true-copy check: exit 0 when the committed file equals a fresh extraction
 """
+import hashlib
+import os
 import re
 import subprocess
 import sys
@@ -28,6 +35,8 @@ COUNTERS = [1, 2, 3, 4, 5, 6, 7, 8, 0x1FFFE, 0x1FFFF, 0x20000, 0x20001, 0x845FED
 IKID = bytes.fromhex("1234567890123456")
 BDK128 = bytes.fromhex("FEDCBA9876543210F1F1F1F1F1F1F1F1")
 BDK256 = BDK128 + BDK128
+PDF_URL = "https://x9.org/wp-content/uploads/2018/03/X9.24-3-2017-Test-Vectors-20180129-1.pdf"
+SOURCE = "ANSI X9.24-3-2017 supplement (X9.24-3-2017-Test-Vectors-20180129-1.pdf, ASC X9), section 2.2"
 
 
 def ecb(key, block):
@@ -79,19 +88,35 @@ def need_words(value, block_text, what):
     return value.hex()
 
 
-def main(pdf, out_path):
-    text = subprocess.run(["pdftotext", "-layout", pdf, "-"], capture_output=True, text=True, encoding="utf-8", errors="replace", check=True).stdout
-    groups = groups_in(text)
-    lines = [
-        "# AES DUKPT vectors, ANSI X9.24-3-2017 supplement (x9.org test vectors, 2018-01-29).",
+def header(pdf):
+    with open(pdf, "rb") as f:
+        sha = hashlib.sha256(f.read()).hexdigest()
+    return [
+        "# AES DUKPT test vectors from the Supplement to ANSI X9.24-3-2017, Test Vectors, dated 2018-01-29.",
+        "# Source PDF: X9.24-3-2017-Test-Vectors-20180129-1.pdf",
+        "# SHA-256: " + sha,
+        "# URL: " + PDF_URL,
+        "# The values are facts taken from that supplement. The supplement is copyright ASC X9, Inc.",
+        "# ASC X9 has not reviewed or endorsed this project.",
+        "# The MIT licence of this repository covers MMPWorks' code. This file claims no ownership of the values.",
+        "# The values are test data. The keys protect nothing.",
+        "# The file holds inputs and expected outputs only. It holds no text, tables or internal-state traces from the PDF.",
         "# Every value below was recomputed (AES-ECB key derivation) and found in the PDF text.",
         "# Initial key id 1234567890123456. BDK-128 and BDK-256 as printed in section 2.2.",
+        "# Made by acceptance/vectors/tools/extract_x9.py. The true-copy check (SELF.x9-vectors-true-copy) compares this file with a fresh extraction.",
         "",
     ]
+
+
+def build(pdf):
+    """The file text and the count of PIN blocks. A value the PDF lacks stops the script."""
+    text = subprocess.run(["pdftotext", "-layout", pdf, "-"], capture_output=True, text=True, encoding="utf-8", errors="replace", check=True).stdout
+    groups = groups_in(text)
+    lines = header(pdf)
     families = [("aes128-from-aes128", BDK128, 16), ("aes128-from-aes256", BDK256, 16), ("aes256-from-aes256", BDK256, 32)]
     for name, bdk, out_len in families:
         ik = kdf(bdk, 0x8001, len(bdk), IKID, b"")
-        lines += ["[dukpt-%s]" % name, "# source: X9.24-3-2017 supplement section 2.2 (%s)" % name.replace("-", " "), ""]
+        lines += ["[dukpt-%s]" % name, "# source: %s (%s)" % (SOURCE, name.replace("-", " ")), ""]
         for c in COUNTERS:
             dk = derivation_key(ik, c)
             rec = ["bdk = " + bdk.hex(), "ikid = " + IKID.hex(), "counter = %d" % c,
@@ -103,7 +128,7 @@ def main(pdf, out_path):
             lines += rec + [""]
     # All key usages, AES-128 under AES-128 BDK: counters 1..8 and 8675309 (section "All Key Usages").
     ik = kdf(BDK128, 0x8001, 16, IKID, b"")
-    lines += ["[dukpt-all-usages]", "# source: X9.24-3-2017 supplement, 'All Key Usages for Transaction N (AES-128 under AES-128 BDK)'", ""]
+    lines += ["[dukpt-all-usages]", "# source: %s, 'All Key Usages for Transaction N (AES-128 under AES-128 BDK)'" % SOURCE, ""]
     for c in [1, 2, 3, 4, 5, 6, 7, 8, 0x845FED]:
         dk = derivation_key(ik, c)
         rec = ["bdk = " + BDK128.hex(), "ikid = " + IKID.hex(), "counter = %d" % c]
@@ -112,7 +137,7 @@ def main(pdf, out_path):
             rec.append("%s = %s" % (use, need(key, groups, "usage %s ctr %d" % (use, c))))
         lines += rec + [""]
     # PIN block format 4 examples. Plaintext PIN field and PAN field are printed; recompute and check.
-    lines += ["[dukpt-pinblock-format4]", "# source: X9.24-3-2017 supplement, 'Calculation of AES PIN Block (Format 4)', PAN 4111111111111111", ""]
+    lines += ["[dukpt-pinblock-format4]", "# source: %s, 'Calculation of AES PIN Block (Format 4)', PAN 4111111111111111" % SOURCE, ""]
     blocks = re.split(r"Calculation of AES PIN Block \(Format 4\)", text)[1:]
     done = 0
     for blk in blocks:
@@ -128,18 +153,44 @@ def main(pdf, out_path):
         block_a = ecb(key, pin_field)
         block_b = bytes(x ^ y for x, y in zip(block_a, pan_field))
         enc = ecb(key, block_b)
+        # The PIN field and PAN field are intermediate values. No clause reads them, so they are checked here and not written.
+        need(pin_field, groups, "pin field")
+        need(pan_field, groups, "pan field")
         lines += ["pan = 4111111111111111", "pin = " + pin_s, "random = " + rnd.group(1).lower(),
                   "pin_key = " + need(key, groups, "pin block key"),
-                  "pin_field = " + need(pin_field, groups, "pin field"),
-                  "pan_field = " + need(pan_field, groups, "pan field"),
                   "encrypted = " + need_words(enc, blk, "encrypted pin block"), ""]
         done += 1
     if done == 0:
         sys.exit("no PIN block examples recovered")
+    return "\n".join(lines).rstrip() + "\n", done
+
+
+def main(pdf, out_path):
+    body, done = build(pdf)
     with open(out_path, "w", encoding="utf-8", newline="\n") as f:
-        f.write("\n".join(lines).rstrip() + "\n")
+        f.write(body)
     print("wrote", out_path, "pin blocks:", done)
 
 
+def check(pdf, committed):
+    """The true-copy check. Exit 0 when the committed file equals a fresh extraction, 1 when it differs. Line ends compare as LF."""
+    fresh, _ = build(pdf)
+    with open(committed, encoding="utf-8") as f:
+        held = f.read().replace("\r\n", "\n")
+    if held == fresh:
+        print("TRUE_COPY: %s equals a fresh extraction from %s (%d lines)" % (os.path.basename(committed), os.path.basename(pdf), fresh.count("\n")))
+        return 0
+    a, b = held.split("\n"), fresh.split("\n")
+    n = next((i for i in range(min(len(a), len(b))) if a[i] != b[i]), min(len(a), len(b)))
+    print("NOT_A_TRUE_COPY: line %d differs. committed: %r, fresh: %r" % (n + 1, a[n] if n < len(a) else "<end>", b[n] if n < len(b) else "<end>"))
+    return 1
+
+
 if __name__ == "__main__":
+    if sys.argv[1] == "--check":
+        try:
+            sys.exit(check(sys.argv[2], sys.argv[3]))
+        except FileNotFoundError as e:          # pdftotext is not on PATH
+            print("TOOL_MISSING: " + str(e))
+            sys.exit(3)
     main(sys.argv[1], sys.argv[2])

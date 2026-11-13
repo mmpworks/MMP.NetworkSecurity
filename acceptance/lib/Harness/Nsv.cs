@@ -37,8 +37,8 @@ namespace Acceptance
         public static List<VectorRecord> Load(string dir, string file, string group)
         {
             string path = Path.Combine(dir, file);
-            if (!File.Exists(path)) path = Path.Combine(dir, "_cache", file);        // vectors made at run time from a fetched source (X9.24-3) live in _cache
-            if (!File.Exists(path)) throw new NotRunException("VECTORS_MISSING", file + " is not in " + dir + " or its _cache folder. Vectors made from a fetched source need vectors/fetch-x9.ps1 and vectors/tools/extract_x9.py first (run.ps1 does both).");
+            // Every vector file is committed, the X9.24-3 file too (2026-11-11). The _cache folder holds downloaded documents only, so it is never read here.
+            if (!File.Exists(path)) throw new NotRunException("VECTORS_MISSING", file + " is not in " + dir + ". Every vector file is committed; vectors/SOURCES.md names the tool that makes each one.");
             List<VectorRecord> all = new List<VectorRecord>();
             string curGroup = null, source = null;
             VectorRecord rec = null;
