@@ -215,12 +215,19 @@ namespace NetSec.Tests
                 Same(sealedBytes, Gcm.Seal(k, r.Bytes("iv"), r.Bytes("aad"), r.Bytes("plaintext")));
                 Assert.True(Gcm.TryOpen(k, r.Bytes("iv"), r.Bytes("aad"), sealedBytes, out byte[] plain));
                 Same(r.Bytes("plaintext"), plain);
+                // A held GcmKey: on net10 it takes the 8-bit GHASH table, while the static forms above take the 4-bit table.
+                GcmKey held = new GcmKey(k);
+                Same(sealedBytes, held.Seal(r.Bytes("iv"), r.Bytes("aad"), r.Bytes("plaintext")));
+                Assert.True(held.TryOpen(r.Bytes("iv"), r.Bytes("aad"), sealedBytes, out byte[] heldPlain));
+                Same(r.Bytes("plaintext"), heldPlain);
             }
             foreach (var r in VectorFile.Read("gcm-cavp.nsv", "gcm-open-fail"))
             {
                 bool opened = Gcm.TryOpen(new AesKey(r.Bytes("key")), r.Bytes("iv"), r.Bytes("aad"), Join(r.Bytes("ciphertext"), r.Bytes("tag")), out byte[] plain);
                 Assert.False(opened);
                 Assert.Null(plain);
+                Assert.False(new GcmKey(new AesKey(r.Bytes("key"))).TryOpen(r.Bytes("iv"), r.Bytes("aad"), Join(r.Bytes("ciphertext"), r.Bytes("tag")), out byte[] heldPlain));
+                Assert.Null(heldPlain);
             }
         }
 

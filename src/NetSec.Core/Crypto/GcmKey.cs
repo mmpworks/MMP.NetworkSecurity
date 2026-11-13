@@ -17,15 +17,20 @@ namespace NetSec.Crypto
         const int TagSize = 16;
 
         readonly AesKey _key;
-        readonly uint[] _table;   // the products i H of the build's width, 4 words each (Gf128.Table): 16 on CF (256 B), 256 on net10 (4 KB)
+        readonly uint[] _table;   // the products i H, 4 words each (Gf128.Table): 16 at 4 bits (256 B), 256 at 8 bits (4 KB)
 
-        public GcmKey(AesKey key)
+        public GcmKey(AesKey key) : this(key, Gf128.KeyWidth)
+        {
+        }
+
+        /// <summary>A key whose GHASH table has the given width, 4 or 8 bits. The static Gcm forms take 4, so a one-message call stays small.</summary>
+        internal GcmKey(AesKey key, int width)
         {
             Arg.NotNull(key, "key");
             _key = key;
             uint h0 = 0, h1 = 0, h2 = 0, h3 = 0;
             key.EncryptWords(ref h0, ref h1, ref h2, ref h3);   // H = AES of the zero block
-            _table = Gf128.Table(h0, h1, h2, h3);
+            _table = Gf128.Table(width, h0, h1, h2, h3);
         }
 
         // ---- forms that return a new array: the behaviour and the checks of 5c5d4a4's Gcm.Seal and Gcm.TryOpen ----

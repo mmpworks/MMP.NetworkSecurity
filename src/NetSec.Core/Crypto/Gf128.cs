@@ -5,9 +5,10 @@ namespace NetSec.Crypto
     /// standard is the top bit of the first word (rule 7.1.4: no long in a 32-bit loop). Each key builds a table of the products i H;
     /// a multiply then takes the value one table index at a time from its last byte, shifting right and folding the bits that fall off
     /// back in with the reduction table.
-    /// Two widths, one interface: the CF build (NETCF) uses 4-bit indexes, 16 products, 256 bytes per key, because memory on CE is the
-    /// goal there and CLR 2.0 GCM already meets the 5x target with it; the net10 build uses 8-bit indexes, 256 products, 4 KB per key,
-    /// which halves the steps of a block. Each build compiles one width, and its tests and AO rows run that width.
+    /// Two widths, one interface: 4-bit indexes (16 products, 256 bytes per table) and 8-bit indexes (256 products, 4 KB per table,
+    /// half the steps of a block). The CF build (NETCF) compiles only the 4-bit width, because memory on CE is the goal there and
+    /// CLR 2.0 GCM meets the 5x target with it. On net10 a held GcmKey takes the 8-bit width and the static Gcm forms, which build a
+    /// table per call, take the 4-bit width (Steve's 2026-11-13 decision); Multiply reads the width from the table length.
     /// The table lookups use secret indexes, which can leak through a CPU cache, like the AES tables. Lesson 11 measures timing.
     /// </summary>
     static class Gf128
@@ -29,12 +30,12 @@ namespace NetSec.Crypto
         }
 
         /// <summary>
-        /// The products i H for every index of the build's width, 4 words each. The top bit of an index is x^0, so entry 2^(w-1) is H
-        /// and each lower power of two is the one above it times x; every other entry is the xor of the powers of two in it.
+        /// The products i H for every index of the width (4 or 8 bits), 4 words each. The top bit of an index is x^0, so entry 2^(w-1)
+        /// is H and each lower power of two is the one above it times x; every other entry is the xor of the powers of two in it.
         /// </summary>
-        public static uint[] Table(uint h0, uint h1, uint h2, uint h3)
+        public static uint[] Table(int width, uint h0, uint h1, uint h2, uint h3)
         {
-            int entries = Width == 8 ? 256 : 16;
+            int entries = 1 << width;
             uint[] t = new uint[4 * entries];
             int top = entries >> 1;
             Set(t, top, h0, h1, h2, h3);
@@ -62,18 +63,36 @@ namespace NetSec.Crypto
         public static void Multiply(uint[] t, ref uint y0, ref uint y1, ref uint y2, ref uint y3)
         {
             uint z0 = 0, z1 = 0, z2 = 0, z3 = 0;
-            Fold(t, y3, ref z0, ref z1, ref z2, ref z3);
-            Fold(t, y2, ref z0, ref z1, ref z2, ref z3);
-            Fold(t, y1, ref z0, ref z1, ref z2, ref z3);
-            Fold(t, y0, ref z0, ref z1, ref z2, ref z3);
+#if !NETCF
+            if (t.Length != Narrow)
+            {
+                Fold8(t, y3, ref z0, ref z1, ref z2, ref z3);
+                Fold8(t, y2, ref z0, ref z1, ref z2, ref z3);
+                Fold8(t, y1, ref z0, ref z1, ref z2, ref z3);
+                Fold8(t, y0, ref z0, ref z1, ref z2, ref z3);
+                y0 = z0; y1 = z1; y2 = z2; y3 = z3;
+                return;
+            }
+#endif
+            Fold4(t, y3, ref z0, ref z1, ref z2, ref z3);
+            Fold4(t, y2, ref z0, ref z1, ref z2, ref z3);
+            Fold4(t, y1, ref z0, ref z1, ref z2, ref z3);
+            Fold4(t, y0, ref z0, ref z1, ref z2, ref z3);
             y0 = z0; y1 = z1; y2 = z2; y3 = z3;
         }
 
+        /// <summary>The width a held GcmKey takes: 4 on CF, 8 on net10.</summary>
 #if NETCF
-        const int Width = 4;
+        internal const int KeyWidth = 4;
+#else
+        internal const int KeyWidth = 8;
+#endif
+
+        /// <summary>The length in words of a 4-bit table.</summary>
+        const int Narrow = 4 * 16;
 
         /// <summary>The 8 nibble steps of one word of y: bytes low to high, each low nibble then high nibble.</summary>
-        static void Fold(uint[] t, uint word, ref uint z0, ref uint z1, ref uint z2, ref uint z3)
+        static void Fold4(uint[] t, uint word, ref uint z0, ref uint z1, ref uint z2, ref uint z3)
         {
             ushort[] r = Reduce4;
             for (int shift = 0; shift < 32; shift += 4)
@@ -87,9 +106,8 @@ namespace NetSec.Crypto
                 z0 ^= t[at]; z1 ^= t[at + 1]; z2 ^= t[at + 2]; z3 ^= t[at + 3];
             }
         }
-#else
-        const int Width = 8;
 
+#if !NETCF
         /// <summary>
         /// Entry i: the reduction of 8 bits that fall off, the xor over the set bits b of i of 0xE1000 shifted right by 7 - b. It equals two
         /// 4-bit steps, Reduce4[i &amp; 15] ^ (Reduce4[i &gt;&gt; 4] &lt;&lt; 4), and it folds in at bit 12 of the top word.
@@ -121,7 +139,7 @@ namespace NetSec.Crypto
         };
 
         /// <summary>The 4 byte steps of one word of y, low byte to high.</summary>
-        static void Fold(uint[] t, uint word, ref uint z0, ref uint z1, ref uint z2, ref uint z3)
+        static void Fold8(uint[] t, uint word, ref uint z0, ref uint z1, ref uint z2, ref uint z3)
         {
             uint[] r = Reduce8;
             for (int shift = 0; shift < 32; shift += 8)
