@@ -112,7 +112,7 @@ OF THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
 ## 7. Not in this repository
 
 1. The .NET Compact Framework 3.5 reference assemblies (`E:\dev\tools\netcf35-ref`). They are Microsoft files, kept out of the repository, and the acceptance suite checks that no CF binary is committed.
-2. The X9.24-3 test vectors. The PRD licence checklist keeps them behind a fetch script and out of the repository.
+2. The X9.24-3-2017 test vector document (an ASC X9 PDF). It stays out of the repository. `acceptance/vectors/fetch-x9.ps1` downloads it for the self-check `SELF.x9-vectors-true-copy`. The vector values are in the repository, in our own format, in `acceptance/vectors/x9-24-3-aes-dukpt.nsv`; `acceptance/vectors/SOURCES.md` names their source.
 3. MMP.AsyncProxy. It is a sibling project of the same owner, referenced by path.
 4. OpenSSL and the Go toolchain. The referee tests run them from the machine. They are not copied here.
 
